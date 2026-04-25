@@ -5,7 +5,28 @@
       "Bash(npx --yes shadcn@latest init --help)",
       "Bash(npx --yes shadcn@latest init -d -y -f)",
       "Bash(npm install *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(npx tsc *)",
+      "Bash(npx --yes shadcn@latest add progress -y)",
+      "Bash(npm run *)",
+      "Bash(break)",
+      "Bash(taskkill *)",
+      "Bash(cmd *)",
+      "Skill(claude-api)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(npm uninstall *)",
+      "Bash(npx --yes shadcn@latest add dialog input textarea badge -y)",
+      "Bash(yes n *)",
+      "Bash(npx --yes shadcn@latest add dialog input textarea badge --no-reinstall)",
+      "Bash(npx --yes shadcn@latest add dialog input textarea badge)",
+      "Bash(mkdir -p \"C:/dev/rennovaite/app/project/[id]/style\")",
+      "Bash(mkdir -p \"C:/dev/rennovaite/app/project/[id]/plan/_components\")",
+      "Bash(mkdir -p \"C:/dev/rennovaite/app/project/[id]/style/_components\")",
+      "Bash(mkdir -p \"C:/dev/rennovaite/app/project/[id]/render\")",
+      "Bash(mkdir -p design-refs)",
+      "Bash(touch design-refs/.gitkeep-test)",
+      "Bash(rm -rf design-refs)",
+      "Bash(curl *)"
     ]
   }
 }
