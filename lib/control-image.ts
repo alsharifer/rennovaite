@@ -1,26 +1,43 @@
 import { createCanvas } from "@napi-rs/canvas";
 
-// Output a wireframe-box "child's drawing" of an empty room as a base64 PNG.
-// Intended as a control input for Flux Canny — only crisp black edges + a
-// white background. No fills, no shading, no doors/windows.
+// Two control-image variants for Flux:
+//
+//   buildControlImageBase64       — black-on-white edge map for flux-*-canny.
+//                                   One-point perspective interior sketch:
+//                                   back wall + four perspective lines + a
+//                                   window cue on the right wall.
+//
+//   buildDepthControlImageBase64  — greyscale depth map for flux-*-depth.
+//                                   Same perspective layout as the canny
+//                                   variant but rendered as smooth gradients
+//                                   (white = near camera, dark = far).
+//
+// Both treat the polygon as a rectangle (use its bbox aspect) and recover
+// real-world width/depth in metres from area_m2. Output: 1024×768 base64 PNG.
 
 const CANVAS_W = 1024;
 const CANVAS_H = 768;
 const CEIL_H_M = 3.0;
-const COS30 = Math.cos(Math.PI / 6); // ≈ 0.866
-const SIN30 = Math.sin(Math.PI / 6); // = 0.5
+
+// Canny edge-map look.
 const STROKE_PX = 3;
 const STROKE_COLOR = "#000000";
 const FILL_BG = "#FFFFFF";
-const MARGIN_PX = 80;
+
+// Depth map look. White = near, dark = far.
+const DEPTH_NEAR = "#FFFFFF";
+const DEPTH_FAR = "#1A1A1A";
 
 type Point2D = [number, number];
-type Point3D = [number, number, number];
 
 type RoomLike = {
   polygon: unknown;
   area_m2: number | null;
 };
+
+// ---------------------------------------------------------------------------
+// Geometry helpers (shared by both variants)
+// ---------------------------------------------------------------------------
 
 function parsePolygon(value: unknown): Point2D[] | null {
   if (!Array.isArray(value)) return null;
@@ -35,16 +52,20 @@ function parsePolygon(value: unknown): Point2D[] | null {
   return pts.length >= 3 ? pts : null;
 }
 
-// Pick the polygon's bounding-box width/height in viewBox units, then use the
-// known area_m2 to recover real-world width and depth in metres.
+function clamp(value: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, value));
+}
+
+// Photographer's convention: shoot the LONGER axis of the room so depth
+// perspective reads. So depth = max(real width, real height); width = min.
 function realWorldDimensions(
   polygon: Point2D[],
   areaM2: number,
 ): { widthM: number; depthM: number } {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (const [x, y] of polygon) {
     if (x < minX) minX = x;
     if (y < minY) minY = y;
@@ -54,78 +75,67 @@ function realWorldDimensions(
   const bboxW = Math.max(maxX - minX, 1e-6);
   const bboxH = Math.max(maxY - minY, 1e-6);
   const aspect = bboxW / bboxH;
-  const safeArea = Math.max(areaM2, 1);
-  const widthM = Math.sqrt(safeArea * aspect);
-  const depthM = Math.sqrt(safeArea / aspect);
-  return { widthM, depthM };
+  const area = Math.max(areaM2, 1);
+  const dimA = Math.sqrt(area * aspect);
+  const dimB = Math.sqrt(area / aspect);
+  return {
+    depthM: Math.max(dimA, dimB),
+    widthM: Math.min(dimA, dimB),
+  };
 }
 
-// Standard 30°/30° isometric. World axes:
-//   x → screen lower-right (cos30, sin30)
-//   y → screen lower-left  (-cos30, sin30)
-//   z → screen straight up (0, -1)
-function isoProject([x, y, z]: Point3D): Point2D {
-  return [(x - y) * COS30, (x + y) * SIN30 - z];
+// Back wall sized by room aspect. Deep narrow rooms → smaller, more recessed
+// back wall. Wide shallow rooms → larger, less recessed.
+function backWallRect(widthM: number, depthM: number) {
+  const aspect = widthM / depthM; // ≤ 1 because of how realWorldDimensions sorts
+  const fracW = clamp(0.25 + 0.15 * aspect, 0.25, 0.6);
+  const fracH = clamp(0.35 + 0.05 * aspect, 0.35, 0.55);
+  const w = fracW * CANVAS_W;
+  const h = fracH * CANVAS_H;
+  const cx = CANVAS_W / 2;
+  const cy = CANVAS_H / 2;
+  return {
+    left: cx - w / 2,
+    right: cx + w / 2,
+    top: cy - h / 2,
+    bottom: cy + h / 2,
+    width: w,
+    height: h,
+  };
 }
+
+// Locate a point on the inside face of the right side wall.
+// t   ∈ [0, 1]: 0 = back of the wall (touching back-wall right edge),
+//                1 = front of the wall (touching canvas right edge).
+// vFrac ∈ [0, 1]: 0 = top of wall at this depth, 1 = bottom.
+function pointOnRightWall(
+  back: ReturnType<typeof backWallRect>,
+  t: number,
+  vFrac: number,
+): Point2D {
+  const x = back.right + t * (CANVAS_W - back.right);
+  const yTop = back.top * (1 - t); // canvas top is y=0
+  const yBot = back.bottom + t * (CANVAS_H - back.bottom);
+  return [x, yTop + vFrac * (yBot - yTop)];
+}
+
+// ---------------------------------------------------------------------------
+// Canny variant — black lines on white
+// ---------------------------------------------------------------------------
 
 export async function buildControlImageBase64(
   room: RoomLike,
 ): Promise<string> {
   const polygon = parsePolygon(room.polygon);
-  if (!polygon) {
-    throw new Error("Room polygon is missing or malformed.");
-  }
+  if (!polygon) throw new Error("Room polygon is missing or malformed.");
 
-  const { widthM, depthM } = realWorldDimensions(
-    polygon,
-    room.area_m2 ?? 0,
-  );
+  const { widthM, depthM } = realWorldDimensions(polygon, room.area_m2 ?? 0);
+  // depthM is implicitly the camera distance to the back wall; CEIL_H_M is
+  // unused in the perspective layout because the back-wall fractions already
+  // encode "how far back". Reference here keeps the model honest.
+  void CEIL_H_M;
 
-  // Eight corners of the box.
-  // 0..3 — floor: (0,0,0), (W,0,0), (W,D,0), (0,D,0)
-  // 4..7 — ceiling at z = ceiling height
-  const verts3D: Point3D[] = [
-    [0, 0, 0],
-    [widthM, 0, 0],
-    [widthM, depthM, 0],
-    [0, depthM, 0],
-    [0, 0, CEIL_H_M],
-    [widthM, 0, CEIL_H_M],
-    [widthM, depthM, CEIL_H_M],
-    [0, depthM, CEIL_H_M],
-  ];
-
-  // Project to raw 2D, then auto-fit into the canvas.
-  const raw = verts3D.map(isoProject);
-  let pMinX = Infinity;
-  let pMinY = Infinity;
-  let pMaxX = -Infinity;
-  let pMaxY = -Infinity;
-  for (const [px, py] of raw) {
-    if (px < pMinX) pMinX = px;
-    if (py < pMinY) pMinY = py;
-    if (px > pMaxX) pMaxX = px;
-    if (py > pMaxY) pMaxY = py;
-  }
-  const projW = pMaxX - pMinX;
-  const projH = pMaxY - pMinY;
-  const availW = CANVAS_W - 2 * MARGIN_PX;
-  const availH = CANVAS_H - 2 * MARGIN_PX;
-  const scale = Math.min(availW / projW, availH / projH);
-  const offsetX = (CANVAS_W - projW * scale) / 2 - pMinX * scale;
-  const offsetY = (CANVAS_H - projH * scale) / 2 - pMinY * scale;
-
-  const verts: Point2D[] = raw.map(([px, py]) => [
-    px * scale + offsetX,
-    py * scale + offsetY,
-  ]);
-
-  // 12 edges of the box: 4 floor + 4 ceiling + 4 vertical risers.
-  const edges: ReadonlyArray<readonly [number, number]> = [
-    [0, 1], [1, 2], [2, 3], [3, 0], // floor
-    [4, 5], [5, 6], [6, 7], [7, 4], // ceiling
-    [0, 4], [1, 5], [2, 6], [3, 7], // verticals
-  ];
+  const back = backWallRect(widthM, depthM);
 
   const canvas = createCanvas(CANVAS_W, CANVAS_H);
   const ctx = canvas.getContext("2d");
@@ -138,12 +148,145 @@ export async function buildControlImageBase64(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  for (const [a, b] of edges) {
+  // Back wall outline
+  ctx.strokeRect(back.left, back.top, back.width, back.height);
+
+  // Four perspective lines from each back-wall corner to the matching canvas
+  // corner. These define the side walls, floor, and ceiling trapezoids.
+  const lines: Array<[number, number, number, number]> = [
+    [back.left, back.top, 0, 0],
+    [back.right, back.top, CANVAS_W, 0],
+    [back.left, back.bottom, 0, CANVAS_H],
+    [back.right, back.bottom, CANVAS_W, CANVAS_H],
+  ];
+  for (const [x1, y1, x2, y2] of lines) {
     ctx.beginPath();
-    ctx.moveTo(verts[a][0], verts[a][1]);
-    ctx.lineTo(verts[b][0], verts[b][1]);
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
     ctx.stroke();
   }
+
+  // Window cue on the right wall (small parallelogram in perspective).
+  const winCorners = [
+    pointOnRightWall(back, 0.32, 0.25),
+    pointOnRightWall(back, 0.6, 0.25),
+    pointOnRightWall(back, 0.6, 0.65),
+    pointOnRightWall(back, 0.32, 0.65),
+  ];
+  ctx.beginPath();
+  ctx.moveTo(winCorners[0][0], winCorners[0][1]);
+  for (let i = 1; i < winCorners.length; i++) {
+    ctx.lineTo(winCorners[i][0], winCorners[i][1]);
+  }
+  ctx.closePath();
+  ctx.stroke();
+
+  return canvas.toBuffer("image/png").toString("base64");
+}
+
+// ---------------------------------------------------------------------------
+// Depth variant — greyscale gradients (white = near, dark = far)
+// ---------------------------------------------------------------------------
+
+export async function buildDepthControlImageBase64(
+  room: RoomLike,
+): Promise<string> {
+  const polygon = parsePolygon(room.polygon);
+  if (!polygon) throw new Error("Room polygon is missing or malformed.");
+
+  const { widthM, depthM } = realWorldDimensions(polygon, room.area_m2 ?? 0);
+  const back = backWallRect(widthM, depthM);
+
+  const canvas = createCanvas(CANVAS_W, CANVAS_H);
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = DEPTH_NEAR;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Helper: clip to a polygon, then fill with a linear gradient between two
+  // points (in canvas coords). near/far stops describe depth, not screen pos.
+  function fillTrapezoidWithGradient(
+    polygon: Point2D[],
+    farX: number,
+    farY: number,
+    nearX: number,
+    nearY: number,
+  ) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(polygon[0][0], polygon[0][1]);
+    for (let i = 1; i < polygon.length; i++) {
+      ctx.lineTo(polygon[i][0], polygon[i][1]);
+    }
+    ctx.closePath();
+    ctx.clip();
+    const grad = ctx.createLinearGradient(farX, farY, nearX, nearY);
+    grad.addColorStop(0, DEPTH_FAR);
+    grad.addColorStop(1, DEPTH_NEAR);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.restore();
+  }
+
+  // Floor: top edge at back-wall bottom (FAR), bottom edge at canvas bottom (NEAR)
+  fillTrapezoidWithGradient(
+    [
+      [back.left, back.bottom],
+      [back.right, back.bottom],
+      [CANVAS_W, CANVAS_H],
+      [0, CANVAS_H],
+    ],
+    0,
+    back.bottom,
+    0,
+    CANVAS_H,
+  );
+
+  // Ceiling: bottom edge at back-wall top (FAR), top edge at canvas top (NEAR)
+  fillTrapezoidWithGradient(
+    [
+      [0, 0],
+      [CANVAS_W, 0],
+      [back.right, back.top],
+      [back.left, back.top],
+    ],
+    0,
+    back.top,
+    0,
+    0,
+  );
+
+  // Left wall: right edge at back-wall left (FAR), left edge at canvas left (NEAR)
+  fillTrapezoidWithGradient(
+    [
+      [0, 0],
+      [back.left, back.top],
+      [back.left, back.bottom],
+      [0, CANVAS_H],
+    ],
+    back.left,
+    0,
+    0,
+    0,
+  );
+
+  // Right wall: left edge at back-wall right (FAR), right edge at canvas right (NEAR)
+  fillTrapezoidWithGradient(
+    [
+      [CANVAS_W, 0],
+      [CANVAS_W, CANVAS_H],
+      [back.right, back.bottom],
+      [back.right, back.top],
+    ],
+    back.right,
+    0,
+    CANVAS_W,
+    0,
+  );
+
+  // Back wall: solid FAR — all of it at one depth.
+  ctx.fillStyle = DEPTH_FAR;
+  ctx.fillRect(back.left, back.top, back.width, back.height);
 
   return canvas.toBuffer("image/png").toString("base64");
 }

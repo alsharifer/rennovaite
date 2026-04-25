@@ -108,7 +108,11 @@ export default async function RenderPage({
             </div>
           ) : (
             <div className="mt-10">
-              <RenderInteractive rooms={roomList} style={style} />
+              <RenderInteractive
+                projectId={project.id}
+                rooms={roomList}
+                style={style}
+              />
             </div>
           )}
         </FadeIn>

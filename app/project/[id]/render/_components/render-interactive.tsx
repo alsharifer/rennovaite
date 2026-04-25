@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertTriangle,
+  ChevronDown,
+  Loader2,
+  RotateCcw,
+  Send,
+  Sparkles,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,81 +24,192 @@ type RoomLite = {
 };
 
 type Props = {
+  projectId: string;
   rooms: RoomLite[];
   style: Style | null;
 };
 
-const FAKE_GENERATION_MS = 3000;
+type RenderResult = { imageUrl: string; prompt: string };
 
-export function RenderInteractive({ rooms, style }: Props) {
-  // Default selection: master bedroom if present, otherwise first room.
-  const defaultSelectedId =
+type RenderResponse = {
+  render_id: string;
+  image_url: string;
+  prompt: string;
+};
+
+const TIPS = [
+  "Mixing the paint",
+  "Placing the light fixtures",
+  "Rolling out the rug",
+  "Adjusting the throw pillow",
+  "Telling the cat to leave",
+] as const;
+const TIP_INTERVAL_MS = 6000;
+
+// Default selection: first bedroom-type room (master first, then secondary).
+function pickDefaultRoomId(rooms: RoomLite[]): string | null {
+  return (
     rooms.find((r) => r.room_type === "master_bedroom")?.id ??
+    rooms.find((r) => r.room_type === "bedroom")?.id ??
     rooms[0]?.id ??
-    null;
+    null
+  );
+}
 
-  const [selectedId, setSelectedId] = useState<string | null>(defaultSelectedId);
-  // Map of roomId → render placeholder marker. In a real implementation
-  // this would be the URL returned by Replicate; for now any non-null
-  // value means "this room has been rendered".
-  const [renders, setRenders] = useState<Record<string, true>>({});
+export function RenderInteractive({ projectId, rooms, style }: Props) {
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    pickDefaultRoomId(rooms),
+  );
+  const [renders, setRenders] = useState<Record<string, RenderResult>>({});
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [chat, setChat] = useState("");
+  const [tipIndex, setTipIndex] = useState(0);
+  const [promptExpanded, setPromptExpanded] = useState(false);
 
   const selectedRoom = rooms.find((r) => r.id === selectedId) ?? null;
-  const hasRender = selectedRoom ? renders[selectedRoom.id] === true : false;
+  const result = selectedRoom ? (renders[selectedRoom.id] ?? null) : null;
   const isGeneratingThis =
     selectedRoom !== null && generatingId === selectedRoom.id;
 
+  // Rotate the humorous tip while a render is in flight.
+  useEffect(() => {
+    if (!generatingId) return;
+    setTipIndex(0);
+    const interval = setInterval(() => {
+      setTipIndex((i) => (i + 1) % TIPS.length);
+    }, TIP_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [generatingId]);
+
+  // Reset the prompt expansion when the selection or render changes.
+  useEffect(() => {
+    setPromptExpanded(false);
+  }, [selectedId, result?.imageUrl]);
+
+  const callRender = async (
+    roomId: string,
+    tweak?: string,
+  ): Promise<RenderResponse> => {
+    const res = await fetch("/api/render", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_id: projectId,
+        room_id: roomId,
+        ...(tweak ? { tweak } : {}),
+      }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | RenderResponse
+      | { error?: string }
+      | null;
+    if (!res.ok || !body || !("image_url" in body)) {
+      const msg =
+        body && typeof body === "object" && "error" in body && body.error
+          ? body.error
+          : `Render failed (${res.status}).`;
+      throw new Error(msg);
+    }
+    return body;
+  };
+
+  const runRender = async (roomId: string, tweak?: string) => {
+    setGeneratingId(roomId);
+    setError(null);
+    try {
+      const result = await callRender(roomId, tweak);
+      setRenders((prev) => ({
+        ...prev,
+        [roomId]: { imageUrl: result.image_url, prompt: result.prompt },
+      }));
+    } catch (err) {
+      console.error("[render] error", err);
+      setError(err instanceof Error ? err.message : "Render failed.");
+    } finally {
+      setGeneratingId((current) => (current === roomId ? null : current));
+    }
+  };
+
   const handleGenerate = () => {
     if (!selectedRoom) return;
-    const id = selectedRoom.id;
-    setGeneratingId(id);
-    setTimeout(() => {
-      setRenders((prev) => ({ ...prev, [id]: true }));
-      setGeneratingId((current) => (current === id ? null : current));
-    }, FAKE_GENERATION_MS);
+    void runRender(selectedRoom.id);
   };
+
+  const handleRetry = () => {
+    if (!selectedRoom) return;
+    void runRender(selectedRoom.id);
+  };
+
+  const handleSendTweak = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRoom) return;
+    const tweak = chat.trim();
+    if (!tweak) return;
+    setChat("");
+    void runRender(selectedRoom.id, tweak);
+  };
+
+  const hasRender = result !== null;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
       <RoomList
         rooms={rooms}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={(id) => {
+          setSelectedId(id);
+          setError(null);
+        }}
         renders={renders}
       />
       <div className="flex flex-col gap-4">
         <RenderCanvas
           room={selectedRoom}
           style={style}
-          rendered={hasRender}
+          result={result}
           generating={isGeneratingThis}
+          error={error}
+          tipIndex={tipIndex}
           onGenerate={handleGenerate}
+          onRetry={handleRetry}
         />
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            // No-op for now; real flow lands tomorrow.
-            setChat("");
-          }}
-        >
+
+        {result && (
+          <PromptToggle
+            prompt={result.prompt}
+            expanded={promptExpanded}
+            onToggle={() => setPromptExpanded((e) => !e)}
+          />
+        )}
+
+        <form className="flex items-center gap-2" onSubmit={handleSendTweak}>
           <Input
             value={chat}
             onChange={(e) => setChat(e.target.value)}
             placeholder="Tell me how to change it…"
-            disabled={!hasRender}
+            disabled={!hasRender || isGeneratingThis}
             className="flex-1 border-bg-border bg-bg-elevated text-text-primary placeholder:text-text-tertiary disabled:opacity-50"
           />
           <Button
             type="submit"
             size="lg"
-            disabled={!hasRender || chat.trim().length === 0}
+            disabled={
+              !hasRender || isGeneratingThis || chat.trim().length === 0
+            }
             className="shrink-0"
           >
-            <Send />
-            Send
+            {isGeneratingThis ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Sending…
+              </>
+            ) : (
+              <>
+                <Send />
+                Send
+              </>
+            )}
           </Button>
         </form>
       </div>
@@ -109,7 +228,7 @@ function RoomList({
   rooms: RoomLite[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  renders: Record<string, true>;
+  renders: Record<string, RenderResult>;
 }) {
   return (
     <aside className="flex flex-col gap-2">
@@ -119,7 +238,7 @@ function RoomList({
       <div className="flex flex-col gap-1.5">
         {rooms.map((room) => {
           const active = selectedId === room.id;
-          const done = renders[room.id] === true;
+          const done = renders[room.id] !== undefined;
           return (
             <button
               key={room.id}
@@ -161,15 +280,21 @@ function RoomList({
 function RenderCanvas({
   room,
   style,
-  rendered,
+  result,
   generating,
+  error,
+  tipIndex,
   onGenerate,
+  onRetry,
 }: {
   room: RoomLite | null;
   style: Style | null;
-  rendered: boolean;
+  result: RenderResult | null;
   generating: boolean;
+  error: string | null;
+  tipIndex: number;
   onGenerate: () => void;
+  onRetry: () => void;
 }) {
   if (!room) {
     return (
@@ -179,66 +304,148 @@ function RenderCanvas({
     );
   }
 
-  const c1 = style?.palette[0] ?? "#1F1830";
-  const c2 = style?.palette[1] ?? "#0B0712";
-
   return (
     <div className="overflow-hidden rounded-xl border border-bg-border bg-bg-elevated/60 backdrop-blur-sm">
       <div className="relative aspect-[16/10] w-full">
-        {rendered ? (
-          <div
-            className="flex h-full w-full items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}
-          >
-            <div className="text-center text-white">
-              {style && (
-                <p className="text-xs uppercase tracking-[0.2em] opacity-80">
-                  {style.name_en}
-                </p>
-              )}
-              <p className="mt-2 font-display text-3xl font-semibold tracking-tight">
-                {room.name_en?.trim() || "Room"}
-              </p>
-              <p className="mt-1 text-xs opacity-60">
-                Render placeholder · Replicate wires up tomorrow
-              </p>
-            </div>
-          </div>
+        {generating ? (
+          <GeneratingState tipIndex={tipIndex} />
+        ) : error ? (
+          <ErrorState onRetry={onRetry} />
+        ) : result ? (
+          <motion.img
+            key={result.imageUrl}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            src={result.imageUrl}
+            alt={`${style?.name_en ?? "Style"} render of ${room.name_en?.trim() || "room"}`}
+            className="h-full w-full object-cover"
+          />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-brand-primary/15 text-brand-primary">
-              <Sparkles className="size-6" />
-            </div>
-            <div>
-              <p className="font-display text-xl font-semibold text-text-primary">
-                Ready to render
-              </p>
-              <p className="mt-1 text-sm text-text-secondary">
-                We'll generate a {style?.name_en ?? "default-style"} render of{" "}
-                {room.name_en?.trim() || "this room"}.
-              </p>
-            </div>
-            <Button
-              size="lg"
-              onClick={onGenerate}
-              disabled={generating}
-              className="min-w-[180px]"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <Sparkles />
-                  Generate render
-                </>
-              )}
-            </Button>
-          </div>
+          <ReadyState
+            roomName={room.name_en?.trim() || "this room"}
+            styleName={style?.name_en ?? "default-style"}
+            onGenerate={onGenerate}
+          />
         )}
       </div>
+    </div>
+  );
+}
+
+function GeneratingState({ tipIndex }: { tipIndex: number }) {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center">
+      <Loader2 className="size-10 animate-spin text-brand-primary" />
+      <div>
+        <p className="font-display text-xl font-semibold text-text-primary">
+          Rendering… (this takes 30 seconds)
+        </p>
+        <div className="mt-2 h-5 text-sm text-text-secondary">
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={tipIndex}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="inline-block"
+            >
+              {TIPS[tipIndex]}…
+            </motion.span>
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-status-warning/15 text-status-warning">
+        <AlertTriangle className="size-6" />
+      </div>
+      <p className="font-display text-xl font-semibold text-text-primary">
+        We couldn&rsquo;t render that one. Try again?
+      </p>
+      <Button size="lg" onClick={onRetry} className="min-w-[160px]">
+        <RotateCcw />
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function ReadyState({
+  roomName,
+  styleName,
+  onGenerate,
+}: {
+  roomName: string;
+  styleName: string;
+  onGenerate: () => void;
+}) {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center">
+      <div className="flex size-14 items-center justify-center rounded-full bg-brand-primary/15 text-brand-primary">
+        <Sparkles className="size-6" />
+      </div>
+      <div>
+        <p className="font-display text-xl font-semibold text-text-primary">
+          Ready to render
+        </p>
+        <p className="mt-1 text-sm text-text-secondary">
+          We&rsquo;ll generate a {styleName} render of {roomName}.
+        </p>
+      </div>
+      <Button size="lg" onClick={onGenerate} className="min-w-[180px]">
+        <Sparkles />
+        Generate render
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function PromptToggle({
+  prompt,
+  expanded,
+  onToggle,
+}: {
+  prompt: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="text-xs text-text-tertiary">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="inline-flex items-center gap-1 rounded-md text-text-tertiary transition-colors hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
+      >
+        <ChevronDown
+          className={cn(
+            "size-3.5 transition-transform duration-200",
+            expanded && "rotate-180",
+          )}
+        />
+        {expanded ? "Hide prompt" : "Show prompt"}
+      </button>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="mt-2 leading-relaxed"
+          >
+            {prompt}
+          </motion.p>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
