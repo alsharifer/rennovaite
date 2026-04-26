@@ -26,7 +26,11 @@
       "Bash(mkdir -p design-refs)",
       "Bash(touch design-refs/.gitkeep-test)",
       "Bash(rm -rf design-refs)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(git mv *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
