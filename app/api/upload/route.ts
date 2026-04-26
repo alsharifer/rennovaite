@@ -100,8 +100,15 @@ export async function POST(request: NextRequest) {
         .delete()
         .eq("id", createdProjectId);
     }
+    // Supabase throws plain objects with `.message`, not Error instances —
+    // `err instanceof Error` would miss those and fall back to the generic
+    // string. Pull `.message` off any object that has one.
     const message =
-      err instanceof Error ? err.message : "Upload failed unexpectedly.";
+      err instanceof Error
+        ? err.message
+        : err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "Upload failed unexpectedly.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
