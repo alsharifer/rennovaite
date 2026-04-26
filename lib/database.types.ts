@@ -206,6 +206,52 @@ export type Database = {
           },
         ];
       };
+      approved_designs: {
+        Row: {
+          id: string;
+          project_id: string | null;
+          room_id: string | null;
+          render_id: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          project_id?: string | null;
+          room_id?: string | null;
+          render_id?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          project_id?: string | null;
+          room_id?: string | null;
+          render_id?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "approved_designs_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "approved_designs_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "approved_designs_render_id_fkey";
+            columns: ["render_id"];
+            isOneToOne: false;
+            referencedRelation: "renders";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       boqs: {
         Row: {
           id: string;

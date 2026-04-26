@@ -161,6 +161,28 @@ export async function POST(request: NextRequest) {
       prompt = `${prompt} — modified: ${tweak.trim()}`;
     }
 
+    // Cache check: if a render with this exact prompt for this room already
+    // exists, return it instead of paying Replicate again. This handles the
+    // case where the user navigates back to a room they already rendered.
+    const { data: existing } = await supabase
+      .from("renders")
+      .select("id, image_url, prompt")
+      .eq("room_id", room_id)
+      .eq("prompt", prompt)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing && existing.image_url && existing.prompt) {
+      return NextResponse.json({
+        render_id: existing.id,
+        image_url: existing.image_url,
+        prompt: existing.prompt,
+        mode,
+        cached: true,
+      });
+    }
+
     const replicate = new Replicate({ auth: apiKey });
     const model = mode === "depth" ? MODEL_DEPTH : MODEL_CANNY;
 

@@ -1,41 +1,19 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { FadeIn } from "@/app/_components/fade-in";
 import { AppShell } from "@/components/AppShell";
 import { BackButton } from "@/components/back-button";
+import { Badge } from "@/components/ui/badge";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { CorrectionModal } from "./_components/correction-modal";
-import { EditablePlanViewer } from "./_components/editable-plan-viewer";
-import { EditableProjectName } from "./_components/editable-project-name";
+import { IntakeWorkspace } from "./_components/intake-workspace";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Guided Intake";
 
-const BEDROOM_TYPES = new Set(["bedroom", "master_bedroom"]);
-const BATHROOM_TYPES = new Set(["bathroom", "ensuite", "powder"]);
-
-function summarize(rooms: { room_type: string | null }[]) {
-  const total = rooms.length;
-  let bedrooms = 0;
-  let bathrooms = 0;
-  for (const r of rooms) {
-    const t = r.room_type ?? "";
-    if (BEDROOM_TYPES.has(t)) bedrooms++;
-    else if (BATHROOM_TYPES.has(t)) bathrooms++;
-  }
-  return { total, bedrooms, bathrooms };
-}
-
-function formatTotalArea(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return "—";
-  return `${Math.round(value)} m²`;
+function Shell({ children }: { children: ReactNode }) {
+  return <AppShell pageName={PAGE_NAME}>{children}</AppShell>;
 }
 
 function CenteredMessage({
@@ -46,20 +24,56 @@ function CenteredMessage({
   children: ReactNode;
 }) {
   return (
-    <AppShell pageName={PAGE_NAME}>
+    <Shell>
       <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
         <p
           className={
             tone === "error"
               ? "text-status-error"
-              : "text-text-secondary"
+              : "text-on-surface-variant"
           }
         >
           {children}
         </p>
       </main>
-    </AppShell>
+    </Shell>
   );
+}
+
+function pdfFilename(
+  pdfUrl: string | null | undefined,
+  projectName: string | null | undefined,
+): string {
+  if (pdfUrl) {
+    try {
+      const u = new URL(pdfUrl);
+      const last = decodeURIComponent(u.pathname.split("/").pop() ?? "");
+      if (last) return last;
+    } catch {
+      /* fall through */
+    }
+  }
+  const safeName = projectName?.trim() || "plan";
+  return `${safeName}.pdf`;
+}
+
+function formatMb(bytes: number | null): string {
+  if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return "—";
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+async function fetchContentLength(url: string | null): Promise<number | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { method: "HEAD", cache: "no-store" });
+    if (!res.ok) return null;
+    const len = res.headers.get("content-length");
+    if (!len) return null;
+    const n = Number.parseInt(len, 10);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
 }
 
 export default async function PlanPage({
@@ -93,7 +107,7 @@ export default async function PlanPage({
 
   const { data: plan, error: planErr } = await supabase
     .from("plans")
-    .select("id, total_area_m2, parsed_json")
+    .select("id, total_area_m2, parsed_json, pdf_url")
     .eq("project_id", projectId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -128,79 +142,48 @@ export default async function PlanPage({
     );
   }
 
-  const summary = summarize(rooms ?? []);
+  const roomList = rooms ?? [];
+  const parsedComplete = plan.parsed_json !== null && roomList.length > 0;
+  const filename = pdfFilename(plan.pdf_url, project.name);
+  const sizeBytes = await fetchContentLength(plan.pdf_url);
+  const planSizeMb = formatMb(sizeBytes);
 
   return (
-    <AppShell pageName={PAGE_NAME}>
-      <main className="flex min-h-[calc(100vh-4rem)] justify-center px-6 py-16 sm:py-24">
-        <FadeIn className="w-full max-w-[980px]">
+    <Shell>
+      <main className="flex min-h-[calc(100vh-4rem)] flex-col px-8 py-10">
+        <FadeIn className="mx-auto w-full max-w-7xl">
           <BackButton />
 
-          <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-            <EditableProjectName
-              projectId={project.id}
-              initialName={project.name ?? "Untitled"}
-            />
+          <header className="mt-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-h1 text-on-surface">Data Ingestion Workspace</h1>
+              <p className="mt-2 max-w-2xl text-body-md text-on-surface-variant">
+                Upload architectural assets for deep semantic parsing and
+                vectorization. Our AI engine is currently processing your
+                villa data.
+              </p>
+            </div>
             <Badge
               variant="secondary"
-              className="bg-bg-elevated text-text-secondary"
+              className="bg-surface-container text-on-surface-variant"
             >
               Step 2 of 6 — Confirm your plan
             </Badge>
-          </div>
+          </header>
 
-          <div className="mt-8 flex items-center justify-end">
-            <CorrectionModal planId={plan.id} initialNotes={null} />
-          </div>
-
-          <div className="mt-2">
-            <EditablePlanViewer
+          <div className="mt-10">
+            <IntakeWorkspace
+              projectId={project.id}
               planId={plan.id}
-              initialRooms={rooms ?? []}
-              initialTotalAreaM2={plan.total_area_m2}
+              planFilename={filename}
+              planSizeMb={planSizeMb}
+              totalAreaM2={plan.total_area_m2}
+              parsedComplete={parsedComplete}
+              rooms={roomList}
             />
-          </div>
-
-          <section className="mt-10 flex flex-col items-center text-center">
-            <p className="font-display text-6xl font-semibold tracking-tight text-text-primary sm:text-7xl">
-              {formatTotalArea(plan.total_area_m2)}
-            </p>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <Badge
-                variant="outline"
-                className="border-bg-border bg-bg-elevated text-text-secondary"
-              >
-                {summary.total} {summary.total === 1 ? "room" : "rooms"}
-              </Badge>
-              <Badge
-                variant="outline"
-                className="border-bg-border bg-bg-elevated text-text-secondary"
-              >
-                {summary.bedrooms}{" "}
-                {summary.bedrooms === 1 ? "bedroom" : "bedrooms"}
-              </Badge>
-              <Badge
-                variant="outline"
-                className="border-bg-border bg-bg-elevated text-text-secondary"
-              >
-                {summary.bathrooms}{" "}
-                {summary.bathrooms === 1 ? "bathroom" : "bathrooms"}
-              </Badge>
-            </div>
-          </section>
-
-          <div className="mt-12 flex justify-center pb-8">
-            <Button
-              size="lg"
-              nativeButton={false}
-              render={<Link href={`/project/${project.id}/style`} />}
-            >
-              Looks right — pick a style
-              <ArrowRight />
-            </Button>
           </div>
         </FadeIn>
       </main>
-    </AppShell>
+    </Shell>
   );
 }
