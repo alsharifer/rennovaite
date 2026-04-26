@@ -7,11 +7,13 @@ export const dynamic = "force-dynamic";
 // values. Hit this on the live URL to verify Vercel's env config without
 // clicking through the dashboard:
 //
-//   curl https://<your-domain>/api/_health
+//   curl https://<your-domain>/api/health
 //
 // `present: true` means the var is set to a non-empty string. The route
 // also reports the Vercel context (preview / production / unknown) so you
 // can tell whether you're hitting the right environment scope.
+// (NB: folder is `health`, not `_health` — App Router treats
+// underscore-prefixed folders as private and excludes them from routing.)
 export async function GET() {
   const vars = [
     "NEXT_PUBLIC_SUPABASE_URL",
