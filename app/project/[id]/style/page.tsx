@@ -25,19 +25,24 @@ export default async function StylePage({
         <FadeIn className="w-full max-w-[1200px]">
           <BackButton />
 
-          <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-            <h1 className="font-display text-4xl font-semibold tracking-tight text-brand-accent sm:text-5xl">
-              Style
-            </h1>
+          {/*
+            Header is one full-width block above the grid. Row 1 is a
+            flex justify-between with the H1 on the left and the step
+            badge on the right; `shrink-0` on the badge prevents it
+            from squeezing the H1 into a single-letter column at any
+            viewport. Row 2 is the subtitle, capped at 720px.
+          */}
+          <header className="mt-4 flex flex-wrap items-center justify-between gap-4">
+            <h1 className="max-w-[720px] text-h1 text-on-surface">Style</h1>
             <Badge
               variant="secondary"
-              className="bg-bg-elevated text-text-secondary"
+              className="shrink-0 bg-surface-container text-on-surface-variant"
             >
               Step 3 of 6 — Choose a direction
             </Badge>
-          </div>
+          </header>
 
-          <p className="mt-4 max-w-2xl text-sm text-text-secondary">
+          <p className="mt-3 max-w-[720px] text-body-md text-on-surface-variant">
             Six directions tuned to Dubai villas and your AED{" "}
             {formatBudget(HARDCODED_BUDGET_AED)} budget.
           </p>

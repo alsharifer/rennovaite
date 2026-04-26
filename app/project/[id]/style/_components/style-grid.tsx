@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,8 +10,6 @@ import {
   DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -91,7 +89,21 @@ export function StyleGrid({ styles, projectId }: Props) {
           if (!next) close();
         }}
       >
-        <DialogContent className="border border-bg-border bg-bg-overlay text-text-primary backdrop-blur-md sm:max-w-2xl">
+        <DialogContent
+          showCloseButton={false}
+          className={cn(
+            // Sizing: 92vw on mobile (the calc takes the 16-px shadcn
+            // viewport gutter into account), capped at 640 px on desktop.
+            "w-[92vw] max-w-[640px] sm:max-w-[640px]",
+            // Layout: outer is fixed-height (max 88 vh) and clips so the
+            // inner body section is the only thing that scrolls.
+            "max-h-[88vh] overflow-hidden p-0",
+            // Surface + animation. duration-200 on the entry/exit zoom +
+            // fade matches the spec; tw-animate-css's zoom-in-95 is
+            // visually identical to scale 0.96 → 1 at this duration.
+            "border border-outline-variant bg-surface-container-high text-on-surface duration-200",
+          )}
+        >
           {opened && (
             <StyleDetail
               style={opened}
@@ -176,52 +188,74 @@ function StyleDetail({
   error: string | null;
   onSubmit: () => void;
 }) {
+  // Three-section layout: header (X + title), scrollable body, sticky footer.
+  // The outer flex column inherits the parent's max-h-[88vh] and the body
+  // is `flex-1 min-h-0 overflow-y-auto` so only the body scrolls.
   return (
-    <>
-      <DialogHeader className="text-left">
-        <DialogTitle className="font-serif text-3xl leading-tight text-text-primary">
+    <div className="flex max-h-[88vh] flex-col">
+      {/* HEADER --------------------------------------------------------- */}
+      <header className="relative p-6">
+        {/* Close button is absolute so the title can never reach it; the
+            title gets pr-12 to leave breathing room. */}
+        <DialogClose
+          render={
+            <button
+              type="button"
+              aria-label="Close"
+              className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+            />
+          }
+        >
+          <X className="size-4" />
+        </DialogClose>
+
+        <DialogTitle className="pr-12 font-serif text-3xl leading-tight text-on-surface">
           {style.name_en}
         </DialogTitle>
         <DialogDescription
-          className="text-base text-text-tertiary"
+          className="mt-1 text-base text-on-surface-variant"
           dir="rtl"
           lang="ar"
         >
           {style.name_ar}
         </DialogDescription>
-      </DialogHeader>
+      </header>
 
-      <div className="grid grid-cols-2 gap-2">
-        {style.reference_images.map((src, i) => (
-          <ImageTile
-            key={src}
-            src={src}
-            alt={`${style.name_en} reference ${i + 1}`}
-            palette={style.palette}
-            index={i}
-          />
-        ))}
+      {/* BODY (only scrollable region) ---------------------------------- */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8">
+        <div className="grid grid-cols-2 gap-3">
+          {style.reference_images.map((src, i) => (
+            <ImageTile
+              key={src}
+              src={src}
+              alt={`${style.name_en} reference ${i + 1}`}
+              palette={style.palette}
+              index={i}
+            />
+          ))}
+        </div>
+
+        <p className="mt-6 mb-2 max-w-[480px] text-sm leading-relaxed text-on-surface-variant">
+          {style.one_line}
+        </p>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <CostChip delta={style.cost_delta_aed} />
+          <PaletteDots colors={style.palette} />
+        </div>
+
+        {status === "error" && error && (
+          <p className="mt-4 text-xs text-status-error">{error}</p>
+        )}
       </div>
 
-      <p className="text-sm leading-relaxed text-text-secondary">
-        {style.one_line}
-      </p>
-
-      <div className="flex items-center justify-between gap-3">
-        <CostChip delta={style.cost_delta_aed} />
-        <PaletteDots colors={style.palette} />
-      </div>
-
-      {status === "error" && error && (
-        <p className="text-xs text-status-error">{error}</p>
-      )}
-
-      <DialogFooter>
+      {/* FOOTER --------------------------------------------------------- */}
+      <footer className="flex justify-end gap-3 border-t border-outline-variant p-6 pt-4">
         <DialogClose
           render={
             <Button
               variant="ghost"
-              className="text-text-secondary hover:text-text-primary"
+              className="text-on-surface-variant hover:text-on-surface"
             />
           }
         >
@@ -237,8 +271,8 @@ function StyleDetail({
             <>Use this style</>
           )}
         </Button>
-      </DialogFooter>
-    </>
+      </footer>
+    </div>
   );
 }
 
