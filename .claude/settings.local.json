@@ -32,7 +32,16 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(npx tsx *)",
-      "Bash(awk -F',' 'NR>1 && \\(NF<8 || $4==\"\" || $5==\"\" || $6==\"\"\\)' C:/dev/rennovaite/.claude/worktrees/priceless-jones-bb887c/assets/labour-rates.csv)"
+      "Bash(awk -F',' 'NR>1 && \\(NF<8 || $4==\"\" || $5==\"\" || $6==\"\"\\)' C:/dev/rennovaite/.claude/worktrees/priceless-jones-bb887c/assets/labour-rates.csv)",
+      "Bash(npx shadcn@latest add accordion table)",
+      "Bash(npx eslint *)",
+      "Bash(unset ANTHROPIC_API_KEY)",
+      "Bash(npx next *)",
+      "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('boq-tmp.html','utf8'\\); const idx = s.toLowerCase\\(\\).indexOf\\('porcelain'\\); console.log\\(s.slice\\(Math.max\\(0,idx-100\\), idx+1200\\)\\);\")",
+      "Bash(node scripts/_test-sensitivity.mjs)",
+      "Bash(rm -f scripts/_test-sensitivity.mjs boq-tmp.html)",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('boq-tmp.html','utf8'\\); for \\(const k of ['Light soft strip','Porcelain floor tile','wardrobe','Floor Finishes','Demolition','Sensitivity','Upgrading','trending_up']\\) console.log\\(k.padEnd\\(25\\), '→', \\(s.match\\(new RegExp\\(k, 'g'\\)\\)||[]\\).length\\);\")",
+      "mcp__Claude_in_Chrome__list_connected_browsers"
     ]
   }
 }
