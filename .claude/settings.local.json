@@ -30,7 +30,9 @@
       "Bash(git mv *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(npx tsx *)",
+      "Bash(awk -F',' 'NR>1 && \\(NF<8 || $4==\"\" || $5==\"\" || $6==\"\"\\)' C:/dev/rennovaite/.claude/worktrees/priceless-jones-bb887c/assets/labour-rates.csv)"
     ]
   }
 }
