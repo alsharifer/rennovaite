@@ -124,18 +124,21 @@ export type Database = {
           project_id: string | null;
           style_key: string | null;
           room_id: string | null;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
           project_id?: string | null;
           style_key?: string | null;
           room_id?: string | null;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
           project_id?: string | null;
           style_key?: string | null;
           room_id?: string | null;
+          created_at?: string | null;
         };
         Relationships: [
           {

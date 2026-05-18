@@ -164,6 +164,57 @@ palette.
 - Don't pull the old violet tokens into new pages — they exist only to
   keep transitional pages alive until they're rebuilt.
 
+## Visual polish principles
+
+The bar is "premium designer-grade product" (Apple, Linear, Stripe, Arc) —
+not "developer prototype". Apply these eight principles to every new
+component and respect them when touching existing ones.
+
+1. **Whitespace over content.** Default page padding is `p-12` on
+   desktop, `p-6` on mobile. Section gaps are `gap-12`–`gap-16`
+   (48–64 px), never less than `gap-8` (32 px). Cards have `p-6` minimum.
+2. **Typography is the star.** H1 is **56–72 px** Plus Jakarta Sans,
+   weight 700, tracking `-0.03em`, leading `1.05`. H2 is 36–44 px. Body
+   is 17 px, leading 1.6. **Exactly one H1 per page.** Subtitles are
+   18–20 px in `text-on-surface-variant`. The tokens in
+   `app/globals.css` (`text-h1`, `text-h2`, `text-h3`, `text-body-lg`,
+   `text-body-md`, `text-label-md`, `text-label-sm`) are already tuned
+   to these — reach for them, not `text-3xl`/`text-[18px]`.
+3. **One hero per screen.** Each page has one dominant element (hero
+   render, primary action, key metric) that the eye lands on first.
+   Everything else is supporting.
+4. **Color restraint.** The page is 90 % surface tones (`slate-950`,
+   `bg-surface-container`). The indigo accent appears on **at most
+   three elements per visible viewport**: the active sidebar item, one
+   primary CTA, and one status/metric highlight. No "decorative" indigo.
+5. **Animations exist but are subtle.** All clickable elements have a
+   150 ms transition on hover (color, `scale-[1.02]`, shadow elevation).
+   Page transitions use a 250 ms fade. Cards lift `-translate-y-1`
+   (4 px) on hover with a soft shadow expansion. Modal entries are
+   200 ms scale-from-0.96.
+6. **No purely decorative elements.** Every visible thing must serve a
+   purpose. Dividers separate sections; icons aid recognition; gradient
+   overlays add depth. If it doesn't, remove it.
+7. **Consistent rhythm.** All cards in the same context share the same
+   border-radius, padding, and shadow treatment. Mixing styles is
+   forbidden — pick the contextual rule and stay with it.
+8. **Buttons feel physical.**
+   - **Primary:** `bg-indigo-600`, soft inset highlight on the top edge,
+     `glow-indigo` on hover, `scale-[0.98]` on `:active`.
+   - **Secondary:** `bg-surface-container`, `neo-raised` shadow,
+     `text-indigo-300` on hover.
+
+### Don't, additions
+
+- Don't reach for `text-[18px]` / `text-3xl` / `text-[16px]` etc. when
+  a token covers it. The token system is the reference; arbitrary sizes
+  are a smell.
+- Don't sprinkle `drop-shadow-…` or `shadow-[…]` to make something
+  "feel important". The neomorphic + glow utilities are the sanctioned
+  depth language. Custom shadows compete with them.
+- Don't add `border-radius` outliers. Use `rounded-md` / `rounded-lg` /
+  `rounded-xl` / `rounded-2xl` from the token scale.
+
 ## Conventions
 
 - **BoQ output must use POMI work-section names.** When Claude or any agent

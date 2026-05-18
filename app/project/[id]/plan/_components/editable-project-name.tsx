@@ -10,9 +10,18 @@ import { cn } from "@/lib/utils";
 type Props = {
   projectId: string;
   initialName: string;
+  /**
+   * Optional override for the size/typography of the rendered name.
+   * Defaults to `text-3xl sm:text-4xl` (the plan-page sizing).
+   */
+  className?: string;
 };
 
-export function EditableProjectName({ projectId, initialName }: Props) {
+export function EditableProjectName({
+  projectId,
+  initialName,
+  className,
+}: Props) {
   const [name, setName] = useState(initialName);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(initialName);
@@ -79,7 +88,10 @@ export function EditableProjectName({ projectId, initialName }: Props) {
           }}
           onBlur={commit}
           disabled={isPending}
-          className="h-auto border-bg-border bg-bg-elevated px-3 py-2 font-display text-3xl font-semibold tracking-tight text-text-primary focus-visible:ring-brand-primary/40 sm:text-4xl"
+          className={cn(
+            "h-auto border-bg-border bg-bg-elevated px-3 py-2 font-semibold tracking-tight text-text-primary focus-visible:ring-brand-primary/40",
+            className ?? "font-display text-3xl sm:text-4xl",
+          )}
           aria-label="Project name"
         />
         {error && <p className="text-xs text-status-error">{error}</p>}
@@ -93,7 +105,8 @@ export function EditableProjectName({ projectId, initialName }: Props) {
       onClick={beginEdit}
       className={cn(
         "group inline-flex items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-bg-elevated/60",
-        "font-display text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl",
+        "font-semibold tracking-tight text-text-primary",
+        className ?? "font-display text-3xl sm:text-4xl",
       )}
       aria-label="Edit project name"
     >

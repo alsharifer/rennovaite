@@ -85,13 +85,13 @@ export default async function RenderPage({
     .limit(1)
     .maybeSingle();
 
-  // Whole-project style choice (room_id null). The schema doesn't track
-  // created_at on style_choices, so just take the first row.
+  // Whole-project style choice (room_id null), most recent first.
   const { data: styleChoiceRows } = await supabase
     .from("style_choices")
     .select("style_key")
     .eq("project_id", projectId)
     .is("room_id", null)
+    .order("created_at", { ascending: false })
     .limit(1);
 
   const styleChoice = styleChoiceRows?.[0] ?? null;

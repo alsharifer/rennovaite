@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
       .select("style_key")
       .eq("project_id", project_id)
       .is("room_id", null)
+      .order("created_at", { ascending: false })
       .limit(1);
     const styleKey = styleRows?.[0]?.style_key ?? null;
     if (!styleKey) {
