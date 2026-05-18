@@ -41,7 +41,11 @@
       "Bash(node scripts/_test-sensitivity.mjs)",
       "Bash(rm -f scripts/_test-sensitivity.mjs boq-tmp.html)",
       "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('boq-tmp.html','utf8'\\); for \\(const k of ['Light soft strip','Porcelain floor tile','wardrobe','Floor Finishes','Demolition','Sensitivity','Upgrading','trending_up']\\) console.log\\(k.padEnd\\(25\\), '→', \\(s.match\\(new RegExp\\(k, 'g'\\)\\)||[]\\).length\\);\")",
-      "mcp__Claude_in_Chrome__list_connected_browsers"
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "Bash(node scripts/_find-boq.mjs)",
+      "Bash(node -e ' *)",
+      "Bash(node scripts/_apply-migration.mjs)",
+      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('vo.json','utf8'\\)\\);console.log\\('success:',d.success,'lines:',Object.keys\\(d.line_options||{}\\).length,'with-options:',Object.values\\(d.line_options||{}\\).filter\\(a=>a.length>0\\).length\\);\")"
     ]
   }
 }
