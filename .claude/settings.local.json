@@ -57,7 +57,12 @@
       "Bash(sed -i 's#pageName=\"Direction\"#pageName=\"Style Direction\"#' app/project/\\\\[id\\\\]/style/page.tsx)",
       "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('home.html','utf8'\\); console.log\\('Start a project:', s.includes\\('Start a project'\\)\\); console.log\\('font var class present:', /--font-eb-garamond|--font-inter/.test\\(s\\)\\); const m=s.match\\(/\\\\/_next\\\\/static\\\\/[^\\\\\"']*\\\\.css/g\\)||[]; console.log\\('css files:', [...new Set\\(m\\)].slice\\(0,3\\)\\);\")",
       "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('plan.html','utf8'\\); console.log\\('Sidebar wordmark:', s.includes\\('RennovAIte'\\)\\); console.log\\('TopBar pageName Plan Analysis:', s.includes\\('Plan Analysis'\\)\\); console.log\\('AI Designer nav item:', s.includes\\('AI Designer'\\)\\); console.log\\('canvas bg class:', s.includes\\('bg-canvas'\\)\\); console.log\\('plan content present \\(Guided Intake / floorplan markers\\):', /Intake|floorplan|Floorplan|plan/i.test\\(s\\)\\);\")",
-      "Bash(rm -f home.html app.css plan.html)"
+      "Bash(rm -f home.html app.css plan.html)",
+      "Bash(cp \"C:/dev/rennovaite/design-refs/stitch_rennovaite_design_system/editorial_architectural_photography_of_a_renovated_arabian_ranches_villa_living/screen.png\" public/images/hero-villa.png)",
+      "Bash(cp \"C:/dev/rennovaite/design-refs/stitch_rennovaite_design_system/a_clean_architectural_floorplan_of_a_dubai_villa_arabian_ranches_type_3e/screen.png\" public/images/canonical-villa-plan.png)",
+      "Bash(file public/images/*.png)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('lp.html','utf8'\\); console.log\\('hero img:', s.includes\\('/images/hero-villa.png'\\)\\); console.log\\('plan img:', s.includes\\('/images/canonical-villa-plan.png'\\)\\); console.log\\('headline:', s.includes\\('From your floorplan to a built villa'\\)\\); console.log\\('matte-image:', s.includes\\('matte-image'\\)\\); console.log\\('AED 2,500:', s.includes\\('AED 2,500'\\)\\); console.log\\('TopNav wordmark:', \\(s.match\\(/RennovAIte/g\\)||[]\\).length\\);\")"
     ]
   }
 }
