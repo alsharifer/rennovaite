@@ -1,5 +1,5 @@
 import { FadeIn } from "@/app/_components/fade-in";
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 import { BackButton } from "@/components/back-button";
 import { Badge } from "@/components/ui/badge";
 import { STYLES } from "@/lib/styles";
@@ -20,7 +20,7 @@ export default async function StylePage({
   const { id } = await params;
 
   return (
-    <AppShell pageName="Direction">
+    <AppShell pageName="Style Direction">
       <main className="flex min-h-[calc(100vh-4rem)] justify-center px-6 py-16 sm:py-24">
         <FadeIn className="w-full max-w-[1200px]">
           <BackButton />

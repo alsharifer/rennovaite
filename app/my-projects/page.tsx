@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, FolderOpen, Plus } from "lucide-react";
 
 import { FadeIn } from "@/app/_components/fade-in";
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";

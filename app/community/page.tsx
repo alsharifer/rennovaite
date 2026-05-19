@@ -1,11 +1,11 @@
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 
 export default function CommunityPage() {
   return (
     <AppShell pageName="Community">
-      <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-        <h1 className="text-h2 text-on-surface">Community coming soon</h1>
-      </main>
+      <h1 className="font-display text-headline-lg text-ink-900">
+        Community — coming soon
+      </h1>
     </AppShell>
   );
 }

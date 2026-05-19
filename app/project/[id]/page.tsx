@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { FadeIn } from "@/app/_components/fade-in";
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { getStyleByKey } from "@/lib/styles";
@@ -60,7 +60,7 @@ export default async function ProjectDashboardPage({
 
   if (!project) {
     return (
-      <AppShell pageName="Project">
+      <AppShell pageName="Project Hub">
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
           <p className="text-on-surface-variant">
             Project {projectId} not found.
@@ -179,7 +179,7 @@ export default async function ProjectDashboardPage({
       : null;
 
   return (
-    <AppShell pageName="Project">
+    <AppShell pageName="Project Hub">
       <main className="flex min-h-[calc(100vh-4rem)] justify-center px-6 py-12 md:px-12 md:py-16">
         <FadeIn className="w-full max-w-[1200px] space-y-12">
           <BackButton />
