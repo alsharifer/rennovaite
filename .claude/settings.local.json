@@ -62,7 +62,12 @@
       "Bash(cp \"C:/dev/rennovaite/design-refs/stitch_rennovaite_design_system/a_clean_architectural_floorplan_of_a_dubai_villa_arabian_ranches_type_3e/screen.png\" public/images/canonical-villa-plan.png)",
       "Bash(file public/images/*.png)",
       "mcp__Claude_Preview__preview_start",
-      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('lp.html','utf8'\\); console.log\\('hero img:', s.includes\\('/images/hero-villa.png'\\)\\); console.log\\('plan img:', s.includes\\('/images/canonical-villa-plan.png'\\)\\); console.log\\('headline:', s.includes\\('From your floorplan to a built villa'\\)\\); console.log\\('matte-image:', s.includes\\('matte-image'\\)\\); console.log\\('AED 2,500:', s.includes\\('AED 2,500'\\)\\); console.log\\('TopNav wordmark:', \\(s.match\\(/RennovAIte/g\\)||[]\\).length\\);\")"
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('lp.html','utf8'\\); console.log\\('hero img:', s.includes\\('/images/hero-villa.png'\\)\\); console.log\\('plan img:', s.includes\\('/images/canonical-villa-plan.png'\\)\\); console.log\\('headline:', s.includes\\('From your floorplan to a built villa'\\)\\); console.log\\('matte-image:', s.includes\\('matte-image'\\)\\); console.log\\('AED 2,500:', s.includes\\('AED 2,500'\\)\\); console.log\\('TopNav wordmark:', \\(s.match\\(/RennovAIte/g\\)||[]\\).length\\);\")",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('af.html','utf8'\\);const m=s.match\\(/\\\\/_next\\\\/static\\\\/chunks\\\\/[^\\\\\"']*\\\\.css/g\\)||[];console.log\\([...new Set\\(m\\)][0]||''\\)\")",
+      "Bash(rm -f af.html af.css)",
+      "Bash(sed -n '90,114p' app/api/upload/route.ts)",
+      "Bash(sed -n '1,40p' components/ui/progress.tsx)",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('pn.html','utf8'\\); console.log\\('STEP 01 OF 05:', s.includes\\('Step 01 of 05'\\)\\); console.log\\('headline:', s.includes\\(\\\\\"Let\\\\\"\\)&&s.includes\\('start with your villa'\\)\\); console.log\\('Floorplans & CAD:', s.includes\\('Floorplans'\\)\\); console.log\\('Site photography:', s.includes\\('Site photography'\\)\\); console.log\\('Project basics:', s.includes\\('Project basics'\\)\\); console.log\\('Analyze my villa:', s.includes\\('Analyze my villa'\\)\\);\")"
     ]
   }
 }
