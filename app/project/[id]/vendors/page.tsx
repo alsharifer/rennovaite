@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { FadeIn } from "@/app/_components/fade-in";
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 import { BackButton } from "@/components/back-button";
 import { Badge } from "@/components/ui/badge";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";

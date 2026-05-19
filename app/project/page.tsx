@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 
 import { FadeIn } from "../_components/fade-in";

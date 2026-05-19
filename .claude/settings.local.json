@@ -45,7 +45,19 @@
       "Bash(node scripts/_find-boq.mjs)",
       "Bash(node -e ' *)",
       "Bash(node scripts/_apply-migration.mjs)",
-      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('vo.json','utf8'\\)\\);console.log\\('success:',d.success,'lines:',Object.keys\\(d.line_options||{}\\).length,'with-options:',Object.values\\(d.line_options||{}\\).filter\\(a=>a.length>0\\).length\\);\")"
+      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('vo.json','utf8'\\)\\);console.log\\('success:',d.success,'lines:',Object.keys\\(d.line_options||{}\\).length,'with-options:',Object.values\\(d.line_options||{}\\).filter\\(a=>a.length>0\\).length\\);\")",
+      "Bash(git -C C:/dev/rennovaite status -sb)",
+      "Bash(git -C C:/dev/rennovaite fetch origin master)",
+      "Bash(git -C C:/dev/rennovaite log --oneline -3 origin/master)",
+      "Bash(git -C C:/dev/rennovaite branch -r --contains 80ba34f)",
+      "Bash(git -C C:/dev/rennovaite rev-parse --short master origin/master)",
+      "Bash(git -C C:/dev/rennovaite rev-list --left-right --count master...origin/master)",
+      "Bash(sed -i 's#pageName=\"Project\"#pageName=\"Project Hub\"#g' app/project/\\\\[id\\\\]/page.tsx)",
+      "Bash(sed -i 's#const PAGE_NAME = \"Guided Intake\";#const PAGE_NAME = \"Plan Analysis\";#' app/project/\\\\[id\\\\]/plan/page.tsx)",
+      "Bash(sed -i 's#pageName=\"Direction\"#pageName=\"Style Direction\"#' app/project/\\\\[id\\\\]/style/page.tsx)",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('home.html','utf8'\\); console.log\\('Start a project:', s.includes\\('Start a project'\\)\\); console.log\\('font var class present:', /--font-eb-garamond|--font-inter/.test\\(s\\)\\); const m=s.match\\(/\\\\/_next\\\\/static\\\\/[^\\\\\"']*\\\\.css/g\\)||[]; console.log\\('css files:', [...new Set\\(m\\)].slice\\(0,3\\)\\);\")",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('plan.html','utf8'\\); console.log\\('Sidebar wordmark:', s.includes\\('RennovAIte'\\)\\); console.log\\('TopBar pageName Plan Analysis:', s.includes\\('Plan Analysis'\\)\\); console.log\\('AI Designer nav item:', s.includes\\('AI Designer'\\)\\); console.log\\('canvas bg class:', s.includes\\('bg-canvas'\\)\\); console.log\\('plan content present \\(Guided Intake / floorplan markers\\):', /Intake|floorplan|Floorplan|plan/i.test\\(s\\)\\);\")",
+      "Bash(rm -f home.html app.css plan.html)"
     ]
   }
 }

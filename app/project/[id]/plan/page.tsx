@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { FadeIn } from "@/app/_components/fade-in";
-import { AppShell } from "@/components/AppShell";
+import { AppShell } from "@/components/app/AppShell";
 import { BackButton } from "@/components/back-button";
 import { Badge } from "@/components/ui/badge";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -10,7 +10,7 @@ import { IntakeWorkspace } from "./_components/intake-workspace";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_NAME = "Guided Intake";
+const PAGE_NAME = "Plan Analysis";
 
 function Shell({ children }: { children: ReactNode }) {
   return <AppShell pageName={PAGE_NAME}>{children}</AppShell>;
