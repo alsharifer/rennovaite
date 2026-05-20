@@ -1,62 +1,62 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, X } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Style } from "@/lib/styles";
+
+const BASELINE_BUDGET_AED = 850_000;
 
 type Props = {
   styles: Style[];
   projectId: string;
+  initialSelectedKey?: string | null;
 };
 
-type SubmitStatus = "idle" | "submitting" | "error";
-
-// Cost delta is rounded to the nearest thousand AED for display ("AED +60k").
-// Deltas of zero render as a neutral "Baseline" pill.
-function formatCostDelta(delta: number): {
-  label: string;
-  tone: "neutral" | "positive" | "negative";
-} {
-  if (delta === 0) return { label: "Baseline", tone: "neutral" };
+function formatDelta(delta: number): { label: string; emphatic: boolean } {
+  if (delta === 0) return { label: "AED ±0 vs baseline", emphatic: false };
   const abs = Math.abs(delta);
   const k = Math.round(abs / 1000);
   const sign = delta > 0 ? "+" : "−";
-  return { label: `AED ${sign}${k}k`, tone: delta > 0 ? "positive" : "negative" };
+  return {
+    label: `AED ${sign}${k}k vs baseline`,
+    emphatic: Math.abs(delta) >= 100_000,
+  };
 }
 
-export function StyleGrid({ styles, projectId }: Props) {
-  const router = useRouter();
-  const [openKey, setOpenKey] = useState<string | null>(null);
-  const [status, setStatus] = useState<SubmitStatus>("idle");
+function formatAed(n: number): string {
+  return `AED ${Math.round(n).toLocaleString("en-US")}`;
+}
+
+export function StyleGrid({
+  styles,
+  projectId,
+  initialSelectedKey = null,
+}: Props) {
+  const [selectedKey, setSelectedKey] = useState<string | null>(
+    initialSelectedKey,
+  );
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [budgetOpen, setBudgetOpen] = useState(false);
 
-  const opened = styles.find((s) => s.key === openKey) ?? null;
+  const selected = useMemo(
+    () => styles.find((s) => s.key === selectedKey) ?? null,
+    [styles, selectedKey],
+  );
+  const indicativeTotal = BASELINE_BUDGET_AED + (selected?.cost_delta_aed ?? 0);
 
-  const close = () => {
-    setOpenKey(null);
-    setStatus("idle");
+  async function pickStyle(key: string) {
+    if (saving) return;
     setError(null);
-  };
-
-  const submit = async (styleKey: string) => {
-    setStatus("submitting");
-    setError(null);
+    setSelectedKey(key); // optimistic
+    setSaving(true);
     try {
       const res = await fetch("/api/style-choice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, style_key: styleKey }),
+        body: JSON.stringify({ project_id: projectId, style_key: key }),
       });
       const body = (await res.json().catch(() => null)) as
         | { success?: boolean; error?: string }
@@ -64,56 +64,84 @@ export function StyleGrid({ styles, projectId }: Props) {
       if (!res.ok || !body?.success) {
         throw new Error(body?.error ?? `Save failed (${res.status}).`);
       }
-      router.push(`/project/${projectId}/render`);
     } catch (err) {
-      setStatus("error");
-      setError(err instanceof Error ? err.message : "Save failed.");
+      setError(err instanceof Error ? err.message : "Couldn't save the pick.");
+    } finally {
+      setSaving(false);
     }
-  };
+  }
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+      {/* 3 × 2 grid -------------------------------------------------- */}
+      <section className="grid grid-cols-1 gap-gutter md:grid-cols-2 lg:grid-cols-3">
         {styles.map((style) => (
           <StyleCard
             key={style.key}
             style={style}
-            onClick={() => setOpenKey(style.key)}
+            selected={style.key === selectedKey}
+            onClick={() => pickStyle(style.key)}
           />
         ))}
+      </section>
+
+      {error && (
+        <p className="mt-md font-body-sm text-body-sm text-error">{error}</p>
+      )}
+
+      {/* Sticky bottom action bar ------------------------------------ */}
+      <div className="fixed inset-x-0 bottom-0 z-10 h-[88px] border-t border-ink-100 bg-paper">
+        <div className="ml-60 flex h-full items-center justify-between px-margin">
+          <Link
+            href={`/project/${projectId}/plan`}
+            className="focus-ring flex h-12 items-center rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
+          >
+            Back to plan
+          </Link>
+          <p className="hidden font-body text-body-sm italic text-on-surface-variant md:block">
+            {selected
+              ? `${selected.name_en} · indicative total ${formatAed(indicativeTotal)}`
+              : "Pick a direction to continue."}
+          </p>
+          {selected ? (
+            <Link
+              href={`/project/${projectId}/render`}
+              className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-xl font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
+            >
+              Generate my first render
+              <span
+                className="material-symbols-outlined text-[18px]"
+                aria-hidden="true"
+              >
+                arrow_forward
+              </span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="flex h-12 cursor-not-allowed items-center gap-sm rounded-lg bg-brass-600/50 px-xl font-body-sm text-body-sm font-semibold text-on-primary"
+            >
+              Generate my first render
+              <span
+                className="material-symbols-outlined text-[18px]"
+                aria-hidden="true"
+              >
+                arrow_forward
+              </span>
+            </button>
+          )}
+        </div>
       </div>
 
-      <Dialog
-        open={!!opened}
-        onOpenChange={(next) => {
-          if (!next) close();
-        }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className={cn(
-            // Sizing: 92vw on mobile (the calc takes the 16-px shadcn
-            // viewport gutter into account), capped at 640 px on desktop.
-            "w-[92vw] max-w-[640px] sm:max-w-[640px]",
-            // Layout: outer is fixed-height (max 88 vh) and clips so the
-            // inner body section is the only thing that scrolls.
-            "max-h-[88vh] overflow-hidden p-0",
-            // Surface + animation. duration-200 on the entry/exit zoom +
-            // fade matches the spec; tw-animate-css's zoom-in-95 is
-            // visually identical to scale 0.96 → 1 at this duration.
-            "border border-outline-variant bg-surface-container-high text-on-surface duration-200",
-          )}
-        >
-          {opened && (
-            <StyleDetail
-              style={opened}
-              status={status}
-              error={error}
-              onSubmit={() => submit(opened.key)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Right-edge Budget panel ------------------------------------- */}
+      <BudgetTab open={budgetOpen} onToggle={() => setBudgetOpen((v) => !v)} />
+      <BudgetPanel
+        open={budgetOpen}
+        selected={selected}
+        indicativeTotal={indicativeTotal}
+        onClose={() => setBudgetOpen(false)}
+      />
     </>
   );
 }
@@ -122,23 +150,28 @@ export function StyleGrid({ styles, projectId }: Props) {
 
 function StyleCard({
   style,
+  selected,
   onClick,
 }: {
   style: Style;
+  selected: boolean;
   onClick: () => void;
 }) {
+  const delta = formatDelta(style.cost_delta_aed);
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selected}
       className={cn(
-        "group flex flex-col gap-4 rounded-xl border border-bg-border bg-bg-elevated/60 p-4 text-left backdrop-blur-sm",
-        "transition-all duration-200 outline-none",
-        "hover:-translate-y-0.5 hover:border-brand-primary/40 hover:bg-bg-elevated/80 hover:shadow-[0_18px_40px_-18px_rgba(168,85,247,0.45)]",
-        "focus-visible:ring-4 focus-visible:ring-brand-primary/30",
+        "focus-ring group flex flex-col gap-md rounded-xl bg-paper p-lg text-left transition-all duration-200",
+        selected
+          ? "border-2 border-brass-600 shadow-level-1"
+          : "border border-ink-100 hover:-translate-y-0.5 hover:shadow-level-1",
       )}
     >
-      <div className="grid grid-cols-2 gap-1.5">
+      {/* 2 × 2 image grid */}
+      <div className="grid grid-cols-2 gap-xs">
         {style.reference_images.map((src, i) => (
           <ImageTile
             key={src}
@@ -150,129 +183,46 @@ function StyleCard({
         ))}
       </div>
 
-      <div className="flex flex-col gap-0.5">
-        <h3 className="font-serif text-2xl leading-tight text-text-primary">
-          {style.name_en}
-        </h3>
-        <p
-          className="text-sm text-text-tertiary"
-          dir="rtl"
-          lang="ar"
-        >
-          {style.name_ar}
-        </p>
+      {/* Name + brass underline (selected) */}
+      <div className="mt-xs">
+        <p className="label-caps text-ink-500">{style.name_en}</p>
+        <span
+          aria-hidden="true"
+          className={cn(
+            "mt-xs block h-px transition-all duration-200",
+            selected ? "w-12 bg-brass-600" : "w-0 bg-transparent",
+          )}
+        />
       </div>
 
-      <p className="text-sm leading-relaxed text-text-secondary">
+      <p className="font-body text-body-lg text-on-surface-variant">
         {style.one_line}
       </p>
 
-      <div className="mt-auto flex items-center justify-between gap-3">
-        <CostChip delta={style.cost_delta_aed} />
-        <PaletteDots colors={style.palette} />
+      <div className="mt-auto flex items-end justify-between gap-md">
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full bg-primary-fixed px-md py-xs font-body-sm text-body-sm font-semibold",
+            delta.emphatic ? "text-on-primary-fixed-variant" : "text-ink-900",
+          )}
+        >
+          {delta.label}
+        </span>
+        <span
+          className={cn(
+            "flex size-10 items-center justify-center rounded-full transition-all duration-200",
+            selected
+              ? "bg-brass-600 text-on-primary"
+              : "border border-brass-600 text-brass-600 group-hover:bg-brass-600 group-hover:text-on-primary",
+          )}
+          aria-hidden="true"
+        >
+          <span className="material-symbols-outlined text-[22px]">
+            {selected ? "check" : "add"}
+          </span>
+        </span>
       </div>
     </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-function StyleDetail({
-  style,
-  status,
-  error,
-  onSubmit,
-}: {
-  style: Style;
-  status: SubmitStatus;
-  error: string | null;
-  onSubmit: () => void;
-}) {
-  // Three-section layout: header (X + title), scrollable body, sticky footer.
-  // The outer flex column inherits the parent's max-h-[88vh] and the body
-  // is `flex-1 min-h-0 overflow-y-auto` so only the body scrolls.
-  return (
-    <div className="flex max-h-[88vh] flex-col">
-      {/* HEADER --------------------------------------------------------- */}
-      <header className="relative p-6">
-        {/* Close button is absolute so the title can never reach it; the
-            title gets pr-12 to leave breathing room. */}
-        <DialogClose
-          render={
-            <button
-              type="button"
-              aria-label="Close"
-              className="absolute top-4 right-4 inline-flex size-8 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
-            />
-          }
-        >
-          <X className="size-4" />
-        </DialogClose>
-
-        <DialogTitle className="pr-12 font-serif text-3xl leading-tight text-on-surface">
-          {style.name_en}
-        </DialogTitle>
-        <DialogDescription
-          className="mt-1 text-base text-on-surface-variant"
-          dir="rtl"
-          lang="ar"
-        >
-          {style.name_ar}
-        </DialogDescription>
-      </header>
-
-      {/* BODY (only scrollable region) ---------------------------------- */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8">
-        <div className="grid grid-cols-2 gap-3">
-          {style.reference_images.map((src, i) => (
-            <ImageTile
-              key={src}
-              src={src}
-              alt={`${style.name_en} reference ${i + 1}`}
-              palette={style.palette}
-              index={i}
-            />
-          ))}
-        </div>
-
-        <p className="mt-6 mb-2 max-w-[480px] text-sm leading-relaxed text-on-surface-variant">
-          {style.one_line}
-        </p>
-
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <CostChip delta={style.cost_delta_aed} />
-          <PaletteDots colors={style.palette} />
-        </div>
-
-        {status === "error" && error && (
-          <p className="mt-4 text-xs text-status-error">{error}</p>
-        )}
-      </div>
-
-      {/* FOOTER --------------------------------------------------------- */}
-      <footer className="flex justify-end gap-3 border-t border-outline-variant p-6 pt-4">
-        <DialogClose
-          render={
-            <Button
-              variant="ghost"
-              className="text-on-surface-variant hover:text-on-surface"
-            />
-          }
-        >
-          Cancel
-        </DialogClose>
-        <Button onClick={onSubmit} disabled={status === "submitting"}>
-          {status === "submitting" ? (
-            <>
-              <Loader2 className="animate-spin" />
-              Saving…
-            </>
-          ) : (
-            <>Use this style</>
-          )}
-        </Button>
-      </footer>
-    </div>
   );
 }
 
@@ -291,22 +241,17 @@ function ImageTile({
 }) {
   const [errored, setErrored] = useState(false);
   if (errored) {
-    // Fallback gradient using two adjacent palette colors so cards still
-    // feel "of the style" while moodboard PNGs are missing.
     const a = palette[index % palette.length];
     const b = palette[(index + 1) % palette.length];
     return (
       <div
-        className="aspect-square rounded-md border border-bg-border"
+        className="aspect-square w-full rounded-md"
         style={{ background: `linear-gradient(135deg, ${a}, ${b})` }}
         aria-label={alt}
       />
     );
   }
   return (
-    // Using a plain <img> instead of next/image so we don't have to register
-    // the Supabase host in next.config.ts and so loading="lazy" works
-    // identically across the moodboards bucket.
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
@@ -319,37 +264,111 @@ function ImageTile({
   );
 }
 
-function CostChip({ delta }: { delta: number }) {
-  const cost = formatCostDelta(delta);
-  const cls =
-    cost.tone === "neutral"
-      ? "border-bg-border bg-bg-overlay text-text-secondary"
-      : cost.tone === "positive"
-        ? "border-[#B85042]/40 bg-[#B85042]/15 text-[#E9B7B0]"
-        : "border-status-success/40 bg-status-success/15 text-status-success";
+// ---------------------------------------------------------------------------
+
+function BudgetTab({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <span
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls="budget-panel"
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
-        cls,
+        "focus-ring fixed z-30 flex h-32 w-9 items-center justify-center rounded-l-lg bg-brass-600 text-on-primary transition-transform duration-300",
+        // Sit just above the sticky bottom action bar (88px) and vertically
+        // mid-ish in the remaining viewport.
+        "top-1/2 -translate-y-1/2",
+        open ? "right-[320px]" : "right-0",
       )}
     >
-      {cost.label}
-    </span>
+      <span
+        className="rotate-90 whitespace-nowrap font-label-caps text-label-caps uppercase tracking-widest"
+        style={{ writingMode: "horizontal-tb" }}
+      >
+        Budget
+      </span>
+    </button>
   );
 }
 
-function PaletteDots({ colors }: { colors: string[] }) {
+function BudgetPanel({
+  open,
+  selected,
+  indicativeTotal,
+  onClose,
+}: {
+  open: boolean;
+  selected: Style | null;
+  indicativeTotal: number;
+  onClose: () => void;
+}) {
   return (
-    <div className="flex items-center gap-1">
-      {colors.map((c, i) => (
-        <span
-          key={i}
-          className="size-3.5 rounded-full border border-bg-border ring-1 ring-bg-base/40"
-          style={{ backgroundColor: c }}
-          aria-hidden="true"
-        />
-      ))}
-    </div>
+    <aside
+      id="budget-panel"
+      aria-hidden={!open}
+      className={cn(
+        "fixed right-0 top-16 bottom-[88px] z-20 flex w-[320px] flex-col border-l border-ink-100 bg-paper transition-transform duration-300",
+        open ? "translate-x-0" : "translate-x-full",
+      )}
+    >
+      <header className="flex items-center justify-between border-b border-ink-100 px-lg py-md">
+        <p className="label-caps text-ink-500">Budget</p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close budget panel"
+          className="focus-ring flex size-7 items-center justify-center rounded text-on-surface-variant hover:text-ink-900"
+        >
+          <span className="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-lg py-lg">
+        {selected ? (
+          <>
+            <p className="label-caps text-ink-500">Chosen direction</p>
+            <p className="mb-lg mt-xs font-display text-headline-md text-ink-900">
+              {selected.name_en}
+            </p>
+
+            <p className="label-caps text-ink-500">Indicative project total</p>
+            <p className="mb-lg mt-xs font-mono text-[28px] tabular-nums text-ink-900">
+              {formatAed(indicativeTotal)}
+            </p>
+            <p className="-mt-md mb-xl font-body-sm text-body-sm text-on-surface-variant">
+              Baseline {formatAed(BASELINE_BUDGET_AED)}
+              {selected.cost_delta_aed === 0
+                ? " · no delta"
+                : ` · ${selected.cost_delta_aed > 0 ? "+" : "−"}${formatAed(
+                    Math.abs(selected.cost_delta_aed),
+                  ).replace("AED ", "")}`}
+            </p>
+
+            <p className="label-caps mb-md text-ink-500">What changes</p>
+            <div className="flex flex-col gap-md">
+              {selected.what_changes.map((line) => (
+                <p
+                  key={line}
+                  className="font-body text-body-md text-on-surface-variant"
+                >
+                  {line}
+                </p>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="font-body text-body-md text-on-surface-variant">
+            Pick a direction on the left to see the indicative total and the
+            three biggest material changes it implies.
+          </p>
+        )}
+      </div>
+    </aside>
   );
 }

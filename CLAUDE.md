@@ -130,11 +130,16 @@ hero → paper bg + hairline on scroll past 80px) and
 
 ### Carve-out: floorplan SVG
 
-`app/project/[id]/plan/_components/editable-plan-viewer.tsx` (and the
-read-only `plan-canvas.tsx`) intentionally render rooms with a sand fill and
-terracotta strokes on a dark canvas — a deliberate "drafting paper on a desk"
-data-viz effect. Leave that SVG's palette alone; it is the only sanctioned
-non-Atelier color use.
+`editable-plan-viewer.tsx` was repainted to Atelier in the parsed-plan
+rebuild (B4): rooms fill bone (`#EDE6D8`) at 50%, walls stroke `ink-900`
+1.5 px, EN label Inter 13/500, AR label Rubik 13/500, area in JetBrains
+Mono 11. Hover swaps the polygon to `primary-fixed` and lifts the label
+2 px.
+
+The read-only `plan-canvas.tsx` thumbnail (used by `/my-projects`) still
+renders the legacy sand fill + terracotta strokes against the dark
+project-card background. Leave that one alone until /my-projects is
+rebuilt — that's the only sanctioned non-Atelier palette in the app.
 
 ### Don't
 

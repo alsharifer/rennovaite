@@ -67,7 +67,11 @@
       "Bash(rm -f af.html af.css)",
       "Bash(sed -n '90,114p' app/api/upload/route.ts)",
       "Bash(sed -n '1,40p' components/ui/progress.tsx)",
-      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('pn.html','utf8'\\); console.log\\('STEP 01 OF 05:', s.includes\\('Step 01 of 05'\\)\\); console.log\\('headline:', s.includes\\(\\\\\"Let\\\\\"\\)&&s.includes\\('start with your villa'\\)\\); console.log\\('Floorplans & CAD:', s.includes\\('Floorplans'\\)\\); console.log\\('Site photography:', s.includes\\('Site photography'\\)\\); console.log\\('Project basics:', s.includes\\('Project basics'\\)\\); console.log\\('Analyze my villa:', s.includes\\('Analyze my villa'\\)\\);\")"
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('pn.html','utf8'\\); console.log\\('STEP 01 OF 05:', s.includes\\('Step 01 of 05'\\)\\); console.log\\('headline:', s.includes\\(\\\\\"Let\\\\\"\\)&&s.includes\\('start with your villa'\\)\\); console.log\\('Floorplans & CAD:', s.includes\\('Floorplans'\\)\\); console.log\\('Site photography:', s.includes\\('Site photography'\\)\\); console.log\\('Project basics:', s.includes\\('Project basics'\\)\\); console.log\\('Analyze my villa:', s.includes\\('Analyze my villa'\\)\\);\")",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('pl.html','utf8'\\); console.log\\('Step 02 of 05:', s.includes\\('Step 02 of 05'\\)\\); console.log\\('headline:', s.includes\\('villa, understood'\\)\\); console.log\\('Parsed plan viewer:', s.includes\\('Parsed plan viewer'\\)\\); console.log\\('Rooms detected:', /\\\\\\\\d+\\\\\\\\s+Rooms detected/.test\\(s\\)\\); console.log\\('Continue to style:', s.includes\\('Continue to style'\\)\\); console.log\\('Maid:', s.includes\\(\\\\\"Maid\\\\\"\\)\\); console.log\\('SVG floorplan:', s.includes\\('Editable floorplan'\\)\\);\")",
+      "Bash(cd C:/dev/rennovaite/.claude/worktrees/priceless-jones-bb887c && rm app/project/\\\\[id\\\\]/plan/_components/intake-workspace.tsx app/project/\\\\[id\\\\]/plan/_components/correction-modal.tsx && ls app/project/\\\\[id\\\\]/plan/_components/)",
+      "Bash(cd C:/dev/rennovaite/.claude/worktrees/priceless-jones-bb887c && sed -i 's#factorRef\\\\.current#unitToM2Factor#g' app/project/\\\\[id\\\\]/plan/_components/editable-plan-viewer.tsx && grep -nE 'factorRef|unitToM2Factor' app/project/\\\\[id\\\\]/plan/_components/editable-plan-viewer.tsx | head)",
+      "Bash(grep -oE 'AED [^<]{0,15}25k' ps.html)"
     ]
   }
 }

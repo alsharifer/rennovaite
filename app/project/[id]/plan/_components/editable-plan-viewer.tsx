@@ -19,8 +19,13 @@ const VIEW_W = 1000;
 const VIEW_H = 600;
 const PADDING = 24;
 const HISTORY_LIMIT = 20;
-const SAND_FILL = "#F5EFE6";
-const TERRACOTTA = "#B85042";
+// Atelier viewer palette — bone room fills at 50% on a paper canvas with
+// ink-900 walls. The old "drafting paper on a dark canvas" sand+terracotta
+// scheme is now scoped to plan-canvas.tsx (read-only thumbnail) only.
+const BONE_FILL = "#EDE6D8";
+const PRIMARY_FIXED = "#FFDDB3";
+const INK_900 = "#0F1B2D";
+const INK_700 = "#4F4539";
 
 type Point = [number, number];
 
@@ -304,12 +309,10 @@ export function EditablePlanViewer({
 }: Props) {
   const router = useRouter();
   const fitted = useMemo(() => fitToViewBox(initialRooms), [initialRooms]);
-  const factorRef = useRef(fitted.unitToM2Factor);
-  // Keep factor stable across edits — recomputing it on every state change
-  // would let resize ops drift the m²-per-unit ratio.
-  useEffect(() => {
-    factorRef.current = fitted.unitToM2Factor;
-  }, [fitted.unitToM2Factor]);
+  // m²-per-unit factor is anchored to the initial fit and stays stable
+  // across edits because `fitted` is memoised on `[initialRooms]` — resize
+  // ops on local state never change it.
+  const unitToM2Factor = fitted.unitToM2Factor;
 
   const [rooms, setRooms] = useState<Room[]>(fitted.rooms);
   const [history, setHistory] = useState<Room[][]>([]);
@@ -320,9 +323,28 @@ export function EditablePlanViewer({
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [overlappingIds, setOverlappingIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  // Derived from `rooms` — `useMemo` instead of state+effect so we don't
+  // trigger a second render to sync (the "you might not need an effect"
+  // pattern). The lint rule at the old setState-in-effect site was a smell
+  // for exactly this case.
+  const overlappingIds = useMemo(() => {
+    const visible = rooms.filter((r) => !r.isDeleted);
+    const ids = new Set<string>();
+    for (let i = 0; i < visible.length - 1; i++) {
+      for (let j = i + 1; j < visible.length; j++) {
+        if (
+          rectsOverlap(
+            polygonToRect(visible[i].polygon),
+            polygonToRect(visible[j].polygon),
+          )
+        ) {
+          ids.add(visible[i].id);
+          ids.add(visible[j].id);
+        }
+      }
+    }
+    return ids;
+  }, [rooms]);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const infoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -372,10 +394,10 @@ export function EditablePlanViewer({
 
   const recomputeArea = useCallback(
     (rect: [Point, Point, Point, Point]): number => {
-      const a = rectArea(rect) * factorRef.current;
+      const a = rectArea(rect) * unitToM2Factor;
       return Math.round(a * 10) / 10;
     },
-    [],
+    [unitToM2Factor],
   );
 
   // Begin a body-drag (move) — also handles selection on click.
@@ -592,25 +614,6 @@ export function EditablePlanViewer({
   };
 
   // Recompute the set of overlapping rooms whenever the room layout changes.
-  useEffect(() => {
-    const visible = rooms.filter((r) => !r.isDeleted);
-    const ids = new Set<string>();
-    for (let i = 0; i < visible.length - 1; i++) {
-      for (let j = i + 1; j < visible.length; j++) {
-        if (
-          rectsOverlap(
-            polygonToRect(visible[i].polygon),
-            polygonToRect(visible[j].polygon),
-          )
-        ) {
-          ids.add(visible[i].id);
-          ids.add(visible[j].id);
-        }
-      }
-    }
-    setOverlappingIds(ids);
-  }, [rooms]);
-
   // Show a transient toast-style message at the top of the editor.
   const flashInfo = useCallback((message: string) => {
     setInfoMessage(message);
@@ -719,7 +722,7 @@ export function EditablePlanViewer({
             variant="outline"
             size="sm"
             onClick={addRoom}
-            className="border-bg-border bg-bg-elevated text-text-primary hover:bg-bg-overlay"
+            className="border-ink-100 bg-paper text-ink-900 hover:bg-surface-container"
           >
             <Plus />
             Add room
@@ -730,12 +733,12 @@ export function EditablePlanViewer({
             size="sm"
             onClick={undo}
             disabled={!canUndo}
-            className="text-text-secondary hover:text-text-primary"
+            className="text-on-surface-variant hover:text-ink-900"
           >
             <Undo2 />
             Undo
             {canUndo && (
-              <span className="ml-1 text-xs text-text-tertiary">
+              <span className="ml-1 text-xs text-ink-500">
                 ({history.length})
               </span>
             )}
@@ -746,7 +749,7 @@ export function EditablePlanViewer({
             size="sm"
             onClick={fixOverlaps}
             className={cn(
-              "border-bg-border bg-bg-elevated text-text-primary hover:bg-bg-overlay",
+              "border-ink-100 bg-paper text-ink-900 hover:bg-surface-container",
               overlappingIds.size > 0 &&
                 "border-status-error/60 text-status-error hover:bg-status-error/10",
             )}
@@ -760,7 +763,7 @@ export function EditablePlanViewer({
         </div>
         <div className="flex items-center gap-3">
           {infoMessage && (
-            <span className="text-xs text-text-secondary">{infoMessage}</span>
+            <span className="text-xs text-on-surface-variant">{infoMessage}</span>
           )}
           {saveStatus === "saved" && (
             <span className="text-xs text-status-success">Saved.</span>
@@ -781,7 +784,7 @@ export function EditablePlanViewer({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-bg-border bg-bg-elevated/60 backdrop-blur-sm">
+      <div className="overflow-hidden rounded-xl border border-ink-100 bg-paper">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
@@ -792,13 +795,22 @@ export function EditablePlanViewer({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
         >
+          {/* Hover affordances per spec — pure CSS keeps the state
+              machine untouched. fill is overridable because the polygon
+              sets it as a presentation attribute (not inline style). */}
+          <style>{`
+            .room-group .room-poly { transition: fill 200ms ease-out, fill-opacity 200ms ease-out; }
+            .room-group .room-label { transition: transform 200ms ease-out; }
+            .room-group:hover .room-poly { fill: ${PRIMARY_FIXED}; fill-opacity: 0.7; }
+            .room-group:hover .room-label { transform: translateY(-2px); }
+          `}</style>
           {visibleRooms.length === 0 ? (
             <text
               x={VIEW_W / 2}
               y={VIEW_H / 2}
               textAnchor="middle"
               dominantBaseline="middle"
-              fill="var(--color-text-tertiary)"
+              fill="var(--color-ink-500)"
               fontSize="16"
             >
               No rooms yet — click &quot;Add room&quot; to start.
@@ -813,8 +825,8 @@ export function EditablePlanViewer({
               const cy = (bb.yT + bb.yB) / 2;
               const rectWPx = bb.xR - bb.xL;
               const rectHPx = bb.yB - bb.yT;
-              const widthM = pixelToM(rectWPx, factorRef.current);
-              const heightM = pixelToM(rectHPx, factorRef.current);
+              const widthM = pixelToM(rectWPx, unitToM2Factor);
+              const heightM = pixelToM(rectHPx, unitToM2Factor);
               const areaInt = Math.round(room.area_m2);
               const dimsLine = `${widthM} × ${heightM} m`;
               const areaLabel = `${areaInt} m²`;
@@ -822,6 +834,7 @@ export function EditablePlanViewer({
               return (
                 <motion.g
                   key={room.id}
+                  className="room-group"
                   initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{
@@ -832,13 +845,14 @@ export function EditablePlanViewer({
                   style={{ transformOrigin: `${cx}px ${cy}px` }}
                 >
                   <polygon
+                    className="room-poly"
                     points={room.polygon
                       .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                       .join(" ")}
-                    fill={SAND_FILL}
-                    fillOpacity={0.88}
-                    stroke={selected ? TERRACOTTA : TERRACOTTA}
-                    strokeOpacity={selected ? 1 : 0.7}
+                    fill={BONE_FILL}
+                    fillOpacity={0.5}
+                    stroke={INK_900}
+                    strokeOpacity={1}
                     strokeWidth={selected ? 2.5 : 1.5}
                     style={{ cursor: "grab" }}
                     onPointerDown={(e) => onRoomPointerDown(e, room)}
@@ -878,82 +892,94 @@ export function EditablePlanViewer({
                           }
                         }}
                         onBlur={commitRename}
-                        className="h-7 w-full rounded-md border border-[#B85042] bg-white px-2 text-center text-sm font-medium text-[#1F1830] outline-none ring-2 ring-[#B85042]/20"
+                        className="h-7 w-full rounded-md border border-brass-600 bg-paper px-2 text-center text-sm font-medium text-ink-900 outline-none ring-2 ring-brass-600/20"
                         aria-label="Rename room"
                       />
                     </foreignObject>
                   ) : (
-                    <text
-                      x={cx}
-                      y={cy - 4}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fontSize="14"
-                      fontWeight={500}
-                      fill="#1F1830"
-                      style={{ cursor: "text" }}
-                      onPointerDown={(e) => onRoomPointerDown(e, room)}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        beginRename(room);
-                      }}
-                    >
-                      {room.name_en}
-                    </text>
-                  )}
-
-                  {!renaming && (
-                    <g pointerEvents="none">
-                      {rectWPx >= 120 ? (
-                        <text
-                          x={cx}
-                          y={cy + 14}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                          fontSize="11"
-                          fontWeight={400}
-                          fill={TERRACOTTA}
-                        >
-                          {inlineLine}
-                        </text>
-                      ) : rectWPx >= 70 ? (
-                        <>
-                          <text
-                            x={cx}
-                            y={cy + 12}
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            fontSize="10"
-                            fontWeight={400}
-                            fill={TERRACOTTA}
-                          >
-                            {dimsLine}
-                          </text>
-                          <text
-                            x={cx}
-                            y={cy + 24}
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            fontSize="10"
-                            fontWeight={400}
-                            fill={TERRACOTTA}
-                          >
-                            {areaLabel}
-                          </text>
-                        </>
-                      ) : (
-                        <text
-                          x={cx}
-                          y={cy + 14}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                          fontSize="11"
-                          fontWeight={400}
-                          fill={TERRACOTTA}
-                        >
-                          {areaLabel}
-                        </text>
-                      )}
+                    <g className="room-label">
+                      {(() => {
+                        const hasAr = !!room.name_ar?.trim();
+                        // Layout per width bucket. The y values position the
+                        // EN baseline so the stack reads visually centred:
+                        //   wide   (≥120): EN, AR (if any), area
+                        //   medium (70–119): EN, area
+                        //   narrow (<70):    area only
+                        const wide = rectWPx >= 120;
+                        const medium = rectWPx >= 70 && rectWPx < 120;
+                        const enY = wide ? (hasAr ? cy - 14 : cy - 8) : medium ? cy - 6 : cy;
+                        const arY = wide && hasAr ? cy + 4 : null;
+                        const areaY = wide
+                          ? hasAr
+                            ? cy + 22
+                            : cy + 10
+                          : medium
+                            ? cy + 10
+                            : cy + 4;
+                        return (
+                          <>
+                            {(wide || medium) && (
+                              <text
+                                x={cx}
+                                y={enY}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                fontSize="13"
+                                fontWeight={500}
+                                fill={INK_900}
+                                style={{
+                                  cursor: "text",
+                                  fontFamily: "var(--font-inter), sans-serif",
+                                }}
+                                onPointerDown={(e) =>
+                                  onRoomPointerDown(e, room)
+                                }
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  beginRename(room);
+                                }}
+                              >
+                                {room.name_en}
+                              </text>
+                            )}
+                            {arY != null && (
+                              <text
+                                x={cx}
+                                y={arY}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                fontSize="13"
+                                fontWeight={500}
+                                fill={INK_900}
+                                pointerEvents="none"
+                                style={{
+                                  fontFamily: "var(--font-rubik), serif",
+                                  direction: "rtl",
+                                }}
+                              >
+                                {room.name_ar}
+                              </text>
+                            )}
+                            <text
+                              x={cx}
+                              y={areaY}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              fontSize="11"
+                              fontWeight={500}
+                              fill={INK_700}
+                              pointerEvents="none"
+                              style={{
+                                fontFamily:
+                                  "var(--font-jetbrains-mono), monospace",
+                              }}
+                            >
+                              {wide && !hasAr ? inlineLine : areaLabel}
+                              {medium ? ` · ${dimsLine}` : ""}
+                            </text>
+                          </>
+                        );
+                      })()}
                     </g>
                   )}
 
@@ -1029,10 +1055,10 @@ export function EditablePlanViewer({
         </svg>
       </div>
 
-      <p className="text-xs text-text-tertiary">
+      <p className="text-xs text-ink-500">
         Click a room to select. Drag the body to move, drag a corner handle to
         resize, double-click the name to rename. Live total:{" "}
-        <span className="text-text-secondary">
+        <span className="text-on-surface-variant">
           {liveTotalM2.toFixed(1)} m²
         </span>
         .
