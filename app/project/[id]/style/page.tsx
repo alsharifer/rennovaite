@@ -1,16 +1,15 @@
-import { FadeIn } from "@/app/_components/fade-in";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { AppShell } from "@/components/app/AppShell";
-import { BackButton } from "@/components/back-button";
-import { Badge } from "@/components/ui/badge";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { STYLES } from "@/lib/styles";
 
 import { StyleGrid } from "./_components/style-grid";
 
-const HARDCODED_BUDGET_AED = 850000;
+export const dynamic = "force-dynamic";
 
-function formatBudget(value: number): string {
-  return value.toLocaleString("en-US");
-}
+const PAGE_NAME = "Style Direction";
+const SEGMENTS = 5;
 
 export default async function StylePage({
   params,
@@ -18,40 +17,51 @@ export default async function StylePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const supabase = getSupabaseAdmin();
+  const sb = supabase as unknown as SupabaseClient;
+
+  // style_choices stores one row per pick; latest row = current selection.
+  const { data: selection } = await sb
+    .from("style_choices")
+    .select("style_key")
+    .eq("project_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ style_key: string | null }>();
 
   return (
-    <AppShell pageName="Style Direction">
-      <main className="flex min-h-[calc(100vh-4rem)] justify-center px-6 py-16 sm:py-24">
-        <FadeIn className="w-full max-w-[1200px]">
-          <BackButton />
-
-          {/*
-            Header is one full-width block above the grid. Row 1 is a
-            flex justify-between with the H1 on the left and the step
-            badge on the right; `shrink-0` on the badge prevents it
-            from squeezing the H1 into a single-letter column at any
-            viewport. Row 2 is the subtitle, capped at 720px.
-          */}
-          <header className="mt-4 flex flex-wrap items-center justify-between gap-4">
-            <h1 className="max-w-[720px] text-h1 text-on-surface">Style</h1>
-            <Badge
-              variant="secondary"
-              className="shrink-0 bg-surface-container text-on-surface-variant"
-            >
-              Step 3 of 6 — Choose a direction
-            </Badge>
-          </header>
-
-          <p className="mt-3 max-w-[720px] text-body-md text-on-surface-variant">
-            Six directions tuned to Dubai villas and your AED{" "}
-            {formatBudget(HARDCODED_BUDGET_AED)} budget.
-          </p>
-
-          <div className="mt-10">
-            <StyleGrid styles={STYLES} projectId={id} />
+    <AppShell pageName={PAGE_NAME}>
+      <div className="mx-auto max-w-[1440px] pb-32">
+        {/* Header */}
+        <header className="mb-2xl">
+          <p className="label-caps mb-md text-brass-600">Step 03 of 05</p>
+          <div className="mb-xl flex gap-sm" aria-hidden="true">
+            {Array.from({ length: SEGMENTS }).map((_, i) => (
+              <span
+                key={i}
+                className={
+                  "h-1 flex-1 rounded-full " +
+                  (i < 3 ? "bg-brass-600" : "bg-bone")
+                }
+              />
+            ))}
           </div>
-        </FadeIn>
-      </main>
+          <h1 className="mb-md font-display text-headline-lg text-ink-900">
+            Pick a direction.
+          </h1>
+          <p className="max-w-[720px] font-body text-body-lg text-on-surface-variant">
+            We tuned six directions to Dubai villas and your AED 850k budget.
+            Each one comes with an indicative cost delta against a baseline
+            finish.
+          </p>
+        </header>
+
+        <StyleGrid
+          styles={STYLES}
+          projectId={id}
+          initialSelectedKey={selection?.style_key ?? null}
+        />
+      </div>
     </AppShell>
   );
 }
