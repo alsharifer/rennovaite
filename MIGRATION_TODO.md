@@ -197,3 +197,63 @@ Two visual notes:
 - `/marketplace`, `/community`, `/settings`, `/support` are still the
   placeholder pages shipped in B0 (Step 7). They render the canonical
   AppShell with the page name, but the content panes are stubbed.
+
+---
+
+## Summary
+
+The Atelier Precise migration (B0–B11) ported every user-facing screen
+from the legacy Dark Silk / neomorphic system to the editorial
+paper-on-paper aesthetic: tokens live in `tailwind.config.ts`,
+`globals.css` only bridges shadcn variables and adds four utility
+classes, every route now wraps `<AppShell>`, and all 15 routes return
+HTTP 200 cleanly. The post-refactor verification pass (VP1–VP9) caught
+the last legacy leftovers — two indigo accents, four stale Dark Silk
+SVG hexes, the purple button glow, six lucide icon sites, an orphan
+`back-button.tsx`, and the plan-route bone-shimmer skeleton — and
+ended with `tsc --noEmit` and `eslint .` both exiting 0. Screenshots
+of all 15 routes at 1440×900 sit under `screenshots/atelier-precise/`.
+
+**Couldn't be matched 1:1 to Stitch:**
+
+- The `/marketplace`, `/community`, `/settings`, `/support` pages are
+  placeholder Atelier shells — Stitch never shipped detailed designs
+  for these surfaces.
+- `/my-projects` had no dedicated Stitch screen; its visual language
+  is derived from the dashboard project-card pattern + the BoQ table
+  treatment. Four spec items couldn't be honored because the data
+  doesn't exist yet: a `community` column on `projects`, a `plan_type`
+  column, an actor field for the "by Sara"/"by Atrium Build & Co."
+  caption on list rows, and a real activity-log table for the
+  dashboard "Recent activity" feed.
+- The "In Construction" and "Handover" filter chips on `/my-projects`
+  always render with a `(0)` badge because no domain tracks either
+  yet.
+- Two shadcn primitives (`components/ui/dialog.tsx`,
+  `components/ui/accordion.tsx`) still import their X / Chevron icons
+  from `lucide-react`. Converting them to Material Symbols would
+  require forking the primitives. Visual impact is invisible (icons
+  are tiny, `currentColor`).
+
+**Still using stub data / hardcoded fallbacks:**
+
+- Dashboard greeting name is hardcoded `"Sara"` — no auth-name
+  wiring yet.
+- The "+N this month" delta on the active-projects stat uses
+  `projects.created_at` as a proxy because there's no real onboarding
+  event.
+- The dashboard "Recent activity" feed is synthesized from recent
+  `renders` / `boqs` / `vendor_selections` rows — there's no
+  `activity_log` table.
+- Vendor distance / country / warranty / sample-availability values
+  on `/vendors` come from a hardcoded `VENDOR_META` lookup keyed by
+  brand — these fields don't exist on `pricing_skus`.
+- BoQ materials-vs-labour classification is a heuristic (B7) — the
+  underlying rows don't carry a classification column.
+- Project Hub's "3 bids in flight" stat ships as `0`; there's no
+  contractor-bids domain yet.
+- 4 stored hero `render` URLs and 15 projects with no render at all
+  cause the matte-image hero slot on the dashboard + `/my-projects`
+  villa cards to fall back to "Render pending" / alt-text. The URLs
+  themselves are TTL-expired `replicate.delivery` presigned links;
+  longer-term fix is to re-host renders in Supabase Storage.
