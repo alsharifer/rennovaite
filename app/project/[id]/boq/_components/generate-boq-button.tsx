@@ -41,7 +41,7 @@ export function GenerateBoqButton({ projectId }: { projectId: string }) {
         size="lg"
         onClick={onClick}
         disabled={status === "submitting"}
-        className="bg-indigo-600 text-white hover:bg-indigo-500"
+        className="bg-brass-600 text-on-primary hover:bg-primary"
       >
         {status === "submitting" ? (
           <>

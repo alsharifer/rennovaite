@@ -24,7 +24,7 @@ export function SendModal({
     >
       <DialogContent className="w-[92vw] max-w-[480px] border border-outline-variant bg-surface-container-high p-6 text-on-surface duration-200 sm:max-w-[480px]">
         <div className="flex flex-col gap-4">
-          <div className="flex size-12 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-400">
+          <div className="flex size-12 items-center justify-center rounded-full bg-primary-fixed text-brass-600">
             <span className="material-symbols-outlined text-2xl" aria-hidden="true">
               send
             </span>
