@@ -63,3 +63,26 @@ class that doesn't resolve to any token. Replaced with
 over shadows). Other variants (`outline`/`secondary`/`ghost`/`destructive`/
 `link`) already route through shadcn variables that are mapped to
 Atelier tokens in `globals.css`.
+
+## Step 4 — Route smoke test
+
+All 15 routes returned HTTP 200 on a fresh fetch sweep against the live
+dev server. No runtime errors in the post-fetch log window.
+
+| Route | Status |
+| --- | --- |
+| `/` | 200 |
+| `/auth` | 200 |
+| `/dashboard` | 200 |
+| `/project/new` | 200 |
+| `/project/[id]` | 200 |
+| `/project/[id]/plan` | 200 |
+| `/project/[id]/style` | 200 |
+| `/project/[id]/render` | 200 |
+| `/project/[id]/boq` | 200 |
+| `/project/[id]/vendors` | 200 |
+| `/my-projects` | 200 |
+| `/marketplace` | 200 |
+| `/community` | 200 |
+| `/settings` | 200 |
+| `/support` | 200 |
