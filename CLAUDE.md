@@ -128,7 +128,7 @@ Marketing surfaces use `components/marketing/TopNav.tsx` (transparent over
 hero → paper bg + hairline on scroll past 80px) and
 `components/marketing/Footer.tsx` (4-col, `ink-900` bg).
 
-### Carve-out: floorplan SVG
+### Floorplan SVG
 
 `editable-plan-viewer.tsx` was repainted to Atelier in the parsed-plan
 rebuild (B4): rooms fill bone (`#EDE6D8`) at 50%, walls stroke `ink-900`
@@ -136,10 +136,9 @@ rebuild (B4): rooms fill bone (`#EDE6D8`) at 50%, walls stroke `ink-900`
 Mono 11. Hover swaps the polygon to `primary-fixed` and lifts the label
 2 px.
 
-The read-only `plan-canvas.tsx` thumbnail (used by `/my-projects`) still
-renders the legacy sand fill + terracotta strokes against the dark
-project-card background. Leave that one alone until /my-projects is
-rebuilt — that's the only sanctioned non-Atelier palette in the app.
+(The legacy `plan-canvas.tsx` thumbnail with the sand + terracotta
+palette was deleted in B11 once `/my-projects` was rebuilt. There is
+now no sanctioned non-Atelier palette anywhere in the app.)
 
 ### Don't
 
