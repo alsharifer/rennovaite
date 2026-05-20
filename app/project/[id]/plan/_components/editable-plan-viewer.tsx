@@ -20,8 +20,7 @@ const VIEW_H = 600;
 const PADDING = 24;
 const HISTORY_LIMIT = 20;
 // Atelier viewer palette — bone room fills at 50% on a paper canvas with
-// ink-900 walls. The old "drafting paper on a dark canvas" sand+terracotta
-// scheme is now scoped to plan-canvas.tsx (read-only thumbnail) only.
+// ink-900 walls.
 const BONE_FILL = "#EDE6D8";
 const PRIMARY_FIXED = "#FFDDB3";
 const INK_900 = "#0F1B2D";
