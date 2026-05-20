@@ -1,51 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  AlertTriangle,
-  ArrowRight,
-  Check,
-  ChevronDown,
-  Loader2,
-  RotateCcw,
-  Send,
-  Sparkles,
-} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { MATERIALS, SURFACE_SPECS, type Material } from "@/lib/materials";
 import type { Style } from "@/lib/styles";
+
+// ---------------------------------------------------------------------------
+// Types + constants
+// ---------------------------------------------------------------------------
 
 type RoomLite = {
   id: string;
   name_en: string | null;
   room_type: string | null;
   area_m2: number | null;
+  polygon: unknown;
 };
+
+type RenderItem = { id: string; imageUrl: string; prompt: string };
+type RoomState = { list: RenderItem[]; currentIndex: number };
 
 type Props = {
   projectId: string;
   rooms: RoomLite[];
   style: Style | null;
   initialChains?: Record<string, RenderItem[]>;
-};
-
-// One render in the timeline. index 0 is the original; subsequent items are
-// tweaks. The list is mutated by truncate-then-append when the user tweaks
-// from a non-tip thumbnail (Notion / Figma version-history pattern).
-type RenderItem = {
-  id: string;
-  imageUrl: string;
-  prompt: string;
-};
-
-type RoomState = {
-  list: RenderItem[];
-  currentIndex: number;
+  initialLockedRoomIds?: string[];
 };
 
 type GenerateResponse = {
@@ -54,17 +43,13 @@ type GenerateResponse = {
   prompt: string;
 };
 
-type IterateResponse = GenerateResponse;
-
 const MAX_TWEAKS = 4;
-const TIPS = [
-  "Mixing the paint",
-  "Placing the light fixtures",
-  "Rolling out the rug",
-  "Adjusting the throw pillow",
-  "Telling the cat to leave",
+const SUBSTEPS = [
+  "Interpreting tweak",
+  "Regenerating geometry",
+  "Relighting scene",
 ] as const;
-const TIP_INTERVAL_MS = 6000;
+const SUBSTEP_INTERVAL_MS = 2200;
 const PROGRESS_TARGET_MS = 30_000;
 
 function pickDefaultRoomId(rooms: RoomLite[]): string | null {
@@ -76,14 +61,27 @@ function pickDefaultRoomId(rooms: RoomLite[]): string | null {
   );
 }
 
+function isPointArray(v: unknown): v is number[][] {
+  if (!Array.isArray(v)) return false;
+  for (const p of v) {
+    if (!Array.isArray(p) || typeof p[0] !== "number" || typeof p[1] !== "number") {
+      return false;
+    }
+  }
+  return v.length >= 3;
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function RenderInteractive({
   projectId,
   rooms,
   style,
   initialChains,
+  initialLockedRoomIds = [],
 }: Props) {
-  const router = useRouter();
-
   const seededState = useMemo<Record<string, RoomState>>(() => {
     const result: Record<string, RoomState> = {};
     for (const [roomId, chain] of Object.entries(initialChains ?? {})) {
@@ -102,57 +100,59 @@ export function RenderInteractive({
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chat, setChat] = useState("");
-  const [tipIndex, setTipIndex] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const [promptExpanded, setPromptExpanded] = useState(false);
-  const [approving, setApproving] = useState(false);
+  const [lockedRoomIds, setLockedRoomIds] = useState<Set<string>>(
+    () => new Set(initialLockedRoomIds),
+  );
+  const [keepIterating, setKeepIterating] = useState<Set<string>>(() => new Set());
+  const [lastRenderMs, setLastRenderMs] = useState<number | null>(null);
+  const [locking, setLocking] = useState(false);
 
-  const selectedRoom = rooms.find((r) => r.id === selectedId) ?? null;
-  const roomState = selectedRoom
-    ? (stateByRoom[selectedRoom.id] ?? null)
-    : null;
-  const currentRender = roomState
-    ? (roomState.list[roomState.currentIndex] ?? null)
-    : null;
-  const tweakCount = roomState ? roomState.list.length - 1 : 0;
-  const atCap = tweakCount >= MAX_TWEAKS;
-  const hasRender = currentRender !== null;
-  const isGeneratingThis =
-    selectedRoom !== null && generatingId === selectedRoom.id;
-  const inputDisabled = !hasRender || atCap || isGeneratingThis;
+  // Controlled-only studio knobs (no backend effect for v1).
+  const [lighting, setLighting] = useState(50);
+  const [density, setDensity] = useState<"sparse" | "optimal" | "maximal">(
+    "optimal",
+  );
 
-  // Rotate the humorous tip while a render is in flight.
+  // Material palette state (4 visible slots; client-only swap).
+  const [materialSlots, setMaterialSlots] = useState<Material[]>(() =>
+    MATERIALS.slice(0, 4),
+  );
+  const [swapTarget, setSwapTarget] = useState<number | null>(null);
+
+  // Generation progress + substep are driven by an elapsedMs state that
+  // ticks only while a render is in flight. No synchronous setState in the
+  // effect body, no ref reads + Date.now() during render — both prior
+  // lint flags surfaced on this file's earlier implementation.
+  const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
     if (!generatingId) return;
-    setTipIndex(0);
-    const interval = setInterval(() => {
-      setTipIndex((i) => (i + 1) % TIPS.length);
-    }, TIP_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [generatingId]);
-
-  // Animate the progress bar 0 → 95% over PROGRESS_TARGET_MS while
-  // generating. Stays at 95% if the call runs longer than expected.
-  useEffect(() => {
-    if (!generatingId) {
-      setProgress(0);
-      return;
-    }
-    setProgress(0);
     const start = Date.now();
     const interval = setInterval(() => {
-      const elapsed = Date.now() - start;
-      setProgress(Math.min(95, (elapsed / PROGRESS_TARGET_MS) * 95));
+      setElapsedMs(Date.now() - start);
     }, 200);
     return () => clearInterval(interval);
   }, [generatingId]);
 
-  // Collapse the prompt toggle when the displayed render changes.
-  useEffect(() => {
-    setPromptExpanded(false);
-  }, [currentRender?.id]);
+  const selectedRoom = rooms.find((r) => r.id === selectedId) ?? null;
+  const roomState = selectedRoom ? stateByRoom[selectedRoom.id] ?? null : null;
+  const currentRender = roomState ? roomState.list[roomState.currentIndex] ?? null : null;
+  const tweakCount = roomState ? roomState.list.length - 1 : 0;
+  const atCap =
+    selectedRoom !== null &&
+    tweakCount >= MAX_TWEAKS &&
+    !keepIterating.has(selectedRoom.id);
+  const isGenerating = selectedRoom !== null && generatingId === selectedRoom.id;
+  const isLocked = selectedRoom !== null && lockedRoomIds.has(selectedRoom.id);
 
-  const callGenerate = async (roomId: string): Promise<GenerateResponse> => {
+  const substepIdx =
+    Math.floor(elapsedMs / SUBSTEP_INTERVAL_MS) % SUBSTEPS.length;
+  const progress = Math.min(95, (elapsedMs / PROGRESS_TARGET_MS) * 95);
+
+  // -------------------------------------------------------------------------
+  // API calls (preserve the existing data flow)
+  // -------------------------------------------------------------------------
+
+  async function callGenerate(roomId: string): Promise<GenerateResponse> {
     const res = await fetch("/api/render", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -169,13 +169,13 @@ export function RenderInteractive({
       );
     }
     return body;
-  };
+  }
 
-  const callIterate = async (
+  async function callIterate(
     roomId: string,
     parentRenderId: string,
     tweak: string,
-  ): Promise<IterateResponse> => {
+  ): Promise<GenerateResponse> {
     const res = await fetch("/api/render-iterate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -187,7 +187,7 @@ export function RenderInteractive({
       }),
     });
     const body = (await res.json().catch(() => null)) as
-      | IterateResponse
+      | GenerateResponse
       | { error?: string }
       | null;
     if (!res.ok || !body || !("image_url" in body)) {
@@ -197,15 +197,22 @@ export function RenderInteractive({
       );
     }
     return body;
-  };
+  }
 
-  const handleGenerate = async () => {
-    if (!selectedRoom) return;
+  async function timed<T>(fn: () => Promise<T>): Promise<T> {
+    const t0 = Date.now();
+    const out = await fn();
+    setLastRenderMs(Date.now() - t0);
+    return out;
+  }
+
+  async function handleRegenerate() {
+    if (!selectedRoom || isGenerating) return;
     const id = selectedRoom.id;
     setGeneratingId(id);
     setError(null);
     try {
-      const result = await callGenerate(id);
+      const result = await timed(() => callGenerate(id));
       const item: RenderItem = {
         id: result.render_id,
         imageUrl: result.image_url,
@@ -216,16 +223,15 @@ export function RenderInteractive({
         [id]: { list: [item], currentIndex: 0 },
       }));
     } catch (err) {
-      console.error("[render] generate error", err);
       setError(err instanceof Error ? err.message : "Render failed.");
     } finally {
-      setGeneratingId((current) => (current === id ? null : current));
+      setGeneratingId((cur) => (cur === id ? null : cur));
     }
-  };
+  }
 
-  const handleSendTweak = async (e: React.FormEvent) => {
+  async function handleSendTweak(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedRoom || !currentRender || atCap) return;
+    if (!selectedRoom || !currentRender || atCap || isGenerating) return;
     const tweak = chat.trim();
     if (!tweak) return;
     const id = selectedRoom.id;
@@ -234,19 +240,16 @@ export function RenderInteractive({
     setGeneratingId(id);
     setError(null);
     try {
-      const result = await callIterate(id, parent.id, tweak);
+      const result = await timed(() => callIterate(id, parent.id, tweak));
       const item: RenderItem = {
         id: result.render_id,
         imageUrl: result.image_url,
         prompt: result.prompt,
       };
-      // Truncate at the current viewing position, then append. This means
-      // tweaking off a thumbnail mid-history starts a new branch from there
-      // and discards anything later in the previous chain.
       setStateByRoom((prev) => {
-        const current = prev[id];
-        if (!current) return prev;
-        const truncated = current.list.slice(0, current.currentIndex + 1);
+        const cur = prev[id];
+        if (!cur) return prev;
+        const truncated = cur.list.slice(0, cur.currentIndex + 1);
         const nextList = [...truncated, item];
         return {
           ...prev,
@@ -254,38 +257,15 @@ export function RenderInteractive({
         };
       });
     } catch (err) {
-      console.error("[render] iterate error", err);
       setError(err instanceof Error ? err.message : "Iteration failed.");
     } finally {
-      setGeneratingId((current) => (current === id ? null : current));
+      setGeneratingId((cur) => (cur === id ? null : cur));
     }
-  };
+  }
 
-  const handleReset = () => {
-    if (!selectedRoom || !roomState || roomState.list.length === 0) return;
-    setStateByRoom((prev) => ({
-      ...prev,
-      [selectedRoom.id]: {
-        list: [roomState.list[0]],
-        currentIndex: 0,
-      },
-    }));
-    setError(null);
-  };
-
-  const setCurrentIndex = (idx: number) => {
-    if (!selectedRoom) return;
-    setStateByRoom((prev) => {
-      const current = prev[selectedRoom.id];
-      if (!current) return prev;
-      return { ...prev, [selectedRoom.id]: { ...current, currentIndex: idx } };
-    });
-    setError(null);
-  };
-
-  const handleApprove = async () => {
-    if (!selectedRoom || !currentRender) return;
-    setApproving(true);
+  async function handleLock() {
+    if (!selectedRoom || !currentRender || locking) return;
+    setLocking(true);
     setError(null);
     try {
       const res = await fetch("/api/approve-design", {
@@ -301,372 +281,505 @@ export function RenderInteractive({
         | { id?: string; error?: string }
         | null;
       if (!res.ok || !body?.id) {
-        throw new Error(
-          (body && typeof body === "object" && "error" in body && body.error) ||
-            `Approve failed (${res.status}).`,
-        );
+        throw new Error(body?.error ?? `Lock failed (${res.status}).`);
       }
-      router.push(`/project/${projectId}/boq`);
+      setLockedRoomIds((prev) => new Set(prev).add(selectedRoom.id));
     } catch (err) {
-      console.error("[render] approve error", err);
-      setApproving(false);
-      setError(err instanceof Error ? err.message : "Approve failed.");
+      setError(err instanceof Error ? err.message : "Couldn't lock the view.");
+    } finally {
+      setLocking(false);
     }
-  };
-
-  return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
-      <RoomList
-        rooms={rooms}
-        selectedId={selectedId}
-        onSelect={(id) => {
-          setSelectedId(id);
-          setError(null);
-        }}
-        stateByRoom={stateByRoom}
-      />
-      <div className="flex flex-col gap-4">
-        <RenderCanvas
-          room={selectedRoom}
-          style={style}
-          render={currentRender}
-          generating={isGeneratingThis && !hasRender}
-          error={error && !hasRender ? error : null}
-          tipIndex={tipIndex}
-          onGenerate={handleGenerate}
-          onRetry={handleGenerate}
-        />
-
-        {(isGeneratingThis || error) && hasRender && (
-          <div className="space-y-2">
-            {isGeneratingThis && (
-              <div className="space-y-1">
-                <Progress value={progress} className="h-1" />
-                <p className="text-xs text-text-tertiary">
-                  Rendering…{" "}
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={tipIndex}
-                      initial={{ opacity: 0, y: 2 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -2 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                      className="inline-block"
-                    >
-                      {TIPS[tipIndex]}…
-                    </motion.span>
-                  </AnimatePresence>
-                </p>
-              </div>
-            )}
-            {error && (
-              <div className="flex items-start gap-2 rounded-lg border border-status-error/40 bg-status-error/10 px-3 py-2 text-xs text-status-error">
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                <span className="min-w-0 break-words">{error}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {roomState && roomState.list.length > 0 && (
-          <ThumbnailStrip
-            list={roomState.list}
-            currentIndex={roomState.currentIndex}
-            onSelect={setCurrentIndex}
-            disabled={isGeneratingThis}
-          />
-        )}
-
-        {roomState && roomState.list.length > 0 && (
-          <div className="flex items-center justify-between text-xs">
-            <span
-              className={cn(
-                "text-text-tertiary",
-                atCap && "text-status-warning",
-              )}
-            >
-              {tweakCount === 0
-                ? "Original"
-                : `Tweak ${tweakCount} of ${MAX_TWEAKS}`}
-              {atCap && " — limit reached"}
-            </span>
-            {tweakCount > 0 && (
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={isGeneratingThis}
-                className="inline-flex items-center gap-1 text-text-tertiary transition-colors hover:text-text-secondary disabled:opacity-50"
-              >
-                <RotateCcw className="size-3" />
-                Reset to original
-              </button>
-            )}
-          </div>
-        )}
-
-        {currentRender && (
-          <PromptToggle
-            prompt={currentRender.prompt}
-            expanded={promptExpanded}
-            onToggle={() => setPromptExpanded((e) => !e)}
-          />
-        )}
-
-        <form className="flex items-center gap-2" onSubmit={handleSendTweak}>
-          <Input
-            value={chat}
-            onChange={(e) => setChat(e.target.value)}
-            placeholder={
-              atCap
-                ? "Limit reached — click Reset to start over"
-                : "Tell me how to change it…"
-            }
-            disabled={inputDisabled}
-            className="flex-1 border-bg-border bg-bg-elevated text-text-primary placeholder:text-text-tertiary disabled:opacity-50"
-            aria-label="Tweak the render"
-          />
-          <Button
-            type="submit"
-            size="lg"
-            disabled={inputDisabled || chat.trim().length === 0}
-            className="shrink-0"
-          >
-            {isGeneratingThis ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Sending…
-              </>
-            ) : (
-              <>
-                <Send />
-                Send
-              </>
-            )}
-          </Button>
-        </form>
-
-        <div className="mt-2 flex justify-end border-t border-bg-border pt-4">
-          <Button
-            type="button"
-            size="lg"
-            onClick={handleApprove}
-            disabled={!hasRender || approving || isGeneratingThis}
-          >
-            {approving ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <Check />
-                Approve &amp; continue
-                <ArrowRight />
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-function RoomList({
-  rooms,
-  selectedId,
-  onSelect,
-  stateByRoom,
-}: {
-  rooms: RoomLite[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  stateByRoom: Record<string, RoomState>;
-}) {
-  return (
-    <aside className="flex flex-col gap-2">
-      <p className="px-1 text-xs uppercase tracking-widest text-text-tertiary">
-        Rooms
-      </p>
-      <div className="flex flex-col gap-1.5">
-        {rooms.map((room) => {
-          const active = selectedId === room.id;
-          const done = (stateByRoom[room.id]?.list.length ?? 0) > 0;
-          return (
-            <button
-              key={room.id}
-              type="button"
-              onClick={() => onSelect(room.id)}
-              className={cn(
-                "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-all",
-                "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/30",
-                active
-                  ? "border-brand-primary/60 bg-brand-primary/10 text-text-primary shadow-[0_0_24px_-12px_rgba(168,85,247,0.55)]"
-                  : "border-bg-border bg-bg-elevated/60 text-text-secondary hover:border-bg-border hover:bg-bg-elevated/80 hover:text-text-primary",
-              )}
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {room.name_en?.trim() || "Room"}
-                </p>
-                {typeof room.area_m2 === "number" && (
-                  <p className="text-xs text-text-tertiary">
-                    {Math.round(room.area_m2 * 10) / 10} m²
-                  </p>
-                )}
-              </div>
-              {done && (
-                <span className="text-xs font-medium text-status-success">
-                  ✓
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </aside>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-function RenderCanvas({
-  room,
-  style,
-  render,
-  generating,
-  error,
-  tipIndex,
-  onGenerate,
-  onRetry,
-}: {
-  room: RoomLite | null;
-  style: Style | null;
-  render: RenderItem | null;
-  generating: boolean;
-  error: string | null;
-  tipIndex: number;
-  onGenerate: () => void;
-  onRetry: () => void;
-}) {
-  if (!room) {
-    return (
-      <div className="flex aspect-[16/10] items-center justify-center rounded-xl border border-bg-border bg-bg-elevated/60 backdrop-blur-sm">
-        <p className="text-sm text-text-tertiary">Select a room to render.</p>
-      </div>
-    );
   }
 
+  function setCurrentIndex(idx: number) {
+    if (!selectedRoom) return;
+    setStateByRoom((prev) => {
+      const cur = prev[selectedRoom.id];
+      if (!cur) return prev;
+      return { ...prev, [selectedRoom.id]: { ...cur, currentIndex: idx } };
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
+
   return (
-    <div className="overflow-hidden rounded-xl border border-bg-border bg-bg-elevated/60 backdrop-blur-sm">
-      <div className="relative aspect-[16/10] w-full">
-        {render ? (
-          // The render is shown even when generating a follow-up. The
-          // progress bar below the canvas signals the in-flight tweak.
-          // eslint-disable-next-line jsx-a11y/alt-text
-          <motion.img
-            key={render.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            src={render.imageUrl}
-            alt={`${style?.name_en ?? "Style"} render of ${room.name_en?.trim() || "room"}`}
-            className="h-full w-full object-cover"
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-canvas">
+      {/* LEFT COL — rooms & style picker -------------------------------- */}
+      <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-r border-ink-100 bg-paper px-lg py-lg">
+        <p className="label-caps mb-md text-ink-500">Rooms</p>
+        <ul className="flex flex-col gap-xs">
+          {rooms.map((room) => (
+            <RoomRow
+              key={room.id}
+              room={room}
+              selected={room.id === selectedId}
+              rendered={(stateByRoom[room.id]?.list.length ?? 0) > 0}
+              onClick={() => setSelectedId(room.id)}
+            />
+          ))}
+        </ul>
+
+        <div className="my-xl h-px bg-bone" />
+
+        <p className="label-caps mb-md text-ink-500">Style</p>
+        <StylePicker projectId={projectId} style={style} />
+
+        <p className="label-caps mt-xl mb-sm text-ink-500">Lighting mood</p>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={lighting}
+          onChange={(e) => setLighting(Number(e.target.value))}
+          className="w-full accent-brass-600"
+          aria-label="Lighting mood"
+        />
+        <div className="mt-xs flex justify-between font-mono text-[11px] text-ink-500">
+          <span>Golden hour</span>
+          <span>Midnight glow</span>
+        </div>
+
+        <p className="label-caps mt-xl mb-sm text-ink-500">Detail density</p>
+        <div className="grid grid-cols-3 overflow-hidden rounded border border-ink-100">
+          {(["sparse", "optimal", "maximal"] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDensity(d)}
+              className={cn(
+                "px-sm py-xs font-body-sm text-body-sm font-semibold capitalize transition-colors",
+                density === d
+                  ? "bg-brass-600 text-on-primary"
+                  : "bg-paper text-ink-700 hover:bg-surface-container-low",
+              )}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {/* CENTER COL — hero render stage --------------------------------- */}
+      <main className="relative flex flex-1 flex-col overflow-y-auto px-lg py-lg">
+        <div className="mx-auto flex w-full max-w-[840px] flex-col items-center gap-md">
+          <ActivePill />
+
+          <HeroRender
+            render={currentRender}
+            roomName={selectedRoom?.name_en?.trim() || "this room"}
+            styleName={style?.name_en ?? "default style"}
+            generating={isGenerating}
+            progress={progress}
+            substepIdx={substepIdx}
+            error={!currentRender ? error : null}
           />
-        ) : generating ? (
-          <GeneratingState tipIndex={tipIndex} />
-        ) : error ? (
-          <ErrorState onRetry={onRetry} />
-        ) : (
-          <ReadyState
-            roomName={room.name_en?.trim() || "this room"}
-            styleName={style?.name_en ?? "default-style"}
-            onGenerate={onGenerate}
+
+          <HeroActions
+            disabled={!selectedRoom || isGenerating}
+            onRegenerate={handleRegenerate}
+            downloadUrl={currentRender?.imageUrl ?? null}
+          />
+
+          <StatusRow lastRenderMs={lastRenderMs} />
+
+          {roomState && roomState.list.length > 0 && (
+            <ThumbStrip
+              list={roomState.list}
+              currentIndex={roomState.currentIndex}
+              onSelect={setCurrentIndex}
+              disabled={isGenerating}
+            />
+          )}
+
+          {error && currentRender && (
+            <p className="font-body-sm text-body-sm text-error">{error}</p>
+          )}
+
+          {atCap ? (
+            <CapBanner
+              onLock={handleLock}
+              onKeepIterating={() => {
+                if (!selectedRoom) return;
+                setKeepIterating((p) => new Set(p).add(selectedRoom.id));
+              }}
+              locking={locking}
+              locked={isLocked}
+            />
+          ) : (
+            <ChatInput
+              value={chat}
+              onChange={setChat}
+              onSubmit={handleSendTweak}
+              disabled={!currentRender || isGenerating}
+              isGenerating={isGenerating}
+              lastRenderMs={lastRenderMs}
+            />
+          )}
+        </div>
+      </main>
+
+      {/* RIGHT COL — material palette ----------------------------------- */}
+      <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-ink-100 bg-paper px-lg py-lg">
+        <p className="label-caps mb-xs text-ink-500">Material palette</p>
+        <p className="mb-lg font-body-sm text-body-sm text-on-surface-variant">
+          Four core finishes that anchor this style. Swap any for a vetted
+          alternative.
+        </p>
+        <ul className="flex flex-col gap-md">
+          {materialSlots.map((m, i) => (
+            <MaterialCard
+              key={`${m.id}-${i}`}
+              material={m}
+              onSwap={() => setSwapTarget(i)}
+            />
+          ))}
+        </ul>
+
+        <p className="label-caps mt-xl mb-md text-ink-500">Surface specs</p>
+        <div className="grid grid-cols-2 gap-md rounded-lg border border-ink-100 bg-canvas p-md">
+          {SURFACE_SPECS.map((s) => (
+            <div key={s.label} className="flex flex-col gap-xs">
+              <span className="label-caps text-ink-500">{s.label}</span>
+              <span className="font-mono text-body-sm tabular-nums text-ink-900">
+                {s.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {/* Floating Cost-it CTA ------------------------------------------ */}
+      {lockedRoomIds.size > 0 && (
+        <Link
+          href={`/project/${projectId}/boq`}
+          className="focus-ring fixed bottom-lg right-lg z-30 flex h-[56px] items-center gap-sm rounded-full bg-brass-600 px-xl font-body-sm text-body-sm font-semibold text-on-primary shadow-level-2 transition-transform hover:scale-[1.02]"
+        >
+          <span
+            className="material-symbols-outlined text-[18px]"
+            aria-hidden="true"
+          >
+            receipt_long
+          </span>
+          Cost it →
+        </Link>
+      )}
+
+      {/* Material swap modal ------------------------------------------- */}
+      <Dialog
+        open={swapTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setSwapTarget(null);
+        }}
+      >
+        <DialogContent className="w-[92vw] max-w-[560px] border border-ink-100 bg-paper p-6 duration-200 sm:max-w-[560px]">
+          {swapTarget !== null && materialSlots[swapTarget] && (
+            <SwapPanel
+              current={materialSlots[swapTarget]!}
+              onPick={(alt) => {
+                setMaterialSlots((prev) => {
+                  const next = [...prev];
+                  // Merge: keep the slot's alternates list so future swaps
+                  // see the same palette of options.
+                  next[swapTarget] = {
+                    ...alt,
+                    alternates: prev[swapTarget]!.alternates,
+                  };
+                  return next;
+                });
+                setSwapTarget(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Left column
+// ---------------------------------------------------------------------------
+
+function RoomRow({
+  room,
+  selected,
+  rendered,
+  onClick,
+}: {
+  room: RoomLite;
+  selected: boolean;
+  rendered: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={selected}
+        className={cn(
+          "relative flex h-14 w-full items-center gap-md rounded px-sm text-left transition-colors",
+          selected ? "bg-surface-container-low" : "hover:bg-surface-container-low",
+        )}
+      >
+        {selected && (
+          <span
+            aria-hidden="true"
+            className="absolute inset-y-2 left-0 w-[3px] rounded-r-sm bg-brass-600"
           />
         )}
+        <RoomThumb polygon={room.polygon} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-body-sm text-body-sm font-semibold text-ink-900">
+            {room.name_en?.trim() || "Room"}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "rounded-full px-sm py-[2px] text-[10px] font-semibold uppercase tracking-wider",
+            rendered ? "bg-primary-fixed text-ink-900" : "bg-bone text-ink-500",
+          )}
+        >
+          {rendered ? "Rendered" : "Not yet"}
+        </span>
+      </button>
+    </li>
+  );
+}
+
+function RoomThumb({ polygon }: { polygon: unknown }) {
+  if (!isPointArray(polygon)) {
+    return <div className="size-10 shrink-0 rounded bg-bone" />;
+  }
+  const xs = polygon.map((p) => p[0]!);
+  const ys = polygon.map((p) => p[1]!);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const w = Math.max(maxX - minX, 1e-6);
+  const h = Math.max(maxY - minY, 1e-6);
+  const PAD = 2;
+  const sizes = 40 - PAD * 2;
+  const scale = Math.min(sizes / w, sizes / h);
+  const offX = (40 - w * scale) / 2;
+  const offY = (40 - h * scale) / 2;
+  const points = polygon
+    .map(([x, y]) => `${((x - minX) * scale + offX).toFixed(1)},${((y - minY) * scale + offY).toFixed(1)}`)
+    .join(" ");
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      className="size-10 shrink-0 rounded bg-bone"
+      aria-hidden="true"
+    >
+      <polygon points={points} fill="#0F1B2D" />
+    </svg>
+  );
+}
+
+function StylePicker({
+  projectId,
+  style,
+}: {
+  projectId: string;
+  style: Style | null;
+}) {
+  if (!style) {
+    return (
+      <Link
+        href={`/project/${projectId}/style`}
+        className="focus-ring flex h-14 items-center justify-between rounded border border-dashed border-ink-100 px-md font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-low"
+      >
+        Pick a style direction
+        <span
+          className="material-symbols-outlined text-[18px]"
+          aria-hidden="true"
+        >
+          arrow_forward
+        </span>
+      </Link>
+    );
+  }
+  return (
+    <div className="flex items-center gap-md rounded-lg border border-ink-100 p-sm">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={style.reference_images[0]}
+        alt={`${style.name_en} reference`}
+        className="size-12 shrink-0 rounded object-cover"
+        onError={(e) => {
+          // Palette fallback if the moodboard PNG is missing.
+          const el = e.currentTarget;
+          el.style.background = `linear-gradient(135deg, ${style.palette[0]}, ${style.palette[1]})`;
+          el.removeAttribute("src");
+        }}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-body-sm text-body-sm font-semibold text-ink-900">
+          {style.name_en}
+        </p>
+        <Link
+          href={`/project/${projectId}/style`}
+          className="text-[12px] font-semibold text-brass-600 hover:underline"
+        >
+          Change
+        </Link>
       </div>
     </div>
   );
 }
 
-function GeneratingState({ tipIndex }: { tipIndex: number }) {
+// ---------------------------------------------------------------------------
+// Center column
+// ---------------------------------------------------------------------------
+
+function ActivePill() {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center">
-      <Loader2 className="size-10 animate-spin text-brand-primary" />
-      <div>
-        <p className="font-display text-xl font-semibold text-text-primary">
-          Rendering… (this takes 30 seconds)
-        </p>
-        <div className="mt-2 h-5 text-sm text-text-secondary">
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={tipIndex}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
-              className="inline-block"
-            >
-              {TIPS[tipIndex]}…
-            </motion.span>
-          </AnimatePresence>
+    <div className="flex items-center gap-sm rounded-full border border-ink-100 bg-paper px-md py-xs">
+      <span className="size-2 rounded-full bg-brass-600" aria-hidden="true" />
+      <span className="label-caps text-brass-600">AI Studio · Active</span>
+    </div>
+  );
+}
+
+function HeroRender({
+  render,
+  roomName,
+  styleName,
+  generating,
+  progress,
+  substepIdx,
+  error,
+}: {
+  render: RenderItem | null;
+  roomName: string;
+  styleName: string;
+  generating: boolean;
+  progress: number;
+  substepIdx: number;
+  error: string | null;
+}) {
+  return (
+    <div className="relative w-full max-w-[720px]">
+      <div className="matte-image relative">
+        <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg bg-bone">
+          {render ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={render.id}
+              src={render.imageUrl}
+              alt={`${styleName} render of ${roomName}`}
+              className={cn(
+                "size-full object-cover transition-opacity duration-300",
+                generating ? "opacity-40" : "opacity-100",
+              )}
+            />
+          ) : (
+            <div className="flex size-full items-center justify-center text-center">
+              {error ? (
+                <p className="font-body-sm text-body-sm text-error">{error}</p>
+              ) : (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Click <span className="font-semibold">Regenerate this view</span>{" "}
+                  to render {roomName} in {styleName}.
+                </p>
+              )}
+            </div>
+          )}
+          {generating && (
+            <>
+              <div
+                aria-hidden="true"
+                className="absolute bottom-0 left-0 h-[2px] bg-brass-600 transition-[width] duration-200"
+                style={{ width: `${Math.max(4, progress)}%` }}
+              />
+              <div className="absolute inset-x-0 bottom-[10px] flex justify-center">
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={substepIdx}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.3 }}
+                    className="font-display text-body-lg italic text-ink-900"
+                  >
+                    {SUBSTEPS[substepIdx]}…
+                  </motion.p>
+                </AnimatePresence>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function ErrorState({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center">
-      <div className="flex size-12 items-center justify-center rounded-full bg-status-warning/15 text-status-warning">
-        <AlertTriangle className="size-6" />
-      </div>
-      <p className="font-display text-xl font-semibold text-text-primary">
-        We couldn&rsquo;t render that one. Try again?
-      </p>
-      <Button size="lg" onClick={onRetry} className="min-w-[160px]">
-        <RotateCcw />
-        Retry
-      </Button>
-    </div>
-  );
-}
-
-function ReadyState({
-  roomName,
-  styleName,
-  onGenerate,
+function HeroActions({
+  disabled,
+  onRegenerate,
+  downloadUrl,
 }: {
-  roomName: string;
-  styleName: string;
-  onGenerate: () => void;
+  disabled: boolean;
+  onRegenerate: () => void;
+  downloadUrl: string | null;
 }) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center">
-      <div className="flex size-14 items-center justify-center rounded-full bg-brand-primary/15 text-brand-primary">
-        <Sparkles className="size-6" />
-      </div>
-      <div>
-        <p className="font-display text-xl font-semibold text-text-primary">
-          Ready to render
-        </p>
-        <p className="mt-1 text-sm text-text-secondary">
-          We&rsquo;ll generate a {styleName} render of {roomName}.
-        </p>
-      </div>
-      <Button size="lg" onClick={onGenerate} className="min-w-[180px]">
-        <Sparkles />
-        Generate render
-      </Button>
+    <div className="flex items-center gap-md">
+      <button
+        type="button"
+        aria-label="Zoom in"
+        className="focus-ring flex size-12 items-center justify-center rounded-full border border-ink-100 text-ink-700 hover:bg-surface-container-low"
+      >
+        <span className="material-symbols-outlined">zoom_in</span>
+      </button>
+      <button
+        type="button"
+        onClick={onRegenerate}
+        disabled={disabled}
+        className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+          auto_fix_high
+        </span>
+        Regenerate this view
+      </button>
+      {downloadUrl ? (
+        <a
+          href={downloadUrl}
+          download
+          aria-label="Download render"
+          className="focus-ring flex size-12 items-center justify-center rounded-full border border-ink-100 text-ink-700 hover:bg-surface-container-low"
+        >
+          <span className="material-symbols-outlined">download</span>
+        </a>
+      ) : (
+        <button
+          type="button"
+          aria-label="Download render"
+          disabled
+          className="flex size-12 cursor-not-allowed items-center justify-center rounded-full border border-ink-100 text-ink-500 opacity-50"
+        >
+          <span className="material-symbols-outlined">download</span>
+        </button>
+      )}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
+function StatusRow({ lastRenderMs }: { lastRenderMs: number | null }) {
+  const seconds = lastRenderMs ? Math.round(lastRenderMs / 1000) : null;
+  return (
+    <p className="label-caps text-on-surface-variant">
+      4K render · {seconds ? `${seconds} sec` : "—"} · Flux Canny
+    </p>
+  );
+}
 
-function ThumbnailStrip({
+function ThumbStrip({
   list,
   currentIndex,
   onSelect,
@@ -674,48 +787,33 @@ function ThumbnailStrip({
 }: {
   list: RenderItem[];
   currentIndex: number;
-  onSelect: (idx: number) => void;
+  onSelect: (i: number) => void;
   disabled: boolean;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="flex w-full max-w-[720px] gap-sm overflow-x-auto pb-xs">
       {list.map((item, i) => {
         const active = i === currentIndex;
-        const label = i === 0 ? "Original" : `Tweak ${i}`;
         return (
           <button
             key={item.id}
             type="button"
             onClick={() => onSelect(i)}
             disabled={disabled}
+            title={item.prompt}
+            aria-pressed={active}
             className={cn(
-              "flex shrink-0 flex-col items-center gap-1 rounded-md p-1 transition-opacity",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40",
-              !active && "opacity-60 hover:opacity-100",
+              "shrink-0 overflow-hidden rounded transition-shadow",
+              active ? "border-2 border-brass-600" : "border border-ink-100 opacity-70 hover:opacity-100",
               disabled && "cursor-not-allowed",
             )}
-            aria-pressed={active}
-            aria-label={`View ${label}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={item.imageUrl}
-              alt={label}
-              className={cn(
-                "h-12 w-20 rounded-md border object-cover transition-shadow",
-                active
-                  ? "border-brand-primary ring-2 ring-brand-primary/40"
-                  : "border-bg-border",
-              )}
+              alt={i === 0 ? "Original render" : `Tweak ${i}`}
+              className="h-[66px] w-[100px] object-cover"
             />
-            <span
-              className={cn(
-                "text-[10px] font-medium",
-                active ? "text-text-primary" : "text-text-tertiary",
-              )}
-            >
-              {label}
-            </span>
           </button>
         );
       })}
@@ -723,45 +821,201 @@ function ThumbnailStrip({
   );
 }
 
-// ---------------------------------------------------------------------------
-
-function PromptToggle({
-  prompt,
-  expanded,
-  onToggle,
+function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  disabled,
+  isGenerating,
+  lastRenderMs,
 }: {
-  prompt: string;
-  expanded: boolean;
-  onToggle: () => void;
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  disabled: boolean;
+  isGenerating: boolean;
+  lastRenderMs: number | null;
 }) {
   return (
-    <div className="text-xs text-text-tertiary">
+    <div className="w-full max-w-[720px]">
+      {!isGenerating && lastRenderMs != null && (
+        <p className="mb-xs text-center font-body-sm text-body-sm italic text-on-surface-variant">
+          Rendered in {Math.round(lastRenderMs / 1000)}s
+        </p>
+      )}
+      <form
+        onSubmit={onSubmit}
+        className="flex h-14 items-center gap-sm rounded-lg border border-ink-100 bg-paper px-md focus-within:border-brass-600 focus-within:ring-1 focus-within:ring-brass-600"
+      >
+        <span
+          className="material-symbols-outlined text-brass-600"
+          aria-hidden="true"
+        >
+          auto_awesome
+        </span>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          placeholder='Try: "warmer wood, less gold" or "add a reading nook"'
+          className="h-full flex-1 bg-transparent font-body-sm text-body-sm text-ink-900 outline-none placeholder:text-ink-500"
+        />
+        <button
+          type="submit"
+          disabled={disabled || value.trim().length === 0}
+          aria-label="Send tweak"
+          className="focus-ring flex size-10 items-center justify-center rounded-full bg-brass-600 text-on-primary disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function CapBanner({
+  onLock,
+  onKeepIterating,
+  locking,
+  locked,
+}: {
+  onLock: () => void;
+  onKeepIterating: () => void;
+  locking: boolean;
+  locked: boolean;
+}) {
+  return (
+    <div className="w-full max-w-[720px] rounded-lg border border-brass-600/40 bg-primary-fixed/40 p-md text-center">
+      <p className="mb-md font-body text-body-md text-ink-900">
+        You&apos;ve iterated 4 times on this view — usually a good place to lock
+        it. Want to render a different room?
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-md">
+        <button
+          type="button"
+          onClick={onLock}
+          disabled={locking || locked}
+          className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            {locked ? "check" : "lock"}
+          </span>
+          {locked ? "View locked" : locking ? "Locking…" : "Lock this view"}
+        </button>
+        <button
+          type="button"
+          onClick={onKeepIterating}
+          className="focus-ring flex h-12 items-center rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low"
+        >
+          Keep iterating
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Right column
+// ---------------------------------------------------------------------------
+
+function MaterialCard({
+  material,
+  onSwap,
+}: {
+  material: Material;
+  onSwap: () => void;
+}) {
+  return (
+    <li className="flex h-20 items-center gap-md rounded-lg border border-ink-100 bg-canvas p-sm">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={material.swatch_url}
+        alt={`${material.name} swatch`}
+        className="size-16 shrink-0 rounded-md object-cover"
+        onError={(e) => {
+          const el = e.currentTarget;
+          el.style.background =
+            "linear-gradient(135deg, #C9B79A 0%, #6B5B3E 100%)";
+          el.removeAttribute("src");
+        }}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-body-md text-body-md font-semibold text-ink-900">
+          {material.name}
+        </p>
+        <p className="truncate font-body-sm text-body-sm text-on-surface-variant">
+          {material.source} — {material.unit_label}
+        </p>
+      </div>
       <button
         type="button"
-        onClick={onToggle}
-        className="inline-flex items-center gap-1 rounded-md text-text-tertiary transition-colors hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/30"
+        onClick={onSwap}
+        aria-label={`Swap ${material.name}`}
+        className="focus-ring flex size-10 items-center justify-center rounded-full text-brass-600 hover:bg-surface-container-low"
       >
-        <ChevronDown
-          className={cn(
-            "size-3.5 transition-transform duration-200",
-            expanded && "rotate-180",
-          )}
-        />
-        {expanded ? "Hide prompt" : "Show prompt"}
+        <span className="material-symbols-outlined">swap_horiz</span>
       </button>
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.p
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="mt-2 leading-relaxed"
-          >
-            {prompt}
-          </motion.p>
-        )}
-      </AnimatePresence>
+    </li>
+  );
+}
+
+function SwapPanel({
+  current,
+  onPick,
+}: {
+  current: Material;
+  onPick: (alt: Material) => void;
+}) {
+  return (
+    <div>
+      <DialogTitle className="mb-xs font-display text-headline-md text-ink-900">
+        Swap {current.name}
+      </DialogTitle>
+      <DialogDescription className="mb-lg font-body text-body-md text-on-surface-variant">
+        Three vetted alternates in the same finish family.
+      </DialogDescription>
+      <ul className="flex flex-col gap-md">
+        {current.alternates.map((alt) => (
+          <li key={alt.id}>
+            <button
+              type="button"
+              onClick={() =>
+                onPick({
+                  id: alt.id,
+                  name: alt.name,
+                  source: alt.source,
+                  unit_label: alt.unit_label,
+                  swatch_url: alt.swatch_url,
+                  alternates: current.alternates,
+                })
+              }
+              className="focus-ring flex h-20 w-full items-center gap-md rounded-lg border border-ink-100 bg-canvas p-sm text-left transition-colors hover:bg-surface-container-low"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={alt.swatch_url}
+                alt={`${alt.name} swatch`}
+                className="size-16 shrink-0 rounded-md object-cover"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.background =
+                    "linear-gradient(135deg, #C9B79A 0%, #6B5B3E 100%)";
+                  el.removeAttribute("src");
+                }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-body-md text-body-md font-semibold text-ink-900">
+                  {alt.name}
+                </p>
+                <p className="truncate font-body-sm text-body-sm text-on-surface-variant">
+                  {alt.source} — {alt.unit_label}
+                </p>
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

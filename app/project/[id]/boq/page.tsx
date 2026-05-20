@@ -1,16 +1,36 @@
-import { FadeIn } from "@/app/_components/fade-in";
-import { AppShell } from "@/components/app/AppShell";
-import { BackButton } from "@/components/back-button";
-import { Badge } from "@/components/ui/badge";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { BoqView, type BoqPayload } from "./_components/boq-view";
+import { AppShell } from "@/components/app/AppShell";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  ALL_RELEVANT_CATEGORIES,
+  categoriesForLine,
+} from "@/lib/vendor-options-helpers";
+
+import {
+  BoqView,
+  type BoqPayload,
+  type VendorOption,
+} from "./_components/boq-view";
 import { GenerateBoqButton } from "./_components/generate-boq-button";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Bill of Quantities";
-const FALLBACK_BUDGET_AED = 400000;
+const FALLBACK_BUDGET_AED = 850000;
+const SEGMENTS = 5;
+
+type SkuRow = {
+  id: string;
+  sku: string | null;
+  brand: string | null;
+  category: string | null;
+  description_en: string | null;
+  price_aed: number | null;
+  photo_url: string | null;
+  lead_time_days: number | null;
+  in_stock: boolean | null;
+};
 
 function isBoqPayload(value: unknown): value is BoqPayload {
   if (!value || typeof value !== "object") return false;
@@ -22,15 +42,71 @@ function isBoqPayload(value: unknown): value is BoqPayload {
   );
 }
 
+function toOption(s: SkuRow): VendorOption {
+  return {
+    id: s.id,
+    sku: s.sku,
+    brand: s.brand,
+    description: s.description_en,
+    photo_url: s.photo_url,
+    price_aed: s.price_aed ?? 0,
+    lead_time_days: s.lead_time_days,
+    in_stock: s.in_stock,
+  };
+}
+
+/**
+ * Pre-compute up to 3 vendor alternatives per BoQ line, same logic as
+ * /api/vendor-options but inline so each row's expansion has data ready
+ * without a per-row fetch on click. Same ±25% band + category filter.
+ */
+function buildLineOptions(
+  boq: BoqPayload,
+  skus: SkuRow[],
+): Record<string, VendorOption[]> {
+  const out: Record<string, VendorOption[]> = {};
+  for (const section of boq.sections) {
+    for (let idx = 0; idx < section.lines.length; idx++) {
+      const line = section.lines[idx]!;
+      const key = `${section.work_section}-${idx}`;
+      const cats = categoriesForLine(section.work_section, line.description);
+      if (cats.length === 0 || line.rate_aed <= 0) {
+        out[key] = [];
+        continue;
+      }
+      const min = line.rate_aed * 0.75;
+      const max = line.rate_aed * 1.25;
+      out[key] = skus
+        .filter(
+          (s) =>
+            s.category != null &&
+            cats.includes(s.category) &&
+            s.price_aed != null &&
+            s.price_aed >= min &&
+            s.price_aed <= max,
+        )
+        .sort(
+          (a, b) =>
+            Math.abs((a.price_aed ?? 0) - line.rate_aed) -
+            Math.abs((b.price_aed ?? 0) - line.rate_aed),
+        )
+        .slice(0, 3)
+        .map(toOption);
+    }
+  }
+  return out;
+}
+
 export default async function BoqPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
   const supabase = getSupabaseAdmin();
-  const [projectRes, boqRes] = await Promise.all([
+  const sb = supabase as unknown as SupabaseClient;
+
+  const [projectRes, boqRes, skuRes] = await Promise.all([
     supabase
       .from("projects")
       .select("id, name, city, budget_aed")
@@ -42,82 +118,103 @@ export default async function BoqPage({
       .eq("project_id", id)
       .order("created_at", { ascending: false })
       .limit(1),
+    sb
+      .from("pricing_skus")
+      .select(
+        "id, sku, brand, category, description_en, price_aed, photo_url, lead_time_days, in_stock",
+      )
+      .in("category", ALL_RELEVANT_CATEGORIES)
+      .not("price_aed", "is", null)
+      .returns<SkuRow[]>(),
   ]);
 
   if (projectRes.error || !projectRes.data) {
     return (
       <AppShell pageName={PAGE_NAME}>
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-          <p className="text-status-error">Project not found.</p>
+          <p className="text-error">Project not found.</p>
         </main>
       </AppShell>
     );
   }
 
   const project = projectRes.data;
-  const projectName = project.name?.trim() || "Untitled";
-  const projectTitle =
-    projectName === "Untitled"
-      ? `${project.city ?? "Dubai"} · First-floor refit`
-      : `${projectName} · First-floor refit`;
   const budgetAed = project.budget_aed ?? FALLBACK_BUDGET_AED;
-
   const latestBoq = boqRes.data?.[0];
   const boqPayload =
     latestBoq && isBoqPayload(latestBoq.sections) ? latestBoq.sections : null;
+  const skus = skuRes.data ?? [];
+  const lineOptions = boqPayload ? buildLineOptions(boqPayload, skus) : {};
+
+  const lineCount =
+    boqPayload?.sections.reduce((n, s) => n + s.lines.length, 0) ?? 0;
+  const sectionCount = boqPayload?.sections.length ?? 0;
 
   return (
     <AppShell pageName={PAGE_NAME}>
-      <main className="flex min-h-[calc(100vh-4rem)] justify-center px-6 py-12">
-        <FadeIn className="w-full max-w-[1200px]">
-          <BackButton />
-
-          <header className="mt-4 flex flex-wrap items-center justify-between gap-4">
-            <h1 className="max-w-[720px] text-h1 text-on-surface">
-              Bill of Quantities
-            </h1>
-            <Badge
-              variant="secondary"
-              className="shrink-0 bg-surface-container text-on-surface-variant"
-            >
-              Step 5 of 6 — Cost it out
-            </Badge>
-          </header>
-
-          <p className="mt-3 max-w-[720px] text-body-md text-on-surface-variant">
-            POMI-formatted, sourced from QS-vetted labour rates and Dubai supplier SKUs.
-          </p>
-
+      <div className="mx-auto max-w-[1440px]">
+        {/* Header */}
+        <header className="mb-xl">
+          <p className="label-caps mb-md text-brass-600">Step 04 of 05</p>
+          <div className="mb-xl flex gap-sm" aria-hidden="true">
+            {Array.from({ length: SEGMENTS }).map((_, i) => (
+              <span
+                key={i}
+                className={
+                  "h-1 flex-1 rounded-full " +
+                  (i < 4 ? "bg-brass-600" : "bg-bone")
+                }
+              />
+            ))}
+          </div>
+          <h1 className="mb-md font-display text-headline-lg text-ink-900">
+            Your bill of quantities.
+          </h1>
           {boqPayload ? (
-            <BoqView
-              projectId={id}
-              projectTitle={projectTitle}
-              budgetAed={budgetAed}
-              boq={boqPayload}
-            />
+            <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
+              {lineCount} line items across {sectionCount} work sections,
+              priced against today&apos;s Dubai catalogues. Tap any line for
+              sources and sensitivity.
+            </p>
           ) : (
-            <EmptyState projectId={id} />
+            <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
+              POMI-formatted, sourced from QS-vetted labour rates and Dubai
+              supplier SKUs.
+            </p>
           )}
-        </FadeIn>
-      </main>
+        </header>
+
+        {boqPayload ? (
+          <BoqView
+            projectId={id}
+            budgetAed={budgetAed}
+            boq={boqPayload}
+            lineOptions={lineOptions}
+          />
+        ) : (
+          <EmptyState projectId={id} />
+        )}
+      </div>
     </AppShell>
   );
 }
 
 function EmptyState({ projectId }: { projectId: string }) {
   return (
-    <div className="mt-16 flex flex-col items-center gap-6 rounded-2xl border border-dashed border-outline-variant bg-surface-container-low px-6 py-16 text-center">
+    <div className="mt-xl flex flex-col items-center gap-lg rounded-2xl border border-dashed border-ink-100 bg-paper px-margin py-3xl text-center">
       <span
         className="material-symbols-outlined text-5xl text-on-surface-variant"
         aria-hidden="true"
       >
         request_quote
       </span>
-      <div className="flex flex-col gap-2">
-        <h2 className="text-h3 text-on-surface">No BoQ yet</h2>
-        <p className="max-w-[520px] text-body-md text-on-surface-variant">
-          Generate a priced bill of quantities from the plan, your chosen style, and the
-          approved designs. This takes about a minute.
+      <div className="flex flex-col gap-sm">
+        <h2 className="font-display text-headline-md text-ink-900">
+          No BoQ yet
+        </h2>
+        <p className="max-w-[520px] font-body text-body-md text-on-surface-variant">
+          Generate a priced bill of quantities from the plan, your chosen
+          style, and the approved designs. This takes about a minute.
         </p>
       </div>
       <GenerateBoqButton projectId={projectId} />

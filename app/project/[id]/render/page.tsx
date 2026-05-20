@@ -1,7 +1,4 @@
-import { FadeIn } from "@/app/_components/fade-in";
 import { AppShell } from "@/components/app/AppShell";
-import { BackButton } from "@/components/back-button";
-import { Badge } from "@/components/ui/badge";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -95,7 +92,6 @@ export default async function RenderPage({
     .limit(1);
 
   const styleChoice = styleChoiceRows?.[0] ?? null;
-
   const style = styleChoice?.style_key
     ? (getStyleByKey(styleChoice.style_key) ?? null)
     : null;
@@ -104,7 +100,7 @@ export default async function RenderPage({
     return (
       <AppShell pageName="AI Designer">
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-          <p className="text-text-secondary">
+          <p className="text-on-surface-variant">
             {!project
               ? `Project ${projectId} not found.`
               : "No plan attached to this project yet."}
@@ -116,7 +112,7 @@ export default async function RenderPage({
 
   const { data: rooms } = await supabase
     .from("rooms")
-    .select("id, name_en, room_type, area_m2")
+    .select("id, name_en, room_type, area_m2, polygon")
     .eq("plan_id", plan.id)
     .order("name_en");
 
@@ -133,56 +129,42 @@ export default async function RenderPage({
 
   const initialChains = buildInitialChains(renderRows ?? []);
 
+  // Rooms that already have an approved/locked design — these gate the
+  // floating Cost-it CTA on the right.
+  const { data: approvedRows } = await supabase
+    .from("approved_designs")
+    .select("room_id")
+    .eq("project_id", projectId);
+
+  const initialLockedRoomIds = Array.from(
+    new Set(
+      (approvedRows ?? [])
+        .map((r) => r.room_id)
+        .filter((v): v is string => typeof v === "string"),
+    ),
+  );
+
+  if (roomList.length === 0) {
+    return (
+      <AppShell pageName="AI Designer">
+        <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
+          <p className="text-on-surface-variant">
+            No rooms found on this plan. Go back and confirm the plan first.
+          </p>
+        </main>
+      </AppShell>
+    );
+  }
+
   return (
-    <AppShell pageName="AI Designer">
-      <main className="flex min-h-[calc(100vh-4rem)] justify-center px-6 py-16 sm:py-24">
-        <FadeIn className="w-full max-w-[1400px]">
-          <BackButton />
-
-          <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="font-display text-4xl font-semibold tracking-tight text-brand-accent sm:text-5xl">
-                Render rooms
-              </h1>
-              {style && (
-                <p className="mt-2 text-sm text-text-secondary">
-                  Style direction:{" "}
-                  <span className="text-text-primary">{style.name_en}</span>
-                </p>
-              )}
-              {!style && (
-                <p className="mt-2 text-sm text-text-tertiary">
-                  No style chosen yet — defaults will be used.
-                </p>
-              )}
-            </div>
-            <Badge
-              variant="secondary"
-              className="bg-bg-elevated text-text-secondary"
-            >
-              Step 4 of 6 — See it rendered
-            </Badge>
-          </div>
-
-          {roomList.length === 0 ? (
-            <div className="mt-10 rounded-xl border border-bg-border bg-bg-elevated/60 p-8 text-center backdrop-blur-sm">
-              <p className="text-sm text-text-secondary">
-                No rooms found on this plan. Go back and confirm the plan
-                first.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-10">
-              <RenderInteractive
-                projectId={project.id}
-                rooms={roomList}
-                style={style}
-                initialChains={initialChains}
-              />
-            </div>
-          )}
-        </FadeIn>
-      </main>
+    <AppShell pageName="AI Designer" noPadding>
+      <RenderInteractive
+        projectId={project.id}
+        rooms={roomList}
+        style={style}
+        initialChains={initialChains}
+        initialLockedRoomIds={initialLockedRoomIds}
+      />
     </AppShell>
   );
 }

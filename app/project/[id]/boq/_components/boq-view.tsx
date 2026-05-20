@@ -1,26 +1,14 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
-const TERRACOTTA = "#B85042";
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type BoqLine = {
   description: string;
@@ -48,103 +36,127 @@ export type BoqPayload = {
   grand_total_aed: number;
 };
 
+export type VendorOption = {
+  id: string;
+  sku: string | null;
+  brand: string | null;
+  description: string | null;
+  photo_url: string | null;
+  price_aed: number;
+  lead_time_days: number | null;
+  in_stock: boolean | null;
+};
+
 type Props = {
   projectId: string;
-  projectTitle: string;
   budgetAed: number;
   boq: BoqPayload;
+  lineOptions: Record<string, VendorOption[]>;
 };
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const BRASS_TINTS = [
+  "#7A5518", // primary
+  "#966D2F", // primary-container
+  "#A4793A", // brass-600
+  "#C9A66B", // mid tone
+  "#F1BE78", // primary-fixed-dim
+] as const;
+
+type Sensitivity = { description: string; delta_aed: number };
+
+const SENSITIVITY_TOGGLES = [
+  { id: "premium", label: "Premium materials", pct: 15 },
+  { id: "local-labour", label: "Local labour sourcing", pct: -8 },
+  { id: "tight", label: "Tight schedule (60 days)", pct: 6 },
+  { id: "phased", label: "Phase the work (2 phases)", pct: -3 },
+] as const;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function formatAed(n: number): string {
   return `AED ${Math.round(n).toLocaleString("en-US")}`;
 }
 
-function budgetComparison(grand: number, budget: number): {
-  label: string;
-  tone: "under" | "over" | "on-target";
-} {
-  if (budget <= 0) return { label: "No budget set", tone: "on-target" };
-  const diff = budget - grand;
-  const pct = Math.round((Math.abs(diff) / budget) * 100);
-  if (pct <= 1) return { label: "On target", tone: "on-target" };
-  return diff > 0
-    ? { label: `${pct}% under`, tone: "under" }
-    : { label: `${pct}% over`, tone: "over" };
+function formatAedSigned(n: number): string {
+  const abs = Math.abs(Math.round(n)).toLocaleString("en-US");
+  return n >= 0 ? `+AED ${abs}` : `−AED ${abs}`;
 }
 
-// Hardcoded upgrade hints. Each entry returns a matcher against a section's
-// lines plus a delta (AED) and copy. We pick 6–8 to actually surface based
-// on which sections exist in this BoQ.
-type Sensitivity = {
-  description: string;
-  delta_aed: number;
-};
+function sectionRef(work_section: string, idx: number): string {
+  // Section prefix: first letters of each capitalised word, up to 4 chars.
+  const initials = work_section
+    .split(/[\s&/]+/)
+    .filter(Boolean)
+    .map((w) => w[0]!.toUpperCase())
+    .join("")
+    .slice(0, 4);
+  return `${initials}-${String(idx + 1).padStart(2, "0")}`;
+}
 
 function sensitivityFor(
   workSection: string,
   line: BoqLine,
 ): Sensitivity | null {
   const desc = line.description.toLowerCase();
-
   if (workSection === "Floor Finishes" && desc.includes("porcelain")) {
     return {
       description:
-        "Upgrading to engineered European oak (180mm wide, brushed matt) adds AED 18,400",
+        "Upgrading to engineered European oak (180mm wide, brushed matt) adds AED 18,400.",
       delta_aed: 18400,
     };
   }
   if (workSection === "Floor Finishes" && desc.includes("screed")) {
     return {
       description:
-        "Upgrading to a self-levelling polymer screed (acoustic-rated) adds AED 4,200",
+        "Upgrading to a self-levelling polymer screed (acoustic-rated) adds AED 4,200.",
       delta_aed: 4200,
     };
   }
   if (workSection === "Wall Finishes") {
     return {
       description:
-        "Upgrading to large-format marble-effect porcelain (60×120, rectified) adds AED 6,600",
+        "Upgrading to large-format marble-effect porcelain (60×120, rectified) adds AED 6,600.",
       delta_aed: 6600,
     };
   }
   if (workSection === "Sanitaryware") {
     return {
       description:
-        "Upgrading the set to Duravit + Hansgrohe (matt black) adds AED 14,500 per bathroom",
+        "Upgrading the set to Duravit + Hansgrohe (matt black) adds AED 14,500 per bathroom.",
       delta_aed: 14500,
     };
   }
-  if (
-    workSection === "Joinery & Carpentry" &&
-    desc.includes("wardrobe")
-  ) {
+  if (workSection === "Joinery & Carpentry" && desc.includes("wardrobe")) {
     return {
       description:
-        "Upgrading wardrobe carcass to smoked oak veneer with soft-close push-to-open adds AED 11,800 per bedroom",
+        "Upgrading wardrobe carcass to smoked oak veneer with soft-close push-to-open adds AED 11,800 per bedroom.",
       delta_aed: 11800,
     };
   }
   if (workSection === "Joinery & Carpentry" && desc.includes("door")) {
     return {
       description:
-        "Upgrading from flush MDF to engineered solid-core oak doors adds AED 1,900 per door",
+        "Upgrading from flush MDF to engineered solid-core oak doors adds AED 1,900 per door.",
       delta_aed: 1900,
     };
   }
-  if (
-    workSection === "Joinery & Carpentry" &&
-    desc.includes("vanity")
-  ) {
+  if (workSection === "Joinery & Carpentry" && desc.includes("vanity")) {
     return {
       description:
-        "Upgrading the vanity top to honed Calacatta marble adds AED 3,400 per bathroom",
+        "Upgrading the vanity top to honed Calacatta marble adds AED 3,400 per bathroom.",
       delta_aed: 3400,
     };
   }
   if (workSection === "Lighting") {
     return {
       description:
-        "Adding 4 designer pendants (Flos / Foscarini) plus DALI dimming adds AED 12,200",
+        "Adding 4 designer pendants (Flos / Foscarini) plus DALI dimming adds AED 12,200.",
       delta_aed: 12200,
     };
   }
@@ -154,297 +166,594 @@ function sensitivityFor(
   ) {
     return {
       description:
-        "Upgrading to a hand-applied lime wash on living-area walls adds AED 7,800",
+        "Upgrading to a hand-applied lime wash on living-area walls adds AED 7,800.",
       delta_aed: 7800,
     };
   }
   return null;
 }
 
-export function BoqView({ projectId, projectTitle, budgetAed, boq }: Props) {
-  const compare = budgetComparison(boq.grand_total_aed, budgetAed);
+// ---------------------------------------------------------------------------
 
-  // First sensitivity hit per (section, line). Cap at 8 total so the page
-  // doesn't get noisy.
-  const sensitivityIndex = useMemo(() => {
-    const map = new Map<string, Sensitivity>();
-    let count = 0;
-    for (const section of boq.sections) {
-      for (const line of section.lines) {
-        if (count >= 8) break;
-        const hint = sensitivityFor(section.work_section, line);
-        if (hint) {
-          map.set(`${section.work_section}::${line.description}`, hint);
-          count++;
-        }
+export function BoqView({ projectId, budgetAed, boq, lineOptions }: Props) {
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [activeToggles, setActiveToggles] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const baseTotal = boq.grand_total_aed;
+
+  const adjustments = useMemo(() => {
+    let pct = 0;
+    const changes: { label: string; pct: number }[] = [];
+    for (const t of SENSITIVITY_TOGGLES) {
+      if (activeToggles.has(t.id)) {
+        pct += t.pct;
+        changes.push({ label: t.label, pct: t.pct });
       }
-      if (count >= 8) break;
     }
-    return map;
+    return { pct, changes };
+  }, [activeToggles]);
+
+  const adjustedTotal = Math.round(baseTotal * (1 + adjustments.pct / 100));
+  const headroom = budgetAed - adjustedTotal;
+
+  // Top 5 sections by total for the stacked bar, with everything else
+  // rolled into an "Other" bucket so the bar reads cleanly.
+  const barSegments = useMemo(() => {
+    const totals = boq.sections.map((s) => ({
+      label: s.work_section,
+      total: s.section_total_aed,
+    }));
+    totals.sort((a, b) => b.total - a.total);
+    const top = totals.slice(0, 5);
+    const rest = totals.slice(5);
+    if (rest.length > 0) {
+      const otherTotal = rest.reduce((sum, t) => sum + t.total, 0);
+      // Replace the smallest of the top 5 with "Other" only if Other is
+      // larger; otherwise keep the top 5 and drop the small remainder.
+      top.push({ label: `Other (${rest.length})`, total: otherTotal });
+    }
+    const total = top.reduce((s, t) => s + t.total, 0) || 1;
+    return top.slice(0, 5).map((t, i) => ({
+      label: t.label,
+      total: t.total,
+      pct: Math.round((t.total / total) * 100),
+      tint: BRASS_TINTS[i % BRASS_TINTS.length]!,
+    }));
   }, [boq.sections]);
 
   return (
-    <div className="pb-32">
-      {/* HERO ---------------------------------------------------------- */}
-      <section className="mt-8 rounded-2xl border border-outline-variant bg-surface-container p-8">
-        <p className="text-label-sm uppercase tracking-wider text-on-surface-variant">
-          {projectTitle}
-        </p>
-        <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-3">
-          <div
-            className="text-[64px] leading-[1.05] font-semibold tracking-tight"
-            style={{
-              fontFamily: '"Georgia", "Times New Roman", serif',
-              color: TERRACOTTA,
-            }}
+    <>
+      {/* TOP SUMMARY BAND ----------------------------------------------- */}
+      <section className="-mx-12 grid grid-cols-12 items-center gap-gutter border-y border-ink-100 bg-paper px-margin py-md">
+        {/* Left: total + headroom */}
+        <div className="col-span-12 flex flex-col gap-xs lg:col-span-4">
+          <motion.h2
+            key={adjustedTotal}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            className="font-display text-headline-lg tabular-nums text-ink-900"
           >
-            {formatAed(boq.grand_total_aed)}
+            {formatAed(adjustedTotal)}
+          </motion.h2>
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            against your {formatAed(budgetAed)} budget —{" "}
+            <span
+              className={cn(
+                "font-semibold",
+                headroom >= 0 ? "text-tertiary" : "text-error",
+              )}
+            >
+              {formatAed(Math.abs(headroom))}{" "}
+              {headroom >= 0 ? "headroom" : "over"}
+            </span>
+            {adjustments.pct !== 0 && (
+              <>
+                {" "}
+                ·{" "}
+                <span className="text-ink-500">
+                  base {formatAed(baseTotal)} · adjusted{" "}
+                  {adjustments.pct > 0 ? "+" : ""}
+                  {adjustments.pct}%
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* Center: stacked bar */}
+        <div className="col-span-12 flex flex-col gap-xs lg:col-span-5">
+          <div
+            className="flex h-2 w-full overflow-hidden rounded-full"
+            role="img"
+            aria-label="Section share of total"
+          >
+            {barSegments.map((seg) => (
+              <div
+                key={seg.label}
+                style={{
+                  width: `${seg.pct}%`,
+                  background: seg.tint,
+                }}
+                title={`${seg.label} — ${formatAed(seg.total)} (${seg.pct}%)`}
+              />
+            ))}
           </div>
-          <div className="flex flex-col gap-1 pb-2 text-body-md text-on-surface-variant">
-            <span>Budget: {formatAed(budgetAed)}</span>
-            <BudgetPill tone={compare.tone} label={compare.label} />
+          <div className="flex flex-wrap gap-x-md gap-y-xs">
+            {barSegments.map((seg) => (
+              <div key={seg.label} className="flex items-center gap-xs">
+                <span
+                  aria-hidden="true"
+                  className="size-2 rounded-sm"
+                  style={{ background: seg.tint }}
+                />
+                <span className="label-caps text-on-surface-variant">
+                  {seg.label} · {seg.pct}%
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          <SummaryChip label="Subtotal" value={formatAed(boq.subtotal_aed)} />
-          <SummaryChip
-            label={`Contingency ${boq.contingency_pct}%`}
-            value={formatAed(boq.contingency_aed)}
-          />
-          <SummaryChip
-            label={`VAT ${boq.vat_pct}%`}
-            value={formatAed(boq.vat_aed)}
-          />
-          <SummaryChip
-            label="Grand total"
-            value={formatAed(boq.grand_total_aed)}
-            emphasis
-          />
+        {/* Right: actions */}
+        <div className="col-span-12 flex items-center justify-end gap-md lg:col-span-3">
+          <button
+            type="button"
+            className="focus-ring flex h-12 items-center gap-sm rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              picture_as_pdf
+            </span>
+            Export PDF
+          </button>
+          <Link
+            href={`/project/${projectId}/vendors`}
+            className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
+          >
+            Continue to vendors
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              arrow_forward
+            </span>
+          </Link>
         </div>
       </section>
 
-      {/* SECTIONS ------------------------------------------------------ */}
-      <section className="mt-10">
-        <Accordion multiple defaultValue={[boq.sections[0]?.work_section ?? ""]}>
-          {boq.sections.map((section) => (
-            <AccordionItem
-              key={section.work_section}
-              value={section.work_section}
-              className="rounded-xl border border-outline-variant bg-surface-container px-5 mb-3"
-            >
-              <AccordionTrigger className="py-5 hover:no-underline">
-                <div className="flex w-full items-center justify-between gap-4 pr-6">
-                  <div className="flex flex-col gap-1 text-left">
-                    <span className="text-h3 text-on-surface">
-                      {section.work_section}
-                    </span>
-                    <span className="text-label-sm text-on-surface-variant">
-                      {section.lines.length}{" "}
-                      {section.lines.length === 1 ? "line item" : "line items"}
-                    </span>
-                  </div>
-                  <span className="text-h3 text-on-surface tabular-nums">
-                    {formatAed(section.section_total_aed)}
+      {/* TABLE + SIDEBAR ------------------------------------------------ */}
+      <div
+        className={cn(
+          "mt-xl grid gap-gutter",
+          sidebarOpen ? "lg:grid-cols-[1fr_320px]" : "lg:grid-cols-1",
+        )}
+      >
+        {/* Main table */}
+        <section className="overflow-hidden rounded-xl border border-ink-100 bg-paper">
+          {/* table-fixed forces the col widths to honor the % hints below;
+              without it, auto-layout starves the unconstrained
+              description column when the table is narrow (e.g. 743px
+              left column at 1440 with the sidebar open). */}
+          <table className="w-full table-fixed text-left">
+            <colgroup>
+              <col className="w-[56px]" />
+              <col />
+              <col className="w-[48px]" />
+              <col className="w-[64px]" />
+              <col className="w-[88px]" />
+              <col className="w-[104px]" />
+              <col className="w-[132px]" />
+              <col className="w-[40px]" />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-ink-100">
+                <Th>Ref</Th>
+                <Th>Line item description</Th>
+                <Th>Unit</Th>
+                <Th className="text-right">Qty</Th>
+                <Th className="text-right">Rate (AED)</Th>
+                <Th className="text-right">Total (AED)</Th>
+                <Th>Source</Th>
+                <Th> </Th>
+              </tr>
+            </thead>
+            <tbody>
+              {boq.sections.map((section) => (
+                <SectionGroup
+                  key={section.work_section}
+                  section={section}
+                  expandedKey={expandedKey}
+                  onToggle={(k) =>
+                    setExpandedKey((cur) => (cur === k ? null : k))
+                  }
+                  lineOptions={lineOptions}
+                />
+              ))}
+              <tr className="border-t-2 border-ink-900">
+                <td className="px-md py-md" colSpan={5}>
+                  <span className="label-caps text-brass-600">
+                    Project total
                   </span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="border-t border-outline-variant pt-3">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="text-on-surface-variant">
-                          Description
-                        </TableHead>
-                        <TableHead className="text-right text-on-surface-variant">
-                          Qty
-                        </TableHead>
-                        <TableHead className="text-on-surface-variant">
-                          Unit
-                        </TableHead>
-                        <TableHead className="text-right text-on-surface-variant">
-                          Rate (AED)
-                        </TableHead>
-                        <TableHead className="text-right text-on-surface-variant">
-                          Total (AED)
-                        </TableHead>
-                        <TableHead className="text-on-surface-variant">
-                          Source
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {section.lines.map((line, idx) => {
-                        const hint = sensitivityIndex.get(
-                          `${section.work_section}::${line.description}`,
-                        );
-                        return (
-                          <LineRow
-                            key={`${section.work_section}-${idx}`}
-                            line={line}
-                            sensitivity={hint}
-                          />
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </section>
+                </td>
+                <td className="px-md py-md text-right">
+                  <motion.span
+                    key={adjustedTotal}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.24, ease: "easeOut" }}
+                    className="inline-block font-display text-[24px] leading-none tabular-nums text-ink-900"
+                    style={{
+                      fontFamily: "var(--font-jetbrains-mono), monospace",
+                    }}
+                  >
+                    {formatAed(adjustedTotal)}
+                  </motion.span>
+                </td>
+                <td colSpan={2} />
+              </tr>
+            </tbody>
+          </table>
+        </section>
 
-      {/* STICKY FOOTER ------------------------------------------------- */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-outline-variant bg-surface/95 backdrop-blur-sm">
-        <div className="ml-64 px-6 py-4">
-          <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
-            <p className="text-label-md text-on-surface-variant">
-              Total: <span className="text-on-surface">{formatAed(boq.grand_total_aed)}</span>{" "}
-              · {compare.label}
-            </p>
-            <Link
-              href={`/project/${projectId}/vendors`}
-              className={buttonVariants({ size: "lg" })}
-            >
-              Approve BoQ → pick vendors
-              <span
-                className="material-symbols-outlined ml-1 text-base"
-                aria-hidden="true"
+        {/* Sidebar */}
+        {sidebarOpen && (
+          <aside className="flex flex-col gap-md rounded-xl border border-ink-100 bg-paper p-lg">
+            <div className="flex items-center justify-between">
+              <p className="label-caps text-ink-500">Cost sensitivity</p>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Collapse sensitivity panel"
+                className="focus-ring flex size-7 items-center justify-center rounded text-on-surface-variant hover:text-ink-900"
               >
-                arrow_forward
-              </span>
-            </Link>
-          </div>
-        </div>
+                <span className="material-symbols-outlined text-[18px]">
+                  close
+                </span>
+              </button>
+            </div>
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              Toggle assumptions to see live impacts on the BoQ totals.
+            </p>
+
+            <div className="flex flex-col gap-sm">
+              {SENSITIVITY_TOGGLES.map((t) => {
+                const active = activeToggles.has(t.id);
+                const positive = t.pct > 0;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() =>
+                      setActiveToggles((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(t.id)) next.delete(t.id);
+                        else next.add(t.id);
+                        return next;
+                      })
+                    }
+                    aria-pressed={active}
+                    className={cn(
+                      "focus-ring flex items-center justify-between rounded-lg border px-md py-sm text-left transition-colors",
+                      active
+                        ? "border-brass-600 bg-primary-fixed/40 text-ink-900"
+                        : "border-ink-100 bg-paper text-ink-900 hover:bg-surface-container-low",
+                    )}
+                  >
+                    <span className="font-body-sm text-body-sm font-semibold">
+                      {t.label}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-mono text-body-sm tabular-nums",
+                        positive ? "text-error" : "text-tertiary",
+                      )}
+                    >
+                      {positive ? "+" : "−"}
+                      {Math.abs(t.pct)}%
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-md border-t border-bone pt-md">
+              <p className="label-caps mb-sm text-ink-500">What changed</p>
+              {adjustments.changes.length === 0 ? (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  No modifiers active — total holds at{" "}
+                  {formatAed(baseTotal)}.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-sm">
+                  {adjustments.changes.map((c) => (
+                    <li
+                      key={c.label}
+                      className="font-body-sm text-body-sm text-on-surface-variant"
+                    >
+                      <span className="font-semibold text-ink-900">
+                        {c.label}
+                      </span>{" "}
+                      ·{" "}
+                      <span
+                        className={cn(
+                          "font-mono",
+                          c.pct > 0 ? "text-error" : "text-tertiary",
+                        )}
+                      >
+                        {formatAedSigned(baseTotal * (c.pct / 100))}
+                      </span>
+                    </li>
+                  ))}
+                  <li className="border-t border-bone pt-sm font-body-sm text-body-sm">
+                    <span className="font-semibold text-ink-900">
+                      Net effect
+                    </span>{" "}
+                    ·{" "}
+                    <span
+                      className={cn(
+                        "font-mono",
+                        adjustments.pct > 0 ? "text-error" : "text-tertiary",
+                      )}
+                    >
+                      {formatAedSigned(adjustedTotal - baseTotal)}
+                    </span>
+                  </li>
+                </ul>
+              )}
+            </div>
+          </aside>
+        )}
       </div>
-    </div>
+
+      {/* Sidebar toggle tab when closed */}
+      {!sidebarOpen && (
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open sensitivity panel"
+          className="focus-ring fixed right-0 top-1/2 z-30 flex h-32 w-9 -translate-y-1/2 items-center justify-center rounded-l-lg bg-brass-600 text-on-primary"
+        >
+          <span
+            className="rotate-90 whitespace-nowrap font-label-caps text-label-caps uppercase tracking-widest"
+            style={{ writingMode: "horizontal-tb" }}
+          >
+            Sensitivity
+          </span>
+        </button>
+      )}
+    </>
   );
 }
 
 // ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
-function SummaryChip({
-  label,
-  value,
-  emphasis = false,
+function Th({
+  children,
+  className,
 }: {
-  label: string;
-  value: string;
-  emphasis?: boolean;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div
-      className={
-        "flex items-center gap-3 rounded-full border px-4 py-2 " +
-        (emphasis
-          ? "border-indigo-500/40 bg-indigo-500/10"
-          : "border-outline-variant bg-surface-container-low")
-      }
+    <th
+      scope="col"
+      className={cn(
+        "label-caps bg-canvas px-md py-sm text-on-surface-variant",
+        className,
+      )}
     >
-      <span className="text-label-sm uppercase tracking-wider text-on-surface-variant">
-        {label}
-      </span>
-      <span
-        className={
-          "text-label-md tabular-nums " +
-          (emphasis ? "text-indigo-400" : "text-on-surface")
-        }
-      >
-        {value}
-      </span>
-    </div>
+      {children}
+    </th>
   );
 }
 
-function BudgetPill({
-  tone,
-  label,
+function SectionGroup({
+  section,
+  expandedKey,
+  onToggle,
+  lineOptions,
 }: {
-  tone: "under" | "over" | "on-target";
-  label: string;
+  section: BoqSection;
+  expandedKey: string | null;
+  onToggle: (k: string) => void;
+  lineOptions: Record<string, VendorOption[]>;
 }) {
-  const cls =
-    tone === "under"
-      ? "border-status-success/40 bg-status-success/15 text-status-success"
-      : tone === "over"
-        ? "border-status-error/40 bg-status-error/15 text-status-error"
-        : "border-outline-variant bg-surface-container-low text-on-surface-variant";
   return (
-    <Badge
-      variant="secondary"
-      className={"w-fit border " + cls}
-    >
-      {label}
-    </Badge>
+    <>
+      <tr className="bg-bone">
+        <td colSpan={6} className="h-14 px-md">
+          <span className="font-display text-headline-md text-ink-900">
+            {section.work_section}
+          </span>
+        </td>
+        <td
+          colSpan={2}
+          className="px-md text-right font-mono text-body-sm tabular-nums text-ink-900"
+        >
+          {formatAed(section.section_total_aed)}
+        </td>
+      </tr>
+      {section.lines.map((line, idx) => {
+        const key = `${section.work_section}-${idx}`;
+        const ref = sectionRef(section.work_section, idx);
+        const expanded = expandedKey === key;
+        return (
+          <LineRow
+            key={key}
+            lineKey={key}
+            ref_={ref}
+            line={line}
+            zebra={idx % 2 === 1}
+            expanded={expanded}
+            onToggle={() => onToggle(key)}
+            options={lineOptions[key] ?? []}
+          />
+        );
+      })}
+    </>
   );
 }
 
 function LineRow({
+  lineKey,
+  ref_,
   line,
-  sensitivity,
+  zebra,
+  expanded,
+  onToggle,
+  options,
 }: {
+  lineKey: string;
+  ref_: string;
   line: BoqLine;
-  sensitivity: Sensitivity | undefined;
+  zebra: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  options: VendorOption[];
 }) {
+  const sensitivity = sensitivityFor(lineKey.split("-")[0] ?? "", line) ?? null;
   return (
     <>
-      <TableRow className="hover:bg-surface-container-high/40">
-        <TableCell className="whitespace-normal align-top">
-          <div className="flex flex-col gap-1">
-            <span className="text-body-md text-on-surface">
-              {line.description}
-            </span>
-            {line.notes && (
-              <span className="text-label-sm text-on-surface-variant">
-                {line.notes}
-              </span>
-            )}
-          </div>
-        </TableCell>
-        <TableCell className="text-right align-top tabular-nums text-on-surface">
-          {line.quantity.toLocaleString("en-US")}
-        </TableCell>
-        <TableCell className="align-top text-on-surface-variant">
+      <tr
+        className={cn(
+          "border-b border-ink-100 transition-colors",
+          zebra ? "bg-canvas" : "bg-paper",
+          expanded ? "bg-surface-container-low" : "hover:bg-surface-container-low/60",
+        )}
+      >
+        <td className="px-md py-sm font-mono text-[12px] tabular-nums text-ink-500">
+          {ref_}
+        </td>
+        <td className="px-md py-sm">
+          <p className="font-body-sm text-body-sm text-ink-900">
+            {line.description}
+          </p>
+          {line.notes && (
+            <p className="mt-1 font-body-sm text-[12px] text-on-surface-variant">
+              {line.notes}
+            </p>
+          )}
+        </td>
+        <td className="px-md py-sm font-mono text-body-sm text-on-surface-variant">
           {line.unit}
-        </TableCell>
-        <TableCell className="text-right align-top tabular-nums text-on-surface">
+        </td>
+        <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
+          {line.quantity.toLocaleString("en-US")}
+        </td>
+        <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
           {line.rate_aed.toLocaleString("en-US")}
-        </TableCell>
-        <TableCell className="text-right align-top tabular-nums text-on-surface">
+        </td>
+        <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
           {line.total_aed.toLocaleString("en-US")}
-        </TableCell>
-        <TableCell className="whitespace-normal align-top text-on-surface-variant">
-          <span className="text-label-sm">{line.vendor_or_source}</span>
-        </TableCell>
-      </TableRow>
-      {sensitivity && (
-        <TableRow className="border-b-0 hover:bg-transparent">
-          <TableCell colSpan={6} className="whitespace-normal py-2">
-            <div
-              className="flex items-start gap-2 rounded-md border border-dashed px-3 py-2 text-label-sm"
-              style={{
-                borderColor: `${TERRACOTTA}55`,
-                background: `${TERRACOTTA}0F`,
-                color: "#E9B7B0",
-              }}
+        </td>
+        <td className="px-md py-sm font-body-sm text-[12px] text-on-surface-variant">
+          <span className="line-clamp-2">{line.vendor_or_source}</span>
+        </td>
+        <td className="px-md py-sm">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse details" : "Expand details"}
+            className="focus-ring flex size-8 items-center justify-center rounded text-on-surface-variant hover:text-ink-900"
+          >
+            <motion.span
+              animate={{ rotate: expanded ? 90 : 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="material-symbols-outlined text-[18px]"
+              aria-hidden="true"
             >
-              <span
-                className="material-symbols-outlined text-base"
-                aria-hidden="true"
-                style={{ color: TERRACOTTA }}
-              >
-                trending_up
-              </span>
-              <span>
-                <span className="font-semibold">Sensitivity · </span>
-                {sensitivity.description}
-              </span>
-            </div>
-          </TableCell>
-        </TableRow>
-      )}
+              chevron_right
+            </motion.span>
+          </button>
+        </td>
+      </tr>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.tr
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="bg-surface-container-low"
+          >
+            <td colSpan={8} className="px-md py-md">
+              <div className="grid grid-cols-1 gap-lg lg:grid-cols-[2fr_3fr]">
+                {/* Sensitivity + source */}
+                <div className="flex flex-col gap-sm">
+                  <p className="label-caps text-ink-500">Sensitivity</p>
+                  <p className="font-body-sm text-body-sm text-ink-900">
+                    {sensitivity?.description ??
+                      "No swap impact modelled for this line yet."}
+                  </p>
+                  <p className="mt-xs label-caps text-ink-500">Source</p>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    {line.vendor_or_source}
+                  </p>
+                </div>
+                {/* Alternative vendor mini cards */}
+                <div className="flex flex-col gap-sm">
+                  <p className="label-caps text-ink-500">
+                    Alternative vendors
+                  </p>
+                  {options.length === 0 ? (
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      No vetted alternatives in the ±25% band for this line.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-sm">
+                      {options.map((opt) => (
+                        <VendorMini key={opt.id} option={opt} unit={line.unit} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </td>
+          </motion.tr>
+        )}
+      </AnimatePresence>
     </>
+  );
+}
+
+function VendorMini({
+  option,
+  unit,
+}: {
+  option: VendorOption;
+  unit: string;
+}) {
+  return (
+    <div className="flex flex-col gap-xs rounded-lg border border-ink-100 bg-paper p-sm">
+      {option.photo_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={option.photo_url}
+          alt={option.description ?? option.sku ?? "alternative"}
+          className="aspect-[4/3] w-full rounded object-cover"
+          onError={(e) => {
+            const el = e.currentTarget;
+            el.style.background =
+              "linear-gradient(135deg, #C9B79A 0%, #6B5B3E 100%)";
+            el.removeAttribute("src");
+          }}
+        />
+      ) : (
+        <div className="aspect-[4/3] w-full rounded bg-bone" />
+      )}
+      <p className="truncate font-body-sm text-body-sm font-semibold text-ink-900">
+        {option.brand ?? "—"}
+      </p>
+      <p className="truncate font-mono text-[11px] text-ink-500">
+        {option.sku ?? "—"}
+      </p>
+      <p className="font-mono text-body-sm tabular-nums text-ink-900">
+        AED {option.price_aed.toLocaleString("en-US")}
+        <span className="text-ink-500"> / {unit}</span>
+      </p>
+    </div>
   );
 }
