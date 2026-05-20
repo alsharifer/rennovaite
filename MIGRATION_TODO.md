@@ -148,3 +148,8 @@ These come straight from the shadcn registry and are wired through
 slot props. Converting them to Material Symbols would mean forking the
 primitives. Left as a follow-up — the design impact is invisible to
 the user because dialog/accordion icons are tiny and use `currentColor`.
+
+## Step 7 — `tsc --noEmit`
+
+Clean. `npx tsc --noEmit` exits 0 with no diagnostics after all of the
+VP1–VP6 fixes land.
