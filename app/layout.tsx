@@ -66,7 +66,11 @@ export default function RootLayout({
       <head>
         {/* Material Symbols Outlined — Stitch shipped Material Symbols for
             every icon, so we follow that (DESIGN.md mentions Phosphor;
-            ignored deliberately). */}
+            ignored deliberately). It's a variable icon font (4 axes:
+            opsz/wght/FILL/GRAD), not a typeface we'd swap to next/font —
+            the <link> in the root layout is the documented Google Fonts
+            install path. Hence the rule disable. */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"

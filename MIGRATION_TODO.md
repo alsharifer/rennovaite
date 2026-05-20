@@ -153,3 +153,14 @@ the user because dialog/accordion icons are tiny and use `currentColor`.
 
 Clean. `npx tsc --noEmit` exits 0 with no diagnostics after all of the
 VP1–VP6 fixes land.
+
+## Step 8 — `eslint`
+
+`npx eslint .` exits 0 with zero warnings.
+
+There was one pre-existing warning (`no-page-custom-font` on the
+Material Symbols `<link>` in `app/layout.tsx`) that we silenced with an
+inline `eslint-disable-next-line` plus a comment explaining why: the
+variable icon font has 4 axes (opsz/wght/FILL/GRAD) and isn't
+swappable to `next/font`, so the documented Google Fonts `<link>`
+install path is correct here.
