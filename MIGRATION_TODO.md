@@ -86,3 +86,20 @@ dev server. No runtime errors in the post-fetch log window.
 | `/community` | 200 |
 | `/settings` | 200 |
 | `/support` | 200 |
+
+## Step 5 — Font-family check
+
+Live `getComputedStyle()` audit of every `<h1>…<h6>` on each rebuilt
+route. **Zero heading offenders** — every heading resolves to
+`EB Garamond, EB Garamond Fallback, Rubik, …` (display stack). Body
+text resolves to `Inter, Inter Fallback, IBM Plex Sans Arabic, …`
+(sans stack), and elements with `.font-mono` resolve to
+`JetBrains Mono, JetBrains Mono Fallback, monospace`.
+
+Note: `.tabular-nums` does NOT imply JetBrains Mono — the dashboard's
+big stat value is deliberately `font-display text-[40px] tabular-nums`
+(display font with tabular figures). That's by design, not a regression.
+
+`/project/[id]/render` has zero headings — the workspace uses label
+caps and div labels instead of formal `<h>` elements, also by design
+(it's a tool surface, not editorial text).
