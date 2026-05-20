@@ -1,9 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { FadeIn } from "@/app/_components/fade-in";
 import { AppShell } from "@/components/app/AppShell";
-import { BackButton } from "@/components/back-button";
-import { Badge } from "@/components/ui/badge";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   ALL_RELEVANT_CATEGORIES,
@@ -20,7 +17,9 @@ import {
 export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Vendors";
-const FALLBACK_BUDGET_AED = 400000;
+const FALLBACK_BUDGET_AED = 850000;
+const SEGMENTS = 5;
+const TOP_LANES = 8;
 
 type SkuRow = {
   id: string;
@@ -246,44 +245,49 @@ export default async function VendorsPage({
     budget_aed: budgetAed,
   };
 
+  // Top N lines by base_total_aed — the spec is "top 8 BoQ line items".
+  const topLanes = [...lineCards]
+    .sort((a, b) => b.base_total_aed - a.base_total_aed)
+    .slice(0, TOP_LANES);
+
   return (
     <AppShell pageName={PAGE_NAME}>
-      <main className="flex min-h-[calc(100vh-4rem)] justify-center px-6 py-12">
-        <FadeIn className="w-full max-w-[1200px]">
-          <BackButton />
-
-          <header className="mt-4 flex flex-wrap items-center justify-between gap-4">
-            <h1 className="max-w-[720px] text-h1 text-on-surface">
-              Pick your vendors
-            </h1>
-            <Badge
-              variant="secondary"
-              className="shrink-0 bg-surface-container text-on-surface-variant"
-            >
-              Step 6 of 6 — Pick your vendors
-            </Badge>
-          </header>
-
-          <p className="mt-3 max-w-[720px] text-body-md text-on-surface-variant">
-            Swap any line for an alternative SKU within ±25% of the BoQ price. The
-            grand total recalculates as you pick.
+      <div className="mx-auto max-w-[1440px] pb-2xl">
+        {/* Header */}
+        <header className="mb-xl">
+          <p className="label-caps mb-md text-brass-600">Step 05 of 05</p>
+          <div className="mb-xl flex gap-sm" aria-hidden="true">
+            {Array.from({ length: SEGMENTS }).map((_, i) => (
+              <span
+                key={i}
+                className="h-1 flex-1 rounded-full bg-brass-600"
+              />
+            ))}
+          </div>
+          <h1 className="mb-md font-display text-headline-lg text-ink-900">
+            Pick your vendors.
+          </h1>
+          <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
+            For each major line item we sourced three options across Dubai.
+            Swap, compare, and lock — your BoQ updates as you go.
           </p>
+        </header>
 
-          {lineCards.length === 0 ? (
-            <div className="mt-16 rounded-2xl border border-dashed border-outline-variant bg-surface-container-low px-6 py-16 text-center">
-              <p className="text-on-surface-variant">
-                No material-bearing lines with alternatives were found for this BoQ.
-              </p>
-            </div>
-          ) : (
-            <VendorPicker
-              projectId={id}
-              boqMeta={boqMeta}
-              lines={lineCards}
-            />
-          )}
-        </FadeIn>
-      </main>
+        {topLanes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-ink-100 bg-paper px-margin py-3xl text-center">
+            <p className="text-on-surface-variant">
+              No material-bearing lines with alternatives were found for this
+              BoQ.
+            </p>
+          </div>
+        ) : (
+          <VendorPicker
+            projectId={id}
+            boqMeta={boqMeta}
+            lines={topLanes}
+          />
+        )}
+      </div>
     </AppShell>
   );
 }
