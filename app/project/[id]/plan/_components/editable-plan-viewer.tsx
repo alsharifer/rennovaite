@@ -10,7 +10,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Layers, Plus, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -726,7 +725,9 @@ export function EditablePlanViewer({
             onClick={addRoom}
             className="border-ink-100 bg-paper text-ink-900 hover:bg-surface-container"
           >
-            <Plus />
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              add
+            </span>
             Add room
           </Button>
           <Button
@@ -737,7 +738,9 @@ export function EditablePlanViewer({
             disabled={!canUndo}
             className="text-on-surface-variant hover:text-ink-900"
           >
-            <Undo2 />
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              undo
+            </span>
             Undo
             {canUndo && (
               <span className="ml-1 text-xs text-ink-500">
@@ -753,10 +756,12 @@ export function EditablePlanViewer({
             className={cn(
               "border-ink-100 bg-paper text-ink-900 hover:bg-surface-container",
               overlappingIds.size > 0 &&
-                "border-status-error/60 text-status-error hover:bg-status-error/10",
+                "border-error/60 text-error hover:bg-error/10",
             )}
           >
-            <Layers />
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              layers
+            </span>
             Fix overlaps
             {overlappingIds.size > 0 && (
               <span className="ml-1 text-xs">({overlappingIds.size})</span>
@@ -768,10 +773,10 @@ export function EditablePlanViewer({
             <span className="text-xs text-on-surface-variant">{infoMessage}</span>
           )}
           {saveStatus === "saved" && (
-            <span className="text-xs text-status-success">Saved.</span>
+            <span className="text-xs text-tertiary">Saved.</span>
           )}
           {saveStatus === "error" && saveError && (
-            <span className="max-w-[260px] truncate text-xs text-status-error">
+            <span className="max-w-[260px] truncate text-xs text-error">
               {saveError}
             </span>
           )}

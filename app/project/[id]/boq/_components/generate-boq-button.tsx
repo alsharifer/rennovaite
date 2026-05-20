@@ -1,6 +1,5 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -45,7 +44,14 @@ export function GenerateBoqButton({ projectId }: { projectId: string }) {
       >
         {status === "submitting" ? (
           <>
-            <Loader2 className="mr-2 size-4 animate-spin" />
+            <span
+              className="mr-2 inline-flex size-4 animate-spin items-center justify-center"
+              aria-hidden="true"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                progress_activity
+              </span>
+            </span>
             Generating BoQ… (~1 minute)
           </>
         ) : (
@@ -53,12 +59,12 @@ export function GenerateBoqButton({ projectId }: { projectId: string }) {
         )}
       </Button>
       {status === "submitting" && (
-        <p className="text-label-sm text-on-surface-variant">
+        <p className="text-body-sm text-on-surface-variant">
           Claude is pricing the project against labour rates and supplier SKUs. Don&apos;t close this tab.
         </p>
       )}
       {status === "error" && error && (
-        <p className="text-label-sm text-status-error">{error}</p>
+        <p className="text-body-sm text-error">{error}</p>
       )}
     </div>
   );

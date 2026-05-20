@@ -103,3 +103,48 @@ big stat value is deliberately `font-display text-[40px] tabular-nums`
 `/project/[id]/render` has zero headings — the workspace uses label
 caps and div labels instead of formal `<h>` elements, also by design
 (it's a tool surface, not editorial text).
+
+## Step 6 — Icon audit
+
+Six files still pulled icons from `lucide-react`. Four app-side files
+have been converted to Material Symbols (and their stale Dark Silk
+token classes — `text-text-*`, `bg-bg-*`, `brand-primary`,
+`text-status-error/success` — fixed alongside the icon swap so the
+files are internally consistent):
+
+- `app/project/[id]/plan/_components/editable-project-name.tsx` —
+  `Pencil` → `material-symbols-outlined "edit"`. Replaced
+  `border-bg-border bg-bg-elevated text-text-primary
+  focus-visible:ring-brand-primary/40` with `border-ink-100 bg-paper
+  text-ink-900`; `text-text-tertiary` → `text-ink-500`;
+  `hover:bg-bg-elevated/60` → `hover:bg-surface-container-low`;
+  `text-status-error` → `text-error`.
+- `app/project/[id]/plan/_components/editable-plan-viewer.tsx` —
+  `Plus`/`Undo2`/`Layers` → `add`/`undo`/`layers`. Replaced
+  `border-status-error/60 text-status-error hover:bg-status-error/10`
+  with `border-error/60 text-error hover:bg-error/10`;
+  `text-status-success` → `text-tertiary`; `text-status-error` →
+  `text-error`.
+- `app/project/[id]/boq/_components/generate-boq-button.tsx` —
+  `Loader2` → animated `material-symbols-outlined "progress_activity"`.
+  `text-label-sm` → `text-body-sm`; `text-status-error` → `text-error`.
+- `app/project/[id]/vendors/page.tsx:135` — `text-status-error` →
+  `text-error`.
+
+The orphaned `components/back-button.tsx` (only self-referencing,
+plus 5 stale Dark Silk classes in one line) was deleted.
+
+The plan-route's loading skeleton `app/project/[id]/plan/loading.tsx`
+was rewritten to use Atelier bone shimmer (`bg-bone`, `border-ink-100`,
+`bg-canvas` page background) instead of the old `bg-bg-elevated`
+placeholders.
+
+Remaining lucide imports — both in shadcn primitives:
+
+- `components/ui/dialog.tsx` — `XIcon` for the close button.
+- `components/ui/accordion.tsx` — `ChevronDownIcon`/`ChevronUpIcon`.
+
+These come straight from the shadcn registry and are wired through
+slot props. Converting them to Material Symbols would mean forking the
+primitives. Left as a follow-up — the design impact is invisible to
+the user because dialog/accordion icons are tiny and use `currentColor`.

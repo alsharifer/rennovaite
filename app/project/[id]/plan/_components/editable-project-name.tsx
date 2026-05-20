@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Pencil } from "lucide-react";
 
 import { updateProjectName } from "@/app/_actions/update-project-name";
 import { Input } from "@/components/ui/input";
@@ -89,12 +88,12 @@ export function EditableProjectName({
           onBlur={commit}
           disabled={isPending}
           className={cn(
-            "h-auto border-bg-border bg-bg-elevated px-3 py-2 font-semibold tracking-tight text-text-primary focus-visible:ring-brand-primary/40",
+            "h-auto border-ink-100 bg-paper px-3 py-2 font-semibold tracking-tight text-ink-900",
             className ?? "font-display text-3xl sm:text-4xl",
           )}
           aria-label="Project name"
         />
-        {error && <p className="text-xs text-status-error">{error}</p>}
+        {error && <p className="text-xs text-error">{error}</p>}
       </div>
     );
   }
@@ -104,14 +103,19 @@ export function EditableProjectName({
       type="button"
       onClick={beginEdit}
       className={cn(
-        "group inline-flex items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-bg-elevated/60",
-        "font-semibold tracking-tight text-text-primary",
+        "group inline-flex items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-surface-container-low",
+        "font-semibold tracking-tight text-ink-900",
         className ?? "font-display text-3xl sm:text-4xl",
       )}
       aria-label="Edit project name"
     >
       <span>{name}</span>
-      <Pencil className="size-4 text-text-tertiary opacity-0 transition-opacity group-hover:opacity-100" />
+      <span
+        className="material-symbols-outlined text-[18px] text-ink-500 opacity-0 transition-opacity group-hover:opacity-100"
+        aria-hidden="true"
+      >
+        edit
+      </span>
     </button>
   );
 }

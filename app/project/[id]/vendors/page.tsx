@@ -132,7 +132,7 @@ export default async function VendorsPage({
     return (
       <AppShell pageName={PAGE_NAME}>
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-          <p className="text-status-error">Project not found.</p>
+          <p className="text-error">Project not found.</p>
         </main>
       </AppShell>
     );
