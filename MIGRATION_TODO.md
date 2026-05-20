@@ -164,3 +164,36 @@ inline `eslint-disable-next-line` plus a comment explaining why: the
 variable icon font has 4 axes (opsz/wght/FILL/GRAD) and isn't
 swappable to `next/font`, so the documented Google Fonts `<link>`
 install path is correct here.
+
+## Step 9 — Screenshots at 1440×900
+
+Captured via Chrome headless (`--headless=new --window-size=1440,900`)
+and saved to `screenshots/atelier-precise/`:
+
+| # | File | Route |
+| --- | --- | --- |
+| 01 | `01-landing.png` | `/` |
+| 02 | `02-auth.png` | `/auth` |
+| 03 | `03-dashboard.png` | `/dashboard` |
+| 04 | `04-project-new.png` | `/project/new` |
+| 05 | `05-project-hub.png` | `/project/[id]` |
+| 06 | `06-project-plan.png` | `/project/[id]/plan` |
+| 07 | `07-project-style.png` | `/project/[id]/style` |
+| 08 | `08-project-render.png` | `/project/[id]/render` |
+| 09 | `09-project-boq.png` | `/project/[id]/boq` |
+| 10 | `10-project-vendors.png` | `/project/[id]/vendors` |
+| 11 | `11-my-projects.png` | `/my-projects` |
+| 12 | `12-marketplace.png` | `/marketplace` (placeholder) |
+| 13 | `13-community.png` | `/community` (placeholder) |
+| 14 | `14-settings.png` | `/settings` (placeholder) |
+| 15 | `15-support.png` | `/support` (placeholder) |
+
+Two visual notes:
+- Several villa hero images in the dashboard + my-projects screenshots
+  render as alt-text instead of pixels — these are the expired
+  Replicate `replicate.delivery` presigned URLs flagged in B11 (TTL
+  has elapsed). Pre-existing data quality issue, not a refactor
+  regression.
+- `/marketplace`, `/community`, `/settings`, `/support` are still the
+  placeholder pages shipped in B0 (Step 7). They render the canonical
+  AppShell with the page name, but the content panes are stubbed.
