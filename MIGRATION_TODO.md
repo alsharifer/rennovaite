@@ -47,3 +47,19 @@ attributes, CSS-in-JS gradients, the shadcn `:root` variable bridge in
 | `render-interactive.tsx:578` | `#0F1B2D` | SVG polygon fill = ink-900. Kept as raw hex since the element is a `<polygon>` not a `<div>`. |
 | `parse-loading.tsx:27,41` | `#0F1B2D` / `#4F4539` / `#A4793A` | inline `style={{}}` for animated dot states — ink-900 / ink-700 / brass-600. Cosmetic, kept inline because they're computed from `i === active`. |
 | `components/app/Sidebar.tsx:73` | `#FBF7EE` | arbitrary class `bg-[#FBF7EE]` for the sidebar tint. Matches the `--sidebar` CSS var in `globals.css`. Could be promoted to a `sidebar` token alias in `tailwind.config.ts` — minor. |
+
+## Step 3 — Default Tailwind shadows
+
+`app/` is already fully on `shadow-level-1` (hover lifts, popovers, sticky
+bars) and `shadow-level-2` (the floating Material Board / hero CTA). No
+`shadow-sm` / `shadow-md` / `shadow-lg` / `shadow-xl` left in the app
+tree.
+
+One regression in `components/ui/button.tsx`: the `default` variant
+carried a Dark Silk-era purple glow
+(`shadow-[0_0_32px_rgba(168,85,247,0.28)]`) plus a `hover:bg-brand-hover`
+class that doesn't resolve to any token. Replaced with
+`hover:bg-brass-600` and the glow dropped entirely (Atelier is hairlines
+over shadows). Other variants (`outline`/`secondary`/`ghost`/`destructive`/
+`link`) already route through shadcn variables that are mapped to
+Atelier tokens in `globals.css`.
