@@ -25,6 +25,9 @@ const BONE_FILL = "#EDE6D8";
 const PRIMARY_FIXED = "#FFDDB3";
 const INK_900 = "#0F1B2D";
 const INK_700 = "#4F4539";
+const BRASS_600 = "#A4793A"; // handle fill (was Dark Silk purple)
+const TERRACOTTA = "#9D3E1D"; // overlap warning outline
+const ERROR_RED = "#BA1A1A"; // destructive delete affordance
 
 type Point = [number, number];
 
@@ -863,7 +866,7 @@ export function EditablePlanViewer({
                         .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                         .join(" ")}
                       fill="none"
-                      stroke="#F87171"
+                      stroke={TERRACOTTA}
                       strokeWidth={1.5}
                       strokeDasharray="4 3"
                       pointerEvents="none"
@@ -999,8 +1002,8 @@ export function EditablePlanViewer({
                             cx={hx}
                             cy={hy}
                             r={7}
-                            fill="#A855F7"
-                            stroke="#0B0712"
+                            fill={BRASS_600}
+                            stroke={INK_900}
                             strokeWidth={2}
                             style={{ cursor: cursorMap[cornerIndex] }}
                             onPointerDown={(e) =>
@@ -1022,8 +1025,8 @@ export function EditablePlanViewer({
                           cx={bb.xR + 10}
                           cy={bb.yT - 10}
                           r={11}
-                          fill="#F87171"
-                          stroke="#0B0712"
+                          fill={ERROR_RED}
+                          stroke={INK_900}
                           strokeWidth={2}
                         />
                         <line
@@ -1031,7 +1034,7 @@ export function EditablePlanViewer({
                           y1={bb.yT - 14}
                           x2={bb.xR + 14}
                           y2={bb.yT - 6}
-                          stroke="#0B0712"
+                          stroke={INK_900}
                           strokeWidth={2}
                           strokeLinecap="round"
                         />
@@ -1040,7 +1043,7 @@ export function EditablePlanViewer({
                           y1={bb.yT - 14}
                           x2={bb.xR + 6}
                           y2={bb.yT - 6}
-                          stroke="#0B0712"
+                          stroke={INK_900}
                           strokeWidth={2}
                           strokeLinecap="round"
                         />

@@ -19,3 +19,31 @@ indigo classes:
 No matches for `neo-raised` / `neo-pressed` / `glow-indigo` outside the
 "don't" callout in `CLAUDE.md`, and no literal `#0b1326` / `#131b2e`
 anywhere.
+
+## Step 2 — Hex literal audit
+
+Three stale Dark Silk SVG paint values lived in
+`app/project/[id]/plan/_components/editable-plan-viewer.tsx`. They have
+been promoted to named constants alongside the existing
+BONE_FILL/PRIMARY_FIXED/INK_900/INK_700 block and rewired:
+
+- `#F87171` (Tailwind red-400) overlap-warning dashed stroke → `#9D3E1D`
+  (`tertiary`/terracotta, the Atelier warning hue).
+- `#F87171` Delete-X button circle fill → `#BA1A1A` (`error`, destructive).
+- `#A855F7` (purple-500) resize-handle fill → `#A4793A` (`brass-600`).
+- `#0B0712` (Dark Silk near-black) stroke → `#0F1B2D` (`ink-900`).
+
+The remaining hex literals are all already Atelier values and are kept
+inline because they feed places Tailwind classes can't reach (raw SVG
+attributes, CSS-in-JS gradients, the shadcn `:root` variable bridge in
+`globals.css`). They are:
+
+| File / line | Hex(es) | Notes |
+| --- | --- | --- |
+| `app/globals.css:15–49,60,61,78,83,87` | full Atelier palette | shadcn variable bridge — each `:root` var is already commented with the token name. Leave. |
+| `editable-plan-viewer.tsx:24–30` | full constant block | already named (BONE_FILL/PRIMARY_FIXED/INK_900/INK_700 + the 3 added above). |
+| `boq-view.tsx:62–66` | `#7A5518`, `#966D2F`, `#A4793A`, `#C9A66B`, `#F1BE78` | five-stop sparkline palette across the Atelier brass ramp; already commented. |
+| `vendor-picker.tsx:469,480` / `boq-view.tsx:749` / `render-interactive.tsx:939,1003` | `linear-gradient(135deg, #C9B79A 0%, #6B5B3E 100%)` | Atelier "brass-matte" gradient referenced from the Stitch HTML. Repeated 5×. **Polish opportunity:** centralize as a `bg-brass-matte` utility (or CSS custom property) so it lives next to `matte-image` in `globals.css`. Functionally correct as-is. |
+| `render-interactive.tsx:578` | `#0F1B2D` | SVG polygon fill = ink-900. Kept as raw hex since the element is a `<polygon>` not a `<div>`. |
+| `parse-loading.tsx:27,41` | `#0F1B2D` / `#4F4539` / `#A4793A` | inline `style={{}}` for animated dot states — ink-900 / ink-700 / brass-600. Cosmetic, kept inline because they're computed from `i === active`. |
+| `components/app/Sidebar.tsx:73` | `#FBF7EE` | arbitrary class `bg-[#FBF7EE]` for the sidebar tint. Matches the `--sidebar` CSS var in `globals.css`. Could be promoted to a `sidebar` token alias in `tailwind.config.ts` — minor. |
