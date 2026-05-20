@@ -229,7 +229,7 @@ export function BoqView({ projectId, budgetAed, boq, lineOptions }: Props) {
       {/* TOP SUMMARY BAND ----------------------------------------------- */}
       <section className="-mx-12 grid grid-cols-12 items-center gap-gutter border-y border-ink-100 bg-paper px-margin py-md">
         {/* Left: total + headroom */}
-        <div className="col-span-12 flex flex-col gap-xs lg:col-span-4">
+        <div className="col-span-12 flex flex-col gap-xs lg:col-span-3">
           <motion.h2
             key={adjustedTotal}
             initial={{ opacity: 0, y: 8 }}
@@ -299,15 +299,20 @@ export function BoqView({ projectId, budgetAed, boq, lineOptions }: Props) {
         </div>
 
         {/* Right: actions */}
-        <div className="col-span-12 flex items-center justify-end gap-md lg:col-span-3">
+        <div className="col-span-12 flex items-center justify-end gap-md lg:col-span-4">
+          {/* Icon-only at this density — "Export PDF" + "Continue to
+              vendors" both with text was 390px in a 336px column. The
+              icon is universally read; title attribute carries the
+              label for screen readers and tooltips. */}
           <button
             type="button"
-            className="focus-ring flex h-12 items-center gap-sm rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low"
+            title="Export PDF"
+            aria-label="Export PDF"
+            className="focus-ring flex size-12 items-center justify-center rounded-lg border border-ink-100 text-ink-900 transition-colors hover:bg-surface-container-low"
           >
-            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            <span className="material-symbols-outlined" aria-hidden="true">
               picture_as_pdf
             </span>
-            Export PDF
           </button>
           <Link
             href={`/project/${projectId}/vendors`}
@@ -335,15 +340,19 @@ export function BoqView({ projectId, budgetAed, boq, lineOptions }: Props) {
               description column when the table is narrow (e.g. 743px
               left column at 1440 with the sidebar open). */}
           <table className="w-full table-fixed text-left">
+            {/* Description gets all leftover width. Numeric columns sized
+                to the widest realistic AED amount; Source is wrapped to
+                2 lines via the cell's line-clamp. Chevron column 48px
+                fits the 32px button + 8px each side. */}
             <colgroup>
               <col className="w-[56px]" />
               <col />
+              <col className="w-[52px]" />
+              <col className="w-[56px]" />
+              <col className="w-[80px]" />
+              <col className="w-[96px]" />
+              <col className="w-[112px]" />
               <col className="w-[48px]" />
-              <col className="w-[64px]" />
-              <col className="w-[88px]" />
-              <col className="w-[104px]" />
-              <col className="w-[132px]" />
-              <col className="w-[40px]" />
             </colgroup>
             <thead>
               <tr className="border-b border-ink-100">
@@ -540,7 +549,7 @@ function Th({
     <th
       scope="col"
       className={cn(
-        "label-caps bg-canvas px-md py-sm text-on-surface-variant",
+        "label-caps bg-canvas px-md py-sm align-bottom text-on-surface-variant",
         className,
       )}
     >
