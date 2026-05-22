@@ -41,6 +41,10 @@ const BodySchema = z.object({
   tweak: z.string().min(1).max(500).optional(),
   // Default to canny. Send `"depth"` to A/B against flux-depth-pro.
   mode: z.enum(["canny", "depth"]).optional().default("canny"),
+  // Bypass the prompt cache and force a fresh Replicate call. Used by the
+  // backfill script to re-hydrate rows that still point at dead presigned
+  // URLs.
+  force: z.boolean().optional().default(false),
 });
 
 const VALID_STYLE_KEYS = new Set<string>(STYLE_KEYS);
@@ -121,7 +125,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { project_id, room_id, tweak, mode } = parsed.data;
+    const { project_id, room_id, tweak, mode, force } = parsed.data;
 
     const apiKey = process.env.REPLICATE_API_TOKEN;
     if (!apiKey) {
@@ -213,23 +217,27 @@ export async function POST(request: NextRequest) {
     // Cache check: if a render with this exact prompt for this room already
     // exists, return it instead of paying Replicate again. This handles the
     // case where the user navigates back to a room they already rendered.
-    const { data: existing } = await supabase
-      .from("renders")
-      .select("id, image_url, prompt")
-      .eq("room_id", room_id)
-      .eq("prompt", prompt)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Skipped when `force` is set (used by the backfill flow to overwrite
+    // dead presigned URLs).
+    if (!force) {
+      const { data: existing } = await supabase
+        .from("renders")
+        .select("id, image_url, prompt")
+        .eq("room_id", room_id)
+        .eq("prompt", prompt)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (existing && existing.image_url && existing.prompt) {
-      return NextResponse.json({
-        render_id: existing.id,
-        image_url: existing.image_url,
-        prompt: existing.prompt,
-        mode,
-        cached: true,
-      });
+      if (existing && existing.image_url && existing.prompt) {
+        return NextResponse.json({
+          render_id: existing.id,
+          image_url: existing.image_url,
+          prompt: existing.prompt,
+          mode,
+          cached: true,
+        });
+      }
     }
 
     const replicate = new Replicate({ auth: apiKey });
