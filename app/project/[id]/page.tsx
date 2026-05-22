@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app/AppShell";
+import { HeroImage } from "@/components/app/HeroImage";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { cn } from "@/lib/utils";
 
@@ -517,14 +518,10 @@ function RendersCard({
               <figure key={r.id} className="flex flex-col gap-sm">
                 <div className="matte-image">
                   <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg bg-bone">
-                    {r.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={r.image_url}
-                        alt={`${roomName} concept ${i + 1}`}
-                        className="size-full object-cover"
-                      />
-                    ) : null}
+                    <HeroImage
+                      src={r.image_url}
+                      alt={`${roomName} concept ${i + 1}`}
+                    />
                   </div>
                 </div>
                 <figcaption className="flex items-center justify-between">

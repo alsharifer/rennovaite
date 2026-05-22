@@ -22,6 +22,13 @@ const REPLICATE_TIMEOUT_MS = 90_000;
 const MODEL_CANNY = "black-forest-labs/flux-canny-pro";
 const MODEL_DEPTH = "black-forest-labs/flux-depth-pro";
 
+// Replicate output URLs are presigned + TTL-bound (~1 hour). Persisting them
+// directly into `renders.image_url` means every consumer of that field
+// (dashboard, /my-projects, project hub, render workspace) breaks once the
+// signature expires. We re-host into Supabase Storage so the URL is stable.
+const RENDER_BUCKET = "renders";
+const RENDER_FETCH_TIMEOUT_MS = 30_000;
+
 // Lower than the default 30 so the prompt's style/room cues have more weight
 // than the spatial-structure hint from the control image. The old value of
 // 30 was overpowering the prompt and producing literal hexagons of the cube
@@ -37,6 +44,47 @@ const BodySchema = z.object({
 });
 
 const VALID_STYLE_KEYS = new Set<string>(STYLE_KEYS);
+
+// Fetches the Replicate output URL and uploads it to Supabase Storage,
+// returning the public URL that will survive after Replicate's signature
+// expires. Throws on any failure so the caller can decide how to handle it.
+async function rehostReplicateImage(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  replicateUrl: string,
+  projectId: string,
+): Promise<string> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), RENDER_FETCH_TIMEOUT_MS);
+  let blob: Blob;
+  try {
+    const res = await fetch(replicateUrl, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(
+        `Failed to download Replicate output (${res.status} ${res.statusText}).`,
+      );
+    }
+    blob = await res.blob();
+  } finally {
+    clearTimeout(t);
+  }
+
+  const contentType = blob.type || "image/jpeg";
+  const ext = contentType === "image/png" ? "png" : "jpg";
+  const path = `${projectId}/${crypto.randomUUID()}.${ext}`;
+
+  const { error: uploadErr } = await supabase.storage
+    .from(RENDER_BUCKET)
+    .upload(path, blob, {
+      contentType,
+      upsert: false,
+    });
+  if (uploadErr) {
+    throw uploadErr;
+  }
+
+  const { data } = supabase.storage.from(RENDER_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
 
 function extractImageUrl(output: unknown): string {
   if (typeof output === "string") return output;
@@ -214,10 +262,10 @@ export async function POST(request: NextRequest) {
       );
     });
 
-    let imageUrl: string;
+    let replicateUrl: string;
     try {
       const output = await Promise.race([replicatePromise, timeoutPromise]);
-      imageUrl = extractImageUrl(output);
+      replicateUrl = extractImageUrl(output);
     } catch (err) {
       console.error("[api/render] replicate error", err);
       const message =
@@ -229,6 +277,18 @@ export async function POST(request: NextRequest) {
       );
     } finally {
       if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+
+    // Re-host the Replicate output in Supabase Storage so the persisted URL
+    // doesn't go dead when Replicate's signature expires (~1 hour). Falls back
+    // to the raw Replicate URL if storage round-trip fails — that's still
+    // viewable for the immediate session even though it'll expire later.
+    let imageUrl: string;
+    try {
+      imageUrl = await rehostReplicateImage(supabase, replicateUrl, project_id);
+    } catch (err) {
+      console.error("[api/render] rehost failed; using replicate URL", err);
+      imageUrl = replicateUrl;
     }
 
     const { data: renderRow, error: insertErr } = await supabase

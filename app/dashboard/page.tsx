@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app/AppShell";
+import { HeroImage } from "@/components/app/HeroImage";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { cn } from "@/lib/utils";
 
@@ -547,20 +548,12 @@ function VillaCard({
       <div className="p-2">
         <div className="matte-image">
           <div className="relative aspect-[16/9] w-full overflow-hidden rounded bg-bone">
-            {hero?.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={hero.image_url}
-                alt={`${project.name ?? "Project"} hero render`}
-                className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center text-center">
-                <span className="label-caps text-ink-500">
-                  No render yet
-                </span>
-              </div>
-            )}
+            <HeroImage
+              src={hero?.image_url ?? null}
+              alt={`${project.name ?? "Project"} hero render`}
+              className="transition-transform duration-300 group-hover:scale-[1.02]"
+              fallbackLabel="No render yet"
+            />
           </div>
         </div>
       </div>

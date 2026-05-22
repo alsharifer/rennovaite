@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { HeroImage } from "@/components/app/HeroImage";
 import { cn } from "@/lib/utils";
 
 import {
@@ -528,26 +529,11 @@ function GridCard({
       <div className="relative p-2">
         <div className="matte-image overflow-hidden">
           <div className="relative aspect-[3/2] w-full overflow-hidden rounded bg-bone">
-            {project.hero_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={project.hero_url}
-                alt={`${project.name} hero render`}
-                className="size-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-              />
-            ) : (
-              <div className="flex size-full flex-col items-center justify-center gap-xs px-md text-center">
-                <span
-                  className="material-symbols-outlined text-[28px] text-ink-500"
-                  aria-hidden="true"
-                >
-                  image
-                </span>
-                <span className="label-caps text-ink-500">
-                  Render pending
-                </span>
-              </div>
-            )}
+            <HeroImage
+              src={project.hero_url}
+              alt={`${project.name} hero render`}
+              className="transition-transform duration-700 group-hover:scale-[1.04]"
+            />
           </div>
         </div>
         {/* Status pill, top-right of the hero */}
@@ -851,23 +837,12 @@ function ListRow({
         <div className="flex items-center gap-md">
           <div className="matte-image shrink-0 !p-1">
             <div className="h-8 w-12 overflow-hidden rounded bg-bone">
-              {project.hero_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={project.hero_url}
-                  alt=""
-                  className="size-full object-cover"
-                />
-              ) : (
-                <div className="flex size-full items-center justify-center">
-                  <span
-                    className="material-symbols-outlined text-[14px] text-ink-500"
-                    aria-hidden="true"
-                  >
-                    image
-                  </span>
-                </div>
-              )}
+              <HeroImage
+                src={project.hero_url}
+                alt=""
+                fallbackIconSize={14}
+                fallbackLabel=""
+              />
             </div>
           </div>
           <div className="min-w-0">

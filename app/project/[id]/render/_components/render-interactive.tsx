@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { HeroImage } from "@/components/app/HeroImage";
 import {
   Dialog,
   DialogContent,
@@ -666,29 +667,28 @@ function HeroRender({
     <div className="relative w-full max-w-[720px]">
       <div className="matte-image relative">
         <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg bg-bone">
-          {render ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={render.id}
-              src={render.imageUrl}
-              alt={`${styleName} render of ${roomName}`}
-              className={cn(
-                "size-full object-cover transition-opacity duration-300",
-                generating ? "opacity-40" : "opacity-100",
-              )}
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center text-center">
-              {error ? (
-                <p className="font-body-sm text-body-sm text-error">{error}</p>
-              ) : (
-                <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  Click <span className="font-semibold">Regenerate this view</span>{" "}
-                  to render {roomName} in {styleName}.
-                </p>
-              )}
-            </div>
-          )}
+          <HeroImage
+            key={render?.id ?? "empty"}
+            src={render?.imageUrl ?? null}
+            alt={`${styleName} render of ${roomName}`}
+            className={cn(
+              "transition-opacity duration-300",
+              generating ? "opacity-40" : "opacity-100",
+            )}
+            fallback={
+              <div className="flex size-full items-center justify-center text-center">
+                {error ? (
+                  <p className="font-body-sm text-body-sm text-error">{error}</p>
+                ) : (
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    Click{" "}
+                    <span className="font-semibold">Regenerate this view</span>{" "}
+                    to render {roomName} in {styleName}.
+                  </p>
+                )}
+              </div>
+            }
+          />
           {generating && (
             <>
               <div
@@ -808,12 +808,14 @@ function ThumbStrip({
               disabled && "cursor-not-allowed",
             )}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={item.imageUrl}
-              alt={i === 0 ? "Original render" : `Tweak ${i}`}
-              className="h-[66px] w-[100px] object-cover"
-            />
+            <div className="h-[66px] w-[100px] overflow-hidden bg-bone">
+              <HeroImage
+                src={item.imageUrl}
+                alt={i === 0 ? "Original render" : `Tweak ${i}`}
+                fallbackIconSize={20}
+                fallbackLabel=""
+              />
+            </div>
           </button>
         );
       })}
