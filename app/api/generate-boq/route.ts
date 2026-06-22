@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getKgContext } from "@/lib/kg/context";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getStyleByKey } from "@/lib/styles";
 
@@ -658,6 +659,16 @@ export async function POST(request: NextRequest) {
     // 2. Compute quantities deterministically.
     const { quantities, counts } = computeQuantities(plan.total_area_m2, rooms);
 
+    // KG grounding (feature-flagged, safe fallback). When active, the retrieved
+    // design context grounds material/fixture/vendor picks and regulations. It
+    // is advisory input only — the POMI grouping and zod schema below are
+    // unchanged. getKgContext never throws; on failure it returns "" and the
+    // BoQ is generated exactly as before.
+    const { context: kgContext, bundleId: kgBundleId } = await getKgContext({
+      styleKey: chosenStyleKey,
+      project,
+    });
+
     // 3. Build the prompts.
     const systemPrompt = buildSystemPrompt(labourRates, skus);
 
@@ -701,9 +712,22 @@ ${quantities
 
 Produce the priced BoQ as JSON per the schema in the system prompt. Reply with JSON only.`;
 
+    const composedUserPrompt = kgContext
+      ? `${userPrompt}\n\n${kgContext}`
+      : userPrompt;
+    if (kgContext) {
+      console.log(
+        `[api/generate-boq] KG context injected (bundle=${kgBundleId}) — composed user prompt:\n${composedUserPrompt}`,
+      );
+    }
+
     // 4. Call Claude with retry.
     const anthropic = new Anthropic({ apiKey });
-    const { boq, usage } = await generateBoq(anthropic, systemPrompt, userPrompt);
+    const { boq, usage } = await generateBoq(
+      anthropic,
+      systemPrompt,
+      composedUserPrompt,
+    );
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase
@@ -713,6 +737,10 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
         total_aed: boq.grand_total_aed,
         sections: boq,
         locked_at: null,
+        // Only include kg_bundle_id when KG grounding actually ran. Omitting it
+        // when null keeps this insert byte-identical to the pre-KG behaviour, so
+        // the route works even before migration 008 adds the column.
+        ...(kgBundleId ? { kg_bundle_id: kgBundleId } : {}),
       })
       .select("id")
       .single();

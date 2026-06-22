@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build artifacts can also live in nested locations (e.g. git worktrees
+    // under .claude/). ".next/**" only matches the repo-root one, so also
+    // ignore any nested .next and the gitignored .claude tooling dir — eslint
+    // flat config does not read .gitignore.
+    "**/.next/**",
+    ".claude/**",
   ]),
 ]);
 
