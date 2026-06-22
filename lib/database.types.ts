@@ -165,6 +165,7 @@ export type Database = {
           prompt: string | null;
           image_url: string | null;
           parent_render_id: string | null;
+          kg_bundle_id: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -174,6 +175,7 @@ export type Database = {
           prompt?: string | null;
           image_url?: string | null;
           parent_render_id?: string | null;
+          kg_bundle_id?: string | null;
           created_at?: string | null;
         };
         Update: {
@@ -183,6 +185,7 @@ export type Database = {
           prompt?: string | null;
           image_url?: string | null;
           parent_render_id?: string | null;
+          kg_bundle_id?: string | null;
           created_at?: string | null;
         };
         Relationships: [
@@ -262,6 +265,7 @@ export type Database = {
           total_aed: number | null;
           sections: Json | null;
           locked_at: string | null;
+          kg_bundle_id: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -270,6 +274,7 @@ export type Database = {
           total_aed?: number | null;
           sections?: Json | null;
           locked_at?: string | null;
+          kg_bundle_id?: string | null;
           created_at?: string | null;
         };
         Update: {
@@ -278,6 +283,7 @@ export type Database = {
           total_aed?: number | null;
           sections?: Json | null;
           locked_at?: string | null;
+          kg_bundle_id?: string | null;
           created_at?: string | null;
         };
         Relationships: [

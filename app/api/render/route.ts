@@ -6,6 +6,7 @@ import {
   buildControlImageBase64,
   buildDepthControlImageBase64,
 } from "@/lib/control-image";
+import { getKgContext } from "@/lib/kg/context";
 import {
   STYLE_KEYS,
   buildRenderPrompt,
@@ -162,6 +163,21 @@ export async function POST(request: NextRequest) {
       prompt = `${prompt} — modified: ${tweak.trim()}`;
     }
 
+    // KG grounding (feature-flagged, safe fallback). When KG_ENABLED=true and
+    // Neo4j is reachable for a mapped style, append the retrieved design context
+    // after the prompt. getKgContext never throws — on any failure it returns an
+    // empty context and we proceed exactly as before.
+    const { context: kgContext, bundleId: kgBundleId } = await getKgContext({
+      styleKey,
+      project,
+    });
+    if (kgContext) {
+      prompt = `${prompt}\n\n${kgContext}`;
+      console.log(
+        `[api/render] KG context injected (bundle=${kgBundleId}) — composed prompt:\n${prompt}`,
+      );
+    }
+
     // Cache check: if a render with this exact prompt for this room already
     // exists, return it instead of paying Replicate again. This handles the
     // case where the user navigates back to a room they already rendered.
@@ -239,6 +255,10 @@ export async function POST(request: NextRequest) {
         prompt,
         image_url: imageUrl,
         parent_render_id: null,
+        // Only include kg_bundle_id when KG grounding actually ran. Omitting it
+        // when null keeps this insert byte-identical to the pre-KG behaviour, so
+        // the route works even before migration 008 adds the column.
+        ...(kgBundleId ? { kg_bundle_id: kgBundleId } : {}),
       })
       .select("id")
       .single();

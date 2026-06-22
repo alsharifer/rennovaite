@@ -172,3 +172,12 @@ now no sanctioned non-Atelier palette anywhere in the app.)
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | client                  |
 | `SUPABASE_SERVICE_ROLE_KEY`       | server only — never expose |
 | `NEXT_PUBLIC_POSTHOG_KEY`         | client                  |
+| `NEO4J_URI`                       | server (KG retrieval)   |
+| `NEO4J_USER`                      | server (KG retrieval)   |
+| `NEO4J_PASSWORD`                  | server (KG retrieval)   |
+| `KG_ENABLED`                      | server — `"true"` turns on KG grounding |
+
+KG grounding (render + BoQ prompts) only activates when `KG_ENABLED="true"`
+**and** Neo4j is running — start it from the KG module with
+`cd kg && docker compose up -d`. If Neo4j is down or `KG_ENABLED` is anything
+else, the app falls back to its pre-KG behaviour with no error.
