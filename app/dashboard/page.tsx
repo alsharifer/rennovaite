@@ -2,7 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app/AppShell";
+import { AnalyticsIdentify } from "@/app/_components/analytics-identify";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +81,23 @@ function evening(): string {
   return "Good evening";
 }
 
+// Best-effort first name from the Supabase user: prefer a metadata name (set
+// via OAuth/profile later), else derive a friendly token from the email local
+// part. Returns null when there's nothing usable.
+function firstNameFromUser(user: {
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+} | null): string | null {
+  if (!user) return null;
+  const meta = user.user_metadata ?? {};
+  const full = String(meta.full_name ?? meta.name ?? "").trim();
+  if (full) return full.split(/\s+/)[0]!;
+  const local = (user.email ?? "").split("@")[0] ?? "";
+  const token = local.split(/[._\-+]/)[0] ?? "";
+  if (!token) return null;
+  return token.charAt(0).toUpperCase() + token.slice(1);
+}
+
 // Wrapped so the impure Date.now() call doesn't live in the component body
 // (react-hooks/purity flags top-level Date.now() reads, but not calls inside
 // helpers that are then invoked).
@@ -129,6 +148,14 @@ function nextStepFor(state: {
 export default async function DashboardPage() {
   const supabase = getSupabaseAdmin();
   const sb = supabase as unknown as SupabaseClient;
+
+  // Auth session (anon, cookie-scoped) — drives the greeting + PostHog
+  // identify. Independent of the admin client used for data reads below.
+  const authClient = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  const firstName = firstNameFromUser(user);
 
   // Window for "renders generated · last 30 days".
   const thirtyDaysAgo = thirtyDaysAgoIso();
@@ -294,12 +321,19 @@ export default async function DashboardPage() {
   );
   const activity = events.slice(0, 6);
 
-  // Header greeting — no auth wired yet so the name is a hardcoded fallback;
-  // when /api/auth lands, swap this for the session user's first name.
-  const greeting = `${evening()}, Sara.`;
+  // Header greeting — from the signed-in user's first name; falls back to a
+  // name-less greeting for guest / no-session visits.
+  const greeting = firstName ? `${evening()}, ${firstName}.` : `${evening()}.`;
 
   return (
     <AppShell pageName="Dashboard">
+      {user && (
+        <AnalyticsIdentify
+          distinctId={user.id}
+          email={user.email}
+          name={firstName}
+        />
+      )}
       <div className="mx-auto max-w-[1440px] pb-2xl">
         {/* HEADER ----------------------------------------------------- */}
         <header className="mb-xl">

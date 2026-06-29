@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 import { SendModal } from "./send-modal";
@@ -129,6 +130,7 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
   }, [selection, lines, boqMeta]);
 
   function pick(lineKey: string, opt: VendorOption) {
+    const changed = selection[lineKey]?.id !== opt.id;
     setSelection((prev) => {
       if (prev[lineKey]?.id === opt.id) return prev;
       // Snapshot the current grand BEFORE the swap so the "vs prior" line
@@ -136,6 +138,15 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
       setPrevTotal(totals.grand);
       return { ...prev, [lineKey]: opt };
     });
+
+    if (changed) {
+      track(AnalyticsEvent.VendorSwapped, {
+        project_id: projectId,
+        boq_id: boqMeta.boq_id,
+        boq_line_id: lineKey,
+        sku_id: opt.id,
+      });
+    }
 
     fetch("/api/vendor-selections", {
       method: "POST",
@@ -241,7 +252,14 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
 
             <button
               type="button"
-              onClick={() => setSendOpen(true)}
+              onClick={() => {
+                track(AnalyticsEvent.SentToContractor, {
+                  project_id: projectId,
+                  boq_id: boqMeta.boq_id,
+                  vendor_count: lines.length,
+                });
+                setSendOpen(true);
+              }}
               className="focus-ring mt-md flex h-12 w-full items-center justify-center gap-sm rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
             >
               Send scope to contractors
