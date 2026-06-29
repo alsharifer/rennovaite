@@ -71,7 +71,20 @@
       "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('pl.html','utf8'\\); console.log\\('Step 02 of 05:', s.includes\\('Step 02 of 05'\\)\\); console.log\\('headline:', s.includes\\('villa, understood'\\)\\); console.log\\('Parsed plan viewer:', s.includes\\('Parsed plan viewer'\\)\\); console.log\\('Rooms detected:', /\\\\\\\\d+\\\\\\\\s+Rooms detected/.test\\(s\\)\\); console.log\\('Continue to style:', s.includes\\('Continue to style'\\)\\); console.log\\('Maid:', s.includes\\(\\\\\"Maid\\\\\"\\)\\); console.log\\('SVG floorplan:', s.includes\\('Editable floorplan'\\)\\);\")",
       "Bash(cd C:/dev/rennovaite/.claude/worktrees/priceless-jones-bb887c && rm app/project/\\\\[id\\\\]/plan/_components/intake-workspace.tsx app/project/\\\\[id\\\\]/plan/_components/correction-modal.tsx && ls app/project/\\\\[id\\\\]/plan/_components/)",
       "Bash(cd C:/dev/rennovaite/.claude/worktrees/priceless-jones-bb887c && sed -i 's#factorRef\\\\.current#unitToM2Factor#g' app/project/\\\\[id\\\\]/plan/_components/editable-plan-viewer.tsx && grep -nE 'factorRef|unitToM2Factor' app/project/\\\\[id\\\\]/plan/_components/editable-plan-viewer.tsx | head)",
-      "Bash(grep -oE 'AED [^<]{0,15}25k' ps.html)"
+      "Bash(grep -oE 'AED [^<]{0,15}25k' ps.html)",
+      "Read(//c/dev/**)",
+      "Read(//c/Users/alsha/**)",
+      "PowerShell(npm install neo4j-driver)",
+      "Bash(grep -aE 'kg\\\\\\\\\\(retrieval|\\)|lib\\\\\\\\kg|api\\\\\\\\\\(render|generate-boq\\)' 'C:\\\\Users\\\\alsha\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--dev-rennovaite\\\\3e636eff-477f-4da1-9ce1-f4ce48e0a9be\\\\tasks\\\\bpxa8b5k0.output')",
+      "Bash(python -m json.tool)",
+      "Bash(git checkout *)",
+      "Bash(gh pr create --base master --head feat/kg-grounding --title 'feat\\(kg\\): ground render + BoQ prompts in Knowledge Graph context \\(feature-flagged, safe fallback\\)' --body ' *)",
+      "PowerShell($names = 'GH_TOKEN','GITHUB_TOKEN','GH_PAT','GITHUB_PAT'; foreach \\($n in $names\\) { $v = [Environment]::GetEnvironmentVariable\\($n\\); if \\($v\\) { Write-Output \"$n=SET\\(len $\\($v.Length\\)\\)\" } else { Write-Output \"$n=unset\" } })",
+      "Read(//tmp/**)",
+      "Bash(ls -la word/)",
+      "Bash(which python *)",
+      "Bash(perl -0777 -ne 's/<w:p[ >]/\\\\n/g; s/<[^>]+>//g; s/&amp;/&/g; s/&lt;/</g; s/&gt;/>/g; print' word/document.xml)",
+      "PowerShell(npm run lint 2>&1 | Select-Object -Last 15; \"LINT_EXIT=$LASTEXITCODE\")"
     ]
   }
 }
