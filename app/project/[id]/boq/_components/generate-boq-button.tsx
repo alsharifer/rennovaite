@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { AnalyticsEvent, track } from "@/lib/analytics";
 
 type Status = "idle" | "submitting" | "error";
 
@@ -28,6 +29,7 @@ export function GenerateBoqButton({ projectId }: { projectId: string }) {
       if (!res.ok || !body?.success) {
         throw new Error(body?.error ?? `BoQ generation failed (${res.status}).`);
       }
+      track(AnalyticsEvent.BoqGenerated, { project_id: projectId });
       router.refresh();
     } catch (err) {
       setStatus("error");

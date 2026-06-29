@@ -7,6 +7,7 @@ import {
   Rubik,
 } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./providers";
 
 // Display / headings — EB Garamond.
 const ebGaramond = EB_Garamond({
@@ -72,7 +73,9 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         />
       </head>
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import type { Style } from "@/lib/styles";
 
@@ -64,6 +65,10 @@ export function StyleGrid({
       if (!res.ok || !body?.success) {
         throw new Error(body?.error ?? `Save failed (${res.status}).`);
       }
+      track(AnalyticsEvent.StyleSelected, {
+        project_id: projectId,
+        style_key: key,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save the pick.");
     } finally {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 
+import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 // The existing /api/upload only accepts PDF/PNG/JPG. The design copy mentions
@@ -99,6 +100,8 @@ export function VillaIntake() {
         setPlan({ kind: "uploading", name: f.name, progress: pct }),
       );
       setPlan({ kind: "ready", name: f.name, size: f.size, res });
+      // A project row is created on upload — this is the funnel entry point.
+      track(AnalyticsEvent.ProjectStarted, { project_id: res.project_id });
     } catch (err) {
       setPlan({
         kind: "error",
@@ -152,6 +155,7 @@ export function VillaIntake() {
       if (!r.ok || !b?.success) {
         throw new Error(b?.error ?? `Analysis failed (${r.status}).`);
       }
+      track(AnalyticsEvent.PlanParsed, { project_id: plan.res.project_id });
       router.push(`/project/${plan.res.project_id}/plan`);
     } catch (err) {
       setAnalyzing(false);

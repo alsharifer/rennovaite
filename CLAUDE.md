@@ -171,7 +171,8 @@ now no sanctioned non-Atelier palette anywhere in the app.)
 | `NEXT_PUBLIC_SUPABASE_URL`        | client + server         |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | client                  |
 | `SUPABASE_SERVICE_ROLE_KEY`       | server only — never expose |
-| `NEXT_PUBLIC_POSTHOG_KEY`         | client                  |
+| `NEXT_PUBLIC_POSTHOG_KEY`         | client — analytics on/off switch; unset = no-op |
+| `NEXT_PUBLIC_POSTHOG_HOST`        | client — PostHog ingest host (EU: `https://eu.i.posthog.com`) |
 | `NEO4J_URI`                       | server (KG retrieval)   |
 | `NEO4J_USER`                      | server (KG retrieval)   |
 | `NEO4J_PASSWORD`                  | server (KG retrieval)   |

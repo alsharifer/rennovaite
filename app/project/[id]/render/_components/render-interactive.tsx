@@ -10,6 +10,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { MATERIALS, SURFACE_SPECS, type Material } from "@/lib/materials";
 import type { Style } from "@/lib/styles";
@@ -222,6 +223,11 @@ export function RenderInteractive({
         ...prev,
         [id]: { list: [item], currentIndex: 0 },
       }));
+      track(AnalyticsEvent.RenderGenerated, {
+        project_id: projectId,
+        room_id: id,
+        render_id: result.render_id,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Render failed.");
     } finally {
@@ -255,6 +261,12 @@ export function RenderInteractive({
           ...prev,
           [id]: { list: nextList, currentIndex: nextList.length - 1 },
         };
+      });
+      track(AnalyticsEvent.RenderIterated, {
+        project_id: projectId,
+        room_id: id,
+        render_id: result.render_id,
+        parent_render_id: parent.id,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Iteration failed.");
