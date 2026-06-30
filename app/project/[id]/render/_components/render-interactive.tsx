@@ -414,6 +414,22 @@ export function RenderInteractive({
               onLock={handleLock}
               onKeepIterating={() => {
                 if (!selectedRoom) return;
+                // The capped render wasn't accepted — record a "rejected"
+                // signal against it before the user keeps tweaking. The route
+                // resolves its kg_bundle_id. Fire-and-forget; never blocks UI.
+                if (currentRender) {
+                  void fetch("/api/feedback", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      project_id: projectId,
+                      entity_type: "render",
+                      entity_id: currentRender.id,
+                      action: "rejected",
+                      payload: { reason: "kept_iterating_past_cap" },
+                    }),
+                  }).catch(() => {});
+                }
                 setKeepIterating((p) => new Set(p).add(selectedRoom.id));
               }}
               locking={locking}

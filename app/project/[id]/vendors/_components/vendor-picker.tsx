@@ -130,7 +130,8 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
   }, [selection, lines, boqMeta]);
 
   function pick(lineKey: string, opt: VendorOption) {
-    const changed = selection[lineKey]?.id !== opt.id;
+    const prevOpt = selection[lineKey] ?? null;
+    const changed = prevOpt?.id !== opt.id;
     setSelection((prev) => {
       if (prev[lineKey]?.id === opt.id) return prev;
       // Snapshot the current grand BEFORE the swap so the "vs prior" line
@@ -138,6 +139,14 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
       setPrevTotal(totals.grand);
       return { ...prev, [lineKey]: opt };
     });
+
+    // Per-line price delta of this swap (new line total − previous line total).
+    const line = lines.find((l) => l.line_key === lineKey);
+    const deltaAed =
+      line && prevOpt
+        ? Math.round(line.quantity * opt.price_aed) -
+          Math.round(line.quantity * prevOpt.price_aed)
+        : 0;
 
     if (changed) {
       track(AnalyticsEvent.VendorSwapped, {
@@ -156,6 +165,9 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
         boq_id: boqMeta.boq_id,
         boq_line_id: lineKey,
         sku_id: opt.id,
+        // Swap detail for the feedback signal (skip on a no-op re-pick).
+        from_sku_id: changed ? (prevOpt?.id ?? null) : null,
+        delta_aed: changed ? deltaAed : null,
       }),
     }).catch((err) => console.warn("[vendor-picker] save error:", err));
   }

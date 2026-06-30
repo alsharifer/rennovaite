@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import Replicate from "replicate";
 import { z } from "zod";
 
+import { recordFeedback } from "@/lib/analytics";
 import { buildControlImageBase64 } from "@/lib/control-image";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     const { data: parent, error: parentErr } = await supabase
       .from("renders")
-      .select("id, project_id, room_id, prompt")
+      .select("id, project_id, room_id, prompt, kg_bundle_id")
       .eq("id", parent_render_id)
       .maybeSingle();
     if (parentErr || !parent) {
@@ -285,6 +286,19 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
+
+    // Feedback: an iteration means the parent render wasn't quite right but the
+    // direction is worth refining — an "iterated" signal carrying the tweak.
+    // The KG bundle is inherited from the parent (only the base render is
+    // grounded; iterations reuse its lineage).
+    await recordFeedback({
+      projectId: project_id,
+      entityType: "render",
+      entityId: renderRow.id,
+      action: "iterated",
+      kgBundleId: parent.kg_bundle_id ?? null,
+      payload: { tweak, parent_render_id },
+    });
 
     return NextResponse.json({
       render_id: renderRow.id,

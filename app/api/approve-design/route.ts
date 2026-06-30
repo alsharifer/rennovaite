@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { recordFeedback } from "@/lib/analytics";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -32,6 +33,23 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Feedback: locking a render is the strongest "accepted" signal. Pull the
+    // KG bundle that produced this render so the reweighting job can credit it.
+    const { data: render } = await supabase
+      .from("renders")
+      .select("kg_bundle_id")
+      .eq("id", render_id)
+      .maybeSingle();
+    await recordFeedback({
+      projectId: project_id,
+      entityType: "render",
+      entityId: render_id,
+      action: "accepted",
+      kgBundleId: render?.kg_bundle_id ?? null,
+      payload: { room_id },
+    });
+
     return NextResponse.json({ id: data.id });
   } catch (err) {
     console.error("[api/approve-design] error", err);

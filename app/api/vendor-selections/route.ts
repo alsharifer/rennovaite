@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { recordFeedback } from "@/lib/analytics";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -13,6 +14,9 @@ const BodySchema = z.object({
   boq_id: z.string().uuid(),
   boq_line_id: z.string().min(1),
   sku_id: z.string().uuid(),
+  // Optional swap detail for the feedback signal (before SKU + price delta).
+  from_sku_id: z.string().uuid().nullish(),
+  delta_aed: z.number().nullish(),
 });
 
 type VendorSelectionRow = {
@@ -71,6 +75,28 @@ export async function POST(request: NextRequest) {
       }
       throw new Error(msg);
     }
+
+    // Feedback: a vendor swap is a "swapped" signal against the BoQ's KG
+    // bundle. Resolve the bundle from the BoQ row; before/after + delta go in
+    // the payload.
+    const { data: boq } = await sb
+      .from("boqs")
+      .select("kg_bundle_id")
+      .eq("id", parsed.data.boq_id)
+      .maybeSingle<{ kg_bundle_id: string | null }>();
+    await recordFeedback({
+      projectId: parsed.data.project_id,
+      entityType: "vendor",
+      entityId: parsed.data.boq_line_id,
+      action: "swapped",
+      kgBundleId: boq?.kg_bundle_id ?? null,
+      payload: {
+        from: parsed.data.from_sku_id ?? null,
+        to: parsed.data.sku_id,
+        delta_aed: parsed.data.delta_aed ?? null,
+        boq_id: parsed.data.boq_id,
+      },
+    });
 
     return NextResponse.json({ success: true, id: data?.id ?? null });
   } catch (err) {
