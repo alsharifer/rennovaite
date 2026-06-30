@@ -1,36 +1,37 @@
 /**
  * Brief resolver — maps the app's UI/DB state onto the KG's slug IDs.
  *
- * The seeded KG slice is a single deliberate vertical: Arabian Ranches ×
- * Minimalist × villa-type-3-saheel. So this resolver can only ground the app's
- * style keys that have a sensible nearest-neighbour in that slice. Anything
- * unmapped returns `null`, and the caller treats `null` as "no KG grounding,
- * proceed exactly as before."
+ * The seeded KG now covers the canonical demo: Mudon Al Naseem × the six app
+ * styles × the 4BR first-floor villa. Every app style key has a 1:1 KG style,
+ * so grounding lights up for all six directions. Unknown keys still return
+ * `null`, and the caller treats `null` as "no KG grounding, proceed as before."
  */
 import type { Brief } from "@/kg/retrieval/agent";
 
 /**
- * App style key → KG style slug. The seeded slice only contains
- * `style:minimalist`, so the two warm/minimal-adjacent app styles map onto it
- * as the nearest available direction. Every other app style is intentionally
- * absent — `resolveBrief` returns null for those so the demo falls back to the
- * un-grounded path.
+ * App style key (lib/styles.ts) → KG style slug. Five styles map to their own
+ * seeded KG nodes; `luxe-minimal` maps to the original `style:minimalist` node
+ * (the minimalist-family direction), so all six app styles are grounded.
  */
 const STYLE_KEY_TO_KG_SLUG: Record<string, string> = {
-  "contemporary-majlis": "style:minimalist",
-  "modern-hijazi": "style:minimalist",
-  // coastal-emirati, scandi-arabic, andalusian-heritage, luxe-minimal:
-  // unmapped until the KG seed grows beyond the single Minimalist slice.
+  "contemporary-majlis": "style:contemporary-majlis",
+  "modern-hijazi": "style:modern-hijazi",
+  "coastal-emirati": "style:coastal-emirati",
+  "scandi-arabic": "style:scandi-arabic",
+  "andalusian-heritage": "style:andalusian-heritage",
+  "luxe-minimal": "style:minimalist",
 };
 
-// The seeded slice's community + property typology. These are hardcoded
-// defaults rather than derived from the project record.
-// TODO: community and propertyType should come from the project record once
-// the KG seed covers the Mudon Al Naseem villa (currently the only seeded
-// slice is Arabian Ranches × villa-type-3-saheel).
-const DEFAULT_COMMUNITY = "community:arabian-ranches";
-const DEFAULT_PROPERTY_TYPE = "property:villa-type-3-saheel";
-const DEFAULT_BUDGET_TIERS = ["premium", "luxury"];
+// The canonical demo slice: the Mudon Al Naseem 4BR first-floor refit. These
+// are fixed defaults rather than derived from the project record (the seed only
+// covers this one community/property today).
+const DEFAULT_COMMUNITY = "community:mudon-al-naseem";
+const DEFAULT_PROPERTY_TYPE = "property:villa-mudon-4br-first-floor";
+// Include "mid": the realistic UAE source tier for sanitaryware (RAK) and
+// secondary-bedroom furniture (Home Centre) is mid, so the bathroom and
+// secondary-bedroom spaces only return fixtures when "mid" is in scope. This
+// matches the KG module's own example.ts brief.
+const DEFAULT_BUDGET_TIERS = ["mid", "premium", "luxury"];
 
 type ProjectLike = {
   id?: string | null;
@@ -49,9 +50,9 @@ export function resolveBrief({
   const style = STYLE_KEY_TO_KG_SLUG[styleKey];
   if (!style) return null;
 
-  // `project` is accepted now so callers don't change later, but until the seed
-  // covers the Mudon villa the community/propertyType are fixed to the seeded
-  // slice regardless of the project record.
+  // `project` is accepted so callers don't change when community/propertyType
+  // later become per-project; today the seed covers a single slice, so they are
+  // fixed to the Mudon demo regardless of the project record.
   void project;
 
   return {
