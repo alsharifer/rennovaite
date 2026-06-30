@@ -296,6 +296,50 @@ export type Database = {
           },
         ];
       };
+      feedback_events: {
+        Row: {
+          id: string;
+          project_id: string | null;
+          user_id: string | null;
+          entity_type: string;
+          entity_id: string;
+          action: string;
+          kg_bundle_id: string | null;
+          payload: Json | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          project_id?: string | null;
+          user_id?: string | null;
+          entity_type: string;
+          entity_id: string;
+          action: string;
+          kg_bundle_id?: string | null;
+          payload?: Json | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          project_id?: string | null;
+          user_id?: string | null;
+          entity_type?: string;
+          entity_id?: string;
+          action?: string;
+          kg_bundle_id?: string | null;
+          payload?: Json | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "feedback_events_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

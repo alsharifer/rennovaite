@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { recordFeedback } from "@/lib/analytics";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getStyleByKey } from "@/lib/styles";
 
@@ -39,6 +40,16 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Feedback: picking a style is an explicit "accepted" signal. No KG bundle
+    // here (bundles are produced by render/BoQ); kg_bundle_id stays null.
+    await recordFeedback({
+      projectId: project_id,
+      entityType: "style",
+      entityId: style_key,
+      action: "accepted",
+      payload: { style_key },
+    });
 
     return NextResponse.json({ success: true, style_choice_id: data.id });
   } catch (err) {

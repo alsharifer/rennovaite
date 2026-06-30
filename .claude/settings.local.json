@@ -84,7 +84,8 @@
       "Bash(ls -la word/)",
       "Bash(which python *)",
       "Bash(perl -0777 -ne 's/<w:p[ >]/\\\\n/g; s/<[^>]+>//g; s/&amp;/&/g; s/&lt;/</g; s/&gt;/>/g; print' word/document.xml)",
-      "PowerShell(npm run lint 2>&1 | Select-Object -Last 15; \"LINT_EXIT=$LASTEXITCODE\")"
+      "PowerShell(npm run lint 2>&1 | Select-Object -Last 15; \"LINT_EXIT=$LASTEXITCODE\")",
+      "Bash(command -v gh)"
     ]
   }
 }
