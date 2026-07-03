@@ -5,6 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 import {
@@ -630,7 +636,7 @@ function GridCard({
           >
             Open project →
           </Link>
-          <RowActionsMenu projectId={project.id} />
+          <RowActionsMenu projectId={project.id} projectName={project.name} />
         </div>
       </div>
     </div>
@@ -940,7 +946,7 @@ function ListRow({
               chevron_right
             </span>
           </Link>
-          <RowActionsMenu projectId={project.id} />
+          <RowActionsMenu projectId={project.id} projectName={project.name} />
         </div>
       </td>
     </tr>
@@ -951,8 +957,16 @@ function ListRow({
 // Row-actions menu (popover from more_horiz)
 // ---------------------------------------------------------------------------
 
-function RowActionsMenu({ projectId }: { projectId: string }) {
+function RowActionsMenu({
+  projectId,
+  projectName,
+}: {
+  projectId: string;
+  projectName: string;
+}) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open) return;
@@ -998,8 +1012,30 @@ function RowActionsMenu({ projectId }: { projectId: string }) {
             label="Export BoQ as PDF"
           />
           <MenuItem icon="archive" label="Archive" tone="terracotta" />
+          <div className="my-xs h-px bg-ink-100" role="separator" />
+          <MenuItem
+            icon="delete"
+            label="Delete project"
+            tone="error"
+            onClick={() => {
+              setOpen(false);
+              setConfirmOpen(true);
+            }}
+          />
         </div>
       )}
+
+      <DeleteProjectDialog
+        open={confirmOpen}
+        projectId={projectId}
+        projectName={projectName}
+        onClose={() => setConfirmOpen(false)}
+        onDeleted={() => {
+          setConfirmOpen(false);
+          // The list is server-rendered; re-fetch so the row disappears.
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
@@ -1009,20 +1045,27 @@ function MenuItem({
   icon,
   label,
   tone = "neutral",
+  onClick,
 }: {
   href?: string;
   icon: string;
   label: string;
-  tone?: "neutral" | "terracotta";
+  tone?: "neutral" | "terracotta" | "error";
+  onClick?: () => void;
 }) {
   const cls = cn(
     "flex w-full items-center gap-md px-md py-sm text-left font-body text-body-sm hover:bg-surface-container-low",
-    tone === "terracotta" ? "text-tertiary" : "text-ink-900",
+    tone === "terracotta" && "text-tertiary",
+    tone === "error" && "text-error",
+    tone === "neutral" && "text-ink-900",
   );
   const inner = (
     <>
       <span
-        className="material-symbols-outlined text-[18px] text-on-surface-variant"
+        className={cn(
+          "material-symbols-outlined text-[18px]",
+          tone === "error" ? "text-error" : "text-on-surface-variant",
+        )}
         aria-hidden="true"
       >
         {icon}
@@ -1038,9 +1081,109 @@ function MenuItem({
     );
   }
   return (
-    <button type="button" role="menuitem" className={cls}>
+    <button type="button" role="menuitem" className={cls} onClick={onClick}>
       {inner}
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Delete confirmation dialog
+// ---------------------------------------------------------------------------
+
+function DeleteProjectDialog({
+  open,
+  projectId,
+  projectName,
+  onClose,
+  onDeleted,
+}: {
+  open: boolean;
+  projectId: string;
+  projectName: string;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { success?: boolean; error?: string }
+        | null;
+      if (!res.ok || !body?.success) {
+        throw new Error(body?.error ?? `Delete failed (${res.status}).`);
+      }
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !deleting) {
+          setError(null);
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="w-[92vw] max-w-[440px] border border-ink-100 bg-paper p-6 duration-200 sm:max-w-[440px]">
+        <div className="flex flex-col gap-4">
+          <div className="flex size-12 items-center justify-center rounded-full bg-error-container text-error">
+            <span
+              className="material-symbols-outlined text-2xl"
+              aria-hidden="true"
+            >
+              delete
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            <DialogTitle className="font-display text-headline-md text-ink-900">
+              Delete this project?
+            </DialogTitle>
+            <DialogDescription className="font-body text-body-md text-on-surface-variant">
+              <span className="font-semibold text-ink-900">{projectName}</span>{" "}
+              and everything in it — the parsed plan, renders, BoQ, and vendor
+              selections — will be permanently removed. This can&apos;t be
+              undone.
+            </DialogDescription>
+          </div>
+          {error && (
+            <p className="font-body-sm text-body-sm text-error">{error}</p>
+          )}
+          <div className="mt-2 flex justify-end gap-sm">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={deleting}
+              className="focus-ring flex h-11 items-center rounded-lg border border-ink-100 px-lg font-body text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="focus-ring flex h-11 items-center gap-sm rounded-lg bg-error px-lg font-body text-body-sm font-semibold text-on-error transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              {deleting ? "Deleting…" : "Delete project"}
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
