@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   Dialog,
@@ -957,6 +958,9 @@ function ListRow({
 // Row-actions menu (popover from more_horiz)
 // ---------------------------------------------------------------------------
 
+const MENU_WIDTH = 224; // w-56
+const MENU_EST_HEIGHT = 268; // ~6 items + divider; used only for flip decision
+
 function RowActionsMenu({
   projectId,
   projectName,
@@ -967,19 +971,53 @@ function RowActionsMenu({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
+  const [coords, setCoords] = useState<{ left: number; top: number } | null>(
+    null,
+  );
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Position the menu against the trigger in viewport (fixed) coordinates. The
+  // menu is portalled to <body> so it escapes the card's `overflow-hidden` clip
+  // and the hover-transform stacking context that otherwise hide it.
+  const place = useCallback(() => {
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const left = Math.max(8, r.right - MENU_WIDTH);
+    const spaceBelow = window.innerHeight - r.bottom;
+    const flipUp = spaceBelow < MENU_EST_HEIGHT && r.top > MENU_EST_HEIGHT;
+    const top = flipUp ? r.top - MENU_EST_HEIGHT - 4 : r.bottom + 4;
+    setCoords({ left, top });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
+    place();
     function onDoc(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    }
+    // A menu positioned once against the viewport goes stale on scroll/resize —
+    // simplest correct behaviour is to close it.
+    function onReflow() {
+      setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+    window.addEventListener("scroll", onReflow, true);
+    window.addEventListener("resize", onReflow);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", onReflow, true);
+      window.removeEventListener("resize", onReflow);
+    };
+  }, [open, place]);
 
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Row actions"
@@ -994,36 +1032,47 @@ function RowActionsMenu({
           more_horiz
         </span>
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-10 z-20 w-56 overflow-hidden rounded-lg border border-ink-100 bg-paper shadow-level-1"
-        >
-          <MenuItem
-            href={`/project/${projectId}`}
-            icon="open_in_new"
-            label="Open project"
-          />
-          <MenuItem icon="content_copy" label="Duplicate as new" />
-          <MenuItem icon="share" label="Share with designer" />
-          <MenuItem
-            href={`/project/${projectId}/boq`}
-            icon="picture_as_pdf"
-            label="Export BoQ as PDF"
-          />
-          <MenuItem icon="archive" label="Archive" tone="terracotta" />
-          <div className="my-xs h-px bg-ink-100" role="separator" />
-          <MenuItem
-            icon="delete"
-            label="Delete project"
-            tone="error"
-            onClick={() => {
-              setOpen(false);
-              setConfirmOpen(true);
+
+      {open &&
+        coords &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{
+              position: "fixed",
+              left: coords.left,
+              top: coords.top,
+              width: MENU_WIDTH,
             }}
-          />
-        </div>
-      )}
+            className="z-50 overflow-hidden rounded-lg border border-ink-100 bg-paper shadow-level-1"
+          >
+            <MenuItem
+              href={`/project/${projectId}`}
+              icon="open_in_new"
+              label="Open project"
+            />
+            <MenuItem icon="content_copy" label="Duplicate as new" />
+            <MenuItem icon="share" label="Share with designer" />
+            <MenuItem
+              href={`/project/${projectId}/boq`}
+              icon="picture_as_pdf"
+              label="Export BoQ as PDF"
+            />
+            <MenuItem icon="archive" label="Archive" tone="terracotta" />
+            <div className="my-xs h-px bg-ink-100" role="separator" />
+            <MenuItem
+              icon="delete"
+              label="Delete project"
+              tone="error"
+              onClick={() => {
+                setOpen(false);
+                setConfirmOpen(true);
+              }}
+            />
+          </div>,
+          document.body,
+        )}
 
       <DeleteProjectDialog
         open={confirmOpen}
@@ -1036,7 +1085,7 @@ function RowActionsMenu({
           router.refresh();
         }}
       />
-    </div>
+    </>
   );
 }
 
