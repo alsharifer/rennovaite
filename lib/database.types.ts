@@ -169,6 +169,9 @@ export type Database = {
           source_image_url: string | null;
           model: string | null;
           mode: string | null;
+          prediction_id: string | null;
+          status: string | null;
+          qa: Json | null;
           created_at: string | null;
         };
         Insert: {
@@ -182,6 +185,9 @@ export type Database = {
           source_image_url?: string | null;
           model?: string | null;
           mode?: string | null;
+          prediction_id?: string | null;
+          status?: string | null;
+          qa?: Json | null;
           created_at?: string | null;
         };
         Update: {
@@ -195,6 +201,9 @@ export type Database = {
           source_image_url?: string | null;
           model?: string | null;
           mode?: string | null;
+          prediction_id?: string | null;
+          status?: string | null;
+          qa?: Json | null;
           created_at?: string | null;
         };
         Relationships: [
@@ -227,6 +236,7 @@ export type Database = {
           project_id: string | null;
           room_id: string | null;
           render_id: string | null;
+          upscaled_url: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -234,6 +244,7 @@ export type Database = {
           project_id?: string | null;
           room_id?: string | null;
           render_id?: string | null;
+          upscaled_url?: string | null;
           created_at?: string | null;
         };
         Update: {
@@ -241,6 +252,7 @@ export type Database = {
           project_id?: string | null;
           room_id?: string | null;
           render_id?: string | null;
+          upscaled_url?: string | null;
           created_at?: string | null;
         };
         Relationships: [

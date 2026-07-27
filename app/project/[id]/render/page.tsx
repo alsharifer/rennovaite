@@ -12,10 +12,35 @@ type RenderRow = {
   prompt: string | null;
   image_url: string | null;
   parent_render_id: string | null;
+  qa: unknown;
   created_at: string | null;
 };
 
-type RenderItem = { id: string; imageUrl: string; prompt: string };
+type RenderItem = {
+  id: string;
+  imageUrl: string;
+  prompt: string;
+  qa?: "passed" | "failed" | null;
+  qaReason?: string | null;
+};
+
+// The stored qa jsonb is {passed, reason, ...} (or null). Flatten it to the
+// compact shape the render UI consumes so a QA-flagged render still shows its
+// warning after a page reload.
+function qaFrom(qa: unknown): Pick<RenderItem, "qa" | "qaReason"> {
+  if (qa && typeof qa === "object" && "passed" in qa) {
+    const passed = (qa as { passed: unknown }).passed;
+    const reason =
+      "reason" in qa && typeof (qa as { reason: unknown }).reason === "string"
+        ? (qa as { reason: string }).reason
+        : null;
+    return {
+      qa: passed ? "passed" : "failed",
+      qaReason: passed ? null : reason,
+    };
+  }
+  return { qa: null, qaReason: null };
+}
 
 // For each room: walk back from the most-recent leaf (a render with no
 // children) to its root via parent_render_id, building a linear chain.
@@ -51,6 +76,7 @@ function buildInitialChains(
           id: cur.id,
           imageUrl: cur.image_url,
           prompt: cur.prompt,
+          ...qaFrom(cur.qa),
         });
       }
       cur = cur.parent_render_id ? byId.get(cur.parent_render_id) : undefined;
@@ -139,7 +165,7 @@ export default async function RenderPage({
   // page load so users see their previous renders instead of starting blank.
   const { data: renderRows } = await supabase
     .from("renders")
-    .select("id, room_id, prompt, image_url, parent_render_id, created_at")
+    .select("id, room_id, prompt, image_url, parent_render_id, qa, created_at")
     .eq("project_id", projectId)
     .order("created_at", { ascending: true });
 

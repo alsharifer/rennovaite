@@ -1,21 +1,20 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
-import Replicate from "replicate";
 import { z } from "zod";
 
-import { recordFeedback } from "@/lib/analytics";
-import { buildControlImageBase64 } from "@/lib/control-image";
+import { AnalyticsEvent, recordFeedback, trackServer } from "@/lib/analytics";
+import {
+  buildEditInput,
+  createRenderPrediction,
+  getRenderModel,
+  IN_FLIGHT_CAP,
+  IN_FLIGHT_WINDOW_MS,
+} from "@/lib/render-image";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-const REPLICATE_TIMEOUT_MS = 90_000;
-const MODEL_CANNY = "black-forest-labs/flux-canny-pro";
-// Match the render route: low guidance so the control image only hints at
-// layout instead of being traced literally into the output.
-const GUIDANCE = 10;
 
 const BodySchema = z.object({
   project_id: z.string().uuid(),
@@ -24,30 +23,27 @@ const BodySchema = z.object({
   tweak: z.string().min(1).max(500),
 });
 
-// Take a previous prompt + a one-line tweak. Return ONE new prompt that makes
-// the change UNMISTAKABLE in the next render — diffusion models under-respond
-// to vague tweaks, so we expand the user's request into concrete visual
-// vocabulary the model can latch onto.
-const REWRITE_SYSTEM_PROMPT = `You are a prompt engineer for an AI interior render pipeline. The previous prompt produced an image. The user wants ONE specific change. Your job is to produce a new prompt that makes that change UNMISTAKABLE in the next render.
+// Take the current render's description + a one-line tweak, and return ONE
+// concise EDIT INSTRUCTION for the image-edit model (nano-banana). The model
+// already has the current image — it edits that image in place — so the
+// instruction must describe ONLY the change. Restating the unchanged scene
+// (style, furniture, camera, "keep everything the same") tells an edit model
+// to leave the image alone and suppresses the tweak. We only expand the user's
+// vague words into concrete visual vocabulary so the edit is unmistakable.
+const REWRITE_SYSTEM_PROMPT = `You convert a homeowner's vague tweak into ONE concrete edit instruction for an image-editing model. The model already has the current render of the room and will apply your instruction directly to that image.
 
-Hard rules:
+Rules:
 
-- Keep the head clause EXACTLY, with no modification: "Architectural interior photograph, taken from inside the room at human eye height (approximately 1.6m), looking toward the back wall. Wide-angle 24mm lens."
-- Keep the tail clause EXACTLY, with no modification: "Visible: floor, ceiling, side walls in perspective, with the back wall in the centre of frame. Magazine-quality interior photography, soft natural daylight from the side, 4k, ultra-detailed, no people, no text, no abstract objects, no sculpture, no geometric shape, no top-down view, no isometric view, no floating object, no hexagon, no cube, no render of a single piece of furniture, no bird's eye view."
-- In the middle of the prompt, KEEP all unchanged style, material, and furniture details from the previous prompt. Do not silently rephrase them.
+- Output ONLY the change the user asked for, as a direct imperative instruction. Do NOT re-describe the room, its style, furniture, walls, camera angle, lighting, or image quality — anything the user did not ask to change. Restating unchanged elements makes an edit model keep them identical and cancels your edit.
+- Expand vague words into specific, concrete visual vocabulary — exact colours, materials, textures, finishes, lighting:
+  - "darker floor" → "Make the floor a deep charcoal-stained oak with visible grain."
+  - "make the rug darker" → "Change the rug to a deep charcoal-grey low-pile wool rug."
+  - "more sun" → "Flood the room with bright warm morning sunlight from the side window, casting soft pools of light on the floor."
+  - "warmer" → "Shift the palette warmer: add amber lighting, brass accents, and layered cream textiles."
+  - "different bed" → "Replace the headboard with a curved cream boucle one."
+- Keep it to one or two sentences. Never add camera, resolution, or negative ("no hexagon") clauses.
 
-For the user's requested change:
-
-- Place the change PROMINENTLY in the middle (early, not buried).
-- Expand it into concrete visual vocabulary — specific colours, materials, textures, lighting qualities. Vague words ("nicer", "warmer", "more modern") get expanded into specific descriptors.
-  - "make the rug darker" → "deep charcoal-grey low-pile area rug"
-  - "more sun" → "bright morning sunlight streaming through the side window casting warm pools on the floor"
-  - "different bed" → keep "low king-size platform bed against the back wall" but swap one detail, e.g. "with a curved boucle headboard"
-  - "warmer" → "warm amber light, brass accents, layered cream textiles"
-- If the change CONFLICTS with an existing detail in the previous prompt, REMOVE the conflicting detail.
-- Do not invent unrelated additions. The change is the only delta.
-
-Output ONLY the new prompt as a single line of plain text. No JSON. No markdown. No preamble. No closing remarks. No quotes around the prompt.`;
+Output ONLY the edit instruction as a single line of plain text. No JSON. No markdown. No preamble. No quotes.`;
 
 function extractText(content: Anthropic.Messages.ContentBlock[]): string {
   let out = "";
@@ -84,7 +80,7 @@ async function rewritePrompt(
   previousPrompt: string,
   tweak: string,
 ): Promise<string> {
-  const userMessage = `Previous prompt:\n\n${previousPrompt}\n\nUser tweak: ${tweak}\n\nReturn the new prompt.`;
+  const userMessage = `Current render (context only — describes what is already in the image; do NOT restate it):\n\n${previousPrompt}\n\nUser tweak: ${tweak}\n\nReturn the single edit instruction.`;
 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
@@ -98,31 +94,6 @@ async function rewritePrompt(
   const text = stripWrapping(extractText(response.content));
   if (!text) throw new Error("Claude returned an empty prompt.");
   return text;
-}
-
-function extractImageUrl(output: unknown): string {
-  if (typeof output === "string") return output;
-  if (Array.isArray(output) && typeof output[0] === "string") return output[0];
-  if (
-    output &&
-    typeof output === "object" &&
-    "url" in output &&
-    typeof (output as { url: unknown }).url === "function"
-  ) {
-    const u = (output as { url: () => string | URL }).url();
-    return typeof u === "string" ? u : u.toString();
-  }
-  if (
-    output &&
-    typeof output === "object" &&
-    "output" in output &&
-    typeof (output as { output: unknown }).output === "string"
-  ) {
-    return (output as { output: string }).output;
-  }
-  throw new Error(
-    `Replicate returned an unexpected output shape: ${JSON.stringify(output).slice(0, 200)}`,
-  );
 }
 
 export async function POST(request: NextRequest) {
@@ -156,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     const { data: parent, error: parentErr } = await supabase
       .from("renders")
-      .select("id, project_id, room_id, prompt, kg_bundle_id")
+      .select("id, project_id, room_id, prompt, image_url, kg_bundle_id")
       .eq("id", parent_render_id)
       .maybeSingle();
     if (parentErr || !parent) {
@@ -179,14 +150,11 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-
-    const { data: room } = await supabase
-      .from("rooms")
-      .select("id, polygon, area_m2")
-      .eq("id", room_id)
-      .maybeSingle();
-    if (!room) {
-      return NextResponse.json({ error: "Room not found." }, { status: 404 });
+    if (!parent.image_url) {
+      return NextResponse.json(
+        { error: "Parent render has no image to edit." },
+        { status: 400 },
+      );
     }
 
     // 1. Rewrite prompt via Claude.
@@ -216,68 +184,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Build the SAME control image (geometry hasn't changed).
-    let controlBase64: string;
-    try {
-      controlBase64 = await buildControlImageBase64(room);
-    } catch (err) {
-      console.error("[api/render-iterate] control image failed", err);
-      const message =
-        err instanceof Error ? err.message : "Failed to build control image.";
-      return NextResponse.json({ error: message }, { status: 500 });
+    // 2. In-flight cap: shared with the base render route (pending rows/project).
+    const sinceIso = new Date(Date.now() - IN_FLIGHT_WINDOW_MS).toISOString();
+    const { count: inFlight } = await supabase
+      .from("renders")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", project_id)
+      .eq("status", "pending")
+      .gte("created_at", sinceIso);
+    if ((inFlight ?? 0) >= IN_FLIGHT_CAP) {
+      return NextResponse.json(
+        {
+          error: `Too many renders in progress (max ${IN_FLIGHT_CAP} at once). Wait for one to finish.`,
+        },
+        { status: 429 },
+      );
     }
 
-    // 3. Replicate (with hard timeout).
-    const replicate = new Replicate({ auth: replicateKey });
-    const replicatePromise = replicate.run(MODEL_CANNY, {
-      input: {
-        prompt: newPrompt,
-        control_image: `data:image/png;base64,${controlBase64}`,
-        guidance: GUIDANCE,
-        output_format: "jpg",
-        output_quality: 85,
-      },
-    });
-
-    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutHandle = setTimeout(
-        () =>
-          reject(
-            new Error(
-              `Render timed out after ${Math.round(REPLICATE_TIMEOUT_MS / 1000)}s.`,
-            ),
-          ),
-        REPLICATE_TIMEOUT_MS,
-      );
-    });
-
-    let imageUrl: string;
+    // 3. Localized edit as an async prediction: feed the PARENT render's image
+    // to the edit model with the rewritten tweak as the instruction, so only
+    // the requested element changes instead of re-rolling the whole scene.
+    const editModel = getRenderModel();
+    let prediction;
     try {
-      const output = await Promise.race([replicatePromise, timeoutPromise]);
-      imageUrl = extractImageUrl(output);
+      prediction = await createRenderPrediction(
+        replicateKey,
+        editModel,
+        buildEditInput(editModel, newPrompt, [parent.image_url]),
+      );
     } catch (err) {
-      console.error("[api/render-iterate] replicate error", err);
+      console.error("[api/render-iterate] prediction create error", err);
       const message =
         err instanceof Error ? err.message : "Replicate call failed.";
-      const isTimeout = message.includes("timed out");
-      return NextResponse.json(
-        { error: message },
-        { status: isTimeout ? 504 : 502 },
-      );
-    } finally {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
+      return NextResponse.json({ error: message }, { status: 502 });
     }
 
-    // 4. Persist with parent_render_id set.
+    // 4. Persist a PENDING row with parent_render_id set; /api/render/status
+    // finalises it when the prediction completes (no QA gate for tweaks).
     const { data: renderRow, error: insertErr } = await supabase
       .from("renders")
       .insert({
         project_id,
         room_id,
         prompt: newPrompt,
-        image_url: imageUrl,
+        image_url: null,
         parent_render_id,
+        source_image_url: parent.image_url,
+        model: editModel,
+        mode: "tweak",
+        prediction_id: prediction.id,
+        status: "pending",
       })
       .select("id")
       .single();
@@ -302,9 +258,17 @@ export async function POST(request: NextRequest) {
       payload: { tweak, parent_render_id },
     });
 
+    void trackServer(AnalyticsEvent.RenderTweaked, {
+      projectId: project_id,
+      room_id,
+      model: editModel,
+      mode: "tweak",
+    });
+
     return NextResponse.json({
       render_id: renderRow.id,
-      image_url: imageUrl,
+      prediction_id: prediction.id,
+      status: "pending",
       prompt: newPrompt,
     });
   } catch (err) {

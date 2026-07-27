@@ -13,7 +13,16 @@ import {
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { MATERIALS, SURFACE_SPECS, type Material } from "@/lib/materials";
+import { roomTypeFromDb } from "@/lib/render-prompts";
 import type { Style } from "@/lib/styles";
+
+// Rendering only covers the pilot's four room types (bedroom, bathroom,
+// living). Dressing rooms, balconies, stairs, terraces, foyers etc. map to
+// null and can't be rendered — gate them in the UI instead of firing a call
+// that 400s.
+function isRenderableRoom(roomType: string | null): boolean {
+  return roomTypeFromDb(roomType) !== null;
+}
 
 // ---------------------------------------------------------------------------
 // Types + constants
@@ -27,7 +36,13 @@ type RoomLite = {
   polygon: unknown;
 };
 
-type RenderItem = { id: string; imageUrl: string; prompt: string };
+type RenderItem = {
+  id: string;
+  imageUrl: string;
+  prompt: string;
+  qa?: "passed" | "failed" | null;
+  qaReason?: string | null;
+};
 type RoomState = { list: RenderItem[]; currentIndex: number };
 
 type Props = {
@@ -44,7 +59,75 @@ type GenerateResponse = {
   render_id: string;
   image_url: string;
   prompt: string;
+  qa?: "passed" | "failed" | null;
+  qaReason?: string | null;
 };
+
+// The render + iterate routes now run async: they return a prediction_id and
+// the client polls /api/render/status until the image is ready. A cache hit
+// still returns image_url directly, so both shapes are handled.
+async function pollRenderStatus(
+  predictionId: string,
+): Promise<GenerateResponse> {
+  const deadline = Date.now() + 150_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const res = await fetch(
+      `/api/render/status?prediction_id=${encodeURIComponent(predictionId)}`,
+    );
+    const body = (await res.json().catch(() => null)) as
+      | {
+          status?: string;
+          image_url?: string;
+          render_id?: string;
+          prompt?: string;
+          qa?: "passed" | "failed" | null;
+          qa_reason?: string | null;
+          error?: string;
+        }
+      | null;
+    if (!res.ok || !body) {
+      throw new Error(body?.error || `Status check failed (${res.status}).`);
+    }
+    if (body.status === "succeeded" && body.image_url && body.render_id) {
+      return {
+        render_id: body.render_id,
+        image_url: body.image_url,
+        prompt: body.prompt ?? "",
+        qa: body.qa ?? null,
+        qaReason: body.qa_reason ?? null,
+      };
+    }
+    if (body.status === "failed") {
+      throw new Error(body.error || "Render failed.");
+    }
+    // status === "processing" → keep polling.
+  }
+  throw new Error("Render timed out.");
+}
+
+// Normalise a POST /api/render(-iterate) response: a cache hit carries
+// image_url; otherwise poll the returned prediction_id to completion.
+async function resolveRender(
+  body: Record<string, unknown> | null,
+  status: number,
+): Promise<GenerateResponse> {
+  if (!body) throw new Error(`Render failed (${status}).`);
+  if (typeof body.image_url === "string" && body.image_url) {
+    return {
+      render_id: String(body.render_id),
+      image_url: body.image_url,
+      prompt: typeof body.prompt === "string" ? body.prompt : "",
+    };
+  }
+  if (typeof body.prediction_id === "string" && body.prediction_id) {
+    return pollRenderStatus(body.prediction_id);
+  }
+  throw new Error(
+    (typeof body.error === "string" && body.error) ||
+      "Unexpected render response.",
+  );
+}
 
 const MAX_TWEAKS = 4;
 const SUBSTEPS = [
@@ -109,6 +192,10 @@ export function RenderInteractive({
   );
   const [photosByRoom, setPhotosByRoom] =
     useState<Record<string, string>>(initialPhotosByRoom);
+  // roomId → upscaled (HD) export URL, populated when a view is locked.
+  const [upscaledByRoom, setUpscaledByRoom] = useState<Record<string, string>>(
+    {},
+  );
   const [keepIterating, setKeepIterating] = useState<Set<string>>(() => new Set());
   const [lastRenderMs, setLastRenderMs] = useState<number | null>(null);
   const [locking, setLocking] = useState(false);
@@ -149,6 +236,8 @@ export function RenderInteractive({
     !keepIterating.has(selectedRoom.id);
   const isGenerating = selectedRoom !== null && generatingId === selectedRoom.id;
   const isLocked = selectedRoom !== null && lockedRoomIds.has(selectedRoom.id);
+  const selectedRenderable =
+    selectedRoom !== null && isRenderableRoom(selectedRoom.room_type);
 
   const substepIdx =
     Math.floor(elapsedMs / SUBSTEP_INTERVAL_MS) % SUBSTEPS.length;
@@ -164,17 +253,17 @@ export function RenderInteractive({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_id: projectId, room_id: roomId }),
     });
-    const body = (await res.json().catch(() => null)) as
-      | GenerateResponse
-      | { error?: string }
-      | null;
-    if (!res.ok || !body || !("image_url" in body)) {
+    const body = (await res.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
+    if (!res.ok) {
       throw new Error(
-        (body && typeof body === "object" && "error" in body && body.error) ||
+        (body && typeof body.error === "string" && body.error) ||
           `Render failed (${res.status}).`,
       );
     }
-    return body;
+    return resolveRender(body, res.status);
   }
 
   async function callIterate(
@@ -192,17 +281,17 @@ export function RenderInteractive({
         tweak,
       }),
     });
-    const body = (await res.json().catch(() => null)) as
-      | GenerateResponse
-      | { error?: string }
-      | null;
-    if (!res.ok || !body || !("image_url" in body)) {
+    const body = (await res.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
+    if (!res.ok) {
       throw new Error(
-        (body && typeof body === "object" && "error" in body && body.error) ||
+        (body && typeof body.error === "string" && body.error) ||
           `Iteration failed (${res.status}).`,
       );
     }
-    return body;
+    return resolveRender(body, res.status);
   }
 
   async function timed<T>(fn: () => Promise<T>): Promise<T> {
@@ -213,7 +302,7 @@ export function RenderInteractive({
   }
 
   async function handleRegenerate() {
-    if (!selectedRoom || isGenerating) return;
+    if (!selectedRoom || isGenerating || !selectedRenderable) return;
     const id = selectedRoom.id;
     setGeneratingId(id);
     setError(null);
@@ -223,6 +312,8 @@ export function RenderInteractive({
         id: result.render_id,
         imageUrl: result.image_url,
         prompt: result.prompt,
+        qa: result.qa ?? null,
+        qaReason: result.qaReason ?? null,
       };
       setStateByRoom((prev) => ({
         ...prev,
@@ -256,6 +347,8 @@ export function RenderInteractive({
         id: result.render_id,
         imageUrl: result.image_url,
         prompt: result.prompt,
+        qa: result.qa ?? null,
+        qaReason: result.qaReason ?? null,
       };
       setStateByRoom((prev) => {
         const cur = prev[id];
@@ -295,12 +388,16 @@ export function RenderInteractive({
         }),
       });
       const body = (await res.json().catch(() => null)) as
-        | { id?: string; error?: string }
+        | { id?: string; upscaled_url?: string | null; error?: string }
         | null;
       if (!res.ok || !body?.id) {
         throw new Error(body?.error ?? `Lock failed (${res.status}).`);
       }
       setLockedRoomIds((prev) => new Set(prev).add(selectedRoom.id));
+      if (body.upscaled_url) {
+        const hdUrl = body.upscaled_url;
+        setUpscaledByRoom((prev) => ({ ...prev, [selectedRoom.id]: hdUrl }));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't lock the view.");
     } finally {
@@ -333,6 +430,7 @@ export function RenderInteractive({
               room={room}
               selected={room.id === selectedId}
               rendered={(stateByRoom[room.id]?.list.length ?? 0) > 0}
+              renderable={isRenderableRoom(room.room_type)}
               onClick={() => setSelectedId(room.id)}
             />
           ))}
@@ -408,12 +506,70 @@ export function RenderInteractive({
           />
 
           <HeroActions
-            disabled={!selectedRoom || isGenerating}
+            disabled={!selectedRoom || isGenerating || !selectedRenderable}
             onRegenerate={handleRegenerate}
-            downloadUrl={currentRender?.imageUrl ?? null}
+            downloadUrl={
+              (selectedRoom &&
+                isLocked &&
+                upscaledByRoom[selectedRoom.id]) ||
+              currentRender?.imageUrl ||
+              null
+            }
+            downloadIsHd={
+              !!(selectedRoom && isLocked && upscaledByRoom[selectedRoom.id])
+            }
           />
 
+          {selectedRoom && !selectedRenderable && (
+            <p className="max-w-[560px] text-center font-body-sm text-body-sm text-on-surface-variant">
+              Rendering isn&apos;t available for this room type
+              {selectedRoom.room_type ? ` (${selectedRoom.room_type})` : ""}.
+              The pilot renders bedrooms, bathrooms, and living areas — dressing
+              rooms, balconies, stairs, terraces and the like are out of scope.
+            </p>
+          )}
+
+          {currentRender?.qa === "failed" && !isGenerating && (
+            <div className="flex max-w-[560px] items-start gap-sm rounded-lg border border-error/40 bg-error/5 px-md py-sm">
+              <span
+                className="material-symbols-outlined text-[18px] text-error"
+                aria-hidden="true"
+              >
+                report
+              </span>
+              <p className="text-left font-body-sm text-body-sm text-ink-900">
+                <span className="font-semibold">QA flagged this render.</span>{" "}
+                {currentRender.qaReason ||
+                  "It may not match the room's real geometry or contains an implausible element."}{" "}
+                Try rephrasing your tweak or regenerating.
+              </p>
+            </div>
+          )}
+
           <StatusRow lastRenderMs={lastRenderMs} />
+
+          {/* Persistent lock affordance — lock a view you like without having
+              to iterate to the tweak cap first. */}
+          {currentRender && selectedRenderable && (
+            <button
+              type="button"
+              onClick={handleLock}
+              disabled={locking || isLocked || isGenerating}
+              className="focus-ring flex h-10 items-center gap-sm rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span
+                className="material-symbols-outlined text-[18px]"
+                aria-hidden="true"
+              >
+                {isLocked ? "check" : "lock"}
+              </span>
+              {isLocked
+                ? "View locked"
+                : locking
+                  ? "Locking & upscaling…"
+                  : "Lock this view"}
+            </button>
+          )}
 
           {roomState && roomState.list.length > 0 && (
             <ThumbStrip
@@ -553,11 +709,13 @@ function RoomRow({
   room,
   selected,
   rendered,
+  renderable,
   onClick,
 }: {
   room: RoomLite;
   selected: boolean;
   rendered: boolean;
+  renderable: boolean;
   onClick: () => void;
 }) {
   return (
@@ -586,10 +744,14 @@ function RoomRow({
         <span
           className={cn(
             "rounded-full px-sm py-[2px] text-[10px] font-semibold uppercase tracking-wider",
-            rendered ? "bg-primary-fixed text-ink-900" : "bg-bone text-ink-500",
+            !renderable
+              ? "bg-bone text-ink-500 opacity-60"
+              : rendered
+                ? "bg-primary-fixed text-ink-900"
+                : "bg-bone text-ink-500",
           )}
         >
-          {rendered ? "Rendered" : "Not yet"}
+          {!renderable ? "N/A" : rendered ? "Rendered" : "Not yet"}
         </span>
       </button>
     </li>
@@ -918,10 +1080,12 @@ function HeroActions({
   disabled,
   onRegenerate,
   downloadUrl,
+  downloadIsHd = false,
 }: {
   disabled: boolean;
   onRegenerate: () => void;
   downloadUrl: string | null;
+  downloadIsHd?: boolean;
 }) {
   return (
     <div className="flex items-center gap-md">
@@ -947,10 +1111,16 @@ function HeroActions({
         <a
           href={downloadUrl}
           download
-          aria-label="Download render"
-          className="focus-ring flex size-12 items-center justify-center rounded-full border border-ink-100 text-ink-700 hover:bg-surface-container-low"
+          aria-label={downloadIsHd ? "Download HD render" : "Download render"}
+          title={downloadIsHd ? "Download HD (2× upscaled) render" : "Download render"}
+          className="focus-ring relative flex size-12 items-center justify-center rounded-full border border-ink-100 text-ink-700 hover:bg-surface-container-low"
         >
           <span className="material-symbols-outlined">download</span>
+          {downloadIsHd && (
+            <span className="absolute -right-1 -top-1 rounded-full bg-brass-600 px-1 text-[9px] font-semibold leading-4 text-on-primary">
+              HD
+            </span>
+          )}
         </a>
       ) : (
         <button
@@ -970,7 +1140,7 @@ function StatusRow({ lastRenderMs }: { lastRenderMs: number | null }) {
   const seconds = lastRenderMs ? Math.round(lastRenderMs / 1000) : null;
   return (
     <p className="label-caps text-on-surface-variant">
-      4K render · {seconds ? `${seconds} sec` : "—"} · Flux Canny
+      4K render · {seconds ? `${seconds} sec` : "—"} · nano-banana
     </p>
   );
 }

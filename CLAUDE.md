@@ -162,12 +162,41 @@ now no sanctioned non-Atelier palette anywhere in the app.)
 - Validate every LLM or external-API payload with a zod schema before trusting
   it. Never pass raw model output into a render or a DB write.
 
+## Render pipeline
+
+Room renders are **photo-first, image-edit based** — the old synthetic
+control-image path (`flux-canny-pro` / `flux-depth-pro` + `lib/control-image.ts`)
+was deleted. `app/api/render/route.ts` restyles an image with an edit model
+(`RENDER_MODEL`, default `google/nano-banana`) rather than generating from
+scratch:
+
+- **Photo path** (`mode="photo"`): if the room has an uploaded `room_photos`
+  row, its photo is the edit source — the render reads as the owner's real room.
+- **Off-plan path** (`mode="offplan"`): no photo → `flux-1.1-pro` first
+  synthesises an empty-room shell from the parsed-plan dimensions
+  (`lib/room-geometry.ts` + `buildOffplanBasePrompt`), then the same edit pass
+  restyles it.
+- **Tweak path** (`mode="tweak"`, `app/api/render-iterate/route.ts`): Claude
+  rewrites the tweak into a concrete prompt, then the edit model edits the
+  **parent render's image** so changes stay localized.
+
+**Material grounding**: the chosen style's moodboard
+(`public/moodboards/<style-key>-<room>.png`, sent as a base64 data URI) is
+passed as a second image input to nano-banana, and the user's selected vendor
+SKUs (`vendor_selections` → `pricing_skus`) are appended as a `Materials:`
+clause. Prompt builders live in `lib/render-prompts.ts`; shared Replicate
+helpers (model selection, input shaping per model family, timeout) in
+`lib/render-image.ts`; grounding helpers in `lib/render-grounding.ts`.
+`renders` rows record `source_image_url`, `model`, and `mode` for A/B and
+tracing.
+
 ## Env vars
 
 | Name                              | Where used              |
 | --------------------------------- | ----------------------- |
 | `ANTHROPIC_API_KEY`               | server (Claude calls)   |
 | `REPLICATE_API_TOKEN`             | server (image gen)      |
+| `RENDER_MODEL`                    | server — optional; edit model id for renders (default `google/nano-banana`) |
 | `NEXT_PUBLIC_SUPABASE_URL`        | client + server         |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | client                  |
 | `SUPABASE_SERVICE_ROLE_KEY`       | server only — never expose |

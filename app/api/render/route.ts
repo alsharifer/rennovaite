@@ -1,71 +1,47 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import Replicate from "replicate";
 import { z } from "zod";
 
-import {
-  buildControlImageBase64,
-  buildDepthControlImageBase64,
-} from "@/lib/control-image";
+import { AnalyticsEvent, trackServer } from "@/lib/analytics";
 import { getKgContext } from "@/lib/kg/context";
 import {
+  buildBaseInput,
+  buildEditInput,
+  createRenderPrediction,
+  extractImageUrl,
+  getRenderModel,
+  IN_FLIGHT_CAP,
+  IN_FLIGHT_WINDOW_MS,
+  MODEL_OFFPLAN_BASE,
+  runWithTimeout,
+} from "@/lib/render-image";
+import {
+  buildMaterialsClause,
+  fetchSelectedMaterials,
+  loadMoodboardDataUri,
+} from "@/lib/render-grounding";
+import {
   STYLE_KEYS,
-  buildRenderPrompt,
+  buildEditPrompt,
+  buildOffplanBasePrompt,
   roomTypeFromDb,
   type StyleKey,
 } from "@/lib/render-prompts";
+import { roomDimensions } from "@/lib/room-geometry";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const REPLICATE_TIMEOUT_MS = 90_000;
-const MODEL_CANNY = "black-forest-labs/flux-canny-pro";
-const MODEL_DEPTH = "black-forest-labs/flux-depth-pro";
-
-// Flux's usable guidance band is low; 25 forced over-literal adherence to the
-// control image. Dropped to 10 so the prompt's style/room cues lead and the
-// (depth) control image only hints at spatial layout.
-const GUIDANCE = 10;
-
 const BodySchema = z.object({
   project_id: z.string().uuid(),
   room_id: z.string().uuid(),
   tweak: z.string().min(1).max(500).optional(),
-  // Default to depth. The canny control image is a synthetic one-point-
-  // perspective wireframe, and flux-canny-pro traces those guide lines into the
-  // output as white grid/grout lines (the artifact in "Family Area — Concept
-  // v1"). A depth gradient carries the same spatial hint but has no edges to
-  // trace, so it cannot leave line artifacts. Send `"canny"` to A/B the old path.
-  mode: z.enum(["canny", "depth"]).optional().default("depth"),
 });
 
 const VALID_STYLE_KEYS = new Set<string>(STYLE_KEYS);
-
-function extractImageUrl(output: unknown): string {
-  if (typeof output === "string") return output;
-  if (Array.isArray(output) && typeof output[0] === "string") return output[0];
-  if (
-    output &&
-    typeof output === "object" &&
-    "url" in output &&
-    typeof (output as { url: unknown }).url === "function"
-  ) {
-    const u = (output as { url: () => string | URL }).url();
-    return typeof u === "string" ? u : u.toString();
-  }
-  if (
-    output &&
-    typeof output === "object" &&
-    "output" in output &&
-    typeof (output as { output: unknown }).output === "string"
-  ) {
-    return (output as { output: string }).output;
-  }
-  throw new Error(
-    `Replicate returned an unexpected output shape: ${JSON.stringify(output).slice(0, 200)}`,
-  );
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,7 +53,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { project_id, room_id, tweak, mode } = parsed.data;
+    const { project_id, room_id, tweak } = parsed.data;
 
     const apiKey = process.env.REPLICATE_API_TOKEN;
     if (!apiKey) {
@@ -144,32 +120,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Control image: line-art for canny, gradient for depth.
-    let controlBase64: string;
-    try {
-      controlBase64 =
-        mode === "depth"
-          ? await buildDepthControlImageBase64(room)
-          : await buildControlImageBase64(room);
-    } catch (err) {
-      console.error("[api/render] control image build failed", err);
-      const message =
-        err instanceof Error ? err.message : "Failed to build control image.";
-      return NextResponse.json({ error: message }, { status: 500 });
-    }
-
-    let prompt = buildRenderPrompt({
+    // Compose the restyle prompt: style template + selected-SKU materials +
+    // (optional) KG context + (optional) tweak. Everything that changes the
+    // output goes into `prompt` so the cache key below is exact.
+    let prompt = buildEditPrompt({
       styleKey: styleKey as StyleKey,
       roomType: promptRoomType,
     });
+
+    // Material grounding: append a Materials: clause listing the user's chosen
+    // vendor SKUs. Best-effort — no selections (or no table) yields "".
+    const materials = await fetchSelectedMaterials(
+      supabase as unknown as SupabaseClient,
+      project_id,
+    );
+    const materialsClause = buildMaterialsClause(materials);
+    if (materialsClause) {
+      prompt = `${prompt} ${materialsClause}`;
+    }
+
     if (tweak && tweak.trim()) {
       prompt = `${prompt} — modified: ${tweak.trim()}`;
     }
 
-    // KG grounding (feature-flagged, safe fallback). When KG_ENABLED=true and
-    // Neo4j is reachable for a mapped style, append the retrieved design context
-    // after the prompt. getKgContext never throws — on any failure it returns an
-    // empty context and we proceed exactly as before.
+    // KG grounding (feature-flagged, safe fallback). getKgContext never throws.
     const { context: kgContext, bundleId: kgBundleId } = await getKgContext({
       styleKey,
       project,
@@ -181,14 +155,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cache check: if a render with this exact prompt for this room already
-    // exists, return it instead of paying Replicate again. This handles the
-    // case where the user navigates back to a room they already rendered.
-    const { data: existing } = await supabase
+    // Latest uploaded photo for this room, if any. Its presence decides the
+    // pipeline path (and therefore the cache key).
+    const { data: photo } = await supabase
+      .from("room_photos")
+      .select("public_url")
+      .eq("room_id", room_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const photoUrl = photo?.public_url ?? null;
+    const mode: "photo" | "offplan" = photoUrl ? "photo" : "offplan";
+
+    // Cache check: identical prompt AND path for this room → return the prior
+    // render instead of paying Replicate again (and, for the off-plan path,
+    // skips the base-image generation too). Keying on `mode` stops a stale
+    // off-plan render from being served after a photo is uploaded; for the
+    // photo path we additionally require the same source photo so replacing
+    // the photo forces a fresh render.
+    let cacheQuery = supabase
       .from("renders")
       .select("id, image_url, prompt")
       .eq("room_id", room_id)
       .eq("prompt", prompt)
+      .eq("mode", mode)
+      .eq("status", "succeeded");
+    if (photoUrl) {
+      cacheQuery = cacheQuery.eq("source_image_url", photoUrl);
+    }
+    const { data: existing } = await cacheQuery
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -203,64 +198,104 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const replicate = new Replicate({ auth: apiKey });
-    const model = mode === "depth" ? MODEL_DEPTH : MODEL_CANNY;
-
-    // Note: flux-canny-pro and flux-depth-pro do NOT accept a separate
-    // `negative_prompt` field — the negatives are baked into PROMPT_TAIL
-    // in lib/render-prompts.ts. They also have no `control_strength`
-    // parameter; `guidance` is the closest analog and we've lowered it to 25.
-    const replicatePromise = replicate.run(model, {
-      input: {
-        prompt,
-        control_image: `data:image/png;base64,${controlBase64}`,
-        guidance: GUIDANCE,
-        output_format: "jpg",
-        output_quality: 85,
-      },
-    });
-
-    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutHandle = setTimeout(
-        () =>
-          reject(
-            new Error(
-              `Render timed out after ${Math.round(REPLICATE_TIMEOUT_MS / 1000)}s.`,
-            ),
-          ),
-        REPLICATE_TIMEOUT_MS,
-      );
-    });
-
-    let imageUrl: string;
-    try {
-      const output = await Promise.race([replicatePromise, timeoutPromise]);
-      imageUrl = extractImageUrl(output);
-    } catch (err) {
-      console.error("[api/render] replicate error", err);
-      const message =
-        err instanceof Error ? err.message : "Replicate call failed.";
-      const isTimeout = message.includes("timed out");
+    // In-flight cap: at most IN_FLIGHT_CAP pending renders per project (within
+    // the staleness window). Protects Replicate spend and keeps the UI honest.
+    const sinceIso = new Date(Date.now() - IN_FLIGHT_WINDOW_MS).toISOString();
+    const { count: inFlight } = await supabase
+      .from("renders")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", project_id)
+      .eq("status", "pending")
+      .gte("created_at", sinceIso);
+    if ((inFlight ?? 0) >= IN_FLIGHT_CAP) {
       return NextResponse.json(
-        { error: message },
-        { status: isTimeout ? 504 : 502 },
+        {
+          error: `Too many renders in progress (max ${IN_FLIGHT_CAP} at once). Wait for one to finish.`,
+        },
+        { status: 429 },
       );
-    } finally {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
 
+    const replicate = new Replicate({ auth: apiKey });
+    const editModel = getRenderModel();
+
+    // The moodboard style reference (data URI) is passed to nano-banana as a
+    // second image input. null when the file is missing.
+    const moodboardDataUri = await loadMoodboardDataUri(
+      styleKey,
+      promptRoomType,
+    );
+
+    // Resolve the source image the edit pass restyles.
+    //   - photo present  → restyle the real room photo (mode "photo").
+    //   - no photo       → synthesise an empty-room shell with the base model
+    //                      first, then restyle it (mode "offplan").
+    let sourceImageUrl: string;
+
+    if (photoUrl) {
+      sourceImageUrl = photoUrl;
+    } else {
+      const dims = roomDimensions(room);
+      const basePrompt = buildOffplanBasePrompt({
+        roomType: promptRoomType,
+        widthM: dims?.widthM,
+        depthM: dims?.depthM,
+      });
+      try {
+        const baseOutput = await runWithTimeout(
+          replicate.run(MODEL_OFFPLAN_BASE, {
+            input: buildBaseInput(basePrompt),
+          }),
+        );
+        sourceImageUrl = extractImageUrl(baseOutput);
+      } catch (err) {
+        console.error("[api/render] base image error", err);
+        const message =
+          err instanceof Error ? err.message : "Base image generation failed.";
+        const isTimeout = message.includes("timed out");
+        return NextResponse.json(
+          { error: message },
+          { status: isTimeout ? 504 : 502 },
+        );
+      }
+    }
+
+    // Style/restyle pass — kicked off as an async prediction so the client can
+    // poll /api/render/status for progress instead of holding one long request.
+    const editImages = moodboardDataUri
+      ? [sourceImageUrl, moodboardDataUri]
+      : [sourceImageUrl];
+
+    let prediction;
+    try {
+      prediction = await createRenderPrediction(
+        apiKey,
+        editModel,
+        buildEditInput(editModel, prompt, editImages),
+      );
+    } catch (err) {
+      console.error("[api/render] prediction create error", err);
+      const message =
+        err instanceof Error ? err.message : "Replicate call failed.";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+
+    // Persist a PENDING row now; /api/render/status finalises it (image_url +
+    // QA) when the prediction completes.
     const { data: renderRow, error: insertErr } = await supabase
       .from("renders")
       .insert({
         project_id,
         room_id,
         prompt,
-        image_url: imageUrl,
+        image_url: null,
         parent_render_id: null,
-        // Only include kg_bundle_id when KG grounding actually ran. Omitting it
-        // when null keeps this insert byte-identical to the pre-KG behaviour, so
-        // the route works even before migration 008 adds the column.
+        source_image_url: sourceImageUrl,
+        model: editModel,
+        mode,
+        prediction_id: prediction.id,
+        status: "pending",
+        // Only include kg_bundle_id when KG grounding actually ran.
         ...(kgBundleId ? { kg_bundle_id: kgBundleId } : {}),
       })
       .select("id")
@@ -274,11 +309,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    void trackServer(AnalyticsEvent.RenderStarted, {
+      projectId: project_id,
+      room_id,
+      model: editModel,
+      mode,
+    });
+
     return NextResponse.json({
       render_id: renderRow.id,
-      image_url: imageUrl,
+      prediction_id: prediction.id,
+      status: "pending",
       prompt,
       mode,
+      model: editModel,
     });
   } catch (err) {
     console.error("[api/render] error", err);

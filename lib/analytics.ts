@@ -18,6 +18,11 @@ export enum AnalyticsEvent {
   BoqGenerated = "boq_generated",
   VendorSwapped = "vendor_swapped",
   SentToContractor = "sent_to_contractor",
+  // Render pipeline (Phase 3) — fired server-side from the render routes.
+  RenderStarted = "render_started",
+  RenderCompleted = "render_completed",
+  RenderQaFailed = "render_qa_failed",
+  RenderTweaked = "render_tweaked",
 }
 
 export function track(
@@ -42,6 +47,22 @@ export function identify(
   if (typeof window === "undefined") return;
   if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
   posthog.identify(distinctId, props);
+}
+
+/**
+ * Server-side event capture for route handlers (the browser `track()` no-ops on
+ * the server). Fires the same PostHog project; no-ops without a key. Defaults
+ * the distinct id to the project so render events group per project.
+ */
+export async function trackServer(
+  event: AnalyticsEvent,
+  props: { projectId: string } & Record<string, unknown>,
+): Promise<void> {
+  const { projectId, ...rest } = props;
+  await captureServer(event, `project:${projectId}`, {
+    project_id: projectId,
+    ...rest,
+  });
 }
 
 // =============================================================================

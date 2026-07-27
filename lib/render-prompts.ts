@@ -3,6 +3,8 @@
 // interpret the control image as the SUBJECT (which produced the hexagonal
 // objects we saw with the old isometric-cube control image).
 
+import { getStyleByKey } from "@/lib/styles";
+
 export type StyleKey =
   | "contemporary-majlis"
   | "modern-hijazi"
@@ -101,4 +103,67 @@ const DB_ROOM_TYPE_MAP: Record<string, RoomType> = {
 export function roomTypeFromDb(dbRoomType: string | null): RoomType | null {
   if (!dbRoomType) return null;
   return DB_ROOM_TYPE_MAP[dbRoomType] ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Photo-first / edit-model prompts
+// ---------------------------------------------------------------------------
+//
+// buildRenderPrompt above targets the old text-to-image (flux-canny/depth)
+// path and bakes in camera + negative clauses. The edit model (nano-banana)
+// preserves the source image's geometry itself, so its prompt is shorter and
+// framed as a restyle instruction. buildOffplanBasePrompt describes the empty
+// shell the base model synthesises before that restyle.
+
+// Human-readable room label for prose prompts.
+const ROOM_LABELS: Record<RoomType, string> = {
+  "master-bedroom": "bedroom",
+  "secondary-bedroom": "bedroom",
+  bathroom: "bathroom",
+  living: "living room",
+};
+
+export type BuildEditPromptInput = {
+  styleKey: StyleKey;
+  roomType: RoomType;
+};
+
+// Restyle instruction for the edit model. Preserves architecture/geometry
+// (the model reads it from the source image) and injects the chosen style's
+// signature materials + palette. KG context and the Materials: clause are
+// appended by the caller so they land in the cache key.
+export function buildEditPrompt({
+  styleKey,
+  roomType,
+}: BuildEditPromptInput): string {
+  const styleFrag = STYLE_FRAGMENTS[styleKey];
+  if (!styleFrag) throw new Error(`Unknown styleKey: ${styleKey}`);
+  const style = getStyleByKey(styleKey);
+  const styleName = style?.name_en ?? styleKey;
+  const palette = style ? style.palette.join(", ") : "";
+  const paletteClause = palette ? ` Palette anchors: ${palette}.` : "";
+  const roomLabel = ROOM_LABELS[roomType];
+  return `Renovate this exact ${roomLabel} in ${styleName} style: ${styleFrag}${paletteClause} Keep the room's architecture, wall positions, window and door locations, and camera angle exactly the same. Photorealistic interior photography, magazine quality.`;
+}
+
+export type BuildOffplanBasePromptInput = {
+  roomType: RoomType;
+  widthM?: number | null;
+  depthM?: number | null;
+};
+
+// Text-to-image prompt for the empty-room shell (off-plan path). Dimensions are
+// optional — when the polygon is missing we drop the size clause rather than
+// invent numbers.
+export function buildOffplanBasePrompt({
+  roomType,
+  widthM,
+  depthM,
+}: BuildOffplanBasePromptInput): string {
+  const roomLabel = ROOM_LABELS[roomType];
+  const dims =
+    widthM && depthM
+      ? `${widthM.toFixed(1)}m wide by ${depthM.toFixed(1)}m deep, `
+      : "";
+  return `Empty unfurnished ${roomLabel}, ${dims}ceiling 2.9m, a single window on one side wall, screed floor, white primed walls, photorealistic, eye-level 24mm.`;
 }
