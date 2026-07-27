@@ -118,6 +118,22 @@ export default async function RenderPage({
 
   const roomList = rooms ?? [];
 
+  // Latest uploaded photo per room, so the room card rehydrates on load.
+  const roomIds = roomList.map((r) => r.id);
+  const initialPhotosByRoom: Record<string, string> = {};
+  if (roomIds.length > 0) {
+    const { data: photoRows } = await supabase
+      .from("room_photos")
+      .select("room_id, public_url, created_at")
+      .in("room_id", roomIds)
+      .order("created_at", { ascending: false });
+    for (const p of photoRows ?? []) {
+      if (p.room_id && p.public_url && !initialPhotosByRoom[p.room_id]) {
+        initialPhotosByRoom[p.room_id] = p.public_url;
+      }
+    }
+  }
+
   // Fetch every render for this project, then reconstruct a linear chain
   // per room (root → … → latest leaf). This rehydrates the iteration UI on
   // page load so users see their previous renders instead of starting blank.
@@ -164,6 +180,7 @@ export default async function RenderPage({
         style={style}
         initialChains={initialChains}
         initialLockedRoomIds={initialLockedRoomIds}
+        initialPhotosByRoom={initialPhotosByRoom}
       />
     </AppShell>
   );

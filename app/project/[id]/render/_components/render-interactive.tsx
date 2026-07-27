@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Dialog,
@@ -36,6 +36,8 @@ type Props = {
   style: Style | null;
   initialChains?: Record<string, RenderItem[]>;
   initialLockedRoomIds?: string[];
+  /** roomId → most-recent uploaded photo public URL. */
+  initialPhotosByRoom?: Record<string, string>;
 };
 
 type GenerateResponse = {
@@ -82,6 +84,7 @@ export function RenderInteractive({
   style,
   initialChains,
   initialLockedRoomIds = [],
+  initialPhotosByRoom = {},
 }: Props) {
   const seededState = useMemo<Record<string, RoomState>>(() => {
     const result: Record<string, RoomState> = {};
@@ -104,6 +107,8 @@ export function RenderInteractive({
   const [lockedRoomIds, setLockedRoomIds] = useState<Set<string>>(
     () => new Set(initialLockedRoomIds),
   );
+  const [photosByRoom, setPhotosByRoom] =
+    useState<Record<string, string>>(initialPhotosByRoom);
   const [keepIterating, setKeepIterating] = useState<Set<string>>(() => new Set());
   const [lastRenderMs, setLastRenderMs] = useState<number | null>(null);
   const [locking, setLocking] = useState(false);
@@ -332,6 +337,20 @@ export function RenderInteractive({
             />
           ))}
         </ul>
+
+        <div className="my-xl h-px bg-bone" />
+
+        <p className="label-caps mb-md text-ink-500">Room photo</p>
+        <RoomPhotoPanel
+          key={selectedRoom?.id ?? "none"}
+          roomId={selectedRoom?.id ?? null}
+          roomName={selectedRoom?.name_en?.trim() || "this room"}
+          photoUrl={selectedRoom ? photosByRoom[selectedRoom.id] ?? null : null}
+          onUploaded={(url) => {
+            if (!selectedRoom) return;
+            setPhotosByRoom((prev) => ({ ...prev, [selectedRoom.id]: url }));
+          }}
+        />
 
         <div className="my-xl h-px bg-bone" />
 
@@ -656,6 +675,155 @@ function StylePicker({
           Change
         </Link>
       </div>
+    </div>
+  );
+}
+
+// Room photo uploader. Shows the current photo (matte-image framed) with a
+// Replace action, or an "Add room photo" affordance when none exists. Uploads
+// via XHR so we can show progress; posts to /api/room-photo.
+function RoomPhotoPanel({
+  roomId,
+  roomName,
+  photoUrl,
+  onUploaded,
+}: {
+  roomId: string | null;
+  roomName: string;
+  photoUrl: string | null;
+  onUploaded: (publicUrl: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const MAX_BYTES = 20 * 1024 * 1024;
+
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // let the same file be re-selected later
+    if (!file || !roomId) return;
+    if (!/^image\/(png|jpeg)$/.test(file.type)) {
+      setError("Please choose a PNG or JPG.");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError("Image is larger than 20 MB.");
+      return;
+    }
+    setError(null);
+    setUploading(true);
+    setProgress(0);
+
+    const form = new FormData();
+    form.append("room_id", roomId);
+    form.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/room-photo");
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) setProgress((ev.loaded / ev.total) * 100);
+    };
+    xhr.onload = () => {
+      setUploading(false);
+      let body: unknown = null;
+      try {
+        body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      } catch {
+        // fall through to the generic error below
+      }
+      if (
+        xhr.status >= 200 &&
+        xhr.status < 300 &&
+        body &&
+        typeof body === "object" &&
+        "public_url" in body
+      ) {
+        onUploaded(String((body as { public_url: unknown }).public_url));
+      } else {
+        const msg =
+          body && typeof body === "object" && "error" in body
+            ? String((body as { error: unknown }).error)
+            : `Upload failed (${xhr.status}).`;
+        setError(msg);
+      }
+    };
+    xhr.onerror = () => {
+      setUploading(false);
+      setError("Network error — try again.");
+    };
+    xhr.send(form);
+  }
+
+  return (
+    <div className="flex flex-col gap-sm">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        onChange={onPick}
+        className="hidden"
+      />
+
+      {photoUrl ? (
+        <>
+          <div className="matte-image">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photoUrl}
+              alt={`${roomName} photo`}
+              className="aspect-[3/2] w-full rounded object-cover"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading || !roomId}
+            className="focus-ring flex h-10 items-center justify-center gap-sm rounded-lg border border-ink-100 font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low disabled:opacity-50"
+          >
+            <span
+              className="material-symbols-outlined text-[18px]"
+              aria-hidden="true"
+            >
+              sync
+            </span>
+            {uploading ? "Uploading…" : "Replace photo"}
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading || !roomId}
+          className="focus-ring flex h-[120px] flex-col items-center justify-center gap-xs rounded-lg border-2 border-dashed border-ink-100 text-center transition-colors hover:border-brass-600 hover:bg-primary-fixed/30 disabled:opacity-50"
+        >
+          <span
+            className="material-symbols-outlined text-[28px] text-brass-600"
+            aria-hidden="true"
+          >
+            add_a_photo
+          </span>
+          <span className="font-body-sm text-body-sm text-on-surface-variant">
+            {uploading ? "Uploading…" : "Add room photo"}
+          </span>
+          <span className="font-body-sm text-[11px] text-ink-500">
+            PNG or JPG · max 20 MB
+          </span>
+        </button>
+      )}
+
+      {uploading && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-bone">
+          <div
+            className="h-full rounded-full bg-brass-600 transition-[width] duration-200"
+            style={{ width: `${Math.max(4, progress)}%` }}
+          />
+        </div>
+      )}
+      {error && (
+        <p className="font-body-sm text-body-sm text-error">{error}</p>
+      )}
     </div>
   );
 }

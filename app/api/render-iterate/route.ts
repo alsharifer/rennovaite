@@ -13,7 +13,9 @@ export const maxDuration = 120;
 
 const REPLICATE_TIMEOUT_MS = 90_000;
 const MODEL_CANNY = "black-forest-labs/flux-canny-pro";
-const GUIDANCE = 25;
+// Match the render route: low guidance so the control image only hints at
+// layout instead of being traced literally into the output.
+const GUIDANCE = 10;
 
 const BodySchema = z.object({
   project_id: z.string().uuid(),

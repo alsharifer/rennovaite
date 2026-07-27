@@ -23,18 +23,21 @@ const REPLICATE_TIMEOUT_MS = 90_000;
 const MODEL_CANNY = "black-forest-labs/flux-canny-pro";
 const MODEL_DEPTH = "black-forest-labs/flux-depth-pro";
 
-// Lower than the default 30 so the prompt's style/room cues have more weight
-// than the spatial-structure hint from the control image. The old value of
-// 30 was overpowering the prompt and producing literal hexagons of the cube
-// wireframe.
-const GUIDANCE = 25;
+// Flux's usable guidance band is low; 25 forced over-literal adherence to the
+// control image. Dropped to 10 so the prompt's style/room cues lead and the
+// (depth) control image only hints at spatial layout.
+const GUIDANCE = 10;
 
 const BodySchema = z.object({
   project_id: z.string().uuid(),
   room_id: z.string().uuid(),
   tweak: z.string().min(1).max(500).optional(),
-  // Default to canny. Send `"depth"` to A/B against flux-depth-pro.
-  mode: z.enum(["canny", "depth"]).optional().default("canny"),
+  // Default to depth. The canny control image is a synthetic one-point-
+  // perspective wireframe, and flux-canny-pro traces those guide lines into the
+  // output as white grid/grout lines (the artifact in "Family Area — Concept
+  // v1"). A depth gradient carries the same spatial hint but has no edges to
+  // trace, so it cannot leave line artifacts. Send `"canny"` to A/B the old path.
+  mode: z.enum(["canny", "depth"]).optional().default("depth"),
 });
 
 const VALID_STYLE_KEYS = new Set<string>(STYLE_KEYS);

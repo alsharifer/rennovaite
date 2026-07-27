@@ -166,6 +166,9 @@ export type Database = {
           image_url: string | null;
           parent_render_id: string | null;
           kg_bundle_id: string | null;
+          source_image_url: string | null;
+          model: string | null;
+          mode: string | null;
           created_at: string | null;
         };
         Insert: {
@@ -176,6 +179,9 @@ export type Database = {
           image_url?: string | null;
           parent_render_id?: string | null;
           kg_bundle_id?: string | null;
+          source_image_url?: string | null;
+          model?: string | null;
+          mode?: string | null;
           created_at?: string | null;
         };
         Update: {
@@ -186,6 +192,9 @@ export type Database = {
           image_url?: string | null;
           parent_render_id?: string | null;
           kg_bundle_id?: string | null;
+          source_image_url?: string | null;
+          model?: string | null;
+          mode?: string | null;
           created_at?: string | null;
         };
         Relationships: [
@@ -336,6 +345,38 @@ export type Database = {
             columns: ["project_id"];
             isOneToOne: false;
             referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      room_photos: {
+        Row: {
+          id: string;
+          room_id: string | null;
+          storage_path: string | null;
+          public_url: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          room_id?: string | null;
+          storage_path?: string | null;
+          public_url?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          room_id?: string | null;
+          storage_path?: string | null;
+          public_url?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "room_photos_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "rooms";
             referencedColumns: ["id"];
           },
         ];
