@@ -3,6 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { generateDeterministicBoq } from "@/lib/boq/engine";
+import type {
+  EngineRoom,
+  LabourRate as EngineLabourRate,
+  PricingSku as EnginePricingSku,
+} from "@/lib/boq/schema";
 import { getKgContext } from "@/lib/kg/context";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getStyleByKey } from "@/lib/styles";
@@ -17,7 +23,7 @@ const BodySchema = z.object({
   project_id: z.string().uuid(),
 });
 
-// Categories from pricing_skus that are relevant to a residential first-floor
+// Categories from pricing_skus relevant to a residential first-floor
 // refit. The brief named lowercase tokens ('tile', 'sanitary', etc.) but the
 // seeded CSV uses Title Case ('Tiles', 'Sanitaryware', ...) — these are the
 // actual values in the table.
@@ -613,7 +619,7 @@ export async function POST(request: NextRequest) {
 
     const { data: rooms, error: roomsErr } = await supabase
       .from("rooms")
-      .select("id, name_en, room_type, area_m2")
+      .select("id, name_en, room_type, area_m2, polygon")
       .eq("plan_id", plan.id);
     if (roomsErr || !rooms || rooms.length === 0) {
       return NextResponse.json(
@@ -656,7 +662,71 @@ export async function POST(request: NextRequest) {
     const chosenStyle = chosenStyleKey ? getStyleByKey(chosenStyleKey) : null;
     const approvedCount = approvedRes.data?.length ?? 0;
 
-    // 2. Compute quantities deterministically.
+    // 2a. DEFAULT PATH — fully deterministic financial model (lib/boq).
+    // Quantities, rate selection, SKU picks, and totals are all rules-driven;
+    // no LLM in the pricing path. Set BOQ_ENGINE="llm" to fall back to the
+    // legacy Claude-priced flow below.
+    if (process.env.BOQ_ENGINE !== "llm") {
+      const engineRooms: EngineRoom[] = rooms.map((r) => ({
+        id: r.id,
+        name: r.name_en ?? "(unnamed)",
+        room_type: r.room_type ?? "other",
+        area_m2: r.area_m2 ?? 0,
+        polygon: Array.isArray(r.polygon)
+          ? (r.polygon as unknown as number[][])
+          : null,
+      }));
+      const { boq } = generateDeterministicBoq({
+        rooms: engineRooms,
+        labourRates: labourRates.map(
+          (r): EngineLabourRate => ({
+            work_section: r.work_section ?? "",
+            description: r.description ?? "",
+            unit: r.unit ?? "",
+            rate_low_aed: r.rate_low_aed ?? 0,
+            rate_mid_aed: r.rate_mid_aed ?? 0,
+            rate_high_aed: r.rate_high_aed ?? 0,
+          }),
+        ),
+        skus: skus.map(
+          (s): EnginePricingSku => ({
+            sku: s.sku ?? "",
+            brand: s.brand ?? "",
+            category: s.category ?? "",
+            subcategory: s.subcategory ?? "",
+            description_en: s.description_en ?? "",
+            unit: s.unit ?? "",
+            price_aed: s.price_aed ?? 0,
+            vendor: s.vendor ?? "",
+          }),
+        ),
+        styleKey: chosenStyleKey,
+      });
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("boqs")
+        .insert({
+          project_id: projectId,
+          total_aed: boq.grand_total_aed,
+          sections: boq,
+          locked_at: null,
+        })
+        .select("id")
+        .single();
+      if (insertErr || !inserted) {
+        throw insertErr ?? new Error("Failed to insert BoQ row.");
+      }
+      console.log(
+        `[api/generate-boq] deterministic engine project=${projectId} grand_total=AED ${boq.grand_total_aed}`,
+      );
+      return NextResponse.json({
+        success: true,
+        boq_id: inserted.id,
+        grand_total_aed: boq.grand_total_aed,
+      });
+    }
+
+    // 2b. LEGACY PATH — Claude prices the BoQ (kept behind BOQ_ENGINE="llm").
     const { quantities, counts } = computeQuantities(plan.total_area_m2, rooms);
 
     // KG grounding (feature-flagged, safe fallback). When active, the retrieved

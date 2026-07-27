@@ -1,0 +1,929 @@
+{
+  "takeoff": {
+    "items": [
+      {
+        "rule_id": "Q-01",
+        "work_section": "Demolition",
+        "item_key": "demo.soft_strip",
+        "description": "Full soft strip — finishes, ceilings, doors, cabinets, sanitary ware (no structural)",
+        "quantity": 199,
+        "unit": "m2",
+        "measurement": "total floor area incl. terrace = 199 m²"
+      },
+      {
+        "rule_id": "Q-02",
+        "work_section": "Demolition",
+        "item_key": "demo.floor_removal",
+        "description": "Existing floor finish removal — all areas incl. terrace",
+        "quantity": 199,
+        "unit": "m2",
+        "measurement": "total floor area = 199 m²"
+      },
+      {
+        "rule_id": "Q-03",
+        "work_section": "Demolition",
+        "item_key": "demo.wall_tile_removal",
+        "description": "Bathroom wall tile removal — full height",
+        "quantity": 78.69,
+        "unit": "m2",
+        "measurement": "F-03: Σ bath (perimeter × 2.9 m − door) = 78.69 m²"
+      },
+      {
+        "rule_id": "Q-04",
+        "work_section": "Plaster",
+        "item_key": "plaster.make_good",
+        "description": "Plaster make-good / skim after strip-out",
+        "quantity": 58.24,
+        "unit": "m2",
+        "measurement": "F-05: interior net wall 388.27 m² × 0.15 = 58.24 m²"
+      },
+      {
+        "rule_id": "Q-05",
+        "work_section": "Blockwork",
+        "item_key": "civil.alterations",
+        "description": "Civil alterations — opening closures/openings, new partitions, storage room",
+        "quantity": 1,
+        "unit": "project",
+        "measurement": "allowance pending design layout (R-35)"
+      },
+      {
+        "rule_id": "Q-06",
+        "work_section": "Floor Finishes",
+        "item_key": "floor.screed_wet",
+        "description": "Floor screed 50mm incl. falls — wet areas + terrace",
+        "quantity": 68,
+        "unit": "m2",
+        "measurement": "bath floors 18 + terrace 50 m²"
+      },
+      {
+        "rule_id": "Q-07",
+        "work_section": "Floor Finishes",
+        "item_key": "terrace.waterproof",
+        "description": "Waterproofing membrane — terrace",
+        "quantity": 50,
+        "unit": "m2",
+        "measurement": "terrace area = 50 m²"
+      },
+      {
+        "rule_id": "Q-08",
+        "work_section": "Floor Finishes",
+        "item_key": "floor.porcelain_labour",
+        "description": "Porcelain floor tiling — labour",
+        "quantity": 199,
+        "unit": "m2",
+        "measurement": "total floor area = 199 m² (porcelain throughout incl. wet areas + terrace)"
+      },
+      {
+        "rule_id": "Q-09",
+        "work_section": "Floor Finishes",
+        "item_key": "floor.porcelain_material",
+        "description": "Porcelain floor tiling — material supply",
+        "quantity": 199,
+        "unit": "m2",
+        "measurement": "net laid area; wastage added at pricing per W-01/W-02"
+      },
+      {
+        "rule_id": "Q-10",
+        "work_section": "Floor Finishes",
+        "item_key": "floor.skirting",
+        "description": "Skirting — tile-matched, dry rooms + terrace",
+        "quantity": 142.38,
+        "unit": "lm",
+        "measurement": "F-04: Σ (dry + terrace) perimeter − door widths = 142.38 lm"
+      },
+      {
+        "rule_id": "Q-11",
+        "work_section": "Floor Finishes",
+        "item_key": "stairs.renovation",
+        "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+        "quantity": 1,
+        "unit": "project",
+        "measurement": "allowance (R-36); treads TBC from stair drawing"
+      },
+      {
+        "rule_id": "Q-12",
+        "work_section": "Wall Finishes",
+        "item_key": "wall.bath_tiling_labour",
+        "description": "Bathroom wall tiling — full height, labour",
+        "quantity": 78.69,
+        "unit": "m2",
+        "measurement": "F-03 (as Q-03) = 78.69 m²"
+      },
+      {
+        "rule_id": "Q-13",
+        "work_section": "Wall Finishes",
+        "item_key": "wall.bath_tiling_material",
+        "description": "Bathroom wall tile — material supply",
+        "quantity": 78.69,
+        "unit": "m2",
+        "measurement": "net tiled area; wastage per W-03"
+      },
+      {
+        "rule_id": "Q-14",
+        "work_section": "Ceilings",
+        "item_key": "ceiling.gypsum",
+        "description": "Gypsum false ceiling incl. plastering + painting — all interior rooms",
+        "quantity": 134.1,
+        "unit": "m2",
+        "measurement": "F-12: interior area 149 m² × 0.9 = 134.1 m²"
+      },
+      {
+        "rule_id": "Q-15",
+        "work_section": "Ceilings",
+        "item_key": "ceiling.led_cove",
+        "description": "Continuous LED cove channel within gypsum ceiling",
+        "quantity": 111.35,
+        "unit": "lm",
+        "measurement": "F-13: dry interior area 131 m² × 0.85 = 111.35 lm"
+      },
+      {
+        "rule_id": "Q-16",
+        "work_section": "Decoration & Painting",
+        "item_key": "paint.full",
+        "description": "Internal painting — walls + ceilings, 2 coats",
+        "quantity": 456.42,
+        "unit": "m2",
+        "measurement": "F-02: dry (net wall + ceiling) + bath ceilings = 456.42 m²"
+      },
+      {
+        "rule_id": "Q-17",
+        "work_section": "Electrical",
+        "item_key": "elec.downlight",
+        "description": "LED downlights — supply and install (interior)",
+        "quantity": 48,
+        "unit": "no",
+        "measurement": "F-06: Σ interior ceil(area / 3.5) = 48"
+      },
+      {
+        "rule_id": "Q-18",
+        "work_section": "Electrical",
+        "item_key": "elec.point",
+        "description": "Power sockets and switches — supply and install (interior)",
+        "quantity": 63,
+        "unit": "no",
+        "measurement": "F-07: Σ interior ceil(area × 0.4) = 63"
+      },
+      {
+        "rule_id": "Q-19",
+        "work_section": "Plumbing",
+        "item_key": "plumb.bath_rewire",
+        "description": "Bathroom plumbing re-pipe (full PPR) — per bathroom",
+        "quantity": 3,
+        "unit": "no",
+        "measurement": "bathroom count = 3"
+      },
+      {
+        "rule_id": "Q-20",
+        "work_section": "Plumbing",
+        "item_key": "plumb.water_heater",
+        "description": "Concealed water heater — supply and install",
+        "quantity": 3,
+        "unit": "no",
+        "measurement": "1 per bathroom × 3 (Villa 94 retained existing heaters — QS to confirm inclusion)"
+      },
+      {
+        "rule_id": "Q-21",
+        "work_section": "Plumbing",
+        "item_key": "plumb.floor_drain",
+        "description": "Floor / linear shower drain — install",
+        "quantity": 3,
+        "unit": "no",
+        "measurement": "1 per bathroom × 3"
+      },
+      {
+        "rule_id": "Q-22",
+        "work_section": "Sanitaryware",
+        "item_key": "san.wc",
+        "description": "Wall-hung WC incl. concealed cistern — install",
+        "quantity": 3,
+        "unit": "no",
+        "measurement": "1 per bathroom × 3"
+      },
+      {
+        "rule_id": "Q-23",
+        "work_section": "Sanitaryware",
+        "item_key": "san.basin",
+        "description": "Vanity basin with mixer — install",
+        "quantity": 3,
+        "unit": "no",
+        "measurement": "1 per bathroom × 3"
+      },
+      {
+        "rule_id": "Q-24",
+        "work_section": "Sanitaryware",
+        "item_key": "san.shower",
+        "description": "Shower system with concealed thermostatic valve — install",
+        "quantity": 3,
+        "unit": "no",
+        "measurement": "1 per bathroom × 3"
+      },
+      {
+        "rule_id": "Q-25",
+        "work_section": "MEP / HVAC",
+        "item_key": "hvac.ducted_replace",
+        "description": "New ducted AC unit incl. ductwork, grilles, thermostat — secondary bedrooms",
+        "quantity": 2,
+        "unit": "no",
+        "measurement": "F-15: 1 per secondary bedroom × 2"
+      },
+      {
+        "rule_id": "Q-26",
+        "work_section": "MEP / HVAC",
+        "item_key": "hvac.office_split",
+        "description": "Split AC unit (2 ton) — office, incl. commissioning",
+        "quantity": 1,
+        "unit": "no",
+        "measurement": "F-16: 1 per office × 1"
+      },
+      {
+        "rule_id": "Q-27",
+        "work_section": "MEP / HVAC",
+        "item_key": "hvac.fcu_service",
+        "description": "FCU deep service and clean — retained units",
+        "quantity": 2,
+        "unit": "no",
+        "measurement": "rooms retaining existing FCU = 2"
+      },
+      {
+        "rule_id": "Q-28",
+        "work_section": "Joinery & Carpentry",
+        "item_key": "join.wardrobe",
+        "description": "Built-in wardrobes — bedrooms",
+        "quantity": 8.4,
+        "unit": "lm",
+        "measurement": "F-08: master 3.6 lm + secondary 2.4 lm each = 8.4 lm"
+      },
+      {
+        "rule_id": "Q-29",
+        "work_section": "Joinery & Carpentry",
+        "item_key": "join.vanity",
+        "description": "Bathroom vanity with quartz top",
+        "quantity": 3,
+        "unit": "no",
+        "measurement": "1 per bathroom × 3"
+      },
+      {
+        "rule_id": "Q-30",
+        "work_section": "Joinery & Carpentry",
+        "item_key": "join.door",
+        "description": "Internal doors — supply and hang",
+        "quantity": 6,
+        "unit": "no",
+        "measurement": "F-10: bedrooms 3 + bathrooms 3 = 6"
+      },
+      {
+        "rule_id": "Q-31",
+        "work_section": "Lighting",
+        "item_key": "light.pendant",
+        "description": "Decorative pendants — installation",
+        "quantity": 5,
+        "unit": "no",
+        "measurement": "F-09: 1 per bedroom (3) + 2 living = 5"
+      },
+      {
+        "rule_id": "Q-32",
+        "work_section": "Preliminaries",
+        "item_key": "prelim.site_setup",
+        "description": "Site setup, hoarding, protection, daily clean",
+        "quantity": 1,
+        "unit": "project",
+        "measurement": "lump sum per project"
+      },
+      {
+        "rule_id": "Q-33",
+        "work_section": "Preliminaries",
+        "item_key": "prelim.permits",
+        "description": "DM / DEWA permits and fees",
+        "quantity": 1,
+        "unit": "project",
+        "measurement": "lump sum per project"
+      },
+      {
+        "rule_id": "Q-34",
+        "work_section": "Preliminaries",
+        "item_key": "prelim.skips",
+        "description": "Skip hire and waste disposal",
+        "quantity": 9,
+        "unit": "no",
+        "measurement": "F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips"
+      },
+      {
+        "rule_id": "Q-35",
+        "work_section": "Preliminaries",
+        "item_key": "prelim.floor_protection",
+        "description": "Protective floor covering over new tiling until handover",
+        "quantity": 199,
+        "unit": "m2",
+        "measurement": "F-14: total floor area = 199 m²"
+      },
+      {
+        "rule_id": "Q-36",
+        "work_section": "Preliminaries",
+        "item_key": "prelim.scaffold",
+        "description": "Rolling scaffold hire — ceiling + painting works",
+        "quantity": 1,
+        "unit": "project",
+        "measurement": "lump sum per project"
+      },
+      {
+        "rule_id": "Q-37",
+        "work_section": "Preliminaries",
+        "item_key": "prelim.handover_clean",
+        "description": "Final clearance + professional handover clean",
+        "quantity": 1,
+        "unit": "project",
+        "measurement": "lump sum per project"
+      }
+    ],
+    "summary": {
+      "totalAreaM2": 199,
+      "interiorAreaM2": 149,
+      "bedroomCount": 3,
+      "bathroomCount": 3,
+      "netWallM2": 388.27,
+      "bathWetWallM2": 78.69
+    }
+  },
+  "boq": {
+    "sections": [
+      {
+        "work_section": "Demolition",
+        "lines": [
+          {
+            "description": "Full soft strip — finishes, ceilings, doors, cabinets, sanitary ware (no structural)",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 40,
+            "total_aed": 7960,
+            "vendor_or_source": "labour_rates: Soft strip — carpets, fixtures, fittings removal (no structural)",
+            "notes": "R-01: mid band (tier mid); total floor area incl. terrace = 199 m²",
+            "rule_id": "Q-01/R-01",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Existing floor finish removal — all areas incl. terrace",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 55,
+            "total_aed": 10945,
+            "vendor_or_source": "labour_rates: Floor tile removal — intact substrate",
+            "notes": "R-02: mid band (tier mid); total floor area = 199 m²",
+            "rule_id": "Q-02/R-02",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile removal — full height",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 70,
+            "total_aed": 5508,
+            "vendor_or_source": "labour_rates: Wall tile removal — bathroom",
+            "notes": "R-03: mid band (tier mid); F-03: Σ bath (perimeter × 2.9 m − door) = 78.69 m²",
+            "rule_id": "Q-03/R-03",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 24413
+      },
+      {
+        "work_section": "Blockwork",
+        "lines": [
+          {
+            "description": "Civil alterations — opening closures/openings, new partitions, storage room",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 15000,
+            "total_aed": 15000,
+            "vendor_or_source": "allowance",
+            "notes": "R-35: Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (Villa 94 §2: AED 15k). Design-dependent; QS to re-measure per project.; allowance pending design layout (R-35)",
+            "rule_id": "Q-05/R-35",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 15000
+      },
+      {
+        "work_section": "Plaster",
+        "lines": [
+          {
+            "description": "Plaster make-good / skim after strip-out",
+            "quantity": 58.24,
+            "unit": "m2",
+            "rate_aed": 35,
+            "total_aed": 2038,
+            "vendor_or_source": "labour_rates: Internal skim or smoothing coat",
+            "notes": "R-04: mid band (tier mid); F-05: interior net wall 388.27 m² × 0.15 = 58.24 m²",
+            "rule_id": "Q-04/R-04",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 2038
+      },
+      {
+        "work_section": "Floor Finishes",
+        "lines": [
+          {
+            "description": "Floor screed 50mm incl. falls — wet areas + terrace",
+            "quantity": 68,
+            "unit": "m2",
+            "rate_aed": 60,
+            "total_aed": 4080,
+            "vendor_or_source": "labour_rates: Floor screed 50mm",
+            "notes": "R-05: mid band (tier mid); bath floors 18 + terrace 50 m²",
+            "rule_id": "Q-06/R-05",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Waterproofing membrane — terrace",
+            "quantity": 50,
+            "unit": "m2",
+            "rate_aed": 50,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-34: Full waterproofing membrane to external terrace, AED 50/m². No labour-rates row yet — QS to confirm.; terrace area = 50 m²",
+            "rule_id": "Q-07/R-34",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tiling — labour",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 70,
+            "total_aed": 13930,
+            "vendor_or_source": "labour_rates: Porcelain floor tiling — labour only",
+            "notes": "R-06: mid band (tier mid); total floor area = 199 m² (porcelain throughout incl. wet areas + terrace)",
+            "rule_id": "Q-08/R-06",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tiling — material supply",
+            "quantity": 218.9,
+            "unit": "m2",
+            "rate_aed": 137,
+            "total_aed": 29989,
+            "vendor_or_source": "RAK Ceramics — RAK-MRB-MAXIMUSC-60X120",
+            "notes": "R-07: Maximus Classic marble-effect porcelain floor & wall tile, Polished, 60x120 cm (tier mid, pick 15/30 by price); qty incl. 10% wastage on 199 m2 net (net laid area; wastage added at pricing per W-01/W-02)",
+            "rule_id": "Q-09/R-07",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 10
+          },
+          {
+            "description": "Skirting — tile-matched, dry rooms + terrace",
+            "quantity": 142.38,
+            "unit": "lm",
+            "rate_aed": 55,
+            "total_aed": 7831,
+            "vendor_or_source": "labour_rates: Skirting installation (MDF or wood)",
+            "notes": "R-10: mid band (tier mid); F-04: Σ (dry + terrace) perimeter − door widths = 142.38 lm",
+            "rule_id": "Q-10/R-10",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "allowance",
+            "notes": "R-36: Staircase renovation allowance — tread tiling + LED nosing circuit, excl. handrail (Villa 94 §5: AED 6k). QS to confirm.; allowance (R-36); treads TBC from stair drawing",
+            "rule_id": "Q-11/R-36",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 64330
+      },
+      {
+        "work_section": "Wall Finishes",
+        "lines": [
+          {
+            "description": "Bathroom wall tiling — full height, labour",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 85,
+            "total_aed": 6689,
+            "vendor_or_source": "labour_rates: Ceramic or porcelain wall tiling — bathroom, labour only",
+            "notes": "R-11: mid band (tier mid); F-03 (as Q-03) = 78.69 m²",
+            "rule_id": "Q-12/R-11",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile — material supply",
+            "quantity": 88.13,
+            "unit": "m2",
+            "rate_aed": 97,
+            "total_aed": 8549,
+            "vendor_or_source": "RAK Ceramics — RAK-MRB-CALACATT-60X60",
+            "notes": "R-12: Calacatta Imperiale Hyper White marble-effect porcelain floor & wall tile, Polished, 60x60 (tier mid, pick 43/85 by price); qty incl. 12% wastage on 78.69 m2 net (net tiled area; wastage per W-03)",
+            "rule_id": "Q-13/R-12",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 12
+          }
+        ],
+        "section_total_aed": 15238
+      },
+      {
+        "work_section": "Ceilings",
+        "lines": [
+          {
+            "description": "Gypsum false ceiling incl. plastering + painting — all interior rooms",
+            "quantity": 134.1,
+            "unit": "m2",
+            "rate_aed": 125,
+            "total_aed": 16763,
+            "vendor_or_source": "allowance",
+            "notes": "R-30: Gypsum false ceiling incl. plastering + painting, AED 125/m² (Villa 94: AED 21k ÷ 130 m² + 120 lm cove). No labour-rates row yet — QS to confirm.; F-12: interior area 149 m² × 0.9 = 134.1 m²",
+            "rule_id": "Q-14/R-30",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Continuous LED cove channel within gypsum ceiling",
+            "quantity": 111.35,
+            "unit": "lm",
+            "rate_aed": 45,
+            "total_aed": 5011,
+            "vendor_or_source": "allowance",
+            "notes": "R-31: Continuous cove + recessed LED channel, AED 45/lm labour (strips client-supplied). No labour-rates row yet — QS to confirm.; F-13: dry interior area 131 m² × 0.85 = 111.35 lm",
+            "rule_id": "Q-15/R-31",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 21774
+      },
+      {
+        "work_section": "Decoration & Painting",
+        "lines": [
+          {
+            "description": "Internal painting — walls + ceilings, 2 coats",
+            "quantity": 456.42,
+            "unit": "m2",
+            "rate_aed": 30,
+            "total_aed": 13693,
+            "vendor_or_source": "labour_rates: Internal painting — 2 coats over prepared surface",
+            "notes": "R-13: mid band (tier mid); F-02: dry (net wall + ceiling) + bath ceilings = 456.42 m²",
+            "rule_id": "Q-16/R-13",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 13693
+      },
+      {
+        "work_section": "Joinery & Carpentry",
+        "lines": [
+          {
+            "description": "Built-in wardrobes — bedrooms",
+            "quantity": 8.4,
+            "unit": "lm",
+            "rate_aed": 1800,
+            "total_aed": 15120,
+            "vendor_or_source": "labour_rates: Built-in wardrobe — mid-range MDF with lacquer or melamine",
+            "notes": "R-23: mid band (tier mid); F-08: master 3.6 lm + secondary 2.4 lm each = 8.4 lm",
+            "rule_id": "Q-28/R-23",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom vanity with quartz top",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 7000,
+            "total_aed": 21000,
+            "vendor_or_source": "labour_rates: Vanity cabinet with quartz top — bathroom",
+            "notes": "R-24: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-29/R-24",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Internal doors — supply and hang",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 2400,
+            "total_aed": 14400,
+            "vendor_or_source": "labour_rates: Flush internal door — supply and fit",
+            "notes": "R-25: mid band (tier mid); F-10: bedrooms 3 + bathrooms 3 = 6",
+            "rule_id": "Q-30/R-25",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 50520
+      },
+      {
+        "work_section": "Electrical",
+        "lines": [
+          {
+            "description": "LED downlights — supply and install (interior)",
+            "quantity": 48,
+            "unit": "no",
+            "rate_aed": 180,
+            "total_aed": 8640,
+            "vendor_or_source": "labour_rates: LED downlight — supply and install",
+            "notes": "R-14: mid band (tier mid); F-06: Σ interior ceil(area / 3.5) = 48",
+            "rule_id": "Q-17/R-14",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Power sockets and switches — supply and install (interior)",
+            "quantity": 63,
+            "unit": "no",
+            "rate_aed": 140,
+            "total_aed": 8820,
+            "vendor_or_source": "labour_rates: Power socket or switch — supply and install",
+            "notes": "R-15: mid band (tier mid); F-07: Σ interior ceil(area × 0.4) = 63",
+            "rule_id": "Q-18/R-15",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 17460
+      },
+      {
+        "work_section": "Plumbing",
+        "lines": [
+          {
+            "description": "Bathroom plumbing re-pipe (full PPR) — per bathroom",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 7500,
+            "total_aed": 22500,
+            "vendor_or_source": "labour_rates: Bathroom plumbing rewire — per bathroom, full",
+            "notes": "R-16: mid band (tier mid); bathroom count = 3",
+            "rule_id": "Q-19/R-16",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Concealed water heater — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2800,
+            "total_aed": 8400,
+            "vendor_or_source": "labour_rates: Concealed water heater — supply and install",
+            "notes": "R-17: mid band (tier mid); 1 per bathroom × 3 (Villa 94 retained existing heaters — QS to confirm inclusion)",
+            "rule_id": "Q-20/R-17",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Floor / linear shower drain — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 650,
+            "total_aed": 1950,
+            "vendor_or_source": "labour_rates: Floor drain — supply and install",
+            "notes": "R-18: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-21/R-18",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 32850
+      },
+      {
+        "work_section": "Sanitaryware",
+        "lines": [
+          {
+            "description": "Wall-hung WC incl. concealed cistern — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2400,
+            "total_aed": 7200,
+            "vendor_or_source": "labour_rates: WC suite supply and install — mid-range",
+            "notes": "R-19: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-22/R-19",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Vanity basin with mixer — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1800,
+            "total_aed": 5400,
+            "vendor_or_source": "labour_rates: Wash basin with mixer — supply and install",
+            "notes": "R-20: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-23/R-20",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shower system with concealed thermostatic valve — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 3500,
+            "total_aed": 10500,
+            "vendor_or_source": "labour_rates: Shower system — mixer, handset, rain head",
+            "notes": "R-21: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-24/R-21",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 23100
+      },
+      {
+        "work_section": "MEP / HVAC",
+        "lines": [
+          {
+            "description": "New ducted AC unit incl. ductwork, grilles, thermostat — secondary bedrooms",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 14000,
+            "total_aed": 28000,
+            "vendor_or_source": "labour_rates: Concealed ducted AC FCU replacement",
+            "notes": "R-32: mid band (tier mid); F-15: 1 per secondary bedroom × 2",
+            "rule_id": "Q-25/R-32",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Split AC unit (2 ton) — office, incl. commissioning",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 5500,
+            "total_aed": 5500,
+            "vendor_or_source": "labour_rates: Split AC unit (1.5-2.5 ton) — supply and install",
+            "notes": "R-33: mid band (tier mid); F-16: 1 per office × 1",
+            "rule_id": "Q-26/R-33",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "FCU deep service and clean — retained units",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 350,
+            "total_aed": 700,
+            "vendor_or_source": "labour_rates: AC servicing and cleaning",
+            "notes": "R-22: mid band (tier mid); rooms retaining existing FCU = 2",
+            "rule_id": "Q-27/R-22",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 34200
+      },
+      {
+        "work_section": "Lighting",
+        "lines": [
+          {
+            "description": "Decorative pendants — installation",
+            "quantity": 5,
+            "unit": "no",
+            "rate_aed": 280,
+            "total_aed": 1400,
+            "vendor_or_source": "labour_rates: Decorative pendant — installation labour only",
+            "notes": "R-26: mid band (tier mid); F-09: 1 per bedroom (3) + 2 living = 5",
+            "rule_id": "Q-31/R-26",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 1400
+      },
+      {
+        "work_section": "Preliminaries",
+        "lines": [
+          {
+            "description": "Site setup, hoarding, protection, daily clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 12000,
+            "total_aed": 12000,
+            "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
+            "notes": "R-27: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-32/R-27",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "DM / DEWA permits and fees",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
+            "notes": "R-28: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-33/R-28",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Skip hire and waste disposal",
+            "quantity": 9,
+            "unit": "no",
+            "rate_aed": 1500,
+            "total_aed": 13500,
+            "vendor_or_source": "labour_rates: Skip hire and waste disposal",
+            "notes": "R-29: mid band (tier mid); F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips",
+            "rule_id": "Q-34/R-29",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Protective floor covering over new tiling until handover",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 8,
+            "total_aed": 1592,
+            "vendor_or_source": "allowance",
+            "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 199 m²",
+            "rule_id": "Q-35/R-37",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Rolling scaffold hire — ceiling + painting works",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 2500,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-36/R-38",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Final clearance + professional handover clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 1500,
+            "total_aed": 1500,
+            "vendor_or_source": "allowance",
+            "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-37/R-39",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 37092
+      }
+    ],
+    "subtotal_aed": 353108,
+    "contingency_pct": 8,
+    "contingency_aed": 28249,
+    "vat_pct": 5,
+    "vat_aed": 19068,
+    "grand_total_aed": 400425,
+    "engine": {
+      "version": "0.2.0",
+      "tier": "mid",
+      "flooring": "porcelain",
+      "style_key": "contemporary-majlis",
+      "generated_at": "2026-07-02T21:11:35.334Z"
+    }
+  }
+}
