@@ -4,8 +4,7 @@ import { createCanvas } from "@napi-rs/canvas";
 //
 //   buildControlImageBase64       — black-on-white edge map for flux-*-canny.
 //                                   One-point perspective interior sketch:
-//                                   back wall + four perspective lines + a
-//                                   window cue on the right wall.
+//                                   back wall + four perspective lines.
 //
 //   buildDepthControlImageBase64  — greyscale depth map for flux-*-depth.
 //                                   Same perspective layout as the canny
@@ -104,21 +103,6 @@ function backWallRect(widthM: number, depthM: number) {
   };
 }
 
-// Locate a point on the inside face of the right side wall.
-// t   ∈ [0, 1]: 0 = back of the wall (touching back-wall right edge),
-//                1 = front of the wall (touching canvas right edge).
-// vFrac ∈ [0, 1]: 0 = top of wall at this depth, 1 = bottom.
-function pointOnRightWall(
-  back: ReturnType<typeof backWallRect>,
-  t: number,
-  vFrac: number,
-): Point2D {
-  const x = back.right + t * (CANVAS_W - back.right);
-  const yTop = back.top * (1 - t); // canvas top is y=0
-  const yBot = back.bottom + t * (CANVAS_H - back.bottom);
-  return [x, yTop + vFrac * (yBot - yTop)];
-}
-
 // ---------------------------------------------------------------------------
 // Canny variant — black lines on white
 // ---------------------------------------------------------------------------
@@ -165,21 +149,6 @@ export async function buildControlImageBase64(
     ctx.lineTo(x2, y2);
     ctx.stroke();
   }
-
-  // Window cue on the right wall (small parallelogram in perspective).
-  const winCorners = [
-    pointOnRightWall(back, 0.32, 0.25),
-    pointOnRightWall(back, 0.6, 0.25),
-    pointOnRightWall(back, 0.6, 0.65),
-    pointOnRightWall(back, 0.32, 0.65),
-  ];
-  ctx.beginPath();
-  ctx.moveTo(winCorners[0][0], winCorners[0][1]);
-  for (let i = 1; i < winCorners.length; i++) {
-    ctx.lineTo(winCorners[i][0], winCorners[i][1]);
-  }
-  ctx.closePath();
-  ctx.stroke();
 
   return canvas.toBuffer("image/png").toString("base64");
 }
