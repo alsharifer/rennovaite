@@ -19,6 +19,23 @@ import * as THREE from "three";
 
 import type { SceneModel, WallSegment } from "@/lib/viewer/scene";
 import { WALL_WHITE } from "@/lib/viewer/scene";
+import {
+  floorTarget,
+  wallTarget,
+  type InspectBoq,
+  type InspectTarget,
+  type RoomMeta,
+  type WallMeta,
+} from "@/lib/viewer/inspect";
+
+import { InspectPanel } from "./InspectPanel";
+
+export interface InspectData {
+  projectId: string;
+  boq: InspectBoq;
+  rooms: RoomMeta[];
+  walls: WallMeta[];
+}
 
 export interface RoomRenders {
   roomId: string;
@@ -58,7 +75,16 @@ class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean
 }
 
 // -------------------------------------------------------------- geometry
-function Floors({ scene, onPick }: { scene: SceneModel; onPick?: (p: THREE.Vector3) => void }) {
+type ElementKind = "floor" | "wall";
+
+interface PickProps {
+  onElement: (kind: ElementKind, id: string, p: THREE.Vector3) => void;
+  onHover: (id: string | null) => void;
+  selectedId: string | null;
+  hoveredId: string | null;
+}
+
+function Floors({ scene, onElement, onHover, selectedId, hoveredId }: { scene: SceneModel } & PickProps) {
   const meshes = useMemo(
     () =>
       scene.floors.map((f) => {
@@ -71,43 +97,65 @@ function Floors({ scene, onPick }: { scene: SceneModel; onPick?: (p: THREE.Vecto
   );
   return (
     <group>
-      {meshes.map((m) => (
-        <mesh
-          key={m.key}
-          geometry={m.geom}
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, 0, 0]}
-          onClick={onPick ? (e) => { e.stopPropagation(); onPick(e.point); } : undefined}
-        >
-          <meshStandardMaterial color={m.color} roughness={0.95} metalness={0} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
+      {meshes.map((m) => {
+        const on = m.key === selectedId;
+        const hov = m.key === hoveredId;
+        return (
+          <mesh
+            key={m.key}
+            geometry={m.geom}
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[0, 0, 0]}
+            onClick={(e) => { e.stopPropagation(); onElement("floor", m.key, e.point); }}
+            onPointerOver={(e) => { e.stopPropagation(); onHover(m.key); }}
+            onPointerOut={() => onHover(null)}
+          >
+            <meshStandardMaterial
+              color={m.color}
+              roughness={0.95}
+              metalness={0}
+              side={THREE.DoubleSide}
+              emissive={BRASS}
+              emissiveIntensity={on ? 0.35 : hov ? 0.15 : 0}
+            />
+          </mesh>
+        );
+      })}
     </group>
   );
 }
 
-function Walls({ scene, onPick }: { scene: SceneModel; onPick?: (p: THREE.Vector3) => void }) {
+function Walls({ scene, onElement, onHover, selectedId, hoveredId }: { scene: SceneModel } & PickProps) {
   return (
     <group>
-      {scene.walls.map((w) => (
-        <mesh
-          key={w.id}
-          position={w.center}
-          rotation={[0, w.rotationY, 0]}
-          castShadow={false}
-          onClick={onPick ? (e) => { e.stopPropagation(); onPick(e.point); } : undefined}
-        >
-          <boxGeometry args={w.size} />
-          <meshStandardMaterial
-            color={WALL_WHITE}
-            roughness={0.9}
-            metalness={0}
-            transparent={w.derived}
-            opacity={w.derived ? 0.6 : 1}
-          />
-          {w.derived && <Edges threshold={15} color="#CBD5E1" />}
-        </mesh>
-      ))}
+      {scene.walls.map((w) => {
+        const baseId = w.id.split(":")[0]!; // split walls (openings) share a base id
+        const on = baseId === selectedId;
+        const hov = baseId === hoveredId;
+        return (
+          <mesh
+            key={w.id}
+            position={w.center}
+            rotation={[0, w.rotationY, 0]}
+            castShadow={false}
+            onClick={(e) => { e.stopPropagation(); onElement("wall", baseId, e.point); }}
+            onPointerOver={(e) => { e.stopPropagation(); onHover(baseId); }}
+            onPointerOut={() => onHover(null)}
+          >
+            <boxGeometry args={w.size} />
+            <meshStandardMaterial
+              color={WALL_WHITE}
+              roughness={0.9}
+              metalness={0}
+              transparent={w.derived}
+              opacity={w.derived ? 0.6 : 1}
+              emissive={BRASS}
+              emissiveIntensity={on ? 0.3 : hov ? 0.12 : 0}
+            />
+            {(w.derived || on) && <Edges threshold={15} color={on ? BRASS : "#CBD5E1"} />}
+          </mesh>
+        );
+      })}
     </group>
   );
 }
@@ -281,16 +329,47 @@ function OrbitRig({ scene }: { scene: SceneModel }) {
 }
 
 // -------------------------------------------------------------- main
-export function Villa3D({ scene, renders }: { scene: SceneModel; renders: RoomRenders[] }) {
+export function Villa3D({
+  scene,
+  renders,
+  inspect,
+}: {
+  scene: SceneModel;
+  renders: RoomRenders[];
+  inspect?: InspectData;
+}) {
   const [mode, setMode] = useState<Mode>("orbit");
   const [showAreas, setShowAreas] = useState(true);
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePts, setMeasurePts] = useState<THREE.Vector3[]>([]);
   const [active, setActive] = useState<RoomRenders | null>(null);
+  const [target, setTarget] = useState<InspectTarget | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const onPick = (p: THREE.Vector3) => {
-    if (!measureMode) return;
-    setMeasurePts((cur) => (cur.length >= 2 ? [p] : [...cur, p]));
+  const roomById = useMemo(() => new Map((inspect?.rooms ?? []).map((r) => [r.id, r])), [inspect]);
+  const wallById = useMemo(() => new Map((inspect?.walls ?? []).map((w) => [w.id, w])), [inspect]);
+
+  // Click: in measure mode → drop a measurement point; otherwise inspect.
+  const onElement = (kind: ElementKind, id: string, p: THREE.Vector3) => {
+    if (measureMode) {
+      setMeasurePts((cur) => (cur.length >= 2 ? [p] : [...cur, p]));
+      return;
+    }
+    if (!inspect) return;
+    if (kind === "floor") {
+      const room = roomById.get(id);
+      if (room) { setTarget(floorTarget(room)); setSelectedId(id); }
+    } else {
+      const wall = wallById.get(id);
+      if (wall) { setTarget(wallTarget(wall)); setSelectedId(id); }
+    }
+  };
+  const onHover = (id: string | null) => {
+    setHoveredId(id);
+    if (typeof document !== "undefined") {
+      document.body.style.cursor = id && !measureMode && inspect ? "pointer" : "auto";
+    }
   };
 
   const max = Math.max(scene.bounds.size[0], scene.bounds.size[1]);
@@ -367,8 +446,8 @@ export function Villa3D({ scene, renders }: { scene: SceneModel; renders: RoomRe
         <directionalLight position={[max, max * 1.5, max * 0.5]} intensity={1.1} />
         <directionalLight position={[-max, max, -max * 0.5]} intensity={0.3} />
 
-        <Floors scene={scene} onPick={onPick} />
-        <Walls scene={scene} onPick={onPick} />
+        <Floors scene={scene} onElement={onElement} onHover={onHover} selectedId={selectedId} hoveredId={hoveredId} />
+        <Walls scene={scene} onElement={onElement} onHover={onHover} selectedId={selectedId} hoveredId={hoveredId} />
         {showAreas && <RoomAreaLabels scene={scene} />}
         <RenderAnchors scene={scene} renders={renders} onOpen={setActive} />
         <Measurement points={measurePts} />
@@ -376,6 +455,16 @@ export function Villa3D({ scene, renders }: { scene: SceneModel; renders: RoomRe
         {mode === "orbit" ? <OrbitRig scene={scene} /> : <WalkControls scene={scene} />}
       </Canvas>
       </SceneBoundary>
+
+      {/* Tap-to-inspect panel */}
+      {inspect && target && (
+        <InspectPanel
+          target={target}
+          boq={inspect.boq}
+          projectId={inspect.projectId}
+          onClose={() => { setTarget(null); setSelectedId(null); }}
+        />
+      )}
 
       {/* Render overlay — "step into the photoreal view" */}
       {active && <RenderOverlay room={active} onClose={() => setActive(null)} />}

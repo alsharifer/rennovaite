@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app/AppShell";
 import { Villa3DLoader } from "@/components/viewer/Villa3DLoader";
-import type { RoomRenders } from "@/components/viewer/Villa3D";
+import type { InspectData, RoomRenders } from "@/components/viewer/Villa3D";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildScene } from "@/lib/viewer/scene";
-import { styleFloorColor } from "@/lib/viewer/finishes";
+import { styleFinishes, styleFloorColor } from "@/lib/viewer/finishes";
+import type { InspectBoq, RoomMeta, WallMeta } from "@/lib/viewer/inspect";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -94,10 +95,59 @@ export default async function ViewerPage({
     });
   }
 
+  // P4 tap-to-inspect data: latest BoQ (with element_refs) + element metadata.
+  const { data: boqRows } = await supabase
+    .from("boqs")
+    .select("sections")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const rawSections = boqRows?.[0]?.sections;
+  const boq: InspectBoq =
+    rawSections && typeof rawSections === "object" && "sections" in rawSections
+      ? (rawSections as unknown as InspectBoq)
+      : { sections: [] };
+
+  const fin = styleFinishes(styleKey);
+  const wallIdsByRoom = new Map<string, string[]>();
+  for (const w of graph.walls) {
+    for (const rid of w.room_ids) {
+      (wallIdsByRoom.get(rid) ?? wallIdsByRoom.set(rid, []).get(rid)!).push(w.id);
+    }
+  }
+  const ceilingByRoom = new Map(graph.rooms.map((r) => [r.id, r.ceiling_h_m || 2.9]));
+  const globalCeiling = graph.rooms.reduce((mx, r) => Math.max(mx, r.ceiling_h_m || 0), 0) || 2.9;
+
+  const inspectRooms: RoomMeta[] = graph.rooms.map((r) => ({
+    id: r.id,
+    name: r.name_en,
+    area_m2: r.area_m2,
+    floorFinish: fin.floor,
+    wallFinish: fin.wall,
+    ceilingFinish: fin.ceiling,
+    wallIds: wallIdsByRoom.get(r.id) ?? [],
+  }));
+  const inspectWalls: WallMeta[] = graph.walls.map((w) => {
+    const a = w.polyline[0]!;
+    const b = w.polyline[w.polyline.length - 1]!;
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const h = w.room_ids.reduce((mx, id) => Math.max(mx, ceilingByRoom.get(id) ?? 0), 0) || globalCeiling;
+    return {
+      id: w.id,
+      roomName: roomNameById.get(w.room_ids[0] ?? "") ?? null,
+      length_m: length,
+      height_m: h,
+      thickness_mm: w.thickness_mm,
+      net_area_m2: length * h,
+      wallFinish: fin.wall,
+    };
+  });
+  const inspect: InspectData = { projectId, boq, rooms: inspectRooms, walls: inspectWalls };
+
   return (
     <AppShell pageName={PAGE_NAME} noPadding>
       <div className="p-6">
-        <Villa3DLoader scene={scene} renders={renders} />
+        <Villa3DLoader scene={scene} renders={renders} inspect={inspect} />
       </div>
     </AppShell>
   );

@@ -4,7 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { generateDeterministicBoq } from "@/lib/boq/engine";
+import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
+import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
+import { derivePlanGraph } from "@/lib/plan/derive";
+import { getProposedGraph } from "@/lib/plan/snapshots";
 import type {
   EngineRoom,
   LabourRate as EngineLabourRate,
@@ -663,6 +667,27 @@ export async function POST(request: NextRequest) {
     const chosenStyle = chosenStyleKey ? getStyleByKey(chosenStyleKey) : null;
     const approvedCount = approvedRes.data?.length ?? 0;
 
+    // P4: per-element take-off (ground truth for element↔BoQ mapping). Gated
+    // with the viewer/inspect feature; best-effort. When on, the mapped POMI
+    // sections are rebuilt so their quantities = Σ per-room take-off and their
+    // element_refs are real element ids, and takeoff_items persist for the
+    // per-room views + the tap-to-inspect panel.
+    const p4Enabled = process.env.VIEWER_3D_ENABLED === "true";
+    let takeoffItems: TakeoffItem[] = [];
+    if (p4Enabled) {
+      try {
+        const graph = await derivePlanGraph(projectId);
+        const proposed = await getProposedGraph(projectId);
+        takeoffItems = quantifyPlan(graph, { proposed });
+        await persistTakeoffItems(projectId, takeoffItems, supabaseUntyped);
+      } catch (e) {
+        console.warn(
+          "[api/generate-boq] P4 take-off skipped:",
+          e instanceof Error ? e.message : e,
+        );
+      }
+    }
+
     // 2a. DEFAULT PATH — fully deterministic financial model (lib/boq).
     // Quantities, rate selection, SKU picks, and totals are all rules-driven;
     // no LLM in the pricing path. Set BOQ_ENGINE="llm" to fall back to the
@@ -704,10 +729,13 @@ export async function POST(request: NextRequest) {
         styleKey: chosenStyleKey,
       });
 
+      // P4: rebuild mapped POMI sections from the take-off (element_refs + true
+      // per-room quantities). No-op when there are no take-off items.
+      const mappedBoq = applyElementMapping(engineBoq, takeoffItems);
       // P2: append Electrical Installations + Plumbing & Sanitary sections from
       // plan_fixtures counts (flagged, best-effort, no-op when off/empty).
       const boq = await appendOverlaySections(
-        engineBoq,
+        mappedBoq,
         projectId,
         supabaseUntyped,
       );
@@ -791,9 +819,19 @@ ${quantities
 
 Produce the priced BoQ as JSON per the schema in the system prompt. Reply with JSON only.`;
 
-    const composedUserPrompt = kgContext
-      ? `${userPrompt}\n\n${kgContext}`
-      : userPrompt;
+    // P4: inject computed room areas as ground truth so the LLM's floor/ceiling
+    // quantities converge on the graph (and QS validation tightens).
+    const roomAreaBlock =
+      takeoffItems.length > 0
+        ? "\n\n# ROOM AREAS (computed, do not re-estimate)\n" +
+          takeoffItems
+            .filter((t) => t.work_item_key === "floor_finish")
+            .map((t) => `- room ${t.room_id}: ${t.qty} m²`)
+            .join("\n")
+        : "";
+
+    const composedUserPrompt =
+      (kgContext ? `${userPrompt}\n\n${kgContext}` : userPrompt) + roomAreaBlock;
     if (kgContext) {
       console.log(
         `[api/generate-boq] KG context injected (bundle=${kgBundleId}) — composed user prompt:\n${composedUserPrompt}`,
@@ -808,8 +846,9 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
       composedUserPrompt,
     );
 
-    // P2: append overlay sections from plan_fixtures counts (flagged/best-effort).
-    const boq = await appendOverlaySections(llmBoq, projectId, supabaseUntyped);
+    // P4: rebuild mapped sections from the take-off, then P2 overlays.
+    const mappedLlm = applyElementMapping(llmBoq, takeoffItems);
+    const boq = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase

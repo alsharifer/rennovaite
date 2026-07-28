@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 
 import type { SceneModel } from "@/lib/viewer/scene";
 
-import type { RoomRenders } from "./Villa3D";
+import type { InspectData, RoomRenders } from "./Villa3D";
 
 const Villa3D = dynamic(() => import("./Villa3D").then((m) => m.Villa3D), {
   ssr: false,
@@ -18,6 +18,14 @@ const Villa3D = dynamic(() => import("./Villa3D").then((m) => m.Villa3D), {
   ),
 });
 
-export function Villa3DLoader({ scene, renders }: { scene: SceneModel; renders: RoomRenders[] }) {
-  return <Villa3D scene={scene} renders={renders} />;
+export function Villa3DLoader({
+  scene,
+  renders,
+  inspect,
+}: {
+  scene: SceneModel;
+  renders: RoomRenders[];
+  inspect?: InspectData;
+}) {
+  return <Villa3D scene={scene} renders={renders} inspect={inspect} />;
 }

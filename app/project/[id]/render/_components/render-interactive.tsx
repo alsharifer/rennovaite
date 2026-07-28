@@ -53,6 +53,8 @@ type Props = {
   initialLockedRoomIds?: string[];
   /** roomId → most-recent uploaded photo public URL. */
   initialPhotosByRoom?: Record<string, string>;
+  /** P4: roomId → element-mapped BoQ rollup (AED). Chip near the hero. */
+  roomBoqTotals?: Record<string, number>;
 };
 
 type GenerateResponse = {
@@ -168,6 +170,7 @@ export function RenderInteractive({
   initialChains,
   initialLockedRoomIds = [],
   initialPhotosByRoom = {},
+  roomBoqTotals = {},
 }: Props) {
   const seededState = useMemo<Record<string, RoomState>>(() => {
     const result: Record<string, RoomState> = {};
@@ -504,6 +507,22 @@ export function RenderInteractive({
             substepIdx={substepIdx}
             error={!currentRender ? error : null}
           />
+
+          {/* P4: this room's element-mapped BoQ cost → deep-links to By room. */}
+          {selectedRoom && (roomBoqTotals[selectedRoom.id] ?? 0) > 0 && (
+            <Link
+              href={`/project/${projectId}/boq?view=byroom&room=${selectedRoom.id}`}
+              className="focus-ring inline-flex items-center gap-sm rounded-full border border-ink-100 bg-paper px-md py-xs font-body-sm text-body-sm text-ink-900 transition-colors hover:bg-surface-container"
+            >
+              <span className="material-symbols-outlined text-[16px] text-brass-600" aria-hidden="true">
+                request_quote
+              </span>
+              This room on your BoQ ·{" "}
+              <span className="font-mono tabular-nums">
+                AED {(roomBoqTotals[selectedRoom.id] ?? 0).toLocaleString("en-US")}
+              </span>
+            </Link>
+          )}
 
           <HeroActions
             disabled={!selectedRoom || isGenerating || !selectedRenderable}

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppShell } from "@/components/app/AppShell";
+import { roomRollup } from "@/lib/boq/elements";
+import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   ALL_RELEVANT_CATEGORIES,
@@ -10,6 +12,7 @@ import {
 import {
   BoqView,
   type BoqPayload,
+  type RoomRollupView,
   type VendorOption,
 } from "./_components/boq-view";
 import { GenerateBoqButton } from "./_components/generate-boq-button";
@@ -99,10 +102,13 @@ function buildLineOptions(
 
 export default async function BoqPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ highlight?: string; view?: string; room?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
   const supabase = getSupabaseAdmin();
   const sb = supabase as unknown as SupabaseClient;
 
@@ -150,6 +156,54 @@ export default async function BoqPage({
     boqPayload?.sections.reduce((n, s) => n + s.lines.length, 0) ?? 0;
   const sectionCount = boqPayload?.sections.length ?? 0;
 
+  // P4: per-room rollup from takeoff_items (best-effort; empty if not seeded).
+  let byRoom: RoomRollupView[] = [];
+  try {
+    const { data: tRows } = await sb
+      .from("takeoff_items")
+      .select("work_item_key, room_id, element_id, qty, unit, wet_area")
+      .eq("project_id", id)
+      .returns<
+        {
+          work_item_key: string;
+          room_id: string | null;
+          element_id: string | null;
+          qty: number;
+          unit: string;
+          wet_area: boolean;
+        }[]
+      >();
+    const items: TakeoffItem[] = (tRows ?? []).map((r) => ({
+      work_item_key: r.work_item_key as WorkItemKey,
+      room_id: r.room_id,
+      element_id: r.element_id ?? "",
+      qty: Number(r.qty),
+      unit: r.unit,
+      wet_area: !!r.wet_area,
+    }));
+    if (items.length > 0) {
+      const rollups = roomRollup(items);
+      const { data: roomRows } = await supabase
+        .from("rooms")
+        .select("id, name_en")
+        .in("id", rollups.map((r) => r.room_id));
+      const nameById = new Map((roomRows ?? []).map((r) => [r.id, r.name_en]));
+      byRoom = rollups.map((r) => ({
+        roomId: r.room_id,
+        roomName: nameById.get(r.room_id) ?? "Room",
+        total_aed: r.total_aed,
+        items: r.items.map((w) => ({
+          description: w.description,
+          qty: w.qty,
+          unit: w.unit,
+          total_aed: w.total_aed,
+        })),
+      }));
+    }
+  } catch {
+    /* takeoff_items table absent → no By-room view */
+  }
+
   return (
     <AppShell pageName={PAGE_NAME}>
       <div className="mx-auto max-w-[1440px]">
@@ -190,6 +244,10 @@ export default async function BoqPage({
             budgetAed={budgetAed}
             boq={boqPayload}
             lineOptions={lineOptions}
+            byRoom={byRoom}
+            initialView={sp.view === "byroom" ? "byroom" : "sections"}
+            highlightRef={sp.highlight ?? null}
+            highlightRoom={sp.room ?? null}
           />
         ) : (
           <EmptyState projectId={id} />
