@@ -12,9 +12,9 @@
 // this file. Editing lives in the 2D plan (P1/P2).
 // =============================================================================
 
-import { Edges, Html, Line, PointerLockControls, OrbitControls, Text } from "@react-three/drei";
+import { Edges, Html, PointerLockControls, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
 
 import type { SceneModel, WallSegment } from "@/lib/viewer/scene";
@@ -32,7 +32,30 @@ type Mode = "orbit" | "walk";
 const EYE_H = 1.6;
 const BODY_R = 0.3; // collision radius
 const BRASS = "#A4793A";
-const INK = "#0F1B2D";
+
+// Never blank/crash: if anything in the 3D subtree throws, show a message.
+class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(err: unknown) {
+    console.error("[Villa3D] 3D scene error:", err);
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="flex h-full w-full items-center justify-center rounded-xl border border-ink-100 bg-canvas p-8 text-center">
+          <p className="max-w-[420px] font-body text-body-md text-on-surface-variant">
+            The 3D view couldn&apos;t load in this browser. Your plan and drawings are
+            unaffected.
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // -------------------------------------------------------------- geometry
 function Floors({ scene, onPick }: { scene: SceneModel; onPick?: (p: THREE.Vector3) => void }) {
@@ -90,20 +113,22 @@ function Walls({ scene, onPick }: { scene: SceneModel; onPick?: (p: THREE.Vector
 }
 
 function RoomAreaLabels({ scene }: { scene: SceneModel }) {
+  // DOM labels via drei <Html> — no external font/worker (troika <Text> is a
+  // common R3F crash under bundlers). distanceFactor scales them with distance.
   return (
     <group>
       {scene.labels.map((l) => (
-        <Text
+        <Html
           key={l.roomId}
-          position={[l.center[0], 0.02, l.center[1]]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.32}
-          color={INK}
-          anchorX="center"
-          anchorY="middle"
+          position={[l.center[0], 0.05, l.center[1]]}
+          center
+          distanceFactor={14}
+          zIndexRange={[10, 0]}
         >
-          {`${l.name}  ${Math.round(l.area_m2)} m²`}
-        </Text>
+          <div className="pointer-events-none whitespace-nowrap rounded bg-paper/85 px-1.5 py-0.5 font-mono text-[11px] text-ink-900 shadow-hairline">
+            {l.name} · {Math.round(l.area_m2)} m²
+          </div>
+        </Html>
       ))}
     </group>
   );
@@ -157,7 +182,15 @@ function Measurement({ points }: { points: THREE.Vector3[] }) {
       ))}
       {b && (
         <>
-          <Line points={[a, b]} color={BRASS} lineWidth={2} />
+          {/* Native three line (avoids three-stdlib Line2 fragility). */}
+          <line>
+            <bufferGeometry
+              ref={(g) => {
+                if (g) g.setFromPoints([a, b]);
+              }}
+            />
+            <lineBasicMaterial color={BRASS} />
+          </line>
           <Html position={a.clone().add(b).multiplyScalar(0.5)} center>
             <div className="rounded bg-ink-900 px-2 py-0.5 font-mono text-[12px] text-paper shadow-level-1">
               {a.distanceTo(b).toFixed(2)} m
@@ -322,6 +355,7 @@ export function Villa3D({ scene, renders }: { scene: SceneModel; renders: RoomRe
         ) : null}
       </div>
 
+      <SceneBoundary>
       <Canvas
         shadows={false}
         dpr={[1, 2]}
@@ -341,6 +375,7 @@ export function Villa3D({ scene, renders }: { scene: SceneModel; renders: RoomRe
 
         {mode === "orbit" ? <OrbitRig scene={scene} /> : <WalkControls scene={scene} />}
       </Canvas>
+      </SceneBoundary>
 
       {/* Render overlay — "step into the photoreal view" */}
       {active && <RenderOverlay room={active} onClose={() => setActive(null)} />}
