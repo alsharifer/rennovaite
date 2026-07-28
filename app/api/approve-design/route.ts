@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { recordFeedback } from "@/lib/analytics";
+import { persistDrawingSet } from "@/lib/drawings/persist";
+import { writeProposedSnapshot } from "@/lib/plan/snapshots";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { upscaleRender } from "@/lib/render-upscale";
 
@@ -70,6 +72,21 @@ export async function POST(request: NextRequest) {
             updErr.message,
           );
         }
+      }
+    }
+
+    // Design lock → refresh the "proposed" plan snapshot and regenerate the
+    // drawing set (P1). Flagged + fully best-effort: never blocks the approval,
+    // and no-ops when DRAWINGS_ENABLED is off or the P1 tables aren't applied.
+    if (process.env.DRAWINGS_ENABLED === "true") {
+      try {
+        await writeProposedSnapshot(project_id);
+        await persistDrawingSet(project_id);
+      } catch (drawErr) {
+        console.warn(
+          "[api/approve-design] drawings regen skipped:",
+          drawErr instanceof Error ? drawErr.message : drawErr,
+        );
       }
     }
 

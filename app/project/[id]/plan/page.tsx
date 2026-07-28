@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { EditablePlanViewer } from "./_components/editable-plan-viewer";
 import { ParseLoading } from "./_components/parse-loading";
+import { PlanLayers } from "./_components/plan-layers";
 
 export const dynamic = "force-dynamic";
 
@@ -173,10 +173,12 @@ export default async function PlanPage({
                     {roomList.length} rooms · {formatM2(totalArea)}
                   </p>
                 </div>
-                <EditablePlanViewer
+                <PlanLayers
+                  projectId={projectId}
                   planId={plan.id}
                   initialRooms={roomList}
                   initialTotalAreaM2={totalArea}
+                  overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
                 />
                 <div className="mt-md flex items-center justify-end gap-md text-ink-500">
                   <span
@@ -279,6 +281,44 @@ export default async function PlanPage({
                   </button>
                 </div>
               </article>
+
+              {/* Drawings entry — gated by DRAWINGS_ENABLED so this page is
+                  pixel-identical to today when the flag is off (P1). */}
+              {process.env.DRAWINGS_ENABLED === "true" && (
+                <Link
+                  href={`/project/${projectId}/drawings`}
+                  className="focus-ring group flex items-center justify-between gap-md rounded-xl border border-ink-100 bg-paper p-lg transition-colors hover:bg-surface-container"
+                >
+                  <span>
+                    <span className="label-caps mb-xs block text-ink-500">
+                      Drawings
+                    </span>
+                    <span className="block font-body text-body-sm text-ink-900">
+                      Dimensioned as-built, demolition &amp; finish schedule
+                    </span>
+                  </span>
+                  <span
+                    className="material-symbols-outlined text-brass-600"
+                    aria-hidden="true"
+                  >
+                    draft
+                  </span>
+                </Link>
+              )}
+
+              {/* Walk your villa in 3D — gated; the aside only renders when the
+                  plan is parsed/confirmed (P3, view-only). */}
+              {process.env.VIEWER_3D_ENABLED === "true" && (
+                <Link
+                  href={`/project/${projectId}/viewer`}
+                  className="focus-ring inline-flex items-center justify-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg py-3 font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-brass-600" aria-hidden="true">
+                    view_in_ar
+                  </span>
+                  Walk your villa in 3D
+                </Link>
+              )}
             </aside>
           </div>
         ) : (

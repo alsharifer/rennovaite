@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // @napi-rs/canvas ships native `.node` binaries that Turbopack can't trace.
-  // Mark it external so it's loaded via plain require at runtime.
-  serverExternalPackages: ["@napi-rs/canvas"],
+  // Native `.node` binaries Turbopack can't trace — load via plain require at
+  // runtime. @resvg/resvg-js rasterises drawing SVGs for the P1 PDF export.
+  serverExternalPackages: ["@napi-rs/canvas", "@resvg/resvg-js"],
 };
 
 export default nextConfig;

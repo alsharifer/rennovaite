@@ -1,4 +1,8 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { AppShell } from "@/components/app/AppShell";
+import { roomRollup } from "@/lib/boq/elements";
+import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -198,6 +202,37 @@ export default async function RenderPage({
     );
   }
 
+  // P4: per-room element-mapped BoQ totals for the "This room on your BoQ" chip.
+  const roomBoqTotals: Record<string, number> = {};
+  try {
+    const sb = supabase as unknown as SupabaseClient;
+    const { data: tRows } = await sb
+      .from("takeoff_items")
+      .select("work_item_key, room_id, element_id, qty, unit, wet_area")
+      .eq("project_id", projectId)
+      .returns<
+        {
+          work_item_key: string;
+          room_id: string | null;
+          element_id: string | null;
+          qty: number;
+          unit: string;
+          wet_area: boolean;
+        }[]
+      >();
+    const items: TakeoffItem[] = (tRows ?? []).map((r) => ({
+      work_item_key: r.work_item_key as WorkItemKey,
+      room_id: r.room_id,
+      element_id: r.element_id ?? "",
+      qty: Number(r.qty),
+      unit: r.unit,
+      wet_area: !!r.wet_area,
+    }));
+    for (const r of roomRollup(items)) roomBoqTotals[r.room_id] = r.total_aed;
+  } catch {
+    /* takeoff_items absent → no chips */
+  }
+
   return (
     <AppShell pageName="AI Designer" noPadding>
       <RenderInteractive
@@ -207,6 +242,7 @@ export default async function RenderPage({
         initialChains={initialChains}
         initialLockedRoomIds={initialLockedRoomIds}
         initialPhotosByRoom={initialPhotosByRoom}
+        roomBoqTotals={roomBoqTotals}
       />
     </AppShell>
   );

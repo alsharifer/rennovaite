@@ -1,3 +1,5 @@
+import { BackButton } from "./BackButton";
+
 type Props = {
   pageName: string;
 };
@@ -5,8 +7,9 @@ type Props = {
 export function TopBar({ pageName }: Props) {
   return (
     <header className="fixed left-60 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-outline-variant bg-surface-bright px-lg">
-      {/* Left: wordmark · bone divider · page name */}
+      {/* Left: back · wordmark · bone divider · page name */}
       <div className="flex items-center gap-md">
+        <BackButton />
         <span className="font-display text-headline-md text-primary tracking-tight">
           RennovAIte
         </span>

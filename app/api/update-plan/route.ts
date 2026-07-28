@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { ensureAsBuiltSnapshot } from "@/lib/plan/snapshots";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -68,6 +69,24 @@ export async function POST(request: NextRequest) {
       .update({ total_area_m2: totalRounded })
       .eq("id", plan_id);
     if (planErr) throw planErr;
+
+    // Parse-confirm → persist the as-built plan_snapshot once (P1). Idempotent
+    // (write-if-absent), flagged, and best-effort so it never blocks the save.
+    if (process.env.DRAWINGS_ENABLED === "true") {
+      try {
+        const { data: planRow } = await supabase
+          .from("plans")
+          .select("project_id")
+          .eq("id", plan_id)
+          .maybeSingle();
+        if (planRow?.project_id) await ensureAsBuiltSnapshot(planRow.project_id);
+      } catch (snapErr) {
+        console.warn(
+          "[api/update-plan] as-built snapshot skipped:",
+          snapErr instanceof Error ? snapErr.message : snapErr,
+        );
+      }
+    }
 
     return NextResponse.json({
       success: true,

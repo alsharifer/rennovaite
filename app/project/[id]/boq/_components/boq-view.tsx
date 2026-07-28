@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,9 @@ export type BoqLine = {
   total_aed: number;
   vendor_or_source: string;
   notes: string | null;
+  // P2 additive: overlay-derived lines carry element refs + a rate status.
+  element_refs?: string[] | null;
+  rate_status?: "priced" | "needs_qs";
 };
 
 export type BoqSection = {
@@ -47,11 +50,22 @@ export type VendorOption = {
   in_stock: boolean | null;
 };
 
+export type RoomRollupView = {
+  roomId: string;
+  roomName: string;
+  total_aed: number;
+  items: { description: string; qty: number; unit: string; total_aed: number }[];
+};
+
 type Props = {
   projectId: string;
   budgetAed: number;
   boq: BoqPayload;
   lineOptions: Record<string, VendorOption[]>;
+  byRoom?: RoomRollupView[];
+  initialView?: "sections" | "byroom";
+  highlightRef?: string | null;
+  highlightRoom?: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -175,12 +189,29 @@ function sensitivityFor(
 
 // ---------------------------------------------------------------------------
 
-export function BoqView({ projectId, budgetAed, boq, lineOptions }: Props) {
+export function BoqView({
+  projectId,
+  budgetAed,
+  boq,
+  lineOptions,
+  byRoom = [],
+  initialView = "sections",
+  highlightRef = null,
+  highlightRoom = null,
+}: Props) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [activeToggles, setActiveToggles] = useState<Set<string>>(
     () => new Set(),
   );
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [view, setView] = useState<"sections" | "byroom">(initialView);
+
+  // Deep link ?highlight=REF → scroll the row into view + flash a brass ring.
+  useEffect(() => {
+    if (!highlightRef || view !== "sections") return;
+    const el = document.getElementById(`boq-row-${highlightRef}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightRef, view]);
 
   const baseTotal = boq.grand_total_aed;
 
@@ -326,6 +357,30 @@ export function BoqView({ projectId, budgetAed, boq, lineOptions }: Props) {
         </div>
       </section>
 
+      {/* VIEW TOGGLE — POMI sections (default + export) vs By room (P4) --- */}
+      {byRoom.length > 0 && (
+        <div className="mt-xl inline-flex gap-0.5 rounded-lg border border-ink-100 bg-paper p-0.5">
+          {(["sections", "byroom"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              aria-pressed={view === v}
+              className={cn(
+                "focus-ring rounded-md px-3 py-1.5 text-body-sm font-semibold transition-colors",
+                view === v ? "bg-brass-600 text-on-primary" : "text-ink-700 hover:bg-surface-container",
+              )}
+            >
+              {v === "sections" ? "By section" : "By room"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {view === "byroom" ? (
+        <ByRoomView byRoom={byRoom} highlightRoom={highlightRoom} />
+      ) : (
+      <>
       {/* TABLE + SIDEBAR ------------------------------------------------ */}
       <div
         className={cn(
@@ -376,6 +431,7 @@ export function BoqView({ projectId, budgetAed, boq, lineOptions }: Props) {
                     setExpandedKey((cur) => (cur === k ? null : k))
                   }
                   lineOptions={lineOptions}
+                  highlightRef={highlightRef}
                 />
               ))}
               <tr className="border-t-2 border-ink-900">
@@ -530,7 +586,75 @@ export function BoqView({ projectId, budgetAed, boq, lineOptions }: Props) {
           </span>
         </button>
       )}
+      </>
+      )}
     </>
+  );
+}
+
+function ByRoomView({
+  byRoom,
+  highlightRoom,
+}: {
+  byRoom: RoomRollupView[];
+  highlightRoom: string | null;
+}) {
+  const [open, setOpen] = useState<string | null>(highlightRoom);
+  return (
+    <section className="mt-xl overflow-hidden rounded-xl border border-ink-100 bg-paper">
+      <p className="border-b border-ink-100 bg-canvas px-md py-sm label-caps text-on-surface-variant">
+        Cost by room — read-only rollup of the element take-off (POMI sections remain the export format)
+      </p>
+      <ul>
+        {byRoom.map((r) => {
+          const expanded = open === r.roomId;
+          return (
+            <li key={r.roomId} id={`boq-room-${r.roomId}`} className="border-b border-ink-100">
+              <button
+                type="button"
+                onClick={() => setOpen((cur) => (cur === r.roomId ? null : r.roomId))}
+                className="flex w-full items-center justify-between gap-md px-md py-md text-left transition-colors hover:bg-surface-container-low"
+              >
+                <span className="flex items-center gap-sm">
+                  <span
+                    className="material-symbols-outlined text-[18px] text-on-surface-variant"
+                    style={{ transform: expanded ? "rotate(90deg)" : "none" }}
+                    aria-hidden="true"
+                  >
+                    chevron_right
+                  </span>
+                  <span className="font-body-sm text-body-sm font-semibold text-ink-900">
+                    {r.roomName}
+                  </span>
+                </span>
+                <span className="font-mono text-body-sm tabular-nums text-ink-900">
+                  {formatAed(r.total_aed)}
+                </span>
+              </button>
+              {expanded && (
+                <table className="w-full border-t border-bone text-left">
+                  <tbody>
+                    {r.items.map((w, i) => (
+                      <tr key={i} className="border-b border-bone last:border-0">
+                        <td className="px-md py-sm pl-12 font-body-sm text-body-sm text-ink-900">
+                          {w.description}
+                        </td>
+                        <td className="px-md py-sm text-right font-mono text-[12px] tabular-nums text-on-surface-variant">
+                          {w.qty.toLocaleString("en-US")} {w.unit}
+                        </td>
+                        <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
+                          {formatAed(w.total_aed)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -563,11 +687,13 @@ function SectionGroup({
   expandedKey,
   onToggle,
   lineOptions,
+  highlightRef,
 }: {
   section: BoqSection;
   expandedKey: string | null;
   onToggle: (k: string) => void;
   lineOptions: Record<string, VendorOption[]>;
+  highlightRef: string | null;
 }) {
   return (
     <>
@@ -598,6 +724,7 @@ function SectionGroup({
             expanded={expanded}
             onToggle={() => onToggle(key)}
             options={lineOptions[key] ?? []}
+            highlighted={ref === highlightRef}
           />
         );
       })}
@@ -613,6 +740,7 @@ function LineRow({
   expanded,
   onToggle,
   options,
+  highlighted,
 }: {
   lineKey: string;
   ref_: string;
@@ -621,22 +749,32 @@ function LineRow({
   expanded: boolean;
   onToggle: () => void;
   options: VendorOption[];
+  highlighted: boolean;
 }) {
   const sensitivity = sensitivityFor(lineKey.split("-")[0] ?? "", line) ?? null;
   return (
     <>
       <tr
+        id={`boq-row-${ref_}`}
         className={cn(
           "border-b border-ink-100 transition-colors",
           zebra ? "bg-canvas" : "bg-paper",
           expanded ? "bg-surface-container-low" : "hover:bg-surface-container-low/60",
+          highlighted && "bg-primary-fixed/40 ring-2 ring-inset ring-brass-600",
         )}
       >
         <td className="px-md py-sm font-mono text-[12px] tabular-nums text-ink-500">
           {ref_}
         </td>
         <td className="px-md py-sm">
-          <p className="font-body-sm text-body-sm text-ink-900">
+          <p className="flex items-center gap-xs font-body-sm text-body-sm text-ink-900">
+            {line.rate_status === "needs_qs" && (
+              <span
+                title="Rate to be confirmed by the QS"
+                aria-label="Needs QS pricing"
+                className="inline-block size-1.5 shrink-0 rounded-full bg-tertiary"
+              />
+            )}
             {line.description}
           </p>
           {line.notes && (

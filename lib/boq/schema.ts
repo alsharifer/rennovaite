@@ -23,6 +23,9 @@ export const POMI_SECTIONS = [
   "Plumbing",
   "MEP / HVAC",
   "Lighting",
+  // P2 overlay sections — quantities come from plan_fixtures counts, not the LLM.
+  "Electrical Installations",
+  "Plumbing & Sanitary",
   "Decoration & Painting",
   "Preliminaries",
 ] as const;
@@ -99,6 +102,11 @@ export const BoqLineSchema = z.object({
   kind: z.enum(["labour", "material", "supply_and_install", "lump", "allowance"]),
   rate_band: z.enum(["low", "mid", "high", "sku", "allowance"]),
   wastage_pct: z.number().nonnegative(),
+  // -- P2/P4/P5 additive (optional so pre-P2 lines validate unchanged) --
+  /** Fixture / element ids this line's quantity was counted from (P2 overlays). */
+  element_refs: z.array(z.string()).nullable().optional(),
+  /** 'needs_qs' = no default rate; the QS must price it. */
+  rate_status: z.enum(["priced", "needs_qs"]).optional(),
 });
 
 export const BoqSectionSchema = z.object({

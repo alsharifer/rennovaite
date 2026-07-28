@@ -190,6 +190,117 @@ helpers (model selection, input shaping per model family, timeout) in
 `renders` rows record `source_image_url`, `model`, and `mode` for A/B and
 tracing.
 
+## Drawings — geometry contract + 2D drawing engine (P1)
+
+Auto-generated, **deterministic** (no LLM) A3 drawing set: dimensioned as-built
+plan, proposed/demolition plan, and finish schedule. Gated by `DRAWINGS_ENABLED`
+— when unset/false the `/project/[id]/drawings` route 404s and the plan page is
+unchanged.
+
+- **Geometry contract** lives in `lib/plan/geometry.ts` — `PlanGraph` (rooms /
+  walls / openings / meta) is the single source of truth for the drawings, the
+  future 3D viewer, and permit checks. `buildPlanGraph` is pure/unit-tested;
+  `derivePlanGraph(projectId)` (`lib/plan/derive.ts`) reads it from the DB.
+  Today we persist **room polygons only** (normalised `[0,1]`), so walls are
+  **derived** from shared polygon edges (default 200 mm, `is_structural: null`),
+  metres are derived from `total_area_m2`, ceilings default to 2.9 m, and
+  **openings are empty** (we never invent doors). Every derived value is flagged
+  (`derived: true` / `derived_fields`) and surfaced in the UI + `derivedNotes`.
+- **Snapshots**: `plan_snapshots` (migration `013`) stores as-built (at
+  parse-confirm) and proposed (at design lock) graphs; diffing them drives the
+  demolition sheet (and later P2/P6). Writing is best-effort in
+  `lib/plan/snapshots.ts` and never touches the parse flow / `EditablePlanViewer`.
+- **Drawing engine** in `lib/drawings/`: `sheet.ts` (A3 template, title block,
+  north arrow, scale bar; Inter / JetBrains Mono / EB Garamond), `plan-sheet.ts`
+  (double-line walls, room labels, dimension chains — offset 600 mm, values in
+  mm, closure unit-tested), `demo-sheet.ts` (as-built▵proposed demolition
+  marking), `finish-schedule.ts` (table), `export.ts`
+  (`generateDrawingSet(projectId)` + PDF). Sheets are authored at true A3 size so
+  they print **1:100**.
+- **PDF export uses `@resvg/resvg-js` → PNG → `pdf-lib`** placed on a true-size
+  A3 page (chosen over `svg2pdf`, which needs a DOM server-side). DXF is deferred
+  (`TODO(P-later): DXF via dxf-writer`).
+- **Persistence** (`drawing_sets`, migration `014`) is best-effort in
+  `lib/drawings/persist.ts`, regenerated on design lock (`approve-design`). It
+  uploads to a **private** Storage bucket named **`drawings`** and stores
+  long-lived **signed** URLs in `sheet_urls` (the bucket is private, so public
+  URLs would not resolve).
+- **Manual DB steps** (no migration runner — DDL can't be run with the
+  service-role JWT; apply in the Supabase SQL editor, same as 001–012): apply
+  `scripts/migrations/013…` and `014…`, and create a **private** Storage bucket
+  named `drawings`. Live generation + PDF download work without them.
+
+## Overlays — electrical + plumbing (P2)
+
+Point-based electrical + plumbing layers on the 2D plan whose **counts** feed
+two new BoQ sections deterministically. Gated by `OVERLAYS_ENABLED`.
+
+- **Fixtures** live in `plan_fixtures` (migration `015`): `layer`
+  (electrical|plumbing), `type`, `room_id`, `position` ([x,y] in **normalised**
+  plan space, like `rooms.polygon`), `source` (rule|user). Types are listed in
+  `lib/overlays/types.ts`.
+- **Rule seeding** (`lib/overlays/seed.ts` + `rules.ts`): `seedOverlays(planGraph)`
+  places DEFAULTS per room type (a plain data table with a rationale per rule —
+  these are defaults, **not** code-compliance rules; P6 owns code checks). Pure
+  + unit-tested. Seeded fixtures are `source: 'rule'`; the server seeds on first
+  `GET /api/plan-fixtures`.
+- **2D editing** is the only editing surface: the plan page's `PlanLayers`
+  toggle (Plan / Electrical / Plumbing) swaps `EditablePlanViewer` for
+  `OverlayEditor` (drag / palette-add / delete → `POST`/`DELETE`
+  `/api/plan-fixtures`, always `source: 'user'`). Flag off → no toggle, plan
+  unchanged.
+- **BoQ feed** (`lib/overlays/boq.ts` + `boq-feed.ts`): `appendOverlaySections`
+  adds **"Electrical Installations"** + **"Plumbing & Sanitary"** POMI sections
+  to the generated BoQ (both engine + LLM paths) with quantities = fixture
+  counts (never the LLM). Each line records `element_refs` (fixture ids) and
+  `rate_status`; where the catalog has no default point rate the line is
+  `rate_status: 'needs_qs'` (rate 0) and renders with a terracotta dot in the
+  BoQ table. `element_refs`/`rate_status` are additive optional fields on the
+  jsonb BoQ line (P4/P5 build on `element_refs`). Existing sections / zod / KG
+  are untouched.
+- **Drawings**: `lib/drawings/electrical-sheet.ts` + `plumbing-sheet.ts` add
+  services sheets (symbols + legend + count table) to the drawing set when
+  fixtures exist (needs `DRAWINGS_ENABLED` too).
+- **Manual DB step**: apply `scripts/migrations/015_plan_fixtures.sql` in the
+  Supabase SQL editor (no runner; service-role JWT can't run DDL). The unit
+  tests + flag-off behaviour work without it; seeding/editing/BoQ-feed activate
+  once it's applied.
+
+## 3D viewer — walkthrough from the plan graph (P3)
+
+A **view-only** 3D walkthrough built from the P1 `PlanGraph`. Hard constraint
+(Way Forward): orbit / walk / measure / inspect only — **no** transform gizmos,
+drag handles, or geometry mutation anywhere. Edits live in the 2D plan.
+Gated by `VIEWER_3D_ENABLED`.
+
+- **Deps** (added in P3): `three` 0.185, `@react-three/fiber` 9 (React 19),
+  `@react-three/drei` 10, `@types/three` (dev).
+- **Scene builder** `lib/viewer/scene.ts`: pure `buildScene(planGraph, finishes?)`
+  → plain geometry data (wall boxes extruded to `ceiling_h_m` at true
+  `thickness_mm`, floor slabs per room, world-centred bounds, wall centre-lines
+  for collision). Imports no three.js → SSR-safe + unit-tested (wall count,
+  metric dimensions). Openings are cut where the graph has them (centred, since
+  the P1 contract has no along-wall offset yet — Mudon has none). Walls flagged
+  `derived: true` render at 60% opacity with a hairline edge. Floors tint from
+  the locked style via `lib/viewer/finishes.ts`.
+- **Component** `components/viewer/Villa3D.tsx` (client, react-three-fiber) on
+  route `app/project/[id]/viewer` (AppShell, `pageName="3D Viewer"`), loaded via
+  `Villa3DLoader` (`next/dynamic` `ssr:false` — three must not run in SSR).
+  Orbit (`OrbitControls`, clamped above the floor) / Walk (`PointerLockControls`,
+  1.6 m eye height, WASD+arrows, axis-separated wall collision). Measure tool
+  (click two points → Mono metre label), toggleable room-area labels, and brass
+  render anchors at room centroids that open the room's latest render in a
+  `matte-image` overlay. Empty state (EB Garamond italic) when the plan has no
+  walls.
+- **Panorama (stretch)**: `renders.kind` (migration `016`, default `'still'`)
+  lets the viewer branch to an inverted-sphere 360° view for `'pano'` renders.
+  Pano *generation* is NOT built — `// TODO(P-later): pano generation via render
+  pipeline` marks where it would branch.
+- **Entry**: "Walk your villa in 3D" (`view_in_ar`) on the plan page + project
+  hub, shown only when the flag is on and a confirmed plan exists.
+- **Manual DB step**: apply `scripts/migrations/016_renders_kind.sql` (Supabase
+  SQL editor). The viewer works without it (defaults `kind` to `'still'`).
+
 ## Env vars
 
 | Name                              | Where used              |
@@ -206,6 +317,15 @@ tracing.
 | `NEO4J_USER`                      | server (KG retrieval)   |
 | `NEO4J_PASSWORD`                  | server (KG retrieval)   |
 | `KG_ENABLED`                      | server — `"true"` turns on KG grounding |
+| `BOQ_ENGINE`                      | server — optional; unset = deterministic `lib/boq` engine, `"llm"` = legacy Claude-priced path |
+
+### Pilot Seven feature flags (reserved)
+
+Placeholders for the seven-feature pilot, added to `.env.local.example` by the
+pre-flight (`PILOT_SEVEN_PREFLIGHT.md`). Flag names are inferred — each owning
+prompt confirms/renames when it wires the feature: `PLAN_ENABLED` (P1),
+`DRAWINGS_ENABLED` (P2), `OVERLAYS_ENABLED` (P3), `WHATIF_ENABLED` (P4),
+`COMPLIANCE_ENABLED` (P6), `STAGING_ENABLED` (P7). All default off.
 
 KG grounding (render + BoQ prompts) only activates when `KG_ENABLED="true"`
 **and** Neo4j is running — start it from the KG module with

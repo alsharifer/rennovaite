@@ -299,6 +299,44 @@ export default async function ProjectHubPage({
           fillIndex={trackFillIndex}
         />
 
+        {/* DESIGN & TECHNICAL OUTPUTS (Pilot Seven, flag-gated) -------- */}
+        {planComplete &&
+          (process.env.DRAWINGS_ENABLED === "true" ||
+            process.env.OVERLAYS_ENABLED === "true" ||
+            process.env.VIEWER_3D_ENABLED === "true") && (
+            <section className="mt-xl rounded-xl border border-ink-100 bg-paper p-lg">
+              <p className="label-caps mb-md text-ink-500">
+                Design &amp; technical outputs
+              </p>
+              <div className="grid grid-cols-1 gap-md sm:grid-cols-2 lg:grid-cols-3">
+                {process.env.DRAWINGS_ENABLED === "true" && (
+                  <OutputLink
+                    href={`/project/${projectId}/drawings`}
+                    glyph="draft"
+                    title="Auto-dimensioned drawings"
+                    sub="As-built · proposed · finish schedule"
+                  />
+                )}
+                {process.env.OVERLAYS_ENABLED === "true" && (
+                  <OutputLink
+                    href={`/project/${projectId}/plan`}
+                    glyph="bolt"
+                    title="Electrical & plumbing"
+                    sub="2D overlay layers · BoQ services"
+                  />
+                )}
+                {process.env.VIEWER_3D_ENABLED === "true" && (
+                  <OutputLink
+                    href={`/project/${projectId}/viewer`}
+                    glyph="view_in_ar"
+                    title="3D walkthrough"
+                    sub="Orbit · walk · measure"
+                  />
+                )}
+              </div>
+            </section>
+          )}
+
         {/* ROW 1 — Renders + Budget ----------------------------------- */}
         <div className="mt-xl grid grid-cols-1 gap-gutter lg:grid-cols-12">
           <RendersCard
@@ -363,6 +401,45 @@ export default async function ProjectHubPage({
 // ---------------------------------------------------------------------------
 // Phase tracker
 // ---------------------------------------------------------------------------
+
+function OutputLink({
+  href,
+  glyph,
+  title,
+  sub,
+}: {
+  href: string;
+  glyph: string;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="focus-ring flex items-center gap-md rounded-lg border border-ink-100 bg-paper p-md transition-colors hover:bg-surface-container"
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-fixed/50 text-brass-600">
+        <span className="material-symbols-outlined" aria-hidden="true">
+          {glyph}
+        </span>
+      </span>
+      <span className="min-w-0">
+        <span className="block font-body-sm text-body-sm font-semibold text-ink-900">
+          {title}
+        </span>
+        <span className="block truncate font-body-sm text-[12px] text-on-surface-variant">
+          {sub}
+        </span>
+      </span>
+      <span
+        className="material-symbols-outlined ml-auto text-on-surface-variant"
+        aria-hidden="true"
+      >
+        chevron_right
+      </span>
+    </Link>
+  );
+}
 
 function PhaseTracker({
   completion,
