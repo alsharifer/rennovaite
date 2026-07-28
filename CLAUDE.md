@@ -222,11 +222,13 @@ unchanged.
   (`TODO(P-later): DXF via dxf-writer`).
 - **Persistence** (`drawing_sets`, migration `014`) is best-effort in
   `lib/drawings/persist.ts`, regenerated on design lock (`approve-design`). It
-  needs a public Storage bucket named **`drawings`**.
-- **Manual DB steps** (no migration runner): apply `scripts/migrations/013…`
-  and `014…` in the Supabase SQL editor and create the `drawings` bucket before
-  persistence/snapshots activate. Live generation + PDF download work without
-  them.
+  uploads to a **private** Storage bucket named **`drawings`** and stores
+  long-lived **signed** URLs in `sheet_urls` (the bucket is private, so public
+  URLs would not resolve).
+- **Manual DB steps** (no migration runner — DDL can't be run with the
+  service-role JWT; apply in the Supabase SQL editor, same as 001–012): apply
+  `scripts/migrations/013…` and `014…`, and create a **private** Storage bucket
+  named `drawings`. Live generation + PDF download work without them.
 
 ## Env vars
 

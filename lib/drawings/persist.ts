@@ -1,12 +1,13 @@
 // =============================================================================
 // lib/drawings/persist.ts — best-effort persistence of a drawing set (P1 / S5).
 //
-// Uploads each sheet (SVG + PDF) to Supabase Storage under
-// projects/{id}/drawings/ and records a drawing_sets row. Entirely best-effort:
-// if the `drawings` bucket or the drawing_sets table (migration 014) don't
-// exist yet, this logs and returns null without breaking the caller (e.g. the
-// design-lock flow). The Drawings UI itself generates live and does not depend
-// on this.
+// Uploads each sheet (SVG + PDF) to the PRIVATE Supabase Storage bucket
+// `drawings` under projects/{id}/drawings/ and records a drawing_sets row.
+// Because the bucket is private, sheet_urls hold long-lived SIGNED URLs (not
+// public URLs). Entirely best-effort: if the bucket or the drawing_sets table
+// (migration 014) don't exist yet, this logs and returns null without breaking
+// the caller (e.g. the design-lock flow). The Drawings UI itself generates live
+// and does not depend on this.
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,6 +17,8 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { generateDrawingSet, renderSheetPdf, type SheetKind } from "./export";
 
 const BUCKET = "drawings";
+// Private bucket → signed URLs. ~1 year is plenty for a PoC demo asset.
+const SIGNED_URL_TTL_S = 60 * 60 * 24 * 365;
 
 export interface PersistedSheet {
   kind: SheetKind;
@@ -43,7 +46,8 @@ export async function persistDrawingSet(
           upsert: true,
           contentType: "image/svg+xml",
         });
-        svg_url = storage.getPublicUrl(`${base}.svg`).data.publicUrl;
+        svg_url =
+          (await storage.createSignedUrl(`${base}.svg`, SIGNED_URL_TTL_S)).data?.signedUrl ?? null;
       } catch (e) {
         console.warn(`[drawings/persist] svg upload skipped (${s.kind}):`, e instanceof Error ? e.message : e);
       }
@@ -53,7 +57,8 @@ export async function persistDrawingSet(
           upsert: true,
           contentType: "application/pdf",
         });
-        pdf_url = storage.getPublicUrl(`${base}.pdf`).data.publicUrl;
+        pdf_url =
+          (await storage.createSignedUrl(`${base}.pdf`, SIGNED_URL_TTL_S)).data?.signedUrl ?? null;
       } catch (e) {
         console.warn(`[drawings/persist] pdf upload skipped (${s.kind}):`, e instanceof Error ? e.message : e);
       }

@@ -5,9 +5,9 @@
 -- objects under projects/{id}/drawings/. Regenerated when the proposed snapshot
 -- changes (design lock).
 --
--- Manual apply: paste into the Supabase SQL editor. Also create a public
--- Storage bucket named `drawings` (or reuse an existing bucket) for the sheet
--- objects — see CLAUDE.md "Drawings (P1)".
+-- Manual apply: paste into the Supabase SQL editor. Also create a PRIVATE
+-- Storage bucket named `drawings` for the sheet objects; persist.ts stores
+-- signed URLs in sheet_urls — see CLAUDE.md "Drawings (P1)".
 
 create table if not exists public.drawing_sets (
   id uuid primary key default gen_random_uuid(),

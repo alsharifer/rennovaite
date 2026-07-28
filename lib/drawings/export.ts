@@ -152,6 +152,9 @@ async function loadProposedGraph(
 }
 
 export async function generateDrawingSet(projectId: string): Promise<DrawingSet> {
+  // Read-only: derive the as-built graph live. The as-built plan_snapshot is
+  // written at parse-confirm (update-plan), not here, so viewing drawings never
+  // mutates state.
   const asBuilt = await derivePlanGraph(projectId);
   const [proposed, styleKey, project] = await Promise.all([
     loadProposedGraph(projectId, asBuilt),
