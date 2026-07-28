@@ -190,6 +190,44 @@ helpers (model selection, input shaping per model family, timeout) in
 `renders` rows record `source_image_url`, `model`, and `mode` for A/B and
 tracing.
 
+## Drawings — geometry contract + 2D drawing engine (P1)
+
+Auto-generated, **deterministic** (no LLM) A3 drawing set: dimensioned as-built
+plan, proposed/demolition plan, and finish schedule. Gated by `DRAWINGS_ENABLED`
+— when unset/false the `/project/[id]/drawings` route 404s and the plan page is
+unchanged.
+
+- **Geometry contract** lives in `lib/plan/geometry.ts` — `PlanGraph` (rooms /
+  walls / openings / meta) is the single source of truth for the drawings, the
+  future 3D viewer, and permit checks. `buildPlanGraph` is pure/unit-tested;
+  `derivePlanGraph(projectId)` (`lib/plan/derive.ts`) reads it from the DB.
+  Today we persist **room polygons only** (normalised `[0,1]`), so walls are
+  **derived** from shared polygon edges (default 200 mm, `is_structural: null`),
+  metres are derived from `total_area_m2`, ceilings default to 2.9 m, and
+  **openings are empty** (we never invent doors). Every derived value is flagged
+  (`derived: true` / `derived_fields`) and surfaced in the UI + `derivedNotes`.
+- **Snapshots**: `plan_snapshots` (migration `013`) stores as-built (at
+  parse-confirm) and proposed (at design lock) graphs; diffing them drives the
+  demolition sheet (and later P2/P6). Writing is best-effort in
+  `lib/plan/snapshots.ts` and never touches the parse flow / `EditablePlanViewer`.
+- **Drawing engine** in `lib/drawings/`: `sheet.ts` (A3 template, title block,
+  north arrow, scale bar; Inter / JetBrains Mono / EB Garamond), `plan-sheet.ts`
+  (double-line walls, room labels, dimension chains — offset 600 mm, values in
+  mm, closure unit-tested), `demo-sheet.ts` (as-built▵proposed demolition
+  marking), `finish-schedule.ts` (table), `export.ts`
+  (`generateDrawingSet(projectId)` + PDF). Sheets are authored at true A3 size so
+  they print **1:100**.
+- **PDF export uses `@resvg/resvg-js` → PNG → `pdf-lib`** placed on a true-size
+  A3 page (chosen over `svg2pdf`, which needs a DOM server-side). DXF is deferred
+  (`TODO(P-later): DXF via dxf-writer`).
+- **Persistence** (`drawing_sets`, migration `014`) is best-effort in
+  `lib/drawings/persist.ts`, regenerated on design lock (`approve-design`). It
+  needs a public Storage bucket named **`drawings`**.
+- **Manual DB steps** (no migration runner): apply `scripts/migrations/013…`
+  and `014…` in the Supabase SQL editor and create the `drawings` bucket before
+  persistence/snapshots activate. Live generation + PDF download work without
+  them.
+
 ## Env vars
 
 | Name                              | Where used              |

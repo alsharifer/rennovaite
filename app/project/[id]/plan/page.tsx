@@ -279,6 +279,30 @@ export default async function PlanPage({
                   </button>
                 </div>
               </article>
+
+              {/* Drawings entry — gated by DRAWINGS_ENABLED so this page is
+                  pixel-identical to today when the flag is off (P1). */}
+              {process.env.DRAWINGS_ENABLED === "true" && (
+                <Link
+                  href={`/project/${projectId}/drawings`}
+                  className="focus-ring group flex items-center justify-between gap-md rounded-xl border border-ink-100 bg-paper p-lg transition-colors hover:bg-surface-container"
+                >
+                  <span>
+                    <span className="label-caps mb-xs block text-ink-500">
+                      Drawings
+                    </span>
+                    <span className="block font-body text-body-sm text-ink-900">
+                      Dimensioned as-built, demolition &amp; finish schedule
+                    </span>
+                  </span>
+                  <span
+                    className="material-symbols-outlined text-brass-600"
+                    aria-hidden="true"
+                  >
+                    draft
+                  </span>
+                </Link>
+              )}
             </aside>
           </div>
         ) : (
