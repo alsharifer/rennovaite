@@ -206,6 +206,15 @@ tracing.
 | `NEO4J_USER`                      | server (KG retrieval)   |
 | `NEO4J_PASSWORD`                  | server (KG retrieval)   |
 | `KG_ENABLED`                      | server — `"true"` turns on KG grounding |
+| `BOQ_ENGINE`                      | server — optional; unset = deterministic `lib/boq` engine, `"llm"` = legacy Claude-priced path |
+
+### Pilot Seven feature flags (reserved)
+
+Placeholders for the seven-feature pilot, added to `.env.local.example` by the
+pre-flight (`PILOT_SEVEN_PREFLIGHT.md`). Flag names are inferred — each owning
+prompt confirms/renames when it wires the feature: `PLAN_ENABLED` (P1),
+`DRAWINGS_ENABLED` (P2), `OVERLAYS_ENABLED` (P3), `WHATIF_ENABLED` (P4),
+`COMPLIANCE_ENABLED` (P6), `STAGING_ENABLED` (P7). All default off.
 
 KG grounding (render + BoQ prompts) only activates when `KG_ENABLED="true"`
 **and** Neo4j is running — start it from the KG module with
