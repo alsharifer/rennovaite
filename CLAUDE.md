@@ -266,6 +266,41 @@ two new BoQ sections deterministically. Gated by `OVERLAYS_ENABLED`.
   tests + flag-off behaviour work without it; seeding/editing/BoQ-feed activate
   once it's applied.
 
+## 3D viewer — walkthrough from the plan graph (P3)
+
+A **view-only** 3D walkthrough built from the P1 `PlanGraph`. Hard constraint
+(Way Forward): orbit / walk / measure / inspect only — **no** transform gizmos,
+drag handles, or geometry mutation anywhere. Edits live in the 2D plan.
+Gated by `VIEWER_3D_ENABLED`.
+
+- **Deps** (added in P3): `three` 0.185, `@react-three/fiber` 9 (React 19),
+  `@react-three/drei` 10, `@types/three` (dev).
+- **Scene builder** `lib/viewer/scene.ts`: pure `buildScene(planGraph, finishes?)`
+  → plain geometry data (wall boxes extruded to `ceiling_h_m` at true
+  `thickness_mm`, floor slabs per room, world-centred bounds, wall centre-lines
+  for collision). Imports no three.js → SSR-safe + unit-tested (wall count,
+  metric dimensions). Openings are cut where the graph has them (centred, since
+  the P1 contract has no along-wall offset yet — Mudon has none). Walls flagged
+  `derived: true` render at 60% opacity with a hairline edge. Floors tint from
+  the locked style via `lib/viewer/finishes.ts`.
+- **Component** `components/viewer/Villa3D.tsx` (client, react-three-fiber) on
+  route `app/project/[id]/viewer` (AppShell, `pageName="3D Viewer"`), loaded via
+  `Villa3DLoader` (`next/dynamic` `ssr:false` — three must not run in SSR).
+  Orbit (`OrbitControls`, clamped above the floor) / Walk (`PointerLockControls`,
+  1.6 m eye height, WASD+arrows, axis-separated wall collision). Measure tool
+  (click two points → Mono metre label), toggleable room-area labels, and brass
+  render anchors at room centroids that open the room's latest render in a
+  `matte-image` overlay. Empty state (EB Garamond italic) when the plan has no
+  walls.
+- **Panorama (stretch)**: `renders.kind` (migration `016`, default `'still'`)
+  lets the viewer branch to an inverted-sphere 360° view for `'pano'` renders.
+  Pano *generation* is NOT built — `// TODO(P-later): pano generation via render
+  pipeline` marks where it would branch.
+- **Entry**: "Walk your villa in 3D" (`view_in_ar`) on the plan page + project
+  hub, shown only when the flag is on and a confirmed plan exists.
+- **Manual DB step**: apply `scripts/migrations/016_renders_kind.sql` (Supabase
+  SQL editor). The viewer works without it (defaults `kind` to `'still'`).
+
 ## Env vars
 
 | Name                              | Where used              |

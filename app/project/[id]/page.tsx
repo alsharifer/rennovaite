@@ -266,6 +266,17 @@ export default async function ProjectHubPage({
             </p>
           </div>
           <div className="flex items-center gap-md">
+            {process.env.VIEWER_3D_ENABLED === "true" && planComplete && (
+              <Link
+                href={`/project/${projectId}/viewer`}
+                className="focus-ring flex h-12 items-center gap-sm rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low"
+              >
+                <span className="material-symbols-outlined text-[18px] text-brass-600" aria-hidden="true">
+                  view_in_ar
+                </span>
+                Walk your villa in 3D
+              </Link>
+            )}
             <button
               type="button"
               className="focus-ring flex h-12 items-center gap-sm rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low"

@@ -305,6 +305,20 @@ export default async function PlanPage({
                   </span>
                 </Link>
               )}
+
+              {/* Walk your villa in 3D — gated; the aside only renders when the
+                  plan is parsed/confirmed (P3, view-only). */}
+              {process.env.VIEWER_3D_ENABLED === "true" && (
+                <Link
+                  href={`/project/${projectId}/viewer`}
+                  className="focus-ring inline-flex items-center justify-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg py-3 font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-brass-600" aria-hidden="true">
+                    view_in_ar
+                  </span>
+                  Walk your villa in 3D
+                </Link>
+              )}
             </aside>
           </div>
         ) : (

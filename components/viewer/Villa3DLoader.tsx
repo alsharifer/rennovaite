@@ -1,0 +1,23 @@
+"use client";
+
+// Client-only loader: three/fiber must not run during SSR, so Villa3D is
+// dynamically imported with ssr:false (only allowed inside a client component).
+
+import dynamic from "next/dynamic";
+
+import type { SceneModel } from "@/lib/viewer/scene";
+
+import type { RoomRenders } from "./Villa3D";
+
+const Villa3D = dynamic(() => import("./Villa3D").then((m) => m.Villa3D), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[calc(100vh-9rem)] w-full items-center justify-center rounded-xl border border-ink-100 bg-canvas">
+      <p className="font-body text-body-md text-on-surface-variant">Building your villa in 3D…</p>
+    </div>
+  ),
+});
+
+export function Villa3DLoader({ scene, renders }: { scene: SceneModel; renders: RoomRenders[] }) {
+  return <Villa3D scene={scene} renders={renders} />;
+}
