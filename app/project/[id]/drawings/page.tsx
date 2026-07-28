@@ -21,6 +21,8 @@ const SHEET_BLURB: Record<string, string> = {
   as_built: "Dimensioned as-built plan derived from the parsed geometry.",
   proposed: "Proposed plan with demolition (terracotta) and new-work marking.",
   finish_schedule: "Room-by-room floor / wall / ceiling finishes from the locked style.",
+  electrical: "Electrical services plan — sockets, switches, lighting, AC & data points.",
+  plumbing: "Plumbing / water services plan — WC, basin, shower, drains & heaters.",
 };
 
 export default async function DrawingsPage({

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { generateDeterministicBoq } from "@/lib/boq/engine";
+import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import type {
   EngineRoom,
   LabourRate as EngineLabourRate,
@@ -676,7 +677,7 @@ export async function POST(request: NextRequest) {
           ? (r.polygon as unknown as number[][])
           : null,
       }));
-      const { boq } = generateDeterministicBoq({
+      const { boq: engineBoq } = generateDeterministicBoq({
         rooms: engineRooms,
         labourRates: labourRates.map(
           (r): EngineLabourRate => ({
@@ -702,6 +703,14 @@ export async function POST(request: NextRequest) {
         ),
         styleKey: chosenStyleKey,
       });
+
+      // P2: append Electrical Installations + Plumbing & Sanitary sections from
+      // plan_fixtures counts (flagged, best-effort, no-op when off/empty).
+      const boq = await appendOverlaySections(
+        engineBoq,
+        projectId,
+        supabaseUntyped,
+      );
 
       const { data: inserted, error: insertErr } = await supabase
         .from("boqs")
@@ -793,11 +802,14 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
 
     // 4. Call Claude with retry.
     const anthropic = new Anthropic({ apiKey });
-    const { boq, usage } = await generateBoq(
+    const { boq: llmBoq, usage } = await generateBoq(
       anthropic,
       systemPrompt,
       composedUserPrompt,
     );
+
+    // P2: append overlay sections from plan_fixtures counts (flagged/best-effort).
+    const boq = await appendOverlaySections(llmBoq, projectId, supabaseUntyped);
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase

@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const IdSchema = z.string().uuid();
-const KINDS: SheetKind[] = ["as_built", "proposed", "finish_schedule"];
+const KINDS: SheetKind[] = [
+  "as_built",
+  "proposed",
+  "finish_schedule",
+  "electrical",
+  "plumbing",
+];
 
 function flagOn(): boolean {
   return process.env.DRAWINGS_ENABLED === "true";

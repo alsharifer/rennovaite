@@ -230,6 +230,42 @@ unchanged.
   `scripts/migrations/013…` and `014…`, and create a **private** Storage bucket
   named `drawings`. Live generation + PDF download work without them.
 
+## Overlays — electrical + plumbing (P2)
+
+Point-based electrical + plumbing layers on the 2D plan whose **counts** feed
+two new BoQ sections deterministically. Gated by `OVERLAYS_ENABLED`.
+
+- **Fixtures** live in `plan_fixtures` (migration `015`): `layer`
+  (electrical|plumbing), `type`, `room_id`, `position` ([x,y] in **normalised**
+  plan space, like `rooms.polygon`), `source` (rule|user). Types are listed in
+  `lib/overlays/types.ts`.
+- **Rule seeding** (`lib/overlays/seed.ts` + `rules.ts`): `seedOverlays(planGraph)`
+  places DEFAULTS per room type (a plain data table with a rationale per rule —
+  these are defaults, **not** code-compliance rules; P6 owns code checks). Pure
+  + unit-tested. Seeded fixtures are `source: 'rule'`; the server seeds on first
+  `GET /api/plan-fixtures`.
+- **2D editing** is the only editing surface: the plan page's `PlanLayers`
+  toggle (Plan / Electrical / Plumbing) swaps `EditablePlanViewer` for
+  `OverlayEditor` (drag / palette-add / delete → `POST`/`DELETE`
+  `/api/plan-fixtures`, always `source: 'user'`). Flag off → no toggle, plan
+  unchanged.
+- **BoQ feed** (`lib/overlays/boq.ts` + `boq-feed.ts`): `appendOverlaySections`
+  adds **"Electrical Installations"** + **"Plumbing & Sanitary"** POMI sections
+  to the generated BoQ (both engine + LLM paths) with quantities = fixture
+  counts (never the LLM). Each line records `element_refs` (fixture ids) and
+  `rate_status`; where the catalog has no default point rate the line is
+  `rate_status: 'needs_qs'` (rate 0) and renders with a terracotta dot in the
+  BoQ table. `element_refs`/`rate_status` are additive optional fields on the
+  jsonb BoQ line (P4/P5 build on `element_refs`). Existing sections / zod / KG
+  are untouched.
+- **Drawings**: `lib/drawings/electrical-sheet.ts` + `plumbing-sheet.ts` add
+  services sheets (symbols + legend + count table) to the drawing set when
+  fixtures exist (needs `DRAWINGS_ENABLED` too).
+- **Manual DB step**: apply `scripts/migrations/015_plan_fixtures.sql` in the
+  Supabase SQL editor (no runner; service-role JWT can't run DDL). The unit
+  tests + flag-off behaviour work without it; seeding/editing/BoQ-feed activate
+  once it's applied.
+
 ## Env vars
 
 | Name                              | Where used              |

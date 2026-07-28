@@ -19,11 +19,20 @@ import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { renderDemoSheet } from "./demo-sheet";
+import { renderElectricalSheet } from "./electrical-sheet";
 import { renderFinishSchedule, type FinishRow } from "./finish-schedule";
+import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
+import { renderPlumbingSheet } from "./plumbing-sheet";
 import type { SheetMeta } from "./sheet";
+import { layerOf, type FixtureType } from "@/lib/overlays/types";
 
-export type SheetKind = "as_built" | "proposed" | "finish_schedule";
+export type SheetKind =
+  | "as_built"
+  | "proposed"
+  | "finish_schedule"
+  | "electrical"
+  | "plumbing";
 
 export interface DrawingSheet {
   kind: SheetKind;
@@ -151,6 +160,25 @@ async function loadProposedGraph(
   }
 }
 
+/** Load overlay fixtures for the services sheets (best-effort, flagged). */
+async function loadOverlayFixtures(projectId: string): Promise<OverlayFixtureForSheet[]> {
+  if (process.env.OVERLAYS_ENABLED !== "true") return [];
+  try {
+    const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
+    const { data, error } = await supabase
+      .from("plan_fixtures")
+      .select("type, position")
+      .eq("project_id", projectId);
+    if (error || !data) return [];
+    return (data as { type: FixtureType; position: [number, number] }[]).map((r) => ({
+      type: r.type,
+      position: r.position,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function generateDrawingSet(projectId: string): Promise<DrawingSet> {
   // Read-only: derive the as-built graph live. The as-built plan_snapshot is
   // written at parse-confirm (update-plan), not here, so viewing drawings never
@@ -190,6 +218,33 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
       }),
     },
   ];
+
+  // P2: append electrical + plumbing services sheets when fixtures exist.
+  const fixtures = await loadOverlayFixtures(projectId);
+  const electrical = fixtures.filter((f) => layerOf(f.type) === "electrical");
+  const plumbing = fixtures.filter((f) => layerOf(f.type) === "plumbing");
+  if (electrical.length > 0) {
+    sheets.push({
+      kind: "electrical",
+      title: "Electrical Plan",
+      sheetNumber: "A-401",
+      svg: renderElectricalSheet(asBuilt, electrical, meta, {
+        sheetNumber: "A-401",
+        title: "Electrical Plan",
+      }),
+    });
+  }
+  if (plumbing.length > 0) {
+    sheets.push({
+      kind: "plumbing",
+      title: "Plumbing Plan",
+      sheetNumber: "A-402",
+      svg: renderPlumbingSheet(asBuilt, plumbing, meta, {
+        sheetNumber: "A-402",
+        title: "Plumbing Plan",
+      }),
+    });
+  }
 
   return { projectId, planId: asBuilt.planId, sheets, derivedNotes: asBuilt.notes };
 }

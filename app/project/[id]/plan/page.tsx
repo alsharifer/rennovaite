@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { EditablePlanViewer } from "./_components/editable-plan-viewer";
 import { ParseLoading } from "./_components/parse-loading";
+import { PlanLayers } from "./_components/plan-layers";
 
 export const dynamic = "force-dynamic";
 
@@ -173,10 +173,12 @@ export default async function PlanPage({
                     {roomList.length} rooms · {formatM2(totalArea)}
                   </p>
                 </div>
-                <EditablePlanViewer
+                <PlanLayers
+                  projectId={projectId}
                   planId={plan.id}
                   initialRooms={roomList}
                   initialTotalAreaM2={totalArea}
+                  overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
                 />
                 <div className="mt-md flex items-center justify-end gap-md text-ink-500">
                   <span

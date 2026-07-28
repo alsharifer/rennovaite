@@ -18,6 +18,9 @@ export type BoqLine = {
   total_aed: number;
   vendor_or_source: string;
   notes: string | null;
+  // P2 additive: overlay-derived lines carry element refs + a rate status.
+  element_refs?: string[] | null;
+  rate_status?: "priced" | "needs_qs";
 };
 
 export type BoqSection = {
@@ -636,7 +639,14 @@ function LineRow({
           {ref_}
         </td>
         <td className="px-md py-sm">
-          <p className="font-body-sm text-body-sm text-ink-900">
+          <p className="flex items-center gap-xs font-body-sm text-body-sm text-ink-900">
+            {line.rate_status === "needs_qs" && (
+              <span
+                title="Rate to be confirmed by the QS"
+                aria-label="Needs QS pricing"
+                className="inline-block size-1.5 shrink-0 rounded-full bg-tertiary"
+              />
+            )}
             {line.description}
           </p>
           {line.notes && (

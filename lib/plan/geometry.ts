@@ -76,6 +76,11 @@ export interface PlanGraphMeta {
   total_area_m2: number;
   /** Normalised-unit → metre linear factor used for the whole conversion. */
   unit_to_m: number;
+  /** Raw normalised-space origin (min x/y) subtracted during metric conversion.
+   *  A normalised point p maps to metres via ((p - norm_origin) * unit_to_m).
+   *  Overlay fixtures are stored in this normalised space (like rooms.polygon);
+   *  this lets the drawing sheets place them in metres. */
+  norm_origin: [number, number];
 }
 
 export interface DerivedRecord {
@@ -354,6 +359,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       envelope_m: envelope,
       total_area_m2: totalAreaM2,
       unit_to_m: unitToM,
+      norm_origin: [minX, minY],
     },
     derived: {
       walls: true,
