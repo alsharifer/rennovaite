@@ -179,6 +179,7 @@ export default async function PlanPage({
                   initialRooms={roomList}
                   initialTotalAreaM2={totalArea}
                   overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
+                  mode="edit"
                 />
                 <div className="mt-md flex items-center justify-end gap-md text-ink-500">
                   <span

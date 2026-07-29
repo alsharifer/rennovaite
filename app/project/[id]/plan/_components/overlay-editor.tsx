@@ -43,10 +43,13 @@ export function OverlayEditor({
   projectId,
   rooms,
   layer,
+  readOnly = false,
 }: {
   projectId: string;
   rooms: RawRoomInput[];
   layer: OverlayLayer;
+  /** read mode: render fixtures but hide the palette + disable drag/add/delete. */
+  readOnly?: boolean;
 }) {
   const fit = useMemo(() => fitRooms(rooms), [rooms]);
   const types = layer === "electrical" ? ELECTRICAL_TYPES : PLUMBING_TYPES;
@@ -165,7 +168,8 @@ export function OverlayEditor({
 
   return (
     <div className="space-y-3">
-      {/* Palette + delete toolbar */}
+      {/* Palette + delete toolbar (edit only) */}
+      {!readOnly && (
       <div className="flex flex-wrap items-center gap-2">
         <span className="label-caps mr-1 text-ink-500">Add:</span>
         {types.map((t) => {
@@ -204,6 +208,7 @@ export function OverlayEditor({
           </button>
         </div>
       </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-ink-100 bg-paper">
         <svg
@@ -211,10 +216,10 @@ export function OverlayEditor({
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           className="block h-auto w-full select-none touch-none"
           role="img"
-          aria-label={`${layer} overlay editor`}
-          onPointerDown={onSvgPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
+          aria-label={readOnly ? `${layer} overlay (view-only)` : `${layer} overlay editor`}
+          onPointerDown={readOnly ? undefined : onSvgPointerDown}
+          onPointerMove={readOnly ? undefined : onPointerMove}
+          onPointerUp={readOnly ? undefined : onPointerUp}
         >
           {/* Rooms as read-only context */}
           {fit.rooms.map((r) => {
@@ -244,8 +249,8 @@ export function OverlayEditor({
             return (
               <g
                 key={f.id}
-                style={{ cursor: "grab" }}
-                onPointerDown={(e) => onFixturePointerDown(e, f)}
+                style={{ cursor: readOnly ? "default" : "grab" }}
+                onPointerDown={readOnly ? undefined : (e) => onFixturePointerDown(e, f)}
               >
                 <circle
                   cx={vx}
@@ -278,7 +283,9 @@ export function OverlayEditor({
           ? "Loading fixtures…"
           : error
             ? `Error: ${error}`
-            : `${layerFixtures.length} ${layer} fixtures. Drag to move, pick a type above and click to add, select and Delete to remove. Rule-seeded defaults are editable.`}
+            : readOnly
+              ? `${layerFixtures.length} ${layer} fixtures (view-only). Edit them on the plan step.`
+              : `${layerFixtures.length} ${layer} fixtures. Drag to move, pick a type above and click to add, select and Delete to remove. Rule-seeded defaults are editable.`}
       </p>
     </div>
   );

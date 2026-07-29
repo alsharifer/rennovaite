@@ -15,6 +15,13 @@ import { Layers, Plus, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import {
+  editingEnabled,
+  roomInteraction,
+  svgDragEnabled,
+  type PlanViewerMode,
+} from "./plan-interaction";
+
 const VIEW_W = 1000;
 const VIEW_H = 600;
 const PADDING = 24;
@@ -300,13 +307,21 @@ type Props = {
   planId: string;
   initialRooms: RoomInput[];
   initialTotalAreaM2: number | null;
+  /** Required — every call site must choose. read = view-only + tap-to-inspect,
+   *  edit = full geometry editing (parse-confirm). */
+  mode: PlanViewerMode;
+  /** read mode only: fired when a room is clicked (opens the inspect panel). */
+  onInspectRoom?: (roomId: string) => void;
 };
 
 export function EditablePlanViewer({
   planId,
   initialRooms,
+  mode,
+  onInspectRoom,
 }: Props) {
   const router = useRouter();
+  const editing = editingEnabled(mode);
   const fitted = useMemo(() => fitToViewBox(initialRooms), [initialRooms]);
   // m²-per-unit factor is anchored to the initial fit and stays stable
   // across edits because `fitted` is memoised on `[initialRooms]` — resize
@@ -714,6 +729,7 @@ export function EditablePlanViewer({
 
   return (
     <div className="space-y-3">
+      {editing && (
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button
@@ -782,6 +798,7 @@ export function EditablePlanViewer({
           </Button>
         </div>
       </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-ink-100 bg-paper">
         <svg
@@ -789,10 +806,10 @@ export function EditablePlanViewer({
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           className="block h-auto w-full select-none touch-none"
           role="img"
-          aria-label="Editable floorplan"
-          onPointerDown={onSvgPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
+          aria-label={editing ? "Editable floorplan" : "Floorplan (view-only)"}
+          onPointerDown={svgDragEnabled(mode) ? onSvgPointerDown : undefined}
+          onPointerMove={svgDragEnabled(mode) ? onPointerMove : undefined}
+          onPointerUp={svgDragEnabled(mode) ? onPointerUp : undefined}
         >
           {/* Hover affordances per spec — pure CSS keeps the state
               machine untouched. fill is overridable because the polygon
@@ -820,6 +837,8 @@ export function EditablePlanViewer({
               const renaming = renamingId === room.id;
               const overlapping = overlappingIds.has(room.id);
               const bb = bboxOf(room.polygon);
+              // Mode gate: edit → body-drag, read → inspect-on-click.
+              const roomMode = roomInteraction(mode);
               const cx = (bb.xL + bb.xR) / 2;
               const cy = (bb.yT + bb.yB) / 2;
               const rectWPx = bb.xR - bb.xL;
@@ -852,9 +871,18 @@ export function EditablePlanViewer({
                     fillOpacity={0.5}
                     stroke={INK_900}
                     strokeOpacity={1}
-                    strokeWidth={selected ? 2.5 : 1.5}
-                    style={{ cursor: "grab" }}
-                    onPointerDown={(e) => onRoomPointerDown(e, room)}
+                    strokeWidth={editing && selected ? 2.5 : 1.5}
+                    style={{ cursor: roomMode === "drag" ? "grab" : "pointer" }}
+                    onPointerDown={
+                      roomMode === "drag"
+                        ? (e) => onRoomPointerDown(e, room)
+                        : undefined
+                    }
+                    onClick={
+                      roomMode === "inspect"
+                        ? () => onInspectRoom?.(room.id)
+                        : undefined
+                    }
                   />
 
                   {overlapping && (
@@ -926,17 +954,24 @@ export function EditablePlanViewer({
                                 fontSize="13"
                                 fontWeight={500}
                                 fill={INK_900}
+                                pointerEvents={editing ? undefined : "none"}
                                 style={{
-                                  cursor: "text",
+                                  cursor: editing ? "text" : "pointer",
                                   fontFamily: "var(--font-inter), sans-serif",
                                 }}
-                                onPointerDown={(e) =>
-                                  onRoomPointerDown(e, room)
+                                onPointerDown={
+                                  editing
+                                    ? (e) => onRoomPointerDown(e, room)
+                                    : undefined
                                 }
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation();
-                                  beginRename(room);
-                                }}
+                                onDoubleClick={
+                                  editing
+                                    ? (e) => {
+                                        e.stopPropagation();
+                                        beginRename(room);
+                                      }
+                                    : undefined
+                                }
                               >
                                 {room.name_en}
                               </text>
@@ -982,7 +1017,7 @@ export function EditablePlanViewer({
                     </g>
                   )}
 
-                  {selected && !renaming && (
+                  {editing && selected && !renaming && (
                     <>
                       {/* Resize handles at the four corners. */}
                       {([0, 1, 2, 3] as const).map((cornerIndex) => {
@@ -1055,8 +1090,14 @@ export function EditablePlanViewer({
       </div>
 
       <p className="text-xs text-ink-500">
-        Click a room to select. Drag the body to move, drag a corner handle to
-        resize, double-click the name to rename. Live total:{" "}
+        {editing ? (
+          <>
+            Click a room to select. Drag the body to move, drag a corner handle
+            to resize, double-click the name to rename. Live total:{" "}
+          </>
+        ) : (
+          <>Click a room to see what it is and what it costs. Total:{" "}</>
+        )}
         <span className="text-on-surface-variant">
           {liveTotalM2.toFixed(1)} m²
         </span>

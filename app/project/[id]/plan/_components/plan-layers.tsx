@@ -2,10 +2,18 @@
 
 import { useState } from "react";
 
+import { InspectPanel } from "@/components/viewer/InspectPanel";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
+import {
+  roomTarget,
+  type InspectBoq,
+  type InspectTarget,
+  type RoomMeta,
+} from "@/lib/viewer/inspect";
 
 import { EditablePlanViewer } from "./editable-plan-viewer";
 import { OverlayEditor } from "./overlay-editor";
+import type { PlanViewerMode } from "./plan-interaction";
 
 type Layer = "plan" | "electrical" | "plumbing";
 
@@ -15,10 +23,18 @@ const LAYERS: { key: Layer; label: string; glyph: string }[] = [
   { key: "plumbing", label: "Plumbing", glyph: "water_drop" },
 ];
 
+/** Read-mode tap-to-inspect data (same shape the 3D host builds). */
+export interface PlanInspectData {
+  projectId: string;
+  boq: InspectBoq;
+  rooms: RoomMeta[];
+}
+
 /**
- * Layer toggle over the 2D plan (P2). Plan → the existing EditablePlanViewer;
- * Electrical / Plumbing → the overlay fixture editor. When OVERLAYS_ENABLED is
- * off the toggle is not rendered — the plan is exactly as before.
+ * Layer toggle over the 2D plan. `mode` is required — parse-confirm passes
+ * "edit" (full geometry editing); every read-only surface passes "read"
+ * (view-only + tap-to-inspect, no editing toolbar/palette). Layer visibility
+ * toggles stay in both modes — viewing overlays is reading.
  */
 export function PlanLayers({
   projectId,
@@ -26,22 +42,51 @@ export function PlanLayers({
   initialRooms,
   initialTotalAreaM2,
   overlaysEnabled,
+  mode,
+  inspect,
 }: {
   projectId: string;
   planId: string;
   initialRooms: RawRoomInput[];
   initialTotalAreaM2: number | null;
   overlaysEnabled: boolean;
+  mode: PlanViewerMode;
+  inspect?: PlanInspectData;
 }) {
   const [layer, setLayer] = useState<Layer>("plan");
+  const [target, setTarget] = useState<InspectTarget | null>(null);
+
+  const onInspectRoom = (roomId: string) => {
+    const room = inspect?.rooms.find((r) => r.id === roomId);
+    if (room) setTarget(roomTarget(room));
+  };
+
+  const planViewer = (
+    <EditablePlanViewer
+      planId={planId}
+      initialRooms={initialRooms}
+      initialTotalAreaM2={initialTotalAreaM2}
+      mode={mode}
+      onInspectRoom={onInspectRoom}
+    />
+  );
+
+  const panel =
+    mode === "read" && inspect && target ? (
+      <InspectPanel
+        target={target}
+        boq={inspect.boq}
+        projectId={inspect.projectId}
+        onClose={() => setTarget(null)}
+      />
+    ) : null;
 
   if (!overlaysEnabled) {
     return (
-      <EditablePlanViewer
-        planId={planId}
-        initialRooms={initialRooms}
-        initialTotalAreaM2={initialTotalAreaM2}
-      />
+      <>
+        {planViewer}
+        {panel}
+      </>
     );
   }
 
@@ -73,14 +118,17 @@ export function PlanLayers({
       </div>
 
       {layer === "plan" ? (
-        <EditablePlanViewer
-          planId={planId}
-          initialRooms={initialRooms}
-          initialTotalAreaM2={initialTotalAreaM2}
-        />
+        planViewer
       ) : (
-        <OverlayEditor projectId={projectId} rooms={initialRooms} layer={layer} />
+        <OverlayEditor
+          projectId={projectId}
+          rooms={initialRooms}
+          layer={layer}
+          readOnly={mode === "read"}
+        />
       )}
+
+      {panel}
     </div>
   );
 }
