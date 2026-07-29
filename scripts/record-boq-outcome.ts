@@ -28,7 +28,7 @@ const L = (name: string) => LABOUR_SECTIONS.find((s) => s.section.startsWith(nam
 // contractor's site-establishment sections instead of dumped in a catch-all.
 type Row = { row: string; actual: number; platform_sections: string[]; prelim_match?: string[]; kind: "computed" | "allowance" | "gap"; note?: string };
 const DELTA_LOG: Row[] = [
-  { row: "Mobilisation & site setup", actual: L("Mobilisation"), platform_sections: [], prelim_match: ["site setup", "protective floor covering"], kind: "computed", note: "platform prelims: site setup + protective floor covering" },
+  { row: "Mobilisation & site setup", actual: L("Mobilisation"), platform_sections: [], prelim_match: ["site setup", "protective floor covering", "scaffold"], kind: "computed", note: "platform prelims: site setup + protective floor covering + rolling scaffold" },
   { row: "Waste management & clearance", actual: L("Waste"), platform_sections: [], prelim_match: ["skip hire", "final clearance"], kind: "computed", note: "platform prelims: skip hire + final clearance clean" },
   { row: "Demolition & strip-out", actual: L("Demolition"), platform_sections: ["Demolition"], kind: "computed" },
   { row: "Civil works", actual: L("Civil"), platform_sections: ["Blockwork"], kind: "computed" },
@@ -56,7 +56,6 @@ type PlatformOnly = { row: string; section?: string; prelim_match?: string; note
 const PLATFORM_ONLY: PlatformOnly[] = [
   { row: "Wall plaster / skim coat", section: "Plaster", note: "contractor absorbs skim into Civil/Painting lump sums — no separate line; also gross (openings not yet deducted)" },
   { row: "DM / DEWA permits and fees", prelim_match: "permits", note: "no separate permit line in the contract (client-side / bundled)" },
-  { row: "Rolling scaffold hire", prelim_match: "scaffold", note: "ceiling + painting scaffold — UNMAPPED (no explicit target given)" },
 ];
 
 async function loadEnv() {
