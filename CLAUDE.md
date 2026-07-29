@@ -301,6 +301,47 @@ Gated by `VIEWER_3D_ENABLED`.
 - **Manual DB step**: apply `scripts/migrations/016_renders_kind.sql` (Supabase
   SQL editor). The viewer works without it (defaults `kind` to `'still'`).
 
+## Furniture staging — style-consistent renders + optional priced section (P7)
+
+Two compounding pieces off one staging vocabulary, gated by `STAGING_ENABLED`.
+
+- **Vocabulary** `lib/staging/sets.ts`: per style key × `StagingRoomType`
+  (living / majlis / master-bed / kids-bed / dining / kitchen-adjacent) a
+  style-consistent set of 4–6 GCC-appropriate pieces (traditional directions get
+  majlis floor seating; contemporary ones get raised majlis sofas). Each item's
+  `key` is a generic priceable `FurnitureKey`; its `label` carries the per-style
+  flavour. `stagingRoomTypeFromDb` maps DB room types (wet rooms / circulation →
+  null). Pure + unit-tested.
+- **Render enrichment** `lib/staging/prompt.ts` → `buildStagingBlock`: in
+  `app/api/render/route.ts` the STAGING block is appended **after** the KG
+  context (so real KG fixtures keep precedence for fixed elements) — staging only
+  dresses movable furniture and pins the architecture. It only appends to the
+  prompt (the cache key), so caching + the tweak/iterate flow are untouched: flag
+  off vs on are just two distinct prompts → two cache entries. The set used is
+  persisted best-effort to `renders.staging_set`.
+- **Prices** `lib/staging/prices.ts`: indicative Dubai retail per `FurnitureKey`
+  at three tiers (IKEA / Home Centre / Danube Home); each style maps to a tier.
+  The module is the source of truth; `loadFurniturePrices` prefers the optional
+  `furniture_prices` DB table and falls back to the module (works before the
+  migration). **All furniture rates are `rate_status: 'indicative'`.**
+- **Opt-in** — after a render is locked, a ghost "Add furniture to your budget?"
+  (`components/staging/FurnitureOptIn.tsx`, once per room) POSTs to
+  `/api/furniture-opt-in` → `furniture_opt_ins`.
+- **Optional BoQ section** `lib/staging/furniture-boq.ts` +
+  `collect.ts`: at BoQ read-time `collectFurnitureSection` builds ONE
+  **"Furniture (optional)"** section from opted-in rooms' staging sets. It is
+  passed to `BoqView` as a **separate prop — never written into `boqs.sections`**,
+  so every contractor-facing surface that reads the stored jsonb excludes it by
+  construction. Rendered visually apart with an `OPTIONAL — NOT IN CONTRACTOR
+  SCOPE` eyebrow; toggling it off (what-if panel or the section header) subtracts
+  its total exactly, restoring the prior figure.
+- **Manual DB step**: apply `scripts/migrations/021_staging.sql` (Supabase SQL
+  editor) — adds `renders.staging_set`, `furniture_opt_ins`, and the optional
+  `furniture_prices` table. Unit tests + flag-off/degraded behaviour work without
+  it; opt-in persistence + the live BoQ section + `staging_set` tracing activate
+  once it's applied. Optional: `node scripts/seed-furniture-prices.ts` to seed
+  DB-editable price overrides.
+
 ## Env vars
 
 | Name                              | Where used              |
@@ -318,14 +359,16 @@ Gated by `VIEWER_3D_ENABLED`.
 | `NEO4J_PASSWORD`                  | server (KG retrieval)   |
 | `KG_ENABLED`                      | server — `"true"` turns on KG grounding |
 | `BOQ_ENGINE`                      | server — optional; unset = deterministic `lib/boq` engine, `"llm"` = legacy Claude-priced path |
+| `PERMIT_CHECK_ENABLED`            | server — `"true"` turns on the P6 Dubai permit-trigger checklist |
+| `STAGING_ENABLED`                | server — `"true"` turns on P7 furniture staging (render prompt + optional BoQ section) |
 
 ### Pilot Seven feature flags (reserved)
 
 Placeholders for the seven-feature pilot, added to `.env.local.example` by the
-pre-flight (`PILOT_SEVEN_PREFLIGHT.md`). Flag names are inferred — each owning
-prompt confirms/renames when it wires the feature: `PLAN_ENABLED` (P1),
-`DRAWINGS_ENABLED` (P2), `OVERLAYS_ENABLED` (P3), `WHATIF_ENABLED` (P4),
-`COMPLIANCE_ENABLED` (P6), `STAGING_ENABLED` (P7). All default off.
+pre-flight (`PILOT_SEVEN_PREFLIGHT.md`). As wired: `DRAWINGS_ENABLED` (P1),
+`OVERLAYS_ENABLED` (P2), `VIEWER_3D_ENABLED` (P3, also gates P4 inspect),
+`WHATIF_ENABLED` (P5), `PERMIT_CHECK_ENABLED` (P6, renamed from the reserved
+`COMPLIANCE_ENABLED`), `STAGING_ENABLED` (P7). All default off.
 
 KG grounding (render + BoQ prompts) only activates when `KG_ENABLED="true"`
 **and** Neo4j is running — start it from the KG module with

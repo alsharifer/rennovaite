@@ -84,7 +84,7 @@ function loadLabourRates(): LabourRate[] {
 
 function loadSkus(): PricingSku[] {
   const rows = parseCsv(
-    fs.readFileSync(path.join(ROOT, "assets", "pricing_skus.csv.csv"), "utf8"),
+    fs.readFileSync(path.join(ROOT, "assets", "pricing_skus.csv"), "utf8"),
   );
   const [header, ...data] = rows;
   const col = (name: string) => header!.indexOf(name);

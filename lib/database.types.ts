@@ -173,6 +173,7 @@ export type Database = {
           status: string | null;
           qa: Json | null;
           kind: string | null;
+          staging_set: Json | null;
           created_at: string | null;
         };
         Insert: {
@@ -190,6 +191,7 @@ export type Database = {
           status?: string | null;
           qa?: Json | null;
           kind?: string | null;
+          staging_set?: Json | null;
           created_at?: string | null;
         };
         Update: {
@@ -207,6 +209,7 @@ export type Database = {
           status?: string | null;
           qa?: Json | null;
           kind?: string | null;
+          staging_set?: Json | null;
           created_at?: string | null;
         };
         Relationships: [

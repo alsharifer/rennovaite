@@ -7,7 +7,7 @@
 import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 
-const CSV_PATH = "C:/dev/rennovaite/assets/pricing_skus.csv.csv";
+const CSV_PATH = "C:/dev/rennovaite/assets/pricing_skus.csv";
 const ENV_PATH = "C:/dev/rennovaite/.env.local";
 const BATCH_SIZE = 100;
 
