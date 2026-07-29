@@ -233,6 +233,23 @@ export default async function RenderPage({
     /* takeoff_items absent → no chips */
   }
 
+  // P7: furniture-staging flag + rooms already opted into the furniture budget.
+  const stagingEnabled = process.env.STAGING_ENABLED === "true";
+  let initialFurnitureOptIns: string[] = [];
+  if (stagingEnabled) {
+    try {
+      const sb = supabase as unknown as SupabaseClient;
+      const { data: optRows } = await sb
+        .from("furniture_opt_ins")
+        .select("room_id")
+        .eq("project_id", projectId)
+        .returns<{ room_id: string }[]>();
+      initialFurnitureOptIns = (optRows ?? []).map((r) => r.room_id);
+    } catch {
+      /* furniture_opt_ins absent → none pre-checked */
+    }
+  }
+
   return (
     <AppShell pageName="AI Designer" noPadding>
       <RenderInteractive
@@ -243,6 +260,8 @@ export default async function RenderPage({
         initialLockedRoomIds={initialLockedRoomIds}
         initialPhotosByRoom={initialPhotosByRoom}
         roomBoqTotals={roomBoqTotals}
+        stagingEnabled={stagingEnabled}
+        initialFurnitureOptIns={initialFurnitureOptIns}
       />
     </AppShell>
   );

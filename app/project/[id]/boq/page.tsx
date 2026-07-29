@@ -13,6 +13,8 @@ import {
 import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
 import { runPermitCheck, type PermitCheckResult } from "@/lib/compliance/check";
 import { PermitsCard } from "@/components/compliance/PermitsCard";
+import { collectFurnitureSection } from "@/lib/staging/collect";
+import type { FurnitureSection } from "@/lib/staging/furniture-boq";
 import {
   ALL_RELEVANT_CATEGORIES,
   categoriesForLine,
@@ -238,6 +240,16 @@ export default async function BoqPage({
     }
   }
 
+  // P7 furniture staging — the optional, indicative "Furniture (optional)"
+  // section from opted-in rooms. Never part of boqs.sections, so it is excluded
+  // from every contractor export by construction. Best-effort.
+  let furnitureSection: FurnitureSection | null = null;
+  try {
+    furnitureSection = await collectFurnitureSection(id, sb);
+  } catch {
+    /* best-effort */
+  }
+
   return (
     <AppShell pageName={PAGE_NAME}>
       <div className="mx-auto max-w-[1440px]">
@@ -293,6 +305,7 @@ export default async function BoqPage({
             whatifEnabled={whatifEnabled}
             rateBook={rateBook}
             initialSelections={initialSelections}
+            furnitureSection={furnitureSection}
           />
         ) : (
           <EmptyState projectId={id} />

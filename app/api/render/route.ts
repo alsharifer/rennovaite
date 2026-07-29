@@ -28,6 +28,8 @@ import {
   roomTypeFromDb,
   type StyleKey,
 } from "@/lib/render-prompts";
+import { buildStagingBlock } from "@/lib/staging/prompt";
+import { stagingRoomTypeFromDb, type StagingSet } from "@/lib/staging/sets";
 import { roomDimensions } from "@/lib/room-geometry";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -153,6 +155,24 @@ export async function POST(request: NextRequest) {
       console.log(
         `[api/render] KG context injected (bundle=${kgBundleId}) — composed prompt:\n${prompt}`,
       );
+    }
+
+    // P7 furniture staging (flagged). Appended AFTER the KG context so real KG
+    // fixtures keep precedence for fixed elements — staging only dresses movable
+    // furniture. Persisted to renders.staging_set for tracing + the optional BoQ
+    // feed. Staging only appends to the prompt (which is the cache key), so
+    // caching + the tweak/iterate flow are untouched: flag off vs on simply
+    // produce two distinct prompts → two distinct cache entries.
+    let stagingSet: StagingSet | null = null;
+    if (process.env.STAGING_ENABLED === "true") {
+      const stagingRoom = stagingRoomTypeFromDb(room.room_type);
+      const staging = stagingRoom
+        ? buildStagingBlock(styleKey, stagingRoom)
+        : null;
+      if (staging) {
+        prompt = `${prompt}\n\n${staging.block}`;
+        stagingSet = staging.set;
+      }
     }
 
     // Latest uploaded photo for this room, if any. Its presence decides the
@@ -307,6 +327,20 @@ export async function POST(request: NextRequest) {
         { error: insertErr?.message ?? "Failed to save render." },
         { status: 500 },
       );
+    }
+
+    // P7: record which staging set dressed this render — best-effort in a
+    // separate update so the render flow is untouched whether or not migration
+    // 021 (renders.staging_set) has been applied.
+    if (stagingSet) {
+      try {
+        await supabase
+          .from("renders")
+          .update({ staging_set: stagingSet })
+          .eq("id", renderRow.id);
+      } catch {
+        /* staging_set column absent → traced only via the prompt */
+      }
     }
 
     void trackServer(AnalyticsEvent.RenderStarted, {

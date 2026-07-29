@@ -14,7 +14,9 @@ import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { MATERIALS, SURFACE_SPECS, type Material } from "@/lib/materials";
 import { roomTypeFromDb } from "@/lib/render-prompts";
+import { getStagingSet, stagingRoomTypeFromDb } from "@/lib/staging/sets";
 import type { Style } from "@/lib/styles";
+import { FurnitureOptIn } from "@/components/staging/FurnitureOptIn";
 
 // Rendering only covers the pilot's four room types (bedroom, bathroom,
 // living). Dressing rooms, balconies, stairs, terraces, foyers etc. map to
@@ -55,6 +57,9 @@ type Props = {
   initialPhotosByRoom?: Record<string, string>;
   /** P4: roomId → element-mapped BoQ rollup (AED). Chip near the hero. */
   roomBoqTotals?: Record<string, number>;
+  /** P7: whether furniture staging is on (server flag) + already-opted rooms. */
+  stagingEnabled?: boolean;
+  initialFurnitureOptIns?: string[];
 };
 
 type GenerateResponse = {
@@ -171,6 +176,8 @@ export function RenderInteractive({
   initialLockedRoomIds = [],
   initialPhotosByRoom = {},
   roomBoqTotals = {},
+  stagingEnabled = false,
+  initialFurnitureOptIns = [],
 }: Props) {
   const seededState = useMemo<Record<string, RoomState>>(() => {
     const result: Record<string, RoomState> = {};
@@ -241,6 +248,14 @@ export function RenderInteractive({
   const isLocked = selectedRoom !== null && lockedRoomIds.has(selectedRoom.id);
   const selectedRenderable =
     selectedRoom !== null && isRenderableRoom(selectedRoom.room_type);
+
+  // P7: does this room have a staging set for the chosen style? (bathrooms /
+  // circulation get none). Gates the ghost "add furniture to your budget" offer.
+  const stagingAvailable = (() => {
+    if (!stagingEnabled || !style || !selectedRoom) return false;
+    const rt = stagingRoomTypeFromDb(selectedRoom.room_type);
+    return rt != null && getStagingSet(style.key, rt) != null;
+  })();
 
   const substepIdx =
     Math.floor(elapsedMs / SUBSTEP_INTERVAL_MS) % SUBSTEPS.length;
@@ -588,6 +603,17 @@ export function RenderInteractive({
                   ? "Locking & upscaling…"
                   : "Lock this view"}
             </button>
+          )}
+
+          {/* P7: ghost furniture opt-in — only once the view is locked and the
+              room has a staging set for the chosen style. */}
+          {isLocked && stagingAvailable && selectedRoom && (
+            <FurnitureOptIn
+              key={selectedRoom.id}
+              projectId={projectId}
+              roomId={selectedRoom.id}
+              alreadyOptedIn={initialFurnitureOptIns.includes(selectedRoom.id)}
+            />
           )}
 
           {roomState && roomState.list.length > 0 && (

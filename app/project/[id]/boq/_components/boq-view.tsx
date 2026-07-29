@@ -13,6 +13,7 @@ import {
   type Selections,
 } from "@/lib/whatif/engine";
 import { itemKeyFromRuleId, type Grade, type GradeableItem } from "@/lib/whatif/grades";
+import type { FurnitureSection } from "@/lib/staging/furniture-boq";
 
 import { WhatIfSidebar, type WhatIfRow } from "./whatif-sidebar";
 
@@ -29,8 +30,9 @@ export type BoqLine = {
   vendor_or_source: string;
   notes: string | null;
   // P2 additive: overlay-derived lines carry element refs + a rate status.
+  // P7 adds "indicative" for furniture (ballpark retail, not a QS rate).
   element_refs?: string[] | null;
-  rate_status?: "priced" | "needs_qs";
+  rate_status?: "priced" | "needs_qs" | "indicative";
   // P4/P5: engine rule id (P4/quantify/<key> marks a gradeable line).
   rule_id?: string;
 };
@@ -82,6 +84,9 @@ type Props = {
   whatifEnabled?: boolean;
   rateBook?: RateBook | null;
   initialSelections?: Selections;
+  // P7: optional indicative furniture section (separate from boq.sections so it
+  // never reaches a contractor export). Toggleable from the what-if panel.
+  furnitureSection?: FurnitureSection | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -217,8 +222,14 @@ export function BoqView({
   whatifEnabled = false,
   rateBook = null,
   initialSelections = {},
+  furnitureSection = null,
 }: Props) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  // P7: furniture is included in the display total by default; toggling it off
+  // (from the what-if panel or the section header) restores the prior total
+  // exactly, since it is a single additive integer over the baseline.
+  const furnitureTotal = furnitureSection?.section_total_aed ?? 0;
+  const [furnitureOn, setFurnitureOn] = useState(true);
   const [activeToggles, setActiveToggles] = useState<Set<string>>(
     () => new Set(),
   );
@@ -305,7 +316,9 @@ export function BoqView({
   }, [activeToggles]);
 
   const adjustedTotal = Math.round(baseTotal * (1 + adjustments.pct / 100));
-  const displayTotal = whatifOn && scenario ? scenario.total : adjustedTotal;
+  const scopeTotal = whatifOn && scenario ? scenario.total : adjustedTotal;
+  const furnitureIncluded = furnitureOn ? furnitureTotal : 0;
+  const displayTotal = scopeTotal + furnitureIncluded;
   const headroom = budgetAed - displayTotal;
 
   // Top 5 sections by total for the stacked bar, with everything else
@@ -551,6 +564,15 @@ export function BoqView({
               onReset={resetScenario}
               onBudget={applyBudget}
               onClose={() => setSidebarOpen(false)}
+              furniture={
+                furnitureSection
+                  ? {
+                      total: furnitureTotal,
+                      on: furnitureOn,
+                      onToggle: () => setFurnitureOn((v) => !v),
+                    }
+                  : null
+              }
             />
           ) : (
           <aside className="flex flex-col gap-md rounded-xl border border-ink-100 bg-paper p-lg">
@@ -661,6 +683,15 @@ export function BoqView({
           ))}
       </div>
 
+      {/* P7: optional furniture — visually separated, never in contractor scope */}
+      {furnitureSection && (
+        <FurnitureBlock
+          section={furnitureSection}
+          on={furnitureOn}
+          onToggle={() => setFurnitureOn((v) => !v)}
+        />
+      )}
+
       {/* Sidebar toggle tab when closed */}
       {!sidebarOpen && (
         <button
@@ -745,6 +776,110 @@ function ByRoomView({
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// P7 — the optional furniture section, rendered apart from the POMI table with
+// an OPTIONAL eyebrow. Toggling it off subtracts its total exactly (the header
+// toggle and the what-if-panel toggle drive the same state).
+// ---------------------------------------------------------------------------
+
+function FurnitureBlock({
+  section,
+  on,
+  onToggle,
+}: {
+  section: FurnitureSection;
+  on: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <section
+      className={cn(
+        "mt-xl overflow-hidden rounded-xl border border-dashed bg-paper transition-opacity",
+        on ? "border-brass-600/50" : "border-ink-100 opacity-60",
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-md border-b border-bone bg-canvas px-md py-md">
+        <div className="flex flex-col gap-0.5">
+          <span className="label-caps text-tertiary">
+            Optional — not in contractor scope
+          </span>
+          <span className="font-display text-headline-md text-ink-900">
+            {section.work_section}
+          </span>
+          <span className="font-body-sm text-[12px] italic text-on-surface-variant">
+            Indicative Dubai retail — furnishing your staged renders. Excluded
+            from the contractor package.
+          </span>
+        </div>
+        <div className="flex items-center gap-md">
+          <span className="font-mono text-body-md tabular-nums text-ink-900">
+            {on ? formatAed(section.section_total_aed) : "—"}
+          </span>
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-pressed={on}
+            className={cn(
+              "focus-ring flex h-9 items-center gap-xs rounded-lg border px-md font-body-sm text-body-sm font-semibold transition-colors",
+              on
+                ? "border-brass-600 bg-primary-fixed/40 text-ink-900"
+                : "border-ink-100 bg-paper text-ink-700 hover:bg-surface-container-low",
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              {on ? "check_circle" : "add_circle"}
+            </span>
+            {on ? "In your total" : "Add to total"}
+          </button>
+        </div>
+      </div>
+      <table className="w-full table-fixed text-left">
+        <colgroup>
+          <col />
+          <col className="w-[52px]" />
+          <col className="w-[96px]" />
+          <col className="w-[112px]" />
+          <col className="w-[140px]" />
+        </colgroup>
+        <tbody>
+          {section.lines.map((line, idx) => (
+            <tr
+              key={idx}
+              className={cn(
+                "border-b border-bone last:border-0",
+                idx % 2 === 1 ? "bg-canvas" : "bg-paper",
+              )}
+            >
+              <td className="px-md py-sm">
+                <span className="flex items-center gap-xs font-body-sm text-body-sm text-ink-900">
+                  <span
+                    title="Indicative retail price"
+                    aria-label="Indicative price"
+                    className="inline-block size-1.5 shrink-0 rounded-full bg-tertiary"
+                  />
+                  {line.description}
+                </span>
+              </td>
+              <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-on-surface-variant">
+                {line.quantity}
+              </td>
+              <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
+                {line.rate_aed.toLocaleString("en-US")}
+              </td>
+              <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
+                {line.total_aed.toLocaleString("en-US")}
+              </td>
+              <td className="px-md py-sm font-body-sm text-[12px] text-on-surface-variant">
+                <span className="line-clamp-2">{line.vendor_or_source}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </section>
   );
 }

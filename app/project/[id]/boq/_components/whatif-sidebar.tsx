@@ -40,6 +40,7 @@ export function WhatIfSidebar({
   onReset,
   onBudget,
   onClose,
+  furniture = null,
 }: {
   rows: WhatIfRow[];
   baselineTotal: number;
@@ -49,6 +50,8 @@ export function WhatIfSidebar({
   onReset: () => void;
   onBudget: (target: number) => void;
   onClose: () => void;
+  // P7: optional furniture toggle. Present only when a furniture section exists.
+  furniture?: { total: number; on: boolean; onToggle: () => void } | null;
 }) {
   const delta = scenarioTotal - baselineTotal;
   const [target, setTarget] = useState<number>(Math.round(baselineTotal));
@@ -146,6 +149,35 @@ export function WhatIfSidebar({
           </div>
         ))}
       </div>
+
+      {/* P7: optional furniture toggle */}
+      {furniture && (
+        <div className="mt-sm border-t border-bone pt-md">
+          <button
+            type="button"
+            onClick={furniture.onToggle}
+            aria-pressed={furniture.on}
+            className={cn(
+              "focus-ring flex w-full items-center justify-between gap-md rounded-lg border px-md py-sm text-left transition-colors",
+              furniture.on
+                ? "border-brass-600 bg-primary-fixed/40 text-ink-900"
+                : "border-ink-100 bg-paper text-ink-900 hover:bg-surface-container-low",
+            )}
+          >
+            <span className="flex flex-col">
+              <span className="font-body-sm text-body-sm font-semibold">
+                Furniture (optional)
+              </span>
+              <span className="font-body-sm text-[11px] text-on-surface-variant">
+                Indicative — not in contractor scope
+              </span>
+            </span>
+            <span className="font-mono text-body-sm tabular-nums">
+              {furniture.on ? `+${fmtAed(furniture.total)}` : "off"}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Budget dial */}
       <div className="mt-sm border-t border-bone pt-md">
