@@ -23,10 +23,13 @@ const PID = "6b5fda9d-e40f-4e16-940c-7a17d27ec5dc";
 
 // Delta Log actual rows (excl VAT; labour is GROSS pre-discount per the note).
 const L = (name: string) => LABOUR_SECTIONS.find((s) => s.section.startsWith(name))!.gross_aed;
-type Row = { row: string; actual: number; platform_sections: string[]; kind: "computed" | "allowance" | "gap"; note?: string };
+// `prelim_match` pulls specific Preliminaries LINES (by description keyword)
+// into this row — so the platform's prelim overhead is compared against the
+// contractor's site-establishment sections instead of dumped in a catch-all.
+type Row = { row: string; actual: number; platform_sections: string[]; prelim_match?: string[]; kind: "computed" | "allowance" | "gap"; note?: string };
 const DELTA_LOG: Row[] = [
-  { row: "Mobilisation & site setup", actual: L("Mobilisation"), platform_sections: [], kind: "gap", note: "engine has no mobilisation line (folded into Preliminaries)" },
-  { row: "Waste management & clearance", actual: L("Waste"), platform_sections: [], kind: "gap", note: "not itemised by the engine" },
+  { row: "Mobilisation & site setup", actual: L("Mobilisation"), platform_sections: [], prelim_match: ["site setup", "protective floor covering"], kind: "computed", note: "platform prelims: site setup + protective floor covering" },
+  { row: "Waste management & clearance", actual: L("Waste"), platform_sections: [], prelim_match: ["skip hire", "final clearance"], kind: "computed", note: "platform prelims: skip hire + final clearance clean" },
   { row: "Demolition & strip-out", actual: L("Demolition"), platform_sections: ["Demolition"], kind: "computed" },
   { row: "Civil works", actual: L("Civil"), platform_sections: ["Blockwork"], kind: "computed" },
   { row: "Flooring works (labour)", actual: L("Flooring"), platform_sections: ["Floor Finishes"], kind: "computed", note: "platform bundles supply+install; tile SUPPLY is a separate gap row below" },
@@ -45,6 +48,16 @@ const DELTA_LOG: Row[] = [
   { row: "Sanitary supply (net of disc.)", actual: TRADE_TOTALS.sanitary.excl_vat, platform_sections: ["Sanitaryware"], kind: "gap", note: "platform Sanitaryware is a partial supply estimate — capture gap" },
 ];
 const ACTUAL_TOTAL = 453_228.5036; // Delta Log TOTAL (gross labour)
+
+// Platform items with NO actual counterpart — kept as their own explicit lines
+// (not a catch-all). `section` pulls a whole platform section; `prelim_match`
+// pulls a specific Preliminaries line by keyword.
+type PlatformOnly = { row: string; section?: string; prelim_match?: string; note: string };
+const PLATFORM_ONLY: PlatformOnly[] = [
+  { row: "Wall plaster / skim coat", section: "Plaster", note: "contractor absorbs skim into Civil/Painting lump sums — no separate line; also gross (openings not yet deducted)" },
+  { row: "DM / DEWA permits and fees", prelim_match: "permits", note: "no separate permit line in the contract (client-side / bundled)" },
+  { row: "Rolling scaffold hire", prelim_match: "scaffold", note: "ceiling + painting scaffold — UNMAPPED (no explicit target given)" },
+];
 
 async function loadEnv() {
   const env: Record<string, string> = {};
@@ -68,32 +81,34 @@ async function main() {
   for (const s of boq.sections) platform_by_section[s.work_section] = s.section_total_aed;
   const actual_by_section: Record<string, number> = {};
 
+  // Preliminaries is routed at the LINE level (below), so exclude it from
+  // whole-section mapping. Match a prelim line to a keyword.
+  const prelimSection = (boq.sections as { work_section: string; lines?: { description: string; total_aed: number }[] }[]).find((s) => s.work_section === "Preliminaries");
+  const prelimLines = prelimSection?.lines ?? [];
+  const prelimSum = (keys: string[]) =>
+    prelimLines.filter((l) => keys.some((k) => l.description.toLowerCase().includes(k))).reduce((s, l) => s + l.total_aed, 0);
+
   const table: { row: string; platform: number | null; actual: number; delta_pct: number | null; kind: string }[] = [];
   for (const r of DELTA_LOG) {
     actual_by_section[r.row] = r.actual;
-    const platform = r.platform_sections.length ? r.platform_sections.reduce((s, n) => s + (secTotal.get(n) ?? 0), 0) : null;
+    const fromSections = r.platform_sections.reduce((s, n) => s + (secTotal.get(n) ?? 0), 0);
+    const fromPrelims = r.prelim_match ? prelimSum(r.prelim_match) : 0;
+    const has = r.platform_sections.length > 0 || (r.prelim_match?.length ?? 0) > 0;
+    const platform = has ? fromSections + fromPrelims : null;
     table.push({ row: r.row, platform, actual: r.actual, delta_pct: platform != null ? pct(platform, r.actual) : null, kind: r.kind });
   }
 
-  // Reconciliation: platform sections not mapped to any actual row (Plaster,
-  // Preliminaries, …) — a REVERSE capture gap. Surfaced as one row so the
-  // platform column sums exactly to the subtotal.
-  const referenced = new Set(DELTA_LOG.flatMap((r) => r.platform_sections));
-  const platformOnly = boq.sections.filter((s) => !referenced.has(s.work_section));
-  const platformOnlyTotal = platformOnly.reduce((s, x) => s + x.section_total_aed, 0);
-  if (platformOnly.length > 0) {
-    table.push({
-      row: `Platform-only (${platformOnly.map((s) => s.work_section).join(", ")})`,
-      platform: platformOnlyTotal,
-      actual: 0,
-      delta_pct: null,
-      kind: "gap",
-    });
+  // Platform-only lines (no actual counterpart), each its own explicit row.
+  for (const po of PLATFORM_ONLY) {
+    const platform = po.section ? (secTotal.get(po.section) ?? 0) : po.prelim_match ? prelimSum([po.prelim_match]) : 0;
+    table.push({ row: po.row, platform, actual: 0, delta_pct: null, kind: "gap" });
   }
-  // Column must now reconcile to the platform subtotal.
+
+  // Reconciliation: the platform column must sum EXACTLY to the subtotal — every
+  // platform section is either mapped to an actual row or a platform-only line.
   const columnSum = table.reduce((s, t) => s + (t.platform ?? 0), 0);
   if (columnSum !== boq.subtotal_aed) {
-    console.warn(`[reconcile] platform column ${columnSum} != subtotal ${boq.subtotal_aed}`);
+    throw new Error(`[reconcile] platform column ${columnSum} != subtotal ${boq.subtotal_aed} — a platform section is unallocated`);
   }
 
   const platformSubtotal = boq.subtotal_aed;
@@ -106,7 +121,9 @@ async function main() {
     `Tile SUPPLY + supply/install split + openings deductions remain uncaptured.`,
   ].join(" ");
 
-  // Write boq_outcomes (delta-log entry #1).
+  // Write boq_outcomes (delta-log entry #1). Replace-in-place so re-runs keep a
+  // single current entry rather than accumulating duplicates.
+  await supabase.from("boq_outcomes").delete().eq("project_id", PID);
   const ins = await supabase.from("boq_outcomes").insert({
     project_id: PID,
     platform_boq_total: platformSubtotal,
