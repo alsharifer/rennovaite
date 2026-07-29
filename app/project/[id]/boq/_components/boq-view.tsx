@@ -30,9 +30,10 @@ export type BoqLine = {
   vendor_or_source: string;
   notes: string | null;
   // P2 additive: overlay-derived lines carry element refs + a rate status.
-  // P7 adds "indicative" for furniture (ballpark retail, not a QS rate).
+  // P7 adds "indicative" for furniture; ground-truth adds "actual_transaction"
+  // (priced from a real contract/quote) and "site_assessment" (allowance only).
   element_refs?: string[] | null;
-  rate_status?: "priced" | "needs_qs" | "indicative";
+  rate_status?: "priced" | "needs_qs" | "indicative" | "actual_transaction" | "site_assessment";
   // P4/P5: engine rule id (P4/quantify/<key> marks a gradeable line).
   rule_id?: string;
 };
@@ -1012,6 +1013,20 @@ function LineRow({
                 title="Rate to be confirmed by the QS"
                 aria-label="Needs QS pricing"
                 className="inline-block size-1.5 shrink-0 rounded-full bg-tertiary"
+              />
+            )}
+            {line.rate_status === "site_assessment" && (
+              <span
+                title="Allowance only — requires site measurement"
+                aria-label="Allowance — needs site measurement"
+                className="inline-block size-1.5 shrink-0 rounded-full bg-error"
+              />
+            )}
+            {line.rate_status === "actual_transaction" && (
+              <span
+                title="Priced from a real contract/quotation (actual)"
+                aria-label="Actual contract rate"
+                className="inline-block size-1.5 shrink-0 rounded-full bg-brass-600"
               />
             )}
             {line.description}

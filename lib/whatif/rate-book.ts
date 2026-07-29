@@ -20,11 +20,15 @@ export async function loadRateBook(supabase: SupabaseClient): Promise<RateBook> 
     // the first row seen per (item_key, grade) so the latest rate wins while
     // saved what-if scenarios (which key off item_key/grade) keep resolving.
     // `valid_from` may be absent on pre-022 rows → treat as epoch.
+    // Newest valid_from wins; ties (same-day seed vs actual) break by
+    // provenance — 'actual_transaction' sorts before 'seed' ascending, so an
+    // actual-transaction rate supersedes a same-dated seed rate.
     const { data, error } = await supabase
       .from("rate_book")
       .select("item_key, grade, rate_aed, source, qs_validated, valid_from")
       .eq("city", "Dubai")
-      .order("valid_from", { ascending: false });
+      .order("valid_from", { ascending: false })
+      .order("provenance", { ascending: true });
     if (error || !data) return rb;
     const seen = new Set<string>();
     for (const r of data as {

@@ -7,6 +7,7 @@ import { generateDeterministicBoq } from "@/lib/boq/engine";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
+import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { getProposedGraph } from "@/lib/plan/snapshots";
 import type {
@@ -734,11 +735,14 @@ export async function POST(request: NextRequest) {
       const mappedBoq = applyElementMapping(engineBoq, takeoffItems);
       // P2: append Electrical Installations + Plumbing & Sanitary sections from
       // plan_fixtures counts (flagged, best-effort, no-op when off/empty).
-      const boq = await appendOverlaySections(
+      const overlaid = await appendOverlaySections(
         mappedBoq,
         projectId,
         supabaseUntyped,
       );
+      // Ground-truth: append Joinery + Aluminum & Glass sections (Atrium/Global
+      // Creation actuals; aluminum = site_assessment allowances). Core, additive.
+      const boq = appendJoineryAluminumSections(overlaid, rooms);
 
       const { data: inserted, error: insertErr } = await supabase
         .from("boqs")
@@ -846,9 +850,11 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
       composedUserPrompt,
     );
 
-    // P4: rebuild mapped sections from the take-off, then P2 overlays.
+    // P4: rebuild mapped sections from the take-off, then P2 overlays, then the
+    // ground-truth Joinery + Aluminum & Glass sections.
     const mappedLlm = applyElementMapping(llmBoq, takeoffItems);
-    const boq = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
+    const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
+    const boq = appendJoineryAluminumSections(overlaidLlm, rooms);
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase
