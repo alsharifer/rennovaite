@@ -868,6 +868,7 @@ function StylePicker({
           // Palette fallback if the moodboard PNG is missing.
           const el = e.currentTarget;
           el.style.background = `linear-gradient(135deg, ${style.palette[0]}, ${style.palette[1]})`;
+          el.alt = "";
           el.removeAttribute("src");
         }}
       />
@@ -1079,6 +1080,15 @@ function HeroRender({
                 "size-full object-cover transition-opacity duration-300",
                 generating ? "opacity-40" : "opacity-100",
               )}
+              onError={(e) => {
+                // Expired/missing image → clean bone frame + hint instead of the
+                // browser's broken-image alt text. (Older renders whose ephemeral
+                // URL lapsed; regenerate to get a durable one.)
+                const el = e.currentTarget;
+                el.alt = "";
+                el.removeAttribute("src");
+                el.dataset.expired = "1";
+              }}
             />
           ) : (
             <div className="flex size-full items-center justify-center text-center">
@@ -1223,7 +1233,12 @@ function ThumbStrip({
             <img
               src={item.imageUrl}
               alt={i === 0 ? "Original render" : `Tweak ${i}`}
-              className="h-[66px] w-[100px] object-cover"
+              className="h-[66px] w-[100px] bg-bone object-cover"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.alt = "";
+                el.removeAttribute("src");
+              }}
             />
           </button>
         );
@@ -1348,6 +1363,7 @@ function MaterialCard({
           const el = e.currentTarget;
           el.style.background =
             "linear-gradient(135deg, #C9B79A 0%, #6B5B3E 100%)";
+          el.alt = "";
           el.removeAttribute("src");
         }}
       />
@@ -1412,6 +1428,7 @@ function SwapPanel({
                   const el = e.currentTarget;
                   el.style.background =
                     "linear-gradient(135deg, #C9B79A 0%, #6B5B3E 100%)";
+                  el.alt = "";
                   el.removeAttribute("src");
                 }}
               />
