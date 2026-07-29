@@ -75,6 +75,27 @@ async function main() {
     table.push({ row: r.row, platform, actual: r.actual, delta_pct: platform != null ? pct(platform, r.actual) : null, kind: r.kind });
   }
 
+  // Reconciliation: platform sections not mapped to any actual row (Plaster,
+  // Preliminaries, …) — a REVERSE capture gap. Surfaced as one row so the
+  // platform column sums exactly to the subtotal.
+  const referenced = new Set(DELTA_LOG.flatMap((r) => r.platform_sections));
+  const platformOnly = boq.sections.filter((s) => !referenced.has(s.work_section));
+  const platformOnlyTotal = platformOnly.reduce((s, x) => s + x.section_total_aed, 0);
+  if (platformOnly.length > 0) {
+    table.push({
+      row: `Platform-only (${platformOnly.map((s) => s.work_section).join(", ")})`,
+      platform: platformOnlyTotal,
+      actual: 0,
+      delta_pct: null,
+      kind: "gap",
+    });
+  }
+  // Column must now reconcile to the platform subtotal.
+  const columnSum = table.reduce((s, t) => s + (t.platform ?? 0), 0);
+  if (columnSum !== boq.subtotal_aed) {
+    console.warn(`[reconcile] platform column ${columnSum} != subtotal ${boq.subtotal_aed}`);
+  }
+
   const platformSubtotal = boq.subtotal_aed;
   const overallDelta = pct(platformSubtotal, ACTUAL_TOTAL);
   const captureGaps = DELTA_LOG.filter((r) => r.kind === "gap").map((r) => r.row);

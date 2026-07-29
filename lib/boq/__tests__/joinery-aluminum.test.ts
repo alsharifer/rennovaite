@@ -72,6 +72,20 @@ describe("append post-pass", () => {
     expect(out.grand_total_aed).toBe(out.subtotal_aed + out.contingency_aed + out.vat_aed);
   });
 
+  it("supersedes the engine's generic Joinery & Carpentry (no double-count)", () => {
+    const withEngineJoinery = {
+      ...baseBoq,
+      sections: [
+        ...baseBoq.sections,
+        { work_section: "Joinery & Carpentry", lines: [], section_total_aed: 26_080 },
+      ],
+    };
+    const out = appendJoineryAluminumSections(withEngineJoinery, MUDON_ROOMS);
+    // The engine estimate is dropped; only the actuals-based Joinery remains.
+    expect(out.sections.filter((s) => s.work_section === "Joinery & Carpentry")).toHaveLength(0);
+    expect(out.sections.filter((s) => s.work_section === "Joinery")).toHaveLength(1);
+  });
+
   it("is idempotent (no duplicate sections on re-append)", () => {
     const once = appendJoineryAluminumSections(baseBoq, MUDON_ROOMS);
     const twice = appendJoineryAluminumSections(once, MUDON_ROOMS);

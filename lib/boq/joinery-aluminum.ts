@@ -171,8 +171,14 @@ export function appendJoineryAluminumSections<T extends BoqLike>(boq: T, rooms: 
   const extra = [joinery, aluminum].filter((s): s is GtSection => s !== null);
   if (extra.length === 0) return boq;
 
+  // The actuals-based Joinery section SUPERSEDES the engine's own generic
+  // "Joinery & Carpentry" estimate (same wardrobes/vanities/doors) — keeping
+  // both would double-count joinery. Idempotent for our own two sections too.
   const kept = boq.sections.filter(
-    (s) => s.work_section !== "Joinery" && s.work_section !== "Aluminum & Glass",
+    (s) =>
+      s.work_section !== "Joinery" &&
+      s.work_section !== "Aluminum & Glass" &&
+      !(joinery !== null && s.work_section === "Joinery & Carpentry"),
   );
   const sections = [...kept, ...(extra as unknown as BoqLike["sections"])];
   const subtotal_aed = sections.reduce((s, x) => s + x.section_total_aed, 0);
