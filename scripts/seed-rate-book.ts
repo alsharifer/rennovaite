@@ -17,7 +17,7 @@ import {
   GRADE_SPECS,
   GRADEABLE_ITEMS,
   type GradeableItem,
-} from "../lib/whatif/grades";
+} from "../lib/whatif/grades.ts";
 
 const ROOT = "C:/dev/rennovaite";
 const ENV_PATH = `${ROOT}/.env.local`;
