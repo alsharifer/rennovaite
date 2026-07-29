@@ -89,6 +89,45 @@ export const GRADE_SPECS: Record<GradeableItem, Record<Grade, GradeSpec>> = {
   },
 };
 
+// =============================================================================
+// Sanitary spec classes (ground-truth Step 3) — a SEPARATE reference map, NOT a
+// live what-if toggle. P4 quantify emits no sanitary lines, so these do not
+// drive the what-if panel; the Sanitary BoQ section consumes them. Two of the
+// three "sanitary gaps" in the Rate Calibration sheet were spec-class
+// mismatches, not price gaps — modelled here as distinct spec classes within a
+// grade, per the workbook. EVERY assignment is `// pending partner review`
+// (Newspace to confirm the tier vocabulary).
+// =============================================================================
+
+export interface SanitarySpec {
+  spec: string;
+  rate_aed: number;
+  source: string;
+  /** All ground-truth sanitary assignments await partner (Newspace) review. */
+  pending_partner_review: true;
+}
+
+export type SanitaryClass = "basin_mixer" | "shower_system";
+
+export const SANITARY_SPEC_CLASSES: Record<SanitaryClass, Record<Grade, SanitarySpec | null>> = {
+  basin_mixer: {
+    economy: null,
+    // standard = Eurosmart (actual project spec), NOT Eurocube — the seed had
+    // Eurocube in standard, which was the spec-class error. // pending partner review
+    standard: { spec: "GROHE Eurosmart basin mixer (332652433)", rate_aed: 400, source: "Laspinas quotation 46703 — actual project spec", pending_partner_review: true },
+    // Eurocube (the old seed's "standard") is really the premium tier. // pending partner review
+    premium: { spec: "GROHE Eurocube basin mixer", rate_aed: 675, source: "seed rate reclassified to premium per Rate Calibration", pending_partner_review: true },
+  },
+  shower_system: {
+    economy: null,
+    // Exposed vs concealed are DISTINCT spec classes, not one item at two prices.
+    // standard = exposed Tempesta set (the old seed). // pending partner review
+    standard: { spec: "GROHE Tempesta exposed shower set", rate_aed: 500, source: "seed rate — exposed spec class", pending_partner_review: true },
+    // premium = concealed Tempesta 250 system (the actual project spec). // pending partner review
+    premium: { spec: "GROHE concealed shower Tempesta 250, matt black (1053362430)", rate_aed: 1_750, source: "Laspinas quotation 46703 — actual concealed system", pending_partner_review: true },
+  },
+};
+
 export function isGradeableItem(key: string): key is GradeableItem {
   return (GRADEABLE_ITEMS as readonly string[]).includes(key);
 }

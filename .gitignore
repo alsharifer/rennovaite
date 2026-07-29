@@ -43,3 +43,7 @@ next-env.d.ts
 # local design references — not part of the codebase
 /design-refs/
 /.claude/worktrees
+
+# ground-truth client documents (real contract/quotation data + PII) — the
+# code-shaped source of truth lives in lib/ground-truth/, not the raw workbook.
+/data/
