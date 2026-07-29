@@ -5,6 +5,13 @@ import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
+  hasTakeoffProvenance,
+  type RateBook,
+  type ScenarioBoq,
+  type Selections,
+} from "@/lib/whatif/engine";
+import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
+import {
   ALL_RELEVANT_CATEGORIES,
   categoriesForLine,
 } from "@/lib/vendor-options-helpers";
@@ -204,6 +211,21 @@ export default async function BoqPage({
     /* takeoff_items table absent → no By-room view */
   }
 
+  // P5 what-if — enabled only when the BoQ has P4 takeoff provenance (legacy
+  // LLM-path BoQs are refused). Rate book falls back to grade defaults if the
+  // seed hasn't run; latest scenario restores selections across reload.
+  const whatifEnabled =
+    process.env.WHATIF_ENABLED === "true" &&
+    boqPayload != null &&
+    hasTakeoffProvenance(boqPayload as unknown as ScenarioBoq);
+  let rateBook: RateBook | null = null;
+  let initialSelections: Selections = {};
+  if (whatifEnabled) {
+    rateBook = await loadRateBook(sb);
+    const scenario = await loadLatestScenario(sb, id);
+    initialSelections = scenario?.selections ?? {};
+  }
+
   return (
     <AppShell pageName={PAGE_NAME}>
       <div className="mx-auto max-w-[1440px]">
@@ -248,6 +270,9 @@ export default async function BoqPage({
             initialView={sp.view === "byroom" ? "byroom" : "sections"}
             highlightRef={sp.highlight ?? null}
             highlightRoom={sp.room ?? null}
+            whatifEnabled={whatifEnabled}
+            rateBook={rateBook}
+            initialSelections={initialSelections}
           />
         ) : (
           <EmptyState projectId={id} />

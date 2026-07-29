@@ -2,9 +2,19 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import {
+  recalc,
+  suggestForBudget,
+  type RateBook,
+  type ScenarioBoq,
+  type Selections,
+} from "@/lib/whatif/engine";
+import { itemKeyFromRuleId, type Grade, type GradeableItem } from "@/lib/whatif/grades";
+
+import { WhatIfSidebar, type WhatIfRow } from "./whatif-sidebar";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +31,8 @@ export type BoqLine = {
   // P2 additive: overlay-derived lines carry element refs + a rate status.
   element_refs?: string[] | null;
   rate_status?: "priced" | "needs_qs";
+  // P4/P5: engine rule id (P4/quantify/<key> marks a gradeable line).
+  rule_id?: string;
 };
 
 export type BoqSection = {
@@ -66,6 +78,10 @@ type Props = {
   initialView?: "sections" | "byroom";
   highlightRef?: string | null;
   highlightRoom?: string | null;
+  // P5 what-if: enabled only when the BoQ has takeoff provenance.
+  whatifEnabled?: boolean;
+  rateBook?: RateBook | null;
+  initialSelections?: Selections;
 };
 
 // ---------------------------------------------------------------------------
@@ -198,6 +214,9 @@ export function BoqView({
   initialView = "sections",
   highlightRef = null,
   highlightRoom = null,
+  whatifEnabled = false,
+  rateBook = null,
+  initialSelections = {},
 }: Props) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [activeToggles, setActiveToggles] = useState<Set<string>>(
@@ -205,6 +224,64 @@ export function BoqView({
   );
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [view, setView] = useState<"sections" | "byroom">(initialView);
+
+  // --- P5 what-if scenario (over the locked baseline) ---
+  const whatifOn = whatifEnabled && rateBook != null;
+  const [selections, setSelections] = useState<Selections>(initialSelections);
+  const scenarioBoq: ScenarioBoq = useMemo(
+    () => ({ grand_total_aed: boq.grand_total_aed, sections: boq.sections }),
+    [boq],
+  );
+  const scenario = useMemo(
+    () => (whatifOn && rateBook ? recalc(scenarioBoq, rateBook, selections) : null),
+    [whatifOn, rateBook, scenarioBoq, selections],
+  );
+  const changedItems = useMemo(
+    () => new Set(scenario?.changedItemKeys ?? []),
+    [scenario],
+  );
+  const whatIfRows: WhatIfRow[] = useMemo(() => {
+    if (!scenario || !rateBook) return [];
+    return scenario.perChange
+      .map((c) => ({
+        item_key: c.item_key,
+        label: c.label,
+        qty: c.quantity,
+        selected: c.grade,
+        options: (["economy", "standard", "premium"] as Grade[]).map((g) => ({
+          grade: g,
+          rate: rateBook[c.item_key][g].rate_aed,
+          delta: Math.round((rateBook[c.item_key][g].rate_aed - c.baseline_rate) * c.quantity),
+          qs_validated: rateBook[c.item_key][g].qs_validated,
+          spec: rateBook[c.item_key][g].spec,
+        })),
+      }))
+      .sort((a, b) => b.qty * b.options[1]!.rate - a.qty * a.options[1]!.rate);
+  }, [scenario, rateBook]);
+
+  // Persist the scenario (debounced) so it survives reload + is QS-shareable.
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!whatifOn || !scenario) return;
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      void fetch("/api/whatif-scenario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: projectId, selections, total: scenario.total }),
+      }).catch(() => {});
+    }, 600);
+    return () => {
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+    };
+  }, [whatifOn, scenario, selections, projectId]);
+
+  const selectGrade = (item: GradeableItem, grade: Grade) =>
+    setSelections((cur) => ({ ...cur, [item]: grade }));
+  const resetScenario = () => setSelections({});
+  const applyBudget = (target: number) => {
+    if (rateBook) setSelections(suggestForBudget(scenarioBoq, rateBook, target));
+  };
 
   // Deep link ?highlight=REF → scroll the row into view + flash a brass ring.
   useEffect(() => {
@@ -228,7 +305,8 @@ export function BoqView({
   }, [activeToggles]);
 
   const adjustedTotal = Math.round(baseTotal * (1 + adjustments.pct / 100));
-  const headroom = budgetAed - adjustedTotal;
+  const displayTotal = whatifOn && scenario ? scenario.total : adjustedTotal;
+  const headroom = budgetAed - displayTotal;
 
   // Top 5 sections by total for the stacked bar, with everything else
   // rolled into an "Other" bucket so the bar reads cleanly.
@@ -262,13 +340,13 @@ export function BoqView({
         {/* Left: total + headroom */}
         <div className="col-span-12 flex flex-col gap-xs lg:col-span-3">
           <motion.h2
-            key={adjustedTotal}
+            key={displayTotal}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.24, ease: "easeOut" }}
             className="font-display text-headline-lg tabular-nums text-ink-900"
           >
-            {formatAed(adjustedTotal)}
+            {formatAed(displayTotal)}
           </motion.h2>
           <p className="font-body-sm text-body-sm text-on-surface-variant">
             against your {formatAed(budgetAed)} budget —{" "}
@@ -432,6 +510,7 @@ export function BoqView({
                   }
                   lineOptions={lineOptions}
                   highlightRef={highlightRef}
+                  changedItems={changedItems}
                 />
               ))}
               <tr className="border-t-2 border-ink-900">
@@ -442,7 +521,7 @@ export function BoqView({
                 </td>
                 <td className="px-md py-md text-right">
                   <motion.span
-                    key={adjustedTotal}
+                    key={displayTotal}
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.24, ease: "easeOut" }}
@@ -451,7 +530,7 @@ export function BoqView({
                       fontFamily: "var(--font-jetbrains-mono), monospace",
                     }}
                   >
-                    {formatAed(adjustedTotal)}
+                    {formatAed(displayTotal)}
                   </motion.span>
                 </td>
                 <td colSpan={2} />
@@ -460,8 +539,20 @@ export function BoqView({
           </table>
         </section>
 
-        {/* Sidebar */}
-        {sidebarOpen && (
+        {/* Sidebar — WHAT IF (P5) when enabled, else cost sensitivity */}
+        {sidebarOpen &&
+          (whatifOn && scenario ? (
+            <WhatIfSidebar
+              rows={whatIfRows}
+              baselineTotal={baseTotal}
+              scenarioTotal={scenario.total}
+              changed={changedItems.size > 0}
+              onSelect={selectGrade}
+              onReset={resetScenario}
+              onBudget={applyBudget}
+              onClose={() => setSidebarOpen(false)}
+            />
+          ) : (
           <aside className="flex flex-col gap-md rounded-xl border border-ink-100 bg-paper p-lg">
             <div className="flex items-center justify-between">
               <p className="label-caps text-ink-500">Cost sensitivity</p>
@@ -567,7 +658,7 @@ export function BoqView({
               )}
             </div>
           </aside>
-        )}
+          ))}
       </div>
 
       {/* Sidebar toggle tab when closed */}
@@ -688,12 +779,14 @@ function SectionGroup({
   onToggle,
   lineOptions,
   highlightRef,
+  changedItems,
 }: {
   section: BoqSection;
   expandedKey: string | null;
   onToggle: (k: string) => void;
   lineOptions: Record<string, VendorOption[]>;
   highlightRef: string | null;
+  changedItems: Set<GradeableItem>;
 }) {
   return (
     <>
@@ -714,6 +807,7 @@ function SectionGroup({
         const key = `${section.work_section}-${idx}`;
         const ref = sectionRef(section.work_section, idx);
         const expanded = expandedKey === key;
+        const gi = itemKeyFromRuleId(line.rule_id);
         return (
           <LineRow
             key={key}
@@ -725,6 +819,7 @@ function SectionGroup({
             onToggle={() => onToggle(key)}
             options={lineOptions[key] ?? []}
             highlighted={ref === highlightRef}
+            scenarioChanged={gi ? changedItems.has(gi) : false}
           />
         );
       })}
@@ -741,6 +836,7 @@ function LineRow({
   onToggle,
   options,
   highlighted,
+  scenarioChanged,
 }: {
   lineKey: string;
   ref_: string;
@@ -750,6 +846,7 @@ function LineRow({
   onToggle: () => void;
   options: VendorOption[];
   highlighted: boolean;
+  scenarioChanged: boolean;
 }) {
   const sensitivity = sensitivityFor(lineKey.split("-")[0] ?? "", line) ?? null;
   return (
@@ -768,6 +865,13 @@ function LineRow({
         </td>
         <td className="px-md py-sm">
           <p className="flex items-center gap-xs font-body-sm text-body-sm text-ink-900">
+            {scenarioChanged && (
+              <span
+                title="Changed in your what-if scenario"
+                aria-label="Changed in scenario"
+                className="inline-block size-1.5 shrink-0 rounded-full bg-brass-600"
+              />
+            )}
             {line.rate_status === "needs_qs" && (
               <span
                 title="Rate to be confirmed by the QS"
