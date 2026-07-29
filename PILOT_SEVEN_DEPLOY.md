@@ -29,6 +29,10 @@ this is for any **other** environment (staging/prod project).
 ## 2. Storage
 - [ ] Private Storage bucket named **`drawings`** exists (P1 signed-URL PDF export).
       Without it, live drawings still render; only persisted PDF links fail.
+- [ ] **Public** Storage bucket named **`renders`** exists (durable render images).
+      Replicate delivery URLs expire within ~a day; `lib/render-storage.ts`
+      re-hosts every render/upscale output here at generation time. Without it,
+      re-hosting no-ops and renders fall back to today's ephemeral-URL behaviour.
 
 ## 3. Seed data
 - [ ] Base catalogs present: `labour_rates`, `pricing_skus` (pre-pilot seeds)

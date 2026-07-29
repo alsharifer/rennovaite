@@ -11,6 +11,7 @@ import {
   type ModelRef,
 } from "@/lib/render-image";
 import { qaPassed, runQaGate, type QaVerdict } from "@/lib/render-qa";
+import { rehostImage } from "@/lib/render-storage";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -173,6 +174,14 @@ export async function GET(request: NextRequest) {
     }
 
     const qaJson = verdict ? { ...verdict, passed: !qaFailed } : null;
+
+    // Re-host the (ephemeral Replicate) output to durable Storage before storing
+    // its URL — replicate.delivery links expire within ~a day. Best-effort: on
+    // any failure this returns the original url, so the render still finalises.
+    finalImage = await rehostImage(
+      finalImage,
+      `projects/${row.project_id ?? "unknown"}/renders/${row.id}`,
+    );
 
     const { error: updErr } = await supabase
       .from("renders")

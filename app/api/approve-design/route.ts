@@ -5,6 +5,7 @@ import { recordFeedback } from "@/lib/analytics";
 import { persistDrawingSet } from "@/lib/drawings/persist";
 import { writeProposedSnapshot } from "@/lib/plan/snapshots";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { rehostImage } from "@/lib/render-storage";
 import { upscaleRender } from "@/lib/render-upscale";
 
 export const runtime = "nodejs";
@@ -62,6 +63,11 @@ export async function POST(request: NextRequest) {
     if (replicateKey && render?.image_url) {
       upscaledUrl = await upscaleRender(replicateKey, render.image_url);
       if (upscaledUrl) {
+        // Durable re-host — the upscaler also returns an ephemeral Replicate URL.
+        upscaledUrl = await rehostImage(
+          upscaledUrl,
+          `projects/${project_id}/renders/${render_id}-hd`,
+        );
         const { error: updErr } = await supabase
           .from("approved_designs")
           .update({ upscaled_url: upscaledUrl })
