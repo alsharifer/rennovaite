@@ -11,6 +11,8 @@ import {
   type Selections,
 } from "@/lib/whatif/engine";
 import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
+import { runPermitCheck, type PermitCheckResult } from "@/lib/compliance/check";
+import { PermitsCard } from "@/components/compliance/PermitsCard";
 import {
   ALL_RELEVANT_CATEGORIES,
   categoriesForLine,
@@ -226,6 +228,16 @@ export default async function BoqPage({
     initialSelections = scenario?.selections ?? {};
   }
 
+  // P6 permit check — deterministic triggers over the plan diff.
+  let permitCheck: PermitCheckResult | null = null;
+  if (process.env.PERMIT_CHECK_ENABLED === "true") {
+    try {
+      permitCheck = await runPermitCheck(id);
+    } catch {
+      /* best-effort */
+    }
+  }
+
   return (
     <AppShell pageName={PAGE_NAME}>
       <div className="mx-auto max-w-[1440px]">
@@ -259,6 +271,14 @@ export default async function BoqPage({
             </p>
           )}
         </header>
+
+        {permitCheck && (
+          <PermitsCard
+            fired={permitCheck.fired}
+            community={permitCheck.community}
+            className="mb-xl"
+          />
+        )}
 
         {boqPayload ? (
           <BoqView

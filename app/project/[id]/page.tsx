@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app/AppShell";
+import { PermitsCard } from "@/components/compliance/PermitsCard";
+import { runPermitCheck, type PermitCheckResult } from "@/lib/compliance/check";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { cn } from "@/lib/utils";
 
@@ -161,6 +163,16 @@ export default async function ProjectHubPage({
     hasRooms = (roomTouch?.length ?? 0) > 0;
   }
   const planComplete = planParsed && hasRooms;
+
+  // P6 permit check — deterministic triggers over the plan diff.
+  let permitCheck: PermitCheckResult | null = null;
+  if (process.env.PERMIT_CHECK_ENABLED === "true" && planComplete) {
+    try {
+      permitCheck = await runPermitCheck(projectId);
+    } catch {
+      /* best-effort */
+    }
+  }
 
   const styleRow = styleRes.data;
 
@@ -336,6 +348,15 @@ export default async function ProjectHubPage({
               </div>
             </section>
           )}
+
+        {/* PERMITS & APPROVALS (P6, flag-gated) ----------------------- */}
+        {permitCheck && (
+          <PermitsCard
+            fired={permitCheck.fired}
+            community={permitCheck.community}
+            className="mt-xl"
+          />
+        )}
 
         {/* ROW 1 — Renders + Budget ----------------------------------- */}
         <div className="mt-xl grid grid-cols-1 gap-gutter lg:grid-cols-12">
