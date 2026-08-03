@@ -62,6 +62,22 @@ export function applyElementMapping<T extends BoqLike>(boq: T, items: TakeoffIte
   if (items.length === 0) return boq;
 
   const mapped = assembleMappedSections(items);
+
+  // P8b: the staircase tile (engine rule Q-11b) lives in Floor Finishes, a
+  // MAPPED section — so P4 mapping would drop it. Preserve it by re-appending it
+  // to the rebuilt Floor Finishes. Its footprint is already excluded from the P4
+  // floor_finish (quantify.ts), so there is no double-count.
+  const stairTileLines = boq.sections
+    .flatMap((s) => s.lines as { rule_id?: string; total_aed?: number }[])
+    .filter((l) => typeof l.rule_id === "string" && l.rule_id.startsWith("Q-11b"));
+  if (stairTileLines.length > 0) {
+    const ff = mapped.find((m) => m.work_section === "Floor Finishes");
+    if (ff) {
+      ff.lines.push(...(stairTileLines as unknown as (typeof ff.lines)));
+      ff.section_total_aed += stairTileLines.reduce((s, l) => s + (l.total_aed ?? 0), 0);
+    }
+  }
+
   const kept = boq.sections.filter((s) => !MAPPED_SECTIONS.includes(s.work_section));
   const sections = [...kept, ...(mapped as unknown as BoqSectionLike[])].sort(
     (a, b) => orderIndex(a.work_section) - orderIndex(b.work_section),

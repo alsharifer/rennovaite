@@ -114,7 +114,11 @@ export function computeTakeoff(
   const geos = rooms.map(roomGeometry);
   const external = geos.filter((g) => g.isExternal);
   const interior = geos.filter((g) => !g.isExternal);
-  const dry = interior.filter((g) => !g.isBathroom); // bedrooms, living, corridor, storage, office
+  // Stairs are NOT flat floor — handled as a developed tile surface below, so
+  // exclude them from the dry-floor pool (they were previously priced as flat
+  // floor, and their developed tread/riser surface was invisible).
+  const stairs = interior.filter((g) => g.room.room_type === "stairs");
+  const dry = interior.filter((g) => !g.isBathroom && g.room.room_type !== "stairs"); // bedrooms, living, corridor, storage, office
   const baths = interior.filter((g) => g.isBathroom);
   const beds = geos.filter((g) => g.isBedroom);
   const secondaryBeds = geos.filter((g) => g.room.room_type === "bedroom");
@@ -132,6 +136,9 @@ export function computeTakeoff(
   );
   const dryFloorM2 = round2(dry.reduce((s, g) => s + g.room.area_m2, 0));
   const bathFloorM2 = round2(baths.reduce((s, g) => s + g.room.area_m2, 0));
+  // P8b: staircase developed tile surface = footprint × C-08 (treads + risers).
+  const stairsFootprintM2 = round2(stairs.reduce((s, g) => s + g.room.area_m2, 0));
+  const stairDevelopedM2 = round2(stairsFootprintM2 * CONSTANTS.STAIR_DEVELOPED_FACTOR);
   const netWallM2 = round2(interior.reduce((s, g) => s + g.netWallM2, 0));
 
   // F-03: bathroom wet-wall tiling area (FULL HEIGHT per C-04, v0.2)
@@ -206,7 +213,12 @@ export function computeTakeoff(
   // Porcelain: everywhere incl. terrace. Wood: dry interior only; porcelain in
   // wet areas + terrace.
   const porcelainExtraM2 = round2(bathFloorM2 + externalAreaM2);
-  const mainFloorM2 = flooring === "porcelain" ? totalAreaM2 : dryFloorM2;
+  // Stairs excluded from the main floor (porcelain path counts totalAreaM2,
+  // which includes the stair footprint; wood path uses dryFloorM2, already
+  // stair-free). The staircase is priced as its own developed tile surface.
+  const mainFloorM2 = round2(
+    (flooring === "porcelain" ? totalAreaM2 - stairsFootprintM2 : dryFloorM2),
+  );
 
   const items: ScopeItem[] = [
     {
@@ -336,6 +348,22 @@ export function computeTakeoff(
       unit: "project",
       measurement: "allowance (R-36); treads TBC from stair drawing",
     },
+    // P8b: staircase tile SUPPLY — developed tread/riser surface, 144×305 slab
+    // format. Was invisible (stair footprint priced as flat floor). Only when a
+    // stairs room exists.
+    ...(stairsFootprintM2 > 0
+      ? [
+          {
+            rule_id: "Q-11b",
+            work_section: "Floor Finishes" as const,
+            item_key: "floor.stair_tile",
+            description: "Staircase tile — developed tread/riser surface (144×305 slab)",
+            quantity: stairDevelopedM2,
+            unit: "m2",
+            measurement: `F-16: stair footprint ${stairsFootprintM2} m² × ${CONSTANTS.STAIR_DEVELOPED_FACTOR} (C-08) = ${stairDevelopedM2} m²`,
+          },
+        ]
+      : []),
     {
       rule_id: "Q-12",
       work_section: "Wall Finishes",
@@ -453,6 +481,44 @@ export function computeTakeoff(
       quantity: baths.length,
       unit: "no",
       measurement: `1 per bathroom × ${baths.length}`,
+    },
+    // P8b: sanitary accessory set — one per wet room, priced from the Laspinas
+    // lines. (Was missing entirely; only WC/basin/shower were modelled.)
+    {
+      rule_id: "Q-24a",
+      work_section: "Sanitaryware",
+      item_key: "san.shattaf",
+      description: "Shattaf (health faucet), matt black — supply",
+      quantity: baths.length,
+      unit: "no",
+      measurement: `1 per wet room × ${baths.length} (Laspinas)`,
+    },
+    {
+      rule_id: "Q-24b",
+      work_section: "Sanitaryware",
+      item_key: "san.paper_holder",
+      description: "Paper holder, matt black — supply",
+      quantity: baths.length,
+      unit: "no",
+      measurement: `1 per wet room × ${baths.length} (Laspinas)`,
+    },
+    {
+      rule_id: "Q-24c",
+      work_section: "Sanitaryware",
+      item_key: "san.towel_rail",
+      description: "Towel rail, matt black — supply",
+      quantity: baths.length,
+      unit: "no",
+      measurement: `1 per wet room × ${baths.length} (Laspinas)`,
+    },
+    {
+      rule_id: "Q-24d",
+      work_section: "Sanitaryware",
+      item_key: "san.actuator",
+      description: "WC actuator plate, vertical square — supply",
+      quantity: baths.length,
+      unit: "no",
+      measurement: `1 per wet room × ${baths.length} (Laspinas)`,
     },
     {
       rule_id: "Q-25",

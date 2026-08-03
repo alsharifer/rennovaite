@@ -23,7 +23,10 @@ describe("quantify + assemble — Mudon", () => {
   };
 
   it("emits floor + ceiling per room and plaster + paint per wall", () => {
-    expect(items.filter((i) => i.work_item_key === "floor_finish")).toHaveLength(13);
+    // floor_finish for every room EXCEPT stairs (priced as a developed stair
+    // tile surface in the engine, not flat floor); ceiling still per room.
+    const stairRooms = graph.rooms.filter((r) => r.type === "stairs").length;
+    expect(items.filter((i) => i.work_item_key === "floor_finish")).toHaveLength(13 - stairRooms);
     expect(items.filter((i) => i.work_item_key === "ceiling_finish")).toHaveLength(13);
     expect(items.filter((i) => i.work_item_key === "wall_plaster")).toHaveLength(graph.walls.length);
     expect(items.filter((i) => i.work_item_key === "wall_paint")).toHaveLength(graph.walls.length);
@@ -60,8 +63,11 @@ describe("quantify + assemble — Mudon", () => {
     expect(floorItem.qty).toBe(24); // Mudon Family Area area
     const floorLine = lineFor("floor_finish");
     expect(floorLine.element_refs).toContain(living.id);
-    // total floor area = sum of room areas
-    expect(floorLine.quantity).toBeCloseTo(graph.rooms.reduce((s, r) => s + r.area_m2, 0), 2);
+    // total floor area = sum of room areas EXCLUDING stairs (developed surface)
+    const expected = graph.rooms
+      .filter((r) => r.type !== "stairs")
+      .reduce((s, r) => s + r.area_m2, 0);
+    expect(floorLine.quantity).toBeCloseTo(expected, 2);
   });
 
   it("tiles only wet rooms (bath/ensuite/powder), not dry", () => {

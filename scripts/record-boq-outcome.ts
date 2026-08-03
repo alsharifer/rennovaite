@@ -26,13 +26,15 @@ const L = (name: string) => LABOUR_SECTIONS.find((s) => s.section.startsWith(nam
 // `prelim_match` pulls specific Preliminaries LINES (by description keyword)
 // into this row — so the platform's prelim overhead is compared against the
 // contractor's site-establishment sections instead of dumped in a catch-all.
-type Row = { row: string; actual: number; platform_sections: string[]; prelim_match?: string[]; kind: "computed" | "allowance" | "gap"; note?: string };
+// `stair_tile` moves the P8b staircase slab line (in Floor Finishes) to the
+// Tiles row: "subtract" removes it from Flooring works, "add" credits it to Tiles.
+type Row = { row: string; actual: number; platform_sections: string[]; prelim_match?: string[]; stair_tile?: "add" | "subtract"; kind: "computed" | "allowance" | "gap"; note?: string };
 const DELTA_LOG: Row[] = [
   { row: "Mobilisation & site setup", actual: L("Mobilisation"), platform_sections: [], prelim_match: ["site setup", "protective floor covering", "scaffold"], kind: "computed", note: "platform prelims: site setup + protective floor covering + rolling scaffold" },
   { row: "Waste management & clearance", actual: L("Waste"), platform_sections: [], prelim_match: ["skip hire", "final clearance"], kind: "computed", note: "platform prelims: skip hire + final clearance clean" },
   { row: "Demolition & strip-out", actual: L("Demolition"), platform_sections: ["Demolition"], kind: "computed" },
   { row: "Civil works", actual: L("Civil"), platform_sections: ["Blockwork"], kind: "computed" },
-  { row: "Flooring works (labour)", actual: L("Flooring"), platform_sections: ["Floor Finishes"], kind: "computed", note: "platform bundles supply+install; tile SUPPLY is a separate gap row below" },
+  { row: "Flooring works (labour)", actual: L("Flooring"), platform_sections: ["Floor Finishes"], stair_tile: "subtract", kind: "computed", note: "Floor Finishes less the staircase slab (credited to Tiles below)" },
   { row: "Ceilings & lighting (labour)", actual: L("Ceilings"), platform_sections: ["Ceilings", "Lighting"], kind: "computed" },
   { row: "Painting works", actual: L("Painting"), platform_sections: ["Decoration & Painting"], kind: "computed" },
   { row: "Sanitary & plumbing (labour)", actual: L("Sanitary & Plumbing"), platform_sections: ["Plumbing", "Plumbing & Sanitary"], kind: "computed" },
@@ -42,10 +44,10 @@ const DELTA_LOG: Row[] = [
   { row: "Office build-out", actual: L("Office"), platform_sections: [], kind: "gap", note: "AED 0 — in the aluminum quote" },
   { row: "Terrace balcony", actual: L("Terrace"), platform_sections: [], kind: "gap" },
   { row: "Master bathroom built-in & partition", actual: L("Master Bathroom"), platform_sections: [], kind: "gap", note: "custom built-in — not modelled" },
-  { row: "Tiles & slabs supply (net of 40%)", actual: TRADE_TOTALS.tiles.excl_vat, platform_sections: ["Wall Finishes"], kind: "gap", note: "platform has no separate tile SUPPLY line; Wall Finishes shown as nearest proxy — capture gap" },
+  { row: "Tiles & slabs supply (net of 40%)", actual: TRADE_TOTALS.tiles.excl_vat, platform_sections: ["Wall Finishes"], stair_tile: "add", kind: "computed", note: "Wall Finishes (wet tiling) + the P8b staircase slab; floor/wall tile supply is still bundled into finishes — partial" },
   { row: "Joinery supply+install (net of 4%)", actual: TRADE_TOTALS.joinery.excl_vat, platform_sections: ["Joinery"], kind: "computed", note: "NEW ground-truth section (heuristic qty × Atrium rates)" },
   { row: "Aluminum & glass supply+install", actual: TRADE_TOTALS.aluminum.excl_vat, platform_sections: ["Aluminum & Glass"], kind: "allowance", note: "site_assessment allowances seeded from the Global Creation quote" },
-  { row: "Sanitary supply (net of disc.)", actual: TRADE_TOTALS.sanitary.excl_vat, platform_sections: ["Sanitaryware"], kind: "gap", note: "platform Sanitaryware is a partial supply estimate — capture gap" },
+  { row: "Sanitary supply (net of disc.)", actual: TRADE_TOTALS.sanitary.excl_vat, platform_sections: ["Sanitaryware"], kind: "computed", note: "Sanitaryware now incl. P8b accessory set (shattaf, paper holder, towel rail, actuator); WC/basin/shower are install-rate — still partial vs supply actual" },
 ];
 const ACTUAL_TOTAL = 453_228.5036; // Delta Log TOTAL (gross labour)
 
@@ -87,13 +89,20 @@ async function main() {
   const prelimSum = (keys: string[]) =>
     prelimLines.filter((l) => keys.some((k) => l.description.toLowerCase().includes(k))).reduce((s, l) => s + l.total_aed, 0);
 
+  // P8b staircase slab line (engine rule Q-11b) sits inside Floor Finishes.
+  const ffSection = (boq.sections as { work_section: string; lines?: { rule_id?: string; total_aed: number }[] }[]).find((s) => s.work_section === "Floor Finishes");
+  const stairTileTotal = (ffSection?.lines ?? [])
+    .filter((l) => typeof l.rule_id === "string" && l.rule_id.startsWith("Q-11b"))
+    .reduce((s, l) => s + l.total_aed, 0);
+
   const table: { row: string; platform: number | null; actual: number; delta_pct: number | null; kind: string }[] = [];
   for (const r of DELTA_LOG) {
     actual_by_section[r.row] = r.actual;
     const fromSections = r.platform_sections.reduce((s, n) => s + (secTotal.get(n) ?? 0), 0);
     const fromPrelims = r.prelim_match ? prelimSum(r.prelim_match) : 0;
+    const stairAdj = r.stair_tile === "add" ? stairTileTotal : r.stair_tile === "subtract" ? -stairTileTotal : 0;
     const has = r.platform_sections.length > 0 || (r.prelim_match?.length ?? 0) > 0;
-    const platform = has ? fromSections + fromPrelims : null;
+    const platform = has ? fromSections + fromPrelims + stairAdj : null;
     table.push({ row: r.row, platform, actual: r.actual, delta_pct: platform != null ? pct(platform, r.actual) : null, kind: r.kind });
   }
 

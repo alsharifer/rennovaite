@@ -34,6 +34,12 @@ export const CONSTANTS = {
   DEBRIS_M3_PER_M2: 0.2,
   /** C-07: usable skip capacity, m³ (6-yard skip). */
   SKIP_CAPACITY_M3: 4.5,
+  /** C-08: staircase developed tile surface (treads + risers + landings) as a
+   *  multiple of stair footprint. Villa 94: 13.3 m² footprint → 35.12 m² slab
+   *  actual ≈ 2.64×; 2.6 is the calibrated default (QS to confirm from stair
+   *  drawing). Makes the staircase tile surface visible (was folded into flat
+   *  floor before). */
+  STAIR_DEVELOPED_FACTOR: 2.6,
 } as const;
 
 // --- W: wastage factors (rule IDs W-xx), applied to MATERIAL lines only ------
@@ -280,6 +286,34 @@ export const RATE_RULES: Record<string, RateRule> = {
       work_section: "Sanitaryware",
       description: "Shower system — mixer, handset, rain head",
     },
+  },
+  // P8b: sanitary accessory set — priced directly from the Laspinas quotation
+  // lines (supply). Allowance rates (QS to confirm on promotion).
+  "san.shattaf": {
+    rule_id: "R-40",
+    allowance_aed: 250,
+    allowance_note: "GROHE shattaf, matt black — Laspinas 46703 line 1025302431 (supply)",
+  },
+  "san.paper_holder": {
+    rule_id: "R-41",
+    allowance_aed: 210,
+    allowance_note: "GROHE Essentials paper holder, matt black — Laspinas 46703 line 1024652430",
+  },
+  "san.towel_rail": {
+    rule_id: "R-42",
+    allowance_aed: 260,
+    allowance_note: "GROHE Essentials towel rail, matt black — Laspinas 46703 line 1022512430",
+  },
+  "san.actuator": {
+    rule_id: "R-43",
+    allowance_aed: 450,
+    allowance_note: "GROHE actuator plate, vertical square — Laspinas 46703 line 38732KF0",
+  },
+  // P8b: staircase tile — 144×305 slab format, developed tread/riser surface.
+  "floor.stair_tile": {
+    rule_id: "R-44",
+    allowance_aed: 446.45,
+    allowance_note: "RAK Surface XL 144×305 slab, list rate — staircase; developed area × C-08 factor; QS to confirm from stair drawing",
   },
   "hvac.fcu_service": {
     rule_id: "R-22",

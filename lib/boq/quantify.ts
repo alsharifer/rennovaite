@@ -82,7 +82,12 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
   for (const room of graph.rooms) {
     const wet = isWet(room.type);
     const h = ceilingByRoom.get(room.id) ?? globalCeiling;
-    items.push({ work_item_key: "floor_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
+    // Stairs are priced as a developed tile surface in the engine take-off (not
+    // flat floor), so exclude them from per-room floor_finish here to avoid
+    // double-counting the stair footprint. Ceiling is still emitted.
+    if (room.type !== "stairs") {
+      items.push({ work_item_key: "floor_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
+    }
     items.push({ work_item_key: "ceiling_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
     if (wet) {
       // Full-height wet-wall tiling: room perimeter × ceiling height.
