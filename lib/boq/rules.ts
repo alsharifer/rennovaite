@@ -447,7 +447,10 @@ export const VAT_PCT = 5;
 // --- Room classification -------------------------------------------------------
 
 export const BEDROOM_TYPES = new Set(["master_bedroom", "bedroom"]);
-export const BATHROOM_TYPES = new Set(["bathroom", "ensuite"]);
+// Powder rooms are full wet rooms here: Villa 94 fitted all three (bath, ensuite,
+// powder) with WC + basin + shower + accessories. Aligns the engine with the P4
+// quantify wet-room set (which already tiled powder).
+export const BATHROOM_TYPES = new Set(["bathroom", "ensuite", "powder"]);
 /** External rooms — tiled + skirted but no paint/ceiling/electrical counts. */
 export const EXTERNAL_TYPES = new Set(["terrace", "balcony"]);
 /** Rooms keeping an existing FCU that gets a deep service (F-15: secondary
