@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -85,6 +86,25 @@ export async function POST(request: NextRequest) {
 
     if (planErr || !plan) {
       throw planErr ?? new Error("Failed to create plan row.");
+    }
+
+    // Best-effort: record the floorplan in the project asset library (024) so
+    // it appears in the hub "Project files" panel. The plan/parse flow does not
+    // depend on this, so a missing table (pre-migration) is swallowed.
+    try {
+      await (supabaseAdmin as unknown as SupabaseClient)
+        .from("project_assets")
+        .insert({
+          project_id: project.id,
+          kind: "floorplan",
+          storage_path: path,
+          filename: file.name,
+          mime: file.type || null,
+          bytes: file.size,
+          source: "intake",
+        });
+    } catch {
+      /* project_assets not applied yet — non-fatal */
     }
 
     return NextResponse.json({

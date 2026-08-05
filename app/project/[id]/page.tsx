@@ -2,7 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app/AppShell";
+import { ProjectFilesPanel } from "@/components/assets/ProjectFilesPanel";
 import { PermitsCard } from "@/components/compliance/PermitsCard";
+import { loadProjectAssets, toAssetLite } from "@/lib/assets/load";
 import { runPermitCheck, type PermitCheckResult } from "@/lib/compliance/check";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { cn } from "@/lib/utils";
@@ -262,6 +264,9 @@ export default async function ProjectHubPage({
 
   const shortId = projectId.slice(0, 8);
 
+  // Project asset library (empty until migration 024 is applied).
+  const projectAssets = (await loadProjectAssets(projectId)).map(toAssetLite);
+
   return (
     <AppShell pageName="Project Hub">
       <div className="mx-auto max-w-[1440px] pb-2xl">
@@ -380,6 +385,9 @@ export default async function ProjectHubPage({
           <NextStepsCard steps={nextSteps} />
           <TimelineCard />
         </div>
+
+        {/* PROJECT FILES (asset library) ------------------------------ */}
+        <ProjectFilesPanel assets={projectAssets} />
 
         {/* STAT TILES ------------------------------------------------- */}
         <div className="mt-xl grid grid-cols-1 gap-gutter md:grid-cols-3">

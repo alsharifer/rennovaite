@@ -210,6 +210,47 @@ Server limits (backstops — the client keeps uploads far under them):
 sets `experimental.proxyClientMaxBodySize: "25mb"` (above the route cap) so a
 future proxy/middleware can't silently truncate an upload below it.
 
+## Project asset library (A3/A4/C2)
+
+One catalogue for every document a project accumulates, so a photo uploaded at
+intake is **reusable at the render step** instead of being re-uploaded per room
+(intake photos used to be preview-only and discarded).
+
+- **Table** `project_assets` (migration `024`): `kind` (`floorplan |
+  drawing_mep | drawing_electrical | drawing_hvac | photo | reference_image |
+  other`), nullable `room_id`, `storage_path`, `filename`, `mime`, `bytes`,
+  `source` (`intake | render | moodboard`). RLS disabled like every table.
+- **Storage**: reuses the existing public `plan-uploads` bucket at
+  `<projectId>/assets/<uuid>.<ext>` (the floorplan keeps its
+  `<projectId>/<uuid>.<ext>` path); public URLs are derived at read time, so no
+  url column. Vocabulary + validation are pure in `lib/assets/types.ts`
+  (unit-tested); server reads/paths in `lib/assets/load.ts` (degrade to `[]`
+  when the table is absent).
+- **Route** `POST /api/project-asset` (multipart `file` + `project_id` + `kind`
+  + `source?` + `room_id?`) validates per-kind (images = PNG/JPG; drawings =
+  PDF/DWG/DXF/images), enforces a 25 MB structured 413, stores + inserts, and
+  rolls back storage on failure. `PATCH` assigns an existing photo asset to a
+  room. Images are compressed client-side (the S1 pipeline) before upload.
+- **Intake** (`/project/new`): the floorplan (recorded from `/api/upload`) and
+  site photos both land in the library; an optional **"Existing drawings
+  (MEP · Electrical · HVAC)"** card files uploads under the selected discipline.
+  Assets dropped before the plan exists are **queued** and flushed once the
+  project is created. Drawings are **stored/listed only — not parsed** (later
+  scope; no viewers).
+- **Render** (`RoomPhotoPanel`): the per-room dead-end uploader is replaced by
+  the reusable **`components/assets/AssetPicker`** — a thumbnail grid of the
+  project's photo assets (assign to the current room) plus an "upload new" path
+  into the library. Assigning a photo mirrors a `room_photos` row so the
+  **render pipeline is unchanged** (it still reads the latest `room_photos` per
+  room). The same picker is the pattern for the future moodboard step (B2).
+- **Hub** (`/project/[id]`): a **"Project files"** panel
+  (`components/assets/ProjectFilesPanel`) lists all assets grouped by kind with
+  download links; it renders nothing when the library is empty.
+- **Manual DB step**: apply `scripts/migrations/024_project_assets.sql` in the
+  Supabase SQL editor (no runner). Everything degrades gracefully until then —
+  intake still works, the render picker shows the upload path, and the hub panel
+  is hidden.
+
 ## Drawings — geometry contract + 2D drawing engine (P1)
 
 Auto-generated, **deterministic** (no LLM) A3 drawing set: dimensioned as-built

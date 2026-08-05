@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Dialog,
@@ -10,12 +10,10 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AssetPicker } from "@/components/assets/AssetPicker";
 import { AnalyticsEvent, track } from "@/lib/analytics";
-import {
-  ACCEPT_ATTR,
-  compressImage,
-  ImageProcessingError,
-} from "@/lib/image/compress";
+import type { AssetLite } from "@/lib/assets/types";
+import { compressImage, ImageProcessingError } from "@/lib/image/compress";
 import { cn } from "@/lib/utils";
 import { MATERIALS, SURFACE_SPECS, type Material } from "@/lib/materials";
 import { roomTypeFromDb } from "@/lib/render-prompts";
@@ -60,6 +58,8 @@ type Props = {
   initialLockedRoomIds?: string[];
   /** roomId → most-recent uploaded photo public URL. */
   initialPhotosByRoom?: Record<string, string>;
+  /** Project-wide photo library for the room photo picker. */
+  initialPhotoAssets?: AssetLite[];
   /** P4: roomId → element-mapped BoQ rollup (AED). Chip near the hero. */
   roomBoqTotals?: Record<string, number>;
   /** P7: whether furniture staging is on (server flag) + already-opted rooms. */
@@ -180,6 +180,7 @@ export function RenderInteractive({
   initialChains,
   initialLockedRoomIds = [],
   initialPhotosByRoom = {},
+  initialPhotoAssets = [],
   roomBoqTotals = {},
   stagingEnabled = false,
   initialFurnitureOptIns = [],
@@ -207,6 +208,8 @@ export function RenderInteractive({
   );
   const [photosByRoom, setPhotosByRoom] =
     useState<Record<string, string>>(initialPhotosByRoom);
+  const [photoAssets, setPhotoAssets] =
+    useState<AssetLite[]>(initialPhotoAssets);
   // roomId → upscaled (HD) export URL, populated when a view is locked.
   const [upscaledByRoom, setUpscaledByRoom] = useState<Record<string, string>>(
     {},
@@ -464,12 +467,25 @@ export function RenderInteractive({
         <p className="label-caps mb-md text-ink-500">Room photo</p>
         <RoomPhotoPanel
           key={selectedRoom?.id ?? "none"}
+          projectId={projectId}
           roomId={selectedRoom?.id ?? null}
           roomName={selectedRoom?.name_en?.trim() || "this room"}
-          photoUrl={selectedRoom ? photosByRoom[selectedRoom.id] ?? null : null}
-          onUploaded={(url) => {
+          currentPhotoUrl={
+            selectedRoom ? photosByRoom[selectedRoom.id] ?? null : null
+          }
+          assets={photoAssets}
+          onAssignedUrl={(url) => {
             if (!selectedRoom) return;
             setPhotosByRoom((prev) => ({ ...prev, [selectedRoom.id]: url }));
+          }}
+          onNewAsset={(asset) => {
+            setPhotoAssets((prev) => [asset, ...prev]);
+            if (selectedRoom) {
+              setPhotosByRoom((prev) => ({
+                ...prev,
+                [selectedRoom.id]: asset.url,
+              }));
+            }
           }}
         />
 
@@ -892,185 +908,157 @@ function StylePicker({
   );
 }
 
-// Room photo uploader. Shows the current photo (matte-image framed) with a
-// Replace action, or an "Add room photo" affordance when none exists. Uploads
-// via XHR so we can show progress; posts to /api/room-photo.
+// Room photo picker. Shows the project's photo library (assign any to the
+// current room) plus an "upload new" path that compresses (S1) and writes into
+// the library. No more dead-end per-room uploads. The assigned photo is
+// mirrored to room_photos server-side so the render pipeline uses it unchanged.
 function RoomPhotoPanel({
+  projectId,
   roomId,
   roomName,
-  photoUrl,
-  onUploaded,
+  currentPhotoUrl,
+  assets,
+  onAssignedUrl,
+  onNewAsset,
 }: {
+  projectId: string;
   roomId: string | null;
   roomName: string;
-  photoUrl: string | null;
-  onUploaded: (publicUrl: string) => void;
+  currentPhotoUrl: string | null;
+  assets: AssetLite[];
+  onAssignedUrl: (publicUrl: string) => void;
+  onNewAsset: (asset: AssetLite) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [optimising, setOptimising] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const busy = optimising || uploading;
 
   // Post-compression backstop — the client compresses first, so this should
-  // essentially never trip. Kept a touch under the server's 20 MB so we fail
-  // with a friendly message before hitting the route.
+  // essentially never trip.
   const MAX_BYTES = 18 * 1024 * 1024;
 
-  function uploadFile(file: File) {
-    if (!roomId) return;
-    setUploading(true);
-    setProgress(0);
+  const selectedAssetId =
+    currentPhotoUrl != null
+      ? (assets.find((a) => a.url === currentPhotoUrl)?.id ?? null)
+      : null;
 
-    const form = new FormData();
-    form.append("room_id", roomId);
-    form.append("file", file);
+  async function handleAssign(assetId: string) {
+    if (!roomId || busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/project-asset", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset_id: assetId, room_id: roomId }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { public_url?: string; error?: string }
+        | null;
+      if (!res.ok || !body?.public_url) {
+        throw new Error(body?.error ?? `Couldn't assign photo (${res.status}).`);
+      }
+      onAssignedUrl(body.public_url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't assign photo.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/room-photo");
-    xhr.upload.onprogress = (ev) => {
-      if (ev.lengthComputable) setProgress((ev.loaded / ev.total) * 100);
-    };
-    xhr.onload = () => {
-      setUploading(false);
-      let body: unknown = null;
+  async function handleUploadNew(file: File) {
+    if (!roomId || busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      // Downscale/compress client-side (EXIF-corrected). HEIC the browser can't
+      // decode throws a friendly ImageProcessingError instead of a raw 413.
+      let toUpload = file;
       try {
-        body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
-      } catch {
-        // fall through to the status-based error below
-      }
-      if (
-        xhr.status >= 200 &&
-        xhr.status < 300 &&
-        body &&
-        typeof body === "object" &&
-        "public_url" in body
-      ) {
-        onUploaded(String((body as { public_url: unknown }).public_url));
-        return;
-      }
-      const structured =
-        body && typeof body === "object" && "error" in body
-          ? String((body as { error: unknown }).error)
-          : null;
-      // A platform edge may 413 with HTML or an empty body (no JSON to parse) —
-      // never surface a raw "413" to the user.
-      if (xhr.status === 413) {
+        toUpload = (await compressImage(file)).file;
+      } catch (err) {
         setError(
-          structured ??
-            "This image is too large to upload even after optimisation. Please try a smaller photo.",
+          err instanceof ImageProcessingError
+            ? err.message
+            : "We couldn’t read that image. Please try a JPG or PNG.",
         );
         return;
       }
-      setError(structured ?? `Upload failed (${xhr.status}).`);
-    };
-    xhr.onerror = () => {
-      setUploading(false);
-      setError("Network error — try again.");
-    };
-    xhr.send(form);
+      if (toUpload.size > MAX_BYTES) {
+        setError("This image is too large to upload even after optimisation. Please try a smaller photo.");
+        return;
+      }
+
+      const form = new FormData();
+      form.append("file", toUpload);
+      form.append("project_id", projectId);
+      form.append("kind", "photo");
+      form.append("source", "render");
+      form.append("room_id", roomId);
+
+      const res = await fetch("/api/project-asset", { method: "POST", body: form });
+      const body = (await res.json().catch(() => null)) as
+        | { asset_id?: string; public_url?: string; error?: string }
+        | null;
+      if (!res.ok || !body?.asset_id || !body?.public_url) {
+        if (res.status === 413) {
+          setError(
+            body?.error ??
+              "This image is too large to upload even after optimisation. Please try a smaller photo.",
+          );
+          return;
+        }
+        throw new Error(body?.error ?? `Upload failed (${res.status}).`);
+      }
+      onNewAsset({
+        id: body.asset_id,
+        url: body.public_url,
+        kind: "photo",
+        room_id: roomId,
+        filename: toUpload.name,
+        bytes: toUpload.size,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // let the same file be re-selected later
-    if (!file || !roomId) return;
-    setError(null);
-
-    // Downscale/compress client-side (EXIF-corrected). HEIC the browser can't
-    // decode throws a friendly ImageProcessingError instead of a raw 413.
-    let toUpload = file;
-    setOptimising(true);
-    try {
-      const result = await compressImage(file);
-      toUpload = result.file;
-    } catch (err) {
-      setOptimising(false);
-      setError(
-        err instanceof ImageProcessingError
-          ? err.message
-          : "We couldn’t read that image. Please try a JPG or PNG.",
-      );
-      return;
-    }
-    setOptimising(false);
-
-    if (toUpload.size > MAX_BYTES) {
-      setError(
-        "This image is too large to upload even after optimisation. Please try a smaller photo.",
-      );
-      return;
-    }
-
-    uploadFile(toUpload);
+  if (!roomId) {
+    return (
+      <p className="font-body-sm text-body-sm text-on-surface-variant">
+        Select a room to assign a photo.
+      </p>
+    );
   }
 
   return (
     <div className="flex flex-col gap-sm">
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPT_ATTR}
-        onChange={onPick}
-        className="hidden"
-      />
-
-      {photoUrl ? (
-        <>
-          <div className="matte-image">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photoUrl}
-              alt={`${roomName} photo`}
-              className="aspect-[3/2] w-full rounded object-cover"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={busy || !roomId}
-            className="focus-ring flex h-10 items-center justify-center gap-sm rounded-lg border border-ink-100 font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low disabled:opacity-50"
-          >
-            <span
-              className="material-symbols-outlined text-[18px]"
-              aria-hidden="true"
-            >
-              sync
-            </span>
-            {optimising ? "Optimising…" : uploading ? "Uploading…" : "Replace photo"}
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={busy || !roomId}
-          className="focus-ring flex h-[120px] flex-col items-center justify-center gap-xs rounded-lg border-2 border-dashed border-ink-100 text-center transition-colors hover:border-brass-600 hover:bg-primary-fixed/30 disabled:opacity-50"
-        >
-          <span
-            className="material-symbols-outlined text-[28px] text-brass-600"
-            aria-hidden="true"
-          >
-            add_a_photo
-          </span>
-          <span className="font-body-sm text-body-sm text-on-surface-variant">
-            {optimising ? "Optimising…" : uploading ? "Uploading…" : "Add room photo"}
-          </span>
-          <span className="font-body-sm text-[11px] text-ink-500">
-            JPG, PNG or HEIC · optimised automatically
-          </span>
-        </button>
-      )}
-
-      {uploading && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-bone">
-          <div
-            className="h-full rounded-full bg-brass-600 transition-[width] duration-200"
-            style={{ width: `${Math.max(4, progress)}%` }}
+      {currentPhotoUrl && (
+        <div className="matte-image">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={currentPhotoUrl}
+            alt={`${roomName} photo`}
+            className="aspect-[3/2] w-full rounded object-cover"
           />
         </div>
       )}
+
+      <AssetPicker
+        assets={assets}
+        selectedAssetId={selectedAssetId}
+        onAssign={handleAssign}
+        onUploadNew={handleUploadNew}
+        busy={busy}
+        emptyHint="No photos in this project yet — upload one to reuse across rooms."
+        uploadLabel={currentPhotoUrl ? "Upload new photo" : "Add room photo"}
+      />
+
+      <p className="font-body-sm text-[11px] text-ink-500">
+        JPG, PNG or HEIC · optimised automatically
+      </p>
+
       {error && (
         <div
           role="alert"
