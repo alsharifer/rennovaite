@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPlanGraph } from "@/lib/plan/geometry";
+import { buildPlanGraph, type Point } from "@/lib/plan/geometry";
 
 import { MUDON_FIXTURE } from "./mudon.fixture";
+import { CURVED_BAY, DIAGONAL_SPLIT, L_SHAPE_WITH_NOTCH } from "./synthetic.fixtures";
+
+const isDiagonalWall = (poly: Point[]) => {
+  const [p, q] = poly;
+  return !!p && !!q && Math.abs(p[0] - q[0]) > 1e-6 && Math.abs(p[1] - q[1]) > 1e-6;
+};
 
 describe("buildPlanGraph — Mudon pilot villa", () => {
   const graph = buildPlanGraph(MUDON_FIXTURE);
@@ -48,5 +54,36 @@ describe("buildPlanGraph — Mudon pilot villa", () => {
     expect(d.walls && d.wall_thickness && d.is_structural).toBe(true);
     expect(d.ceiling_h && d.north && d.level && d.metric_scale).toBe(true);
     expect(graph.rooms.every((r) => r.derived_fields.includes("ceiling_h_m"))).toBe(true);
+  });
+
+  it("derives only axis-aligned walls for the (rectilinear) Mudon plan", () => {
+    // Regression: the reworked orientation-agnostic derivation must reproduce
+    // axis-aligned walls for axis-aligned input (no spurious diagonals).
+    expect(graph.walls.some((w) => isDiagonalWall(w.polyline))).toBe(false);
+  });
+});
+
+describe("buildPlanGraph — non-rectilinear (S2)", () => {
+  it("derives a diagonal PARTY wall along a shared hypotenuse", () => {
+    const g = buildPlanGraph(DIAGONAL_SPLIT);
+    const diagonalParty = g.walls.filter(
+      (w) => isDiagonalWall(w.polyline) && w.room_ids.length >= 2,
+    );
+    expect(diagonalParty.length).toBeGreaterThanOrEqual(1);
+    // The two triangles' four axis-aligned legs remain boundary walls.
+    expect(g.walls.some((w) => !isDiagonalWall(w.polyline) && w.room_ids.length === 1)).toBe(true);
+  });
+
+  it("handles a curved-bay room (diagonal boundary walls, no throw)", () => {
+    const g = buildPlanGraph(CURVED_BAY);
+    expect(g.walls.length).toBeGreaterThan(0);
+    expect(g.walls.some((w) => isDiagonalWall(w.polyline))).toBe(true);
+  });
+
+  it("handles a concave L-shape without error and derives walls", () => {
+    const g = buildPlanGraph(L_SHAPE_WITH_NOTCH);
+    expect(g.rooms).toHaveLength(2);
+    expect(g.walls.length).toBeGreaterThan(0);
+    expect(g.walls.every((w) => w.derived === true)).toBe(true);
   });
 });

@@ -156,24 +156,26 @@ export function polygonArea(pts: [number, number][]): number {
   return Math.abs(a) / 2;
 }
 
-/** Snap a coordinate to a grid so co-linear edges from different rooms match. */
-function snap(v: number, eps: number): number {
-  return Math.round(v / eps) * eps;
-}
-
-// --- wall derivation ----------------------------------------------------------
+// --- wall derivation (orientation-agnostic) -----------------------------------
 //
-// Axis-aligned edges only (all we have). For each orientation we group edges by
-// their (snapped) line coordinate, partition the line into elementary intervals
-// at every edge endpoint, and label each interval by the set of rooms whose edge
-// covers it. 1 room → boundary wall; 2 rooms → party wall. Adjacent intervals
-// with an identical room-set are merged into one wall segment.
+// Rooms may be non-rectilinear (L-shapes, diagonals). Each polygon edge is a
+// candidate wall segment lying on some infinite line. We group edges by line
+// identity (canonical unit normal angle + perpendicular offset, both quantised
+// so collinear edges from different rooms fall in one bucket), cut each line
+// into elementary intervals at every endpoint, label each interval by the
+// covering room-set (1 → boundary wall; 2 → party wall), and merge adjacent
+// intervals with an identical room-set. Emitted walls are 2-point segments and
+// may be diagonal — axis-aligned inputs reproduce the previous walls exactly.
+
+const ANG_EPS = 0.01; // ~0.57°: collinear room edges must land in the same bucket
 
 interface Edge {
-  orient: "v" | "h";
-  line: number; // x for vertical, y for horizontal (snapped, normalised)
-  a: number; // interval start along the other axis (snapped)
-  b: number; // interval end
+  key: string; // line identity (quantised angle:offset)
+  nx: number; // canonical unit normal
+  ny: number;
+  c: number; // signed perpendicular offset (n · point)
+  t0: number; // interval along the line direction u = (-ny, nx)
+  t1: number;
   roomId: string;
 }
 
@@ -182,63 +184,74 @@ function edgesOf(roomId: string, poly: [number, number][], eps: number): Edge[] 
   for (let i = 0; i < poly.length; i++) {
     const [x1, y1] = poly[i]!;
     const [x2, y2] = poly[(i + 1) % poly.length]!;
-    const sx1 = snap(x1, eps),
-      sy1 = snap(y1, eps),
-      sx2 = snap(x2, eps),
-      sy2 = snap(y2, eps);
-    if (Math.abs(sx1 - sx2) < eps / 2 && Math.abs(sy1 - sy2) >= eps / 2) {
-      edges.push({ orient: "v", line: sx1, a: Math.min(sy1, sy2), b: Math.max(sy1, sy2), roomId });
-    } else if (Math.abs(sy1 - sy2) < eps / 2 && Math.abs(sx1 - sx2) >= eps / 2) {
-      edges.push({ orient: "h", line: sy1, a: Math.min(sx1, sx2), b: Math.max(sx1, sx2), roomId });
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len < eps) continue; // skip degenerate edges
+    // Canonical unit normal (sign fixed so opposite-wound shared edges match).
+    let nx = -dy / len;
+    let ny = dx / len;
+    if (nx < -1e-9 || (Math.abs(nx) < 1e-9 && ny < 0)) {
+      nx = -nx;
+      ny = -ny;
     }
-    // Non-axis-aligned edges are ignored (the parse only produces rectangles).
+    const c = nx * x1 + ny * y1;
+    const ux = -ny; // line direction
+    const uy = nx;
+    const ta = x1 * ux + y1 * uy;
+    const tb = x2 * ux + y2 * uy;
+    const key = `${Math.round(Math.atan2(ny, nx) / ANG_EPS)}:${Math.round(c / eps)}`;
+    edges.push({ key, nx, ny, c, t0: Math.min(ta, tb), t1: Math.max(ta, tb), roomId });
   }
   return edges;
 }
 
 interface RawWall {
-  orient: "v" | "h";
-  line: number;
-  a: number;
-  b: number;
+  nx: number;
+  ny: number;
+  c: number;
+  t0: number;
+  t1: number;
   roomIds: string[];
 }
 
 function deriveRawWalls(edges: Edge[], eps: number): RawWall[] {
   const byLine = new Map<string, Edge[]>();
   for (const e of edges) {
-    const key = `${e.orient}:${e.line.toFixed(4)}`;
-    (byLine.get(key) ?? byLine.set(key, []).get(key)!).push(e);
+    const g = byLine.get(e.key);
+    if (g) g.push(e);
+    else byLine.set(e.key, [e]);
   }
 
   const walls: RawWall[] = [];
   for (const group of byLine.values()) {
-    const orient = group[0]!.orient;
-    const line = group[0]!.line;
-    const cuts = Array.from(
-      new Set(group.flatMap((e) => [e.a, e.b])),
-    ).sort((p, q) => p - q);
+    const { nx, ny } = group[0]!;
+    // Mean offset so per-edge float noise doesn't shift the reconstructed wall.
+    const c = group.reduce((s, e) => s + e.c, 0) / group.length;
+    const cuts = Array.from(new Set(group.flatMap((e) => [e.t0, e.t1]))).sort(
+      (p, q) => p - q,
+    );
 
     const segs: RawWall[] = [];
     for (let i = 0; i < cuts.length - 1; i++) {
-      const t0 = cuts[i]!;
-      const t1 = cuts[i + 1]!;
-      if (t1 - t0 < eps / 2) continue;
-      const mid = (t0 + t1) / 2;
+      const a = cuts[i]!;
+      const b = cuts[i + 1]!;
+      if (b - a < eps / 2) continue;
+      const mid = (a + b) / 2;
       const rooms = Array.from(
-        new Set(group.filter((e) => e.a <= mid && e.b >= mid).map((e) => e.roomId)),
+        new Set(group.filter((e) => e.t0 <= mid && e.t1 >= mid).map((e) => e.roomId)),
       ).sort();
       if (rooms.length === 0) continue;
       const last = segs[segs.length - 1];
       if (
         last &&
-        Math.abs(last.b - t0) < eps / 2 &&
+        Math.abs(last.t1 - a) < eps / 2 &&
         last.roomIds.length === rooms.length &&
         last.roomIds.every((r, idx) => r === rooms[idx])
       ) {
-        last.b = t1; // merge co-linear neighbour with identical room-set
+        last.t1 = b; // merge co-linear neighbour with identical room-set
       } else {
-        segs.push({ orient, line, a: t0, b: t1, roomIds: rooms });
+        segs.push({ nx, ny, c, t0: a, t1: b, roomIds: rooms });
       }
     }
     walls.push(...segs);
@@ -317,10 +330,14 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
   const rawWalls = deriveRawWalls(allEdges, eps);
 
   const walls: Wall[] = rawWalls.map((w, i) => {
-    const p0: [number, number] =
-      w.orient === "v" ? [w.line, w.a] : [w.a, w.line];
-    const p1: [number, number] =
-      w.orient === "v" ? [w.line, w.b] : [w.b, w.line];
+    // Reconstruct endpoints from line identity: refPoint (foot of the
+    // perpendicular, c·n) + t · direction u=(-ny,nx). Diagonal-capable.
+    const rx = w.c * w.nx;
+    const ry = w.c * w.ny;
+    const ux = -w.ny;
+    const uy = w.nx;
+    const p0: [number, number] = [rx + w.t0 * ux, ry + w.t0 * uy];
+    const p1: [number, number] = [rx + w.t1 * ux, ry + w.t1 * uy];
     return {
       id: `wall-${i + 1}`,
       polyline: [toM(p0), toM(p1)],
