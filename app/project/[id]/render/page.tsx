@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppShell } from "@/components/app/AppShell";
+import { loadProjectPhotoAssets } from "@/lib/assets/load";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { getStyleByKey } from "@/lib/styles";
@@ -164,6 +165,10 @@ export default async function RenderPage({
     }
   }
 
+  // Project-wide photo library for the render photo picker (empty until
+  // migration 024 is applied — the panel then falls back to upload-only).
+  const initialPhotoAssets = await loadProjectPhotoAssets(projectId);
+
   // Fetch every render for this project, then reconstruct a linear chain
   // per room (root → … → latest leaf). This rehydrates the iteration UI on
   // page load so users see their previous renders instead of starting blank.
@@ -259,6 +264,7 @@ export default async function RenderPage({
         initialChains={initialChains}
         initialLockedRoomIds={initialLockedRoomIds}
         initialPhotosByRoom={initialPhotosByRoom}
+        initialPhotoAssets={initialPhotoAssets}
         roomBoqTotals={roomBoqTotals}
         stagingEnabled={stagingEnabled}
         initialFurnitureOptIns={initialFurnitureOptIns}

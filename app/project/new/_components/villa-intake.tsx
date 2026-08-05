@@ -2,10 +2,16 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 
 import { AnalyticsEvent, track } from "@/lib/analytics";
+import {
+  DRAWING_DISCIPLINES,
+  KIND_LABEL,
+  type AssetKind,
+} from "@/lib/assets/types";
+import { compressImage, ImageProcessingError } from "@/lib/image/compress";
 import { cn } from "@/lib/utils";
 
 // The existing /api/upload only accepts PDF/PNG/JPG. The design copy mentions
@@ -20,8 +26,20 @@ const PHOTO_ACCEPT = {
   "image/png": [".png"],
   "image/jpeg": [".jpg", ".jpeg"],
   "image/heic": [".heic"],
+  "image/heif": [".heif"],
 };
-const MAX_SIZE_BYTES = 20 * 1024 * 1024;
+// Existing drawings: PDF/DWG/DXF + images. DWG/DXF rarely carry a reliable MIME
+// (often octet-stream), so they're matched by extension too.
+const DRAWING_ACCEPT = {
+  "application/pdf": [".pdf"],
+  "image/png": [".png"],
+  "image/jpeg": [".jpg", ".jpeg"],
+  "application/acad": [".dwg"],
+  "image/vnd.dwg": [".dwg"],
+  "application/dxf": [".dxf"],
+  "application/octet-stream": [".dwg", ".dxf"],
+};
+const MAX_SIZE_BYTES = 25 * 1024 * 1024;
 
 const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ras Al Khaimah", "Ajman"];
 
@@ -36,6 +54,20 @@ type PlanState =
   | { kind: "uploading"; name: string; progress: number }
   | { kind: "ready"; name: string; size: number; res: UploadResponse }
   | { kind: "error"; message: string };
+
+// A queued/in-flight/finished library upload (photo or drawing). Photos and
+// drawings need a project, which is created when the plan uploads — items
+// dropped before that are "queued" and flushed once the project exists.
+type AssetStatus = "queued" | "uploading" | "done" | "error";
+type AssetItem = {
+  id: string;
+  file: File;
+  name: string;
+  kind: AssetKind;
+  previewUrl?: string;
+  status: AssetStatus;
+  error?: string;
+};
 
 function uploadWithProgress(
   file: File,
@@ -80,16 +112,95 @@ function formatAed(n: number): string {
   return `AED ${n.toLocaleString("en-US")}`;
 }
 
+const isImageType = (t: string) => /^image\/(png|jpeg)$/.test(t);
+
 export function VillaIntake() {
   const router = useRouter();
   const [plan, setPlan] = useState<PlanState>({ kind: "idle" });
-  const [photos, setPhotos] = useState<{ name: string; url: string }[]>([]);
+  const [photos, setPhotos] = useState<AssetItem[]>([]);
+  const [drawings, setDrawings] = useState<AssetItem[]>([]);
+  const [discipline, setDiscipline] = useState<AssetKind>("drawing_mep");
   const [projectName, setProjectName] = useState("");
   const [city, setCity] = useState("Dubai");
   const [budget, setBudget] = useState(850_000);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const photoUrls = useRef<string[]>([]);
+
+  // The project is created by the plan upload; assets can only be written once
+  // it exists.
+  const projectId = plan.kind === "ready" ? plan.res.project_id : null;
+
+  const patchPhoto = useCallback((id: string, p: Partial<AssetItem>) => {
+    setPhotos((prev) => prev.map((it) => (it.id === id ? { ...it, ...p } : it)));
+  }, []);
+  const patchDrawing = useCallback((id: string, p: Partial<AssetItem>) => {
+    setDrawings((prev) => prev.map((it) => (it.id === id ? { ...it, ...p } : it)));
+  }, []);
+
+  const uploadAssetItem = useCallback(
+    async (
+      item: AssetItem,
+      pid: string,
+      patch: (id: string, p: Partial<AssetItem>) => void,
+    ) => {
+      patch(item.id, { status: "uploading", error: undefined });
+      try {
+        let file = item.file;
+        // Photos are downscaled/compressed client-side (S1) so a 12 MP phone
+        // shot lands ~1 MB. Drawings (PDF/DWG) upload as-is.
+        if (item.kind === "photo") {
+          try {
+            file = (await compressImage(item.file)).file;
+          } catch (err) {
+            patch(item.id, {
+              status: "error",
+              error:
+                err instanceof ImageProcessingError
+                  ? err.message
+                  : "We couldn’t read that image. Please try a JPG or PNG.",
+            });
+            return;
+          }
+        }
+        const form = new FormData();
+        form.append("file", file);
+        form.append("project_id", pid);
+        form.append("kind", item.kind);
+        form.append("source", "intake");
+        const res = await fetch("/api/project-asset", { method: "POST", body: form });
+        const body = (await res.json().catch(() => null)) as
+          | { asset_id?: string; error?: string }
+          | null;
+        if (!res.ok || !body?.asset_id) {
+          patch(item.id, {
+            status: "error",
+            error: body?.error ?? `Upload failed (${res.status}).`,
+          });
+          return;
+        }
+        patch(item.id, { status: "done" });
+      } catch (err) {
+        patch(item.id, {
+          status: "error",
+          error: err instanceof Error ? err.message : "Upload failed.",
+        });
+      }
+    },
+    [],
+  );
+
+  // Flush any queued items once the project exists. Guarded on status, so items
+  // already uploading/done are skipped and each is processed exactly once (no
+  // loop despite `photos`/`drawings` being in the dep list).
+  useEffect(() => {
+    if (!projectId) return;
+    for (const it of photos) {
+      if (it.status === "queued") void uploadAssetItem(it, projectId, patchPhoto);
+    }
+    for (const it of drawings) {
+      if (it.status === "queued") void uploadAssetItem(it, projectId, patchDrawing);
+    }
+  }, [projectId, photos, drawings, uploadAssetItem, patchPhoto, patchDrawing]);
 
   const onPlanDrop = useCallback(async (accepted: File[]) => {
     const f = accepted[0];
@@ -110,21 +221,48 @@ export function VillaIntake() {
     }
   }, []);
 
-  const onPhotoDrop = useCallback((accepted: File[]) => {
-    const next = accepted.map((f) => {
-      const url = URL.createObjectURL(f);
-      photoUrls.current.push(url);
-      return { name: f.name, url };
-    });
-    setPhotos((p) => [...p, ...next]);
-  }, []);
+  const onPhotoDrop = useCallback(
+    (accepted: File[]) => {
+      const items: AssetItem[] = accepted.map((f) => ({
+        id: crypto.randomUUID(),
+        file: f,
+        name: f.name,
+        kind: "photo",
+        previewUrl: URL.createObjectURL(f),
+        status: projectId ? "uploading" : "queued",
+      }));
+      setPhotos((p) => [...p, ...items]);
+      if (projectId) {
+        for (const it of items) void uploadAssetItem(it, projectId, patchPhoto);
+      }
+    },
+    [projectId, uploadAssetItem, patchPhoto],
+  );
+
+  const onDrawingDrop = useCallback(
+    (accepted: File[]) => {
+      const items: AssetItem[] = accepted.map((f) => ({
+        id: crypto.randomUUID(),
+        file: f,
+        name: f.name,
+        kind: discipline,
+        previewUrl: isImageType(f.type) ? URL.createObjectURL(f) : undefined,
+        status: projectId ? "uploading" : "queued",
+      }));
+      setDrawings((p) => [...p, ...items]);
+      if (projectId) {
+        for (const it of items) void uploadAssetItem(it, projectId, patchDrawing);
+      }
+    },
+    [projectId, discipline, uploadAssetItem, patchDrawing],
+  );
 
   const planDz = useDropzone({
     onDrop: onPlanDrop,
     onDropRejected: () =>
       setPlan({
         kind: "error",
-        message: "Please upload a PDF, PNG, or JPG under 20 MB.",
+        message: "Please upload a PDF, PNG, or JPG under 25 MB.",
       }),
     accept: PLAN_ACCEPT,
     maxSize: MAX_SIZE_BYTES,
@@ -135,6 +273,13 @@ export function VillaIntake() {
   const photoDz = useDropzone({
     onDrop: onPhotoDrop,
     accept: PHOTO_ACCEPT,
+    maxSize: MAX_SIZE_BYTES,
+    multiple: true,
+  });
+
+  const drawingDz = useDropzone({
+    onDrop: onDrawingDrop,
+    accept: DRAWING_ACCEPT,
     maxSize: MAX_SIZE_BYTES,
     multiple: true,
   });
@@ -166,6 +311,10 @@ export function VillaIntake() {
   }
 
   const planReady = plan.kind === "ready";
+  const queuedNote =
+    !projectId && (photos.length > 0 || drawings.length > 0)
+      ? "Saved to your project once the plan is added."
+      : null;
 
   return (
     <div className="flex flex-col gap-gutter">
@@ -292,28 +441,103 @@ export function VillaIntake() {
 
           {photos.length > 0 && (
             <div className="mt-md grid grid-cols-4 gap-sm">
-              {photos.slice(0, 3).map((p, i) => (
-                <div
-                  key={`${p.url}-${i}`}
-                  className="aspect-square overflow-hidden rounded-md border border-ink-100"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={p.url}
-                    alt={p.name}
-                    className="size-full object-cover"
-                  />
-                </div>
+              {photos.map((p) => (
+                <AssetThumb key={p.id} item={p} />
               ))}
-              {photos.length > 3 && (
-                <div className="flex aspect-square items-center justify-center rounded-md bg-bone font-body-sm text-body-sm font-semibold text-ink-700">
-                  +{photos.length - 3} more
-                </div>
-              )}
             </div>
           )}
         </section>
       </div>
+
+      {/* Existing drawings (MEP · electrical · HVAC) -------------------- */}
+      <section className="rounded-lg border border-ink-100 bg-paper p-8">
+        <div className="mb-md flex flex-wrap items-center justify-between gap-md">
+          <div>
+            <p className="label-caps text-ink-500">
+              Existing drawings (MEP · electrical · HVAC)
+            </p>
+            <p className="mt-xs font-body-sm text-body-sm text-on-surface-variant">
+              Optional — stored for later. We don&apos;t process these yet.
+            </p>
+          </div>
+          {/* Discipline the next dropped files are filed under. */}
+          <div className="flex overflow-hidden rounded border border-ink-100">
+            {DRAWING_DISCIPLINES.map((d) => (
+              <button
+                key={d.kind}
+                type="button"
+                onClick={() => setDiscipline(d.kind)}
+                className={cn(
+                  "px-md py-xs font-body-sm text-body-sm font-semibold transition-colors",
+                  discipline === d.kind
+                    ? "bg-brass-600 text-on-primary"
+                    : "bg-paper text-ink-700 hover:bg-surface-container-low",
+                )}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div
+          {...drawingDz.getRootProps()}
+          className={cn(
+            "flex h-[160px] cursor-pointer flex-col items-center justify-center gap-md rounded-md border-2 border-dashed px-8 text-center transition-colors duration-200 outline-none",
+            drawingDz.isDragActive
+              ? "border-brass-600 bg-primary-fixed/40"
+              : "border-ink-100 hover:border-brass-600 hover:bg-primary-fixed/30",
+          )}
+        >
+          <input {...drawingDz.getInputProps()} />
+          <span
+            className="material-symbols-outlined text-[32px] text-brass-600"
+            aria-hidden="true"
+          >
+            description
+          </span>
+          <p className="font-body text-body-md text-on-surface-variant">
+            Drop PDF, DWG, DXF, or images as{" "}
+            <span className="font-semibold text-ink-900">
+              {KIND_LABEL[discipline]}
+            </span>
+            <span className="text-ink-500"> · or click to browse</span>
+          </p>
+        </div>
+
+        {drawings.length > 0 && (
+          <ul className="mt-md flex flex-col gap-xs">
+            {drawings.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center gap-md rounded-md border border-ink-100 bg-canvas px-md py-sm"
+              >
+                <span
+                  className="material-symbols-outlined text-[20px] text-on-surface-variant"
+                  aria-hidden="true"
+                >
+                  description
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-body-sm text-body-sm text-ink-900">
+                    {d.name}
+                  </p>
+                  <p className="font-mono text-[11px] text-ink-500">
+                    {KIND_LABEL[d.kind]}
+                  </p>
+                </div>
+                <StatusBadge item={d} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {queuedNote && (
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          {queuedNote}
+        </p>
+      )}
 
       {/* Project basics ------------------------------------------------- */}
       <section className="rounded-lg border border-ink-100 bg-paper p-8">
@@ -400,5 +624,73 @@ export function VillaIntake() {
         {projectName ? ` · ${projectName}` : ""}
       </p>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Small status helpers
+// ---------------------------------------------------------------------------
+
+function statusMeta(status: AssetStatus): { icon: string; label: string; tone: string } {
+  switch (status) {
+    case "done":
+      return { icon: "check_circle", label: "Saved", tone: "text-brass-600" };
+    case "uploading":
+      return { icon: "progress_activity", label: "Uploading…", tone: "text-ink-500" };
+    case "error":
+      return { icon: "error", label: "Failed", tone: "text-error" };
+    default:
+      return { icon: "schedule", label: "Queued", tone: "text-ink-500" };
+  }
+}
+
+function AssetThumb({ item }: { item: AssetItem }) {
+  const meta = statusMeta(item.status);
+  return (
+    <div
+      className="relative aspect-square overflow-hidden rounded-md border border-ink-100"
+      title={item.error ?? meta.label}
+    >
+      {item.previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.previewUrl}
+          alt={item.name}
+          className="size-full object-cover"
+        />
+      ) : (
+        <div className="flex size-full items-center justify-center bg-bone">
+          <span className="material-symbols-outlined text-ink-500" aria-hidden="true">
+            description
+          </span>
+        </div>
+      )}
+      <span
+        className={cn(
+          "absolute inset-x-0 bottom-0 flex items-center gap-xs bg-paper/90 px-1.5 py-0.5 font-body-sm text-[10px] font-semibold",
+          meta.tone,
+        )}
+      >
+        <span className="material-symbols-outlined text-[12px]" aria-hidden="true">
+          {meta.icon}
+        </span>
+        {meta.label}
+      </span>
+    </div>
+  );
+}
+
+function StatusBadge({ item }: { item: AssetItem }) {
+  const meta = statusMeta(item.status);
+  return (
+    <span
+      className={cn("flex items-center gap-xs font-body-sm text-[12px] font-semibold", meta.tone)}
+      title={item.error ?? meta.label}
+    >
+      <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+        {meta.icon}
+      </span>
+      {meta.label}
+    </span>
   );
 }

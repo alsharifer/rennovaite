@@ -190,6 +190,67 @@ helpers (model selection, input shaping per model family, timeout) in
 `renders` rows record `source_image_url`, `model`, and `mode` for A/B and
 tracing.
 
+### Room-photo uploads (client compression)
+
+The photo path's source image is uploaded from the render page's
+`RoomPhotoPanel` to `POST /api/room-photo` (multipart `file` + `room_id`, bucket
+`plan-uploads`). Raw phone photos (8–15 MB / 12 MP) used to hit an upstream
+body-cap and fail with a raw **HTTP 413** before ever reaching the route. So the
+client **compresses first** (`lib/image/compress.ts`): decode with EXIF
+orientation baked in, downscale to long edge ≤ **2048 px**, re-encode JPEG
+**q0.85** — a typical upload lands at ~0.5–2 MB. Small in-dimension JPEG/PNG
+originals (≤ 1 MB) pass through **byte-identical**. HEIC is converted where the
+browser can decode it, otherwise the user gets a friendly "use JPG/PNG" message
+(never a raw 413). The pure decision logic (`fitWithin`, `planImageProcessing`,
+`isHeic`) is unit-tested in `lib/image/__tests__`.
+
+Server limits (backstops — the client keeps uploads far under them):
+`app/api/room-photo` rejects `> 20 MB` with a **structured 413** (`{ error, code:
+"payload_too_large" }`) rendered as an Atelier error state; `next.config.ts`
+sets `experimental.proxyClientMaxBodySize: "25mb"` (above the route cap) so a
+future proxy/middleware can't silently truncate an upload below it.
+
+## Project asset library (A3/A4/C2)
+
+One catalogue for every document a project accumulates, so a photo uploaded at
+intake is **reusable at the render step** instead of being re-uploaded per room
+(intake photos used to be preview-only and discarded).
+
+- **Table** `project_assets` (migration `024`): `kind` (`floorplan |
+  drawing_mep | drawing_electrical | drawing_hvac | photo | reference_image |
+  other`), nullable `room_id`, `storage_path`, `filename`, `mime`, `bytes`,
+  `source` (`intake | render | moodboard`). RLS disabled like every table.
+- **Storage**: reuses the existing public `plan-uploads` bucket at
+  `<projectId>/assets/<uuid>.<ext>` (the floorplan keeps its
+  `<projectId>/<uuid>.<ext>` path); public URLs are derived at read time, so no
+  url column. Vocabulary + validation are pure in `lib/assets/types.ts`
+  (unit-tested); server reads/paths in `lib/assets/load.ts` (degrade to `[]`
+  when the table is absent).
+- **Route** `POST /api/project-asset` (multipart `file` + `project_id` + `kind`
+  + `source?` + `room_id?`) validates per-kind (images = PNG/JPG; drawings =
+  PDF/DWG/DXF/images), enforces a 25 MB structured 413, stores + inserts, and
+  rolls back storage on failure. `PATCH` assigns an existing photo asset to a
+  room. Images are compressed client-side (the S1 pipeline) before upload.
+- **Intake** (`/project/new`): the floorplan (recorded from `/api/upload`) and
+  site photos both land in the library; an optional **"Existing drawings
+  (MEP · Electrical · HVAC)"** card files uploads under the selected discipline.
+  Assets dropped before the plan exists are **queued** and flushed once the
+  project is created. Drawings are **stored/listed only — not parsed** (later
+  scope; no viewers).
+- **Render** (`RoomPhotoPanel`): the per-room dead-end uploader is replaced by
+  the reusable **`components/assets/AssetPicker`** — a thumbnail grid of the
+  project's photo assets (assign to the current room) plus an "upload new" path
+  into the library. Assigning a photo mirrors a `room_photos` row so the
+  **render pipeline is unchanged** (it still reads the latest `room_photos` per
+  room). The same picker is the pattern for the future moodboard step (B2).
+- **Hub** (`/project/[id]`): a **"Project files"** panel
+  (`components/assets/ProjectFilesPanel`) lists all assets grouped by kind with
+  download links; it renders nothing when the library is empty.
+- **Manual DB step**: apply `scripts/migrations/024_project_assets.sql` in the
+  Supabase SQL editor (no runner). Everything degrades gracefully until then —
+  intake still works, the render picker shows the upload path, and the hub panel
+  is hidden.
+
 ## Drawings — geometry contract + 2D drawing engine (P1)
 
 Auto-generated, **deterministic** (no LLM) A3 drawing set: dimensioned as-built
