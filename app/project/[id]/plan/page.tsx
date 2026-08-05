@@ -143,6 +143,29 @@ export default async function PlanPage({
 
   const parsedComplete = plan.parsed_json !== null && roomList.length > 0;
 
+  // Real parse-quality KPI: mean room confidence + this plan's correction count
+  // (replaces the old hard-coded "99.2% confidence"). Both best-effort.
+  const confVals = roomList
+    .map((r) => r.confidence)
+    .filter((c): c is number => typeof c === "number");
+  const meanConfidencePct = confVals.length
+    ? Math.round((confVals.reduce((s, c) => s + c, 0) / confVals.length) * 100)
+    : null;
+  let correctionsTotal: number | null = null;
+  try {
+    const pm = await sb
+      .from("parse_metrics")
+      .select("correction_total")
+      .eq("plan_id", plan.id)
+      .eq("kind", "corrections")
+      .returns<{ correction_total: number | null }[]>();
+    if (!pm.error) {
+      correctionsTotal = (pm.data ?? []).reduce((s, r) => s + (r.correction_total ?? 0), 0);
+    }
+  } catch {
+    /* parse_metrics absent pre-025 — leave null */
+  }
+
   // Aggregates for the right column + sticky bar.
   const totalArea = plan.total_area_m2 ?? null;
   const bedroomCount = roomList.filter((r) =>
@@ -358,7 +381,11 @@ export default async function PlanPage({
             </Link>
             <p className="font-body text-body-sm italic text-on-surface-variant">
               Parsed by RennovAIte · {roomList.length} rooms ·{" "}
-              {formatM2(totalArea)} · 99.2% confidence
+              {formatM2(totalArea)}
+              {meanConfidencePct != null ? ` · ${meanConfidencePct}% avg confidence` : ""}
+              {correctionsTotal != null && correctionsTotal > 0
+                ? ` · ${correctionsTotal} correction${correctionsTotal === 1 ? "" : "s"}`
+                : ""}
             </p>
             <Link
               href={`/project/${projectId}/style`}
