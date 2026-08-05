@@ -11,6 +11,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AnalyticsEvent, track } from "@/lib/analytics";
+import {
+  ACCEPT_ATTR,
+  compressImage,
+  ImageProcessingError,
+} from "@/lib/image/compress";
 import { cn } from "@/lib/utils";
 import { MATERIALS, SURFACE_SPECS, type Material } from "@/lib/materials";
 import { roomTypeFromDb } from "@/lib/render-prompts";
@@ -902,25 +907,19 @@ function RoomPhotoPanel({
   onUploaded: (publicUrl: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [optimising, setOptimising] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const busy = optimising || uploading;
 
-  const MAX_BYTES = 20 * 1024 * 1024;
+  // Post-compression backstop — the client compresses first, so this should
+  // essentially never trip. Kept a touch under the server's 20 MB so we fail
+  // with a friendly message before hitting the route.
+  const MAX_BYTES = 18 * 1024 * 1024;
 
-  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // let the same file be re-selected later
-    if (!file || !roomId) return;
-    if (!/^image\/(png|jpeg)$/.test(file.type)) {
-      setError("Please choose a PNG or JPG.");
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setError("Image is larger than 20 MB.");
-      return;
-    }
-    setError(null);
+  function uploadFile(file: File) {
+    if (!roomId) return;
     setUploading(true);
     setProgress(0);
 
@@ -939,7 +938,7 @@ function RoomPhotoPanel({
       try {
         body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
       } catch {
-        // fall through to the generic error below
+        // fall through to the status-based error below
       }
       if (
         xhr.status >= 200 &&
@@ -949,13 +948,22 @@ function RoomPhotoPanel({
         "public_url" in body
       ) {
         onUploaded(String((body as { public_url: unknown }).public_url));
-      } else {
-        const msg =
-          body && typeof body === "object" && "error" in body
-            ? String((body as { error: unknown }).error)
-            : `Upload failed (${xhr.status}).`;
-        setError(msg);
+        return;
       }
+      const structured =
+        body && typeof body === "object" && "error" in body
+          ? String((body as { error: unknown }).error)
+          : null;
+      // A platform edge may 413 with HTML or an empty body (no JSON to parse) —
+      // never surface a raw "413" to the user.
+      if (xhr.status === 413) {
+        setError(
+          structured ??
+            "This image is too large to upload even after optimisation. Please try a smaller photo.",
+        );
+        return;
+      }
+      setError(structured ?? `Upload failed (${xhr.status}).`);
     };
     xhr.onerror = () => {
       setUploading(false);
@@ -964,12 +972,46 @@ function RoomPhotoPanel({
     xhr.send(form);
   }
 
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // let the same file be re-selected later
+    if (!file || !roomId) return;
+    setError(null);
+
+    // Downscale/compress client-side (EXIF-corrected). HEIC the browser can't
+    // decode throws a friendly ImageProcessingError instead of a raw 413.
+    let toUpload = file;
+    setOptimising(true);
+    try {
+      const result = await compressImage(file);
+      toUpload = result.file;
+    } catch (err) {
+      setOptimising(false);
+      setError(
+        err instanceof ImageProcessingError
+          ? err.message
+          : "We couldn’t read that image. Please try a JPG or PNG.",
+      );
+      return;
+    }
+    setOptimising(false);
+
+    if (toUpload.size > MAX_BYTES) {
+      setError(
+        "This image is too large to upload even after optimisation. Please try a smaller photo.",
+      );
+      return;
+    }
+
+    uploadFile(toUpload);
+  }
+
   return (
     <div className="flex flex-col gap-sm">
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg"
+        accept={ACCEPT_ATTR}
         onChange={onPick}
         className="hidden"
       />
@@ -987,7 +1029,7 @@ function RoomPhotoPanel({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            disabled={uploading || !roomId}
+            disabled={busy || !roomId}
             className="focus-ring flex h-10 items-center justify-center gap-sm rounded-lg border border-ink-100 font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container-low disabled:opacity-50"
           >
             <span
@@ -996,14 +1038,14 @@ function RoomPhotoPanel({
             >
               sync
             </span>
-            {uploading ? "Uploading…" : "Replace photo"}
+            {optimising ? "Optimising…" : uploading ? "Uploading…" : "Replace photo"}
           </button>
         </>
       ) : (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          disabled={uploading || !roomId}
+          disabled={busy || !roomId}
           className="focus-ring flex h-[120px] flex-col items-center justify-center gap-xs rounded-lg border-2 border-dashed border-ink-100 text-center transition-colors hover:border-brass-600 hover:bg-primary-fixed/30 disabled:opacity-50"
         >
           <span
@@ -1013,10 +1055,10 @@ function RoomPhotoPanel({
             add_a_photo
           </span>
           <span className="font-body-sm text-body-sm text-on-surface-variant">
-            {uploading ? "Uploading…" : "Add room photo"}
+            {optimising ? "Optimising…" : uploading ? "Uploading…" : "Add room photo"}
           </span>
           <span className="font-body-sm text-[11px] text-ink-500">
-            PNG or JPG · max 20 MB
+            JPG, PNG or HEIC · optimised automatically
           </span>
         </button>
       )}
@@ -1030,7 +1072,20 @@ function RoomPhotoPanel({
         </div>
       )}
       {error && (
-        <p className="font-body-sm text-body-sm text-error">{error}</p>
+        <div
+          role="alert"
+          className="flex items-start gap-sm rounded-lg border border-error/40 bg-error/5 px-md py-sm"
+        >
+          <span
+            className="material-symbols-outlined text-[18px] text-error"
+            aria-hidden="true"
+          >
+            error
+          </span>
+          <p className="text-left font-body-sm text-body-sm text-ink-900">
+            {error}
+          </p>
+        </div>
       )}
     </div>
   );

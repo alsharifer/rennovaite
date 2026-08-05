@@ -190,6 +190,26 @@ helpers (model selection, input shaping per model family, timeout) in
 `renders` rows record `source_image_url`, `model`, and `mode` for A/B and
 tracing.
 
+### Room-photo uploads (client compression)
+
+The photo path's source image is uploaded from the render page's
+`RoomPhotoPanel` to `POST /api/room-photo` (multipart `file` + `room_id`, bucket
+`plan-uploads`). Raw phone photos (8–15 MB / 12 MP) used to hit an upstream
+body-cap and fail with a raw **HTTP 413** before ever reaching the route. So the
+client **compresses first** (`lib/image/compress.ts`): decode with EXIF
+orientation baked in, downscale to long edge ≤ **2048 px**, re-encode JPEG
+**q0.85** — a typical upload lands at ~0.5–2 MB. Small in-dimension JPEG/PNG
+originals (≤ 1 MB) pass through **byte-identical**. HEIC is converted where the
+browser can decode it, otherwise the user gets a friendly "use JPG/PNG" message
+(never a raw 413). The pure decision logic (`fitWithin`, `planImageProcessing`,
+`isHeic`) is unit-tested in `lib/image/__tests__`.
+
+Server limits (backstops — the client keeps uploads far under them):
+`app/api/room-photo` rejects `> 20 MB` with a **structured 413** (`{ error, code:
+"payload_too_large" }`) rendered as an Atelier error state; `next.config.ts`
+sets `experimental.proxyClientMaxBodySize: "25mb"` (above the route cap) so a
+future proxy/middleware can't silently truncate an upload below it.
+
 ## Drawings — geometry contract + 2D drawing engine (P1)
 
 Auto-generated, **deterministic** (no LLM) A3 drawing set: dimensioned as-built

@@ -9,6 +9,11 @@ export const dynamic = "force-dynamic";
 // Reuse the existing bucket the plan uploader writes to. Room photos live under
 // a per-project/room prefix so they're easy to browse and cascade-clean.
 const BUCKET = "plan-uploads";
+// Backstop only. The client compresses/downscales before upload (see
+// lib/image/compress.ts), so a real upload is ~0.5–2 MB. This 20 MB ceiling
+// sits comfortably above that and above the framework proxy buffer
+// (proxyClientMaxBodySize = 25 MB in next.config.ts), so an oversize body is
+// rejected here with a structured 413 rather than a raw platform 413.
 const MAX_SIZE_BYTES = 20 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg"]);
 
@@ -48,9 +53,15 @@ export async function POST(request: NextRequest) {
       );
     }
     if (file.size > MAX_SIZE_BYTES) {
+      // Structured 413 (Payload Too Large). The client renders `error` and
+      // keys off `code`/status to show a friendly "too large" state.
       return NextResponse.json(
-        { error: "File is larger than 20 MB." },
-        { status: 400 },
+        {
+          error:
+            "This image is too large to upload even after optimisation. Please try a smaller photo.",
+          code: "payload_too_large",
+        },
+        { status: 413 },
       );
     }
 
