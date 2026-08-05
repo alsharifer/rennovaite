@@ -1,7 +1,9 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
+import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { ParseLoading } from "./_components/parse-loading";
@@ -107,11 +109,29 @@ export default async function PlanPage({
     );
   }
 
-  const { data: rooms, error: roomsErr } = await supabase
+  // Prefer selecting `confidence` (migration 025); fall back to the base
+  // columns if the column isn't applied yet so the page still renders. The
+  // confidence column isn't in the generated types, so use the untyped client.
+  const sb = supabase as unknown as SupabaseClient;
+  const withConf = await sb
     .from("rooms")
-    .select("id, name_en, name_ar, room_type, area_m2, polygon")
+    .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence")
     .eq("plan_id", plan.id)
-    .order("name_en");
+    .order("name_en")
+    .returns<RawRoomInput[]>();
+  let roomList: RawRoomInput[];
+  let roomsErr: { message: string } | null = null;
+  if (withConf.error) {
+    const base = await supabase
+      .from("rooms")
+      .select("id, name_en, name_ar, room_type, area_m2, polygon")
+      .eq("plan_id", plan.id)
+      .order("name_en");
+    roomsErr = base.error;
+    roomList = (base.data ?? []) as RawRoomInput[];
+  } else {
+    roomList = withConf.data ?? [];
+  }
 
   if (roomsErr) {
     return (
@@ -121,7 +141,6 @@ export default async function PlanPage({
     );
   }
 
-  const roomList = rooms ?? [];
   const parsedComplete = plan.parsed_json !== null && roomList.length > 0;
 
   // Aggregates for the right column + sticky bar.
