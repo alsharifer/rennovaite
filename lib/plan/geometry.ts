@@ -22,6 +22,8 @@
 //     so the UI (and the P1 verification gate) can be honest about confidence.
 // =============================================================================
 
+import { pointToSegment } from "./polygon";
+
 export type Point = [number, number]; // metres. Origin = plan bbox top-left; +x right, +y DOWN (drawing convention).
 
 export const DEFAULT_WALL_THICKNESS_MM = 200;
@@ -56,14 +58,51 @@ export interface Wall {
   derived: true;
 }
 
+// A3/A5: openings are first-class children of walls. Assigned to the nearest
+// derived wall at graph-build time (derived wall ids are volatile), so
+// downstream (net-wall quantities, schedule, 3D door-cuts) key off wall_id.
 export interface Opening {
   id: string;
-  wall_id: string;
-  type: "door" | "window";
+  /** Assigned to the nearest derived wall at build time (null if none). */
+  wall_id: string | null;
+  room_id: string | null;
+  type: "door" | "window" | "archway";
   width_mm: number;
   height_mm: number;
   sill_mm: number;
-  derived: true;
+  /** Metric midpoint (origin = plan bbox top-left). */
+  position: Point | null;
+  /** 0..1 along the assigned wall (null if not computed). */
+  along_offset: number | null;
+  source: "parsed" | "user_drawn";
+  /** true = dimensions were DEFAULTED (standard door/window), not measured. A
+   *  defaulted opening must never silently read as a measured quantity. */
+  derived: boolean;
+}
+
+/** Standard fallback dimensions (mm) when the source can't measure. */
+export const DEFAULT_OPENING_DIMS: Record<
+  Opening["type"],
+  { width_mm: number; height_mm: number; sill_mm: number }
+> = {
+  door: { width_mm: 900, height_mm: 2100, sill_mm: 0 },
+  window: { width_mm: 1200, height_mm: 1200, sill_mm: 900 },
+  archway: { width_mm: 1200, height_mm: 2400, sill_mm: 0 },
+};
+
+/** Raw persisted/provider opening (normalised space, like rooms.polygon). */
+export interface RawOpening {
+  id: string;
+  wall_ref?: string | null;
+  room_id?: string | null;
+  type?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  sill_mm?: number | null;
+  position?: unknown; // normalised [x, y]
+  along_offset?: number | null;
+  source?: string | null;
+  derived?: boolean | null;
 }
 
 export interface PlanGraphMeta {
@@ -122,6 +161,8 @@ export interface BuildPlanGraphInput {
   scale: string | null; // parsed_json.scale, e.g. "1:100"
   total_area_m2: number | null;
   rooms: RawRoom[];
+  /** A3/A5: persisted openings (doors/windows), if any. Absent → openings[] empty. */
+  openings?: RawOpening[];
 }
 
 // --- helpers ------------------------------------------------------------------
@@ -352,7 +393,52 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
   notes.push(
     `${walls.length} walls derived from shared/boundary polygon edges (${partyWalls} party, ${walls.length - partyWalls} boundary); thickness ${DEFAULT_WALL_THICKNESS_MM} mm and structural status are placeholders.`,
   );
-  notes.push("openings: none persisted in the parse — returned empty (no doors/windows invented).");
+
+  // --- Openings (A3/A5) — assign each to its nearest derived wall -------------
+  const openings: Opening[] = (input.openings ?? [])
+    .map((ro): Opening | null => {
+      const type: Opening["type"] =
+        ro.type === "window" || ro.type === "archway" ? ro.type : "door";
+      const def = DEFAULT_OPENING_DIMS[type];
+      const dimsDefaulted = ro.width_mm == null || ro.height_mm == null;
+      const posNorm = isNumberPair(ro.position) ? (ro.position as [number, number]) : null;
+      const posM: Point | null = posNorm
+        ? [(posNorm[0] - minX) * unitToM, (posNorm[1] - minY) * unitToM]
+        : null;
+      let wall_id: string | null = null;
+      let along: number | null = ro.along_offset ?? null;
+      if (posM && walls.length > 0) {
+        let best = Infinity;
+        for (const w of walls) {
+          const a = w.polyline[0];
+          const b = w.polyline[w.polyline.length - 1];
+          if (!a || !b) continue;
+          const { dist, t } = pointToSegment(posM, a, b);
+          if (dist < best) { best = dist; wall_id = w.id; along = t; }
+        }
+      }
+      return {
+        id: ro.id,
+        wall_id,
+        room_id: ro.room_id ?? null,
+        type,
+        width_mm: ro.width_mm ?? def.width_mm,
+        height_mm: ro.height_mm ?? def.height_mm,
+        sill_mm: ro.sill_mm ?? def.sill_mm,
+        position: posM,
+        along_offset: along,
+        source: ro.source === "parsed" ? "parsed" : "user_drawn",
+        // Defaulted dimensions are always derived — never silently "measured".
+        derived: ro.derived ?? dimsDefaulted,
+      };
+    })
+    .filter((o): o is Opening => o !== null);
+
+  notes.push(
+    openings.length === 0
+      ? "openings: none persisted — returned empty (no doors/windows invented)."
+      : `openings: ${openings.length} ingested and snapped to nearest walls (${openings.filter((o) => o.derived).length} with defaulted/derived dimensions).`,
+  );
 
   const envelope = {
     width: (maxX - minX) * unitToM,
@@ -367,7 +453,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
     planId: input.planId,
     rooms,
     walls,
-    openings: [],
+    openings,
     meta: {
       scale,
       north_deg: DEFAULT_NORTH_DEG,
@@ -382,7 +468,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       walls: true,
       wall_thickness: true,
       is_structural: true,
-      openings_empty: true,
+      openings_empty: openings.length === 0,
       ceiling_h: true,
       north: true,
       level: true,

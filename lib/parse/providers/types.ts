@@ -25,11 +25,32 @@ export interface RawParsedRoom {
   confidence: number;
 }
 
+/** An opening a provider reports (normalised space). Persisted with
+ *  source='parsed'; `derived` when the provider defaulted the dimensions. */
+export interface RawProvidedOpening {
+  wall_ref?: string | null;
+  room_id?: string | null;
+  type: "door" | "window" | "archway";
+  width_mm?: number | null;
+  height_mm?: number | null;
+  sill_mm?: number | null;
+  position: [number, number]; // normalised [x, y]
+  along_offset?: number | null;
+  derived?: boolean | null;
+}
+
 export interface RawParseResult {
   scale: string;
   units: "metric" | "imperial";
   total_area_m2: number;
   rooms: RawParsedRoom[];
+  /** Optional: providers that detect doors/windows supply them here (the
+   *  in-house Claude provider does not — it's forward-looking for a hosted /
+   *  vector-extraction provider). Persisted to plan_openings. */
+  openings?: RawProvidedOpening[];
+  /** Optional: a provider that returns true measured walls may supply them
+   *  here (not yet consumed — buildPlanGraph still derives walls from polygons). */
+  walls?: unknown[];
 }
 
 export interface ParseProvider {

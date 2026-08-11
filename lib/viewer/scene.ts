@@ -104,6 +104,7 @@ export function buildScene(
 
   const openingsByWall = new Map<string, Opening[]>();
   for (const o of graph.openings) {
+    if (!o.wall_id) continue; // unsnapped opening — no wall to cut
     (openingsByWall.get(o.wall_id) ?? openingsByWall.set(o.wall_id, []).get(o.wall_id)!).push(o);
   }
 

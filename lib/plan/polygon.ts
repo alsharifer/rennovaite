@@ -90,6 +90,20 @@ export function segmentsOverlapCollinear(
   return [at(lo), at(hi)];
 }
 
+/** Distance from point p to segment a→b, plus the clamped parameter t∈[0,1]
+ *  of the closest point along the segment. Used to snap an opening to its
+ *  nearest wall. */
+export function pointToSegment(p: Pt, a: Pt, b: Pt): { dist: number; t: number } {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len2 = dx * dx + dy * dy;
+  let t = len2 > 0 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = a[0] + t * dx;
+  const cy = a[1] + t * dy;
+  return { dist: Math.hypot(p[0] - cx, p[1] - cy), t };
+}
+
 /** True if a polygon edge is (near) axis-aligned. */
 export function isAxisAligned(p: Pt, q: Pt, eps = 1e-4): boolean {
   return Math.abs(p[0] - q[0]) < eps || Math.abs(p[1] - q[1]) < eps;

@@ -203,9 +203,22 @@ unchanged.
   `derivePlanGraph(projectId)` (`lib/plan/derive.ts`) reads it from the DB.
   Today we persist **room polygons only** (normalised `[0,1]`), so walls are
   **derived** from shared polygon edges (default 200 mm, `is_structural: null`),
-  metres are derived from `total_area_m2`, ceilings default to 2.9 m, and
-  **openings are empty** (we never invent doors). Every derived value is flagged
-  (`derived: true` / `derived_fields`) and surfaced in the UI + `derivedNotes`.
+  metres are derived from `total_area_m2`, ceilings default to 2.9 m. Every
+  derived value is flagged (`derived: true` / `derived_fields`) and surfaced in
+  the UI + `derivedNotes`.
+- **Openings (doors/windows/archways — A5 plumbing)**: `plan_openings`
+  (migration `026`) persists openings as first-class children of **walls**
+  (`kind` door|window|archway, `source` parsed|user_drawn, `position` normalised,
+  `along_offset`, dims in mm, `derived: true` when dimensions are DEFAULTED —
+  a defaulted opening never silently reads as measured). `buildPlanGraph`
+  ingests them and **snaps each to its nearest derived wall** (derived wall ids
+  are volatile), so `quantify.ts` already deducts opening area from
+  `wall_plaster`/`wall_paint` net. `derivePlanGraph` reads the table best-effort
+  (empty before 026). Providers may supply openings via `RawParseResult.openings`
+  (the in-house Claude provider does not — forward-looking for a hosted / vector
+  provider); the R2 2D editor writes via `POST/DELETE /api/plan-openings`
+  (`source: user_drawn`). The door/window schedule view is the remaining A5
+  consumer (R2).
 - **Snapshots**: `plan_snapshots` (migration `013`) stores as-built (at
   parse-confirm) and proposed (at design lock) graphs; diffing them drives the
   demolition sheet (and later P2/P6). Writing is best-effort in

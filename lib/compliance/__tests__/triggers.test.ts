@@ -19,7 +19,10 @@ function room(type: string, id = "r1"): Room {
   return { id, name_en: type, name_ar: null, type, polygon: [[0, 0], [3, 0], [3, 3], [0, 3]], area_m2: 9, ceiling_h_m: 2.9, derived_fields: [] };
 }
 function opening(type: "door" | "window"): Opening {
-  return { id: "o1", wall_id: "w1", type, width_mm: 900, height_mm: 1200, sill_mm: 0, derived: true };
+  return {
+    id: "o1", wall_id: "w1", room_id: null, type, width_mm: 900, height_mm: 1200,
+    sill_mm: 0, position: null, along_offset: null, source: "user_drawn", derived: true,
+  };
 }
 const EMPTY: PlanDiff = { hasProposed: true, removedWalls: [], addedWalls: [], removedRooms: [], addedRooms: [], addedOpenings: [], areaDeltaM2: 0 };
 const diff = (p: Partial<PlanDiff>): PlanDiff => ({ ...EMPTY, ...p });
