@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { Layers, Plus, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { polygonArea } from "@/lib/plan/polygon";
 import { cn } from "@/lib/utils";
 
 import {
@@ -42,6 +43,8 @@ type RoomInput = {
   room_type: string | null;
   area_m2: number | null;
   polygon: unknown;
+  /** Provider confidence 0..1 (nullable); low values flag the room for review. */
+  confidence?: number | null;
 };
 
 type Room = {
@@ -50,22 +53,26 @@ type Room = {
   name_ar: string | null;
   room_type: string | null;
   area_m2: number;
-  // Editor always uses an axis-aligned 4-point rectangle in viewBox space.
-  // Order: [TL, TR, BR, BL].
-  polygon: [Point, Point, Point, Point];
+  // N-vertex polygon in viewBox space (may be non-rectilinear / diagonal).
+  polygon: Point[];
+  confidence: number | null;
   isNew?: boolean;
   isDeleted?: boolean;
 };
 
-type DragKind = "move" | "resize";
+// "move" drags the whole room; "vertex" drags a single polygon vertex.
+type DragKind = "move" | "vertex";
 type DragState = {
   kind: DragKind;
   roomId: string;
-  cornerIndex?: 0 | 1 | 2 | 3;
+  vertexIndex?: number;
   start: Point;
-  startBbox: { xL: number; yT: number; xR: number; yB: number };
+  startPolygon: Point[];
   pointerId: number;
 };
+
+/** Threshold below which a room is flagged low-confidence in the editor. */
+const LOW_CONFIDENCE_FLAG = 0.6;
 
 function isPointArray(value: unknown): value is number[][] {
   if (!Array.isArray(value)) return false;
@@ -119,17 +126,11 @@ function bboxOf(points: Point[]): {
   return { xL, yT, xR, yB };
 }
 
-function rectArea(rect: [Point, Point, Point, Point]): number {
-  const w = Math.abs(rect[1][0] - rect[0][0]);
-  const h = Math.abs(rect[2][1] - rect[1][1]);
-  return w * h;
-}
-
-// [x, y, w, h] from a 4-point axis-aligned polygon. x/y is the top-left
+// [x, y, w, h] from a polygon's bounding box. x/y is the top-left
 // corner; w/h are the bbox extents. Reused by the dimensions display, the
 // overlap-detection effect, and the separation algorithm.
 function polygonToRect(
-  polygon: [Point, Point, Point, Point],
+  polygon: Point[],
 ): [number, number, number, number] {
   const bb = bboxOf(polygon);
   return [bb.xL, bb.yT, bb.xR - bb.xL, bb.yB - bb.yT];
@@ -144,9 +145,7 @@ function pixelToM(px: number, scale: number): number {
 function applyOffset(room: Room, dx: number, dy: number): Room {
   return {
     ...room,
-    polygon: room.polygon.map(
-      ([x, y]) => [x + dx, y + dy] as Point,
-    ) as [Point, Point, Point, Point],
+    polygon: room.polygon.map(([x, y]) => [x + dx, y + dy] as Point),
   };
 }
 
@@ -275,23 +274,25 @@ function fitToViewBox(rooms: RoomInput[]): {
   const offsetY = (VIEW_H - spanY * scale) / 2;
 
   const fitted: Room[] = valid.map((r) => {
+    // Keep ALL vertices — do NOT flatten to a bounding rectangle (that was the
+    // load-path bug that made every room render rectilinear).
     const pts = (r.polygon as number[][]).map<Point>(([x, y]) => [
       (x - minX) * scale + offsetX,
       (y - minY) * scale + offsetY,
     ]);
-    const bb = bboxOf(pts);
     return {
       id: r.id,
       name_en: r.name_en?.trim() || "Room",
       name_ar: r.name_ar ?? null,
       room_type: r.room_type ?? null,
       area_m2: typeof r.area_m2 === "number" ? r.area_m2 : 0,
-      polygon: rectFromBbox(bb.xL, bb.yT, bb.xR, bb.yB),
+      polygon: pts,
+      confidence: typeof r.confidence === "number" ? r.confidence : null,
     };
   });
 
   const initialTotalViewBoxArea = fitted.reduce(
-    (s, r) => s + rectArea(r.polygon),
+    (s, r) => s + polygonArea(r.polygon),
     0,
   );
   const totalM2 = fitted.reduce((s, r) => s + r.area_m2, 0);
@@ -359,6 +360,20 @@ export function EditablePlanViewer({
     }
     return ids;
   }, [rooms]);
+  // Rooms the parser flagged low-confidence — surfaced for review in the editor.
+  const lowConfidenceIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const r of rooms) {
+      if (!r.isDeleted && r.confidence != null && r.confidence < LOW_CONFIDENCE_FLAG) {
+        ids.add(r.id);
+      }
+    }
+    return ids;
+  }, [rooms]);
+  // Rooms the user has flagged (split/merge/other) this session — shown marked.
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(() => new Set());
+  // Per-session correction counts → posted to parse_metrics on save (the KPI).
+  const correctionCounts = useRef({ move: 0, vertex: 0, relabel: 0, delete: 0 });
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const infoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -407,12 +422,14 @@ export function EditablePlanViewer({
   }, []);
 
   const recomputeArea = useCallback(
-    (rect: [Point, Point, Point, Point]): number => {
-      const a = rectArea(rect) * unitToM2Factor;
+    (poly: Point[]): number => {
+      const a = polygonArea(poly) * unitToM2Factor;
       return Math.round(a * 10) / 10;
     },
     [unitToM2Factor],
   );
+
+  const clampToView = (v: number, hi: number) => Math.max(0, Math.min(hi, v));
 
   // Begin a body-drag (move) — also handles selection on click.
   const onRoomPointerDown = (
@@ -423,34 +440,32 @@ export function EditablePlanViewer({
     e.stopPropagation();
     setSelectedId(room.id);
     const [px, py] = toViewBox(e.clientX, e.clientY);
-    const bb = bboxOf(room.polygon);
     dragRef.current = {
       kind: "move",
       roomId: room.id,
       start: [px, py],
-      startBbox: bb,
+      startPolygon: room.polygon.map(([x, y]) => [x, y] as Point),
       pointerId: e.pointerId,
     };
     dirtyDragRef.current = false;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
   };
 
-  // Begin a corner-drag (resize).
-  const onHandlePointerDown = (
+  // Begin a single-vertex drag.
+  const onVertexPointerDown = (
     e: ReactPointerEvent<SVGCircleElement>,
     room: Room,
-    cornerIndex: 0 | 1 | 2 | 3,
+    vertexIndex: number,
   ) => {
     e.stopPropagation();
     setSelectedId(room.id);
     const [px, py] = toViewBox(e.clientX, e.clientY);
-    const bb = bboxOf(room.polygon);
     dragRef.current = {
-      kind: "resize",
+      kind: "vertex",
       roomId: room.id,
-      cornerIndex,
+      vertexIndex,
       start: [px, py],
-      startBbox: bb,
+      startPolygon: room.polygon.map(([x, y]) => [x, y] as Point),
       pointerId: e.pointerId,
     };
     dirtyDragRef.current = false;
@@ -473,69 +488,28 @@ export function EditablePlanViewer({
     setRooms((current) =>
       current.map((r) => {
         if (r.id !== drag.roomId) return r;
-        let nextBbox: { xL: number; yT: number; xR: number; yB: number };
+        let nextPoly: Point[];
         if (drag.kind === "move") {
-          nextBbox = {
-            xL: drag.startBbox.xL + dx,
-            yT: drag.startBbox.yT + dy,
-            xR: drag.startBbox.xR + dx,
-            yB: drag.startBbox.yB + dy,
-          };
+          // Shift the whole polygon; clamp so its bbox stays inside the viewBox
+          // (preserves shape — every vertex moves by the same delta).
+          const bb = bboxOf(drag.startPolygon);
+          let ddx = dx;
+          let ddy = dy;
+          if (bb.xL + ddx < 0) ddx = -bb.xL;
+          if (bb.yT + ddy < 0) ddy = -bb.yT;
+          if (bb.xR + ddx > VIEW_W) ddx = VIEW_W - bb.xR;
+          if (bb.yB + ddy > VIEW_H) ddy = VIEW_H - bb.yB;
+          nextPoly = drag.startPolygon.map(([x, y]) => [x + ddx, y + ddy] as Point);
         } else {
-          // Resize: move the corner the user grabbed; opposite corner stays put.
-          const minSize = 30;
-          let { xL, yT, xR, yB } = drag.startBbox;
-          if (drag.cornerIndex === 0) {
-            // TL
-            xL = Math.min(drag.startBbox.xL + dx, xR - minSize);
-            yT = Math.min(drag.startBbox.yT + dy, yB - minSize);
-          } else if (drag.cornerIndex === 1) {
-            // TR
-            xR = Math.max(drag.startBbox.xR + dx, xL + minSize);
-            yT = Math.min(drag.startBbox.yT + dy, yB - minSize);
-          } else if (drag.cornerIndex === 2) {
-            // BR
-            xR = Math.max(drag.startBbox.xR + dx, xL + minSize);
-            yB = Math.max(drag.startBbox.yB + dy, yT + minSize);
-          } else {
-            // BL
-            xL = Math.min(drag.startBbox.xL + dx, xR - minSize);
-            yB = Math.max(drag.startBbox.yB + dy, yT + minSize);
-          }
-          nextBbox = { xL, yT, xR, yB };
+          // Move only the grabbed vertex (clamped into the viewBox).
+          const vi = drag.vertexIndex ?? 0;
+          nextPoly = drag.startPolygon.map((p, i) =>
+            i === vi
+              ? ([clampToView(p[0] + dx, VIEW_W), clampToView(p[1] + dy, VIEW_H)] as Point)
+              : ([p[0], p[1]] as Point),
+          );
         }
-
-        // Clamp the bbox inside the viewBox.
-        const w = nextBbox.xR - nextBbox.xL;
-        const h = nextBbox.yB - nextBbox.yT;
-        if (nextBbox.xL < 0) {
-          nextBbox.xL = 0;
-          if (drag.kind === "move") nextBbox.xR = w;
-        }
-        if (nextBbox.yT < 0) {
-          nextBbox.yT = 0;
-          if (drag.kind === "move") nextBbox.yB = h;
-        }
-        if (nextBbox.xR > VIEW_W) {
-          nextBbox.xR = VIEW_W;
-          if (drag.kind === "move") nextBbox.xL = VIEW_W - w;
-        }
-        if (nextBbox.yB > VIEW_H) {
-          nextBbox.yB = VIEW_H;
-          if (drag.kind === "move") nextBbox.yT = VIEW_H - h;
-        }
-
-        const nextPoly = rectFromBbox(
-          nextBbox.xL,
-          nextBbox.yT,
-          nextBbox.xR,
-          nextBbox.yB,
-        );
-        return {
-          ...r,
-          polygon: nextPoly,
-          area_m2: recomputeArea(nextPoly),
-        };
+        return { ...r, polygon: nextPoly, area_m2: recomputeArea(nextPoly) };
       }),
     );
   };
@@ -547,6 +521,11 @@ export function EditablePlanViewer({
       (e.currentTarget as Element).releasePointerCapture(e.pointerId);
     } catch {
       // ignore
+    }
+    // Count a correction only if the gesture actually mutated geometry.
+    if (dirtyDragRef.current) {
+      if (drag.kind === "move") correctionCounts.current.move += 1;
+      else correctionCounts.current.vertex += 1;
     }
     dragRef.current = null;
     dirtyDragRef.current = false;
@@ -578,6 +557,7 @@ export function EditablePlanViewer({
       room_type: "other",
       area_m2: recomputeArea(polygon),
       polygon,
+      confidence: null,
       isNew: true,
     };
     setRooms((current) => [...current, next]);
@@ -586,6 +566,7 @@ export function EditablePlanViewer({
 
   const deleteRoom = (roomId: string) => {
     snapshot();
+    correctionCounts.current.delete += 1;
     setRooms((current) =>
       current
         .map((r) =>
@@ -614,6 +595,7 @@ export function EditablePlanViewer({
     if (!renamingId) return;
     const next = renameDraft.trim() || "Room";
     snapshot();
+    correctionCounts.current.relabel += 1;
     setRooms((current) =>
       current.map((r) =>
         r.id === renamingId ? { ...r, name_en: next } : r,
@@ -685,6 +667,43 @@ export function EditablePlanViewer({
     );
   }, [rooms, snapshot, recomputeArea, flashInfo]);
 
+  // Best-effort parse-metrics post (table/route may be absent pre-025).
+  const postParseMetrics = useCallback(
+    async (body: Record<string, unknown>) => {
+      try {
+        await fetch("/api/parse-metrics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan_id: planId, ...body }),
+        });
+      } catch {
+        /* best-effort */
+      }
+    },
+    [planId],
+  );
+
+  // Escape valve for the deferred split/merge: record unmet demand + mark room.
+  const flagIssue = useCallback(
+    (roomId: string, reason: "split" | "merge" | "other") => {
+      setFlaggedIds((prev) => new Set(prev).add(roomId));
+      void postParseMetrics({
+        kind: "corrections",
+        needed_split_count: reason === "split" ? 1 : 0,
+        needed_merge_count: reason === "merge" ? 1 : 0,
+        detail: { flag: reason, room_id: roomId },
+      });
+      flashInfo(
+        reason === "split"
+          ? "Flagged: should be two rooms"
+          : reason === "merge"
+            ? "Flagged: should be merged"
+            : "Flagged for review",
+      );
+    },
+    [postParseMetrics, flashInfo],
+  );
+
   const save = async () => {
     setSaveStatus("saving");
     setSaveError(null);
@@ -716,6 +735,13 @@ export function EditablePlanViewer({
       }
       setSaveStatus("saved");
       setHistory([]);
+      // Record correction counts for the "<3 corrections/plan" KPI, then reset.
+      const c = correctionCounts.current;
+      const correction_total = c.move + c.vertex + c.relabel + c.delete;
+      if (correction_total > 0) {
+        void postParseMetrics({ kind: "corrections", corrections: { ...c }, correction_total });
+        correctionCounts.current = { move: 0, vertex: 0, relabel: 0, delete: 0 };
+      }
       // Make the page re-render so server-fetched totals/rooms refresh.
       router.refresh();
       setTimeout(() => setSaveStatus("idle"), 1500);
@@ -775,6 +801,37 @@ export function EditablePlanViewer({
               <span className="ml-1 text-xs">({overlappingIds.size})</span>
             )}
           </Button>
+          {lowConfidenceIds.size > 0 && (
+            <span className="ml-1 rounded-full bg-[#FEF3C7] px-2 py-0.5 text-xs font-medium text-[#92400E]">
+              {lowConfidenceIds.size} to review
+            </span>
+          )}
+          {selectedId && (
+            <span className="ml-2 flex items-center gap-1 text-xs text-ink-500">
+              Flag:
+              <button
+                type="button"
+                onClick={() => flagIssue(selectedId, "split")}
+                className="rounded border border-ink-100 px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+              >
+                split
+              </button>
+              <button
+                type="button"
+                onClick={() => flagIssue(selectedId, "merge")}
+                className="rounded border border-ink-100 px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+              >
+                merge
+              </button>
+              <button
+                type="button"
+                onClick={() => flagIssue(selectedId, "other")}
+                className="rounded border border-ink-100 px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+              >
+                other
+              </button>
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {infoMessage && (
@@ -836,6 +893,7 @@ export function EditablePlanViewer({
               const selected = selectedId === room.id;
               const renaming = renamingId === room.id;
               const overlapping = overlappingIds.has(room.id);
+              const flagged = lowConfidenceIds.has(room.id) || flaggedIds.has(room.id);
               const bb = bboxOf(room.polygon);
               // Mode gate: edit → body-drag, read → inspect-on-click.
               const roomMode = roomInteraction(mode);
@@ -894,6 +952,20 @@ export function EditablePlanViewer({
                       stroke="#F87171"
                       strokeWidth={1.5}
                       strokeDasharray="4 3"
+                      pointerEvents="none"
+                    />
+                  )}
+
+                  {/* Low-confidence / user-flagged room → amber "check me" outline. */}
+                  {flagged && !overlapping && (
+                    <polygon
+                      points={room.polygon
+                        .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
+                        .join(" ")}
+                      fill="none"
+                      stroke="#D97706"
+                      strokeWidth={1.5}
+                      strokeDasharray="5 3"
                       pointerEvents="none"
                     />
                   )}
@@ -1019,31 +1091,20 @@ export function EditablePlanViewer({
 
                   {editing && selected && !renaming && (
                     <>
-                      {/* Resize handles at the four corners. */}
-                      {([0, 1, 2, 3] as const).map((cornerIndex) => {
-                        const [hx, hy] = room.polygon[cornerIndex];
-                        const cursorMap = [
-                          "nwse-resize",
-                          "nesw-resize",
-                          "nwse-resize",
-                          "nesw-resize",
-                        ];
-                        return (
-                          <circle
-                            key={cornerIndex}
-                            cx={hx}
-                            cy={hy}
-                            r={7}
-                            fill="#A855F7"
-                            stroke="#0B0712"
-                            strokeWidth={2}
-                            style={{ cursor: cursorMap[cornerIndex] }}
-                            onPointerDown={(e) =>
-                              onHandlePointerDown(e, room, cornerIndex)
-                            }
-                          />
-                        );
-                      })}
+                      {/* One draggable handle per polygon vertex (N-vertex). */}
+                      {room.polygon.map(([hx, hy], vertexIndex) => (
+                        <circle
+                          key={vertexIndex}
+                          cx={hx}
+                          cy={hy}
+                          r={7}
+                          fill="#A855F7"
+                          stroke="#0B0712"
+                          strokeWidth={2}
+                          style={{ cursor: "move" }}
+                          onPointerDown={(e) => onVertexPointerDown(e, room, vertexIndex)}
+                        />
+                      ))}
 
                       {/* Delete X above the top-right corner. */}
                       <g
@@ -1092,8 +1153,9 @@ export function EditablePlanViewer({
       <p className="text-xs text-ink-500">
         {editing ? (
           <>
-            Click a room to select. Drag the body to move, drag a corner handle
-            to resize, double-click the name to rename. Live total:{" "}
+            Click a room to select. Drag the body to move, drag a vertex to
+            reshape, double-click the name to rename. Amber = low confidence;
+            use Flag if a room should be split or merged. Live total:{" "}
           </>
         ) : (
           <>Click a room to see what it is and what it costs. Total:{" "}</>

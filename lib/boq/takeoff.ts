@@ -26,6 +26,8 @@ import {
   POINTS_PER_M2,
   WARDROBE_LM,
 } from "./rules";
+import { polygonArea, type Pt } from "@/lib/plan/polygon";
+
 import type { EngineRoom, ScopeItem } from "./schema";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -67,7 +69,26 @@ function roomGeometry(room: EngineRoom): RoomGeometry {
 
   const depthM = Math.sqrt(room.area_m2 / aspect);
   const widthM = depthM * aspect;
-  const perimeterM = 2 * (widthM + depthM);
+
+  // True metric perimeter from the polygon (scaled so its area matches area_m2),
+  // not the fitted rectangle — otherwise non-rectangular rooms (L-shapes,
+  // diagonals) get a wrong wall/tiling/skirting quantity. Falls back to the
+  // fitted rectangle when no usable polygon is present. For a rectangle the two
+  // are identical, so rectilinear plans (e.g. Mudon) are unchanged.
+  let perimeterM = 2 * (widthM + depthM);
+  if (poly && poly.length >= 3 && room.area_m2 > 0) {
+    const pts = poly.filter((p): p is [number, number] => Array.isArray(p) && p.length >= 2) as Pt[];
+    const rawArea = pts.length >= 3 ? polygonArea(pts) : 0;
+    if (rawArea > 0) {
+      let rawPerim = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i]!;
+        const b = pts[(i + 1) % pts.length]!;
+        rawPerim += Math.hypot(b[0] - a[0], b[1] - a[1]);
+      }
+      perimeterM = rawPerim * Math.sqrt(room.area_m2 / rawArea);
+    }
+  }
 
   const isBathroom = BATHROOM_TYPES.has(room.room_type);
   const isBedroom = BEDROOM_TYPES.has(room.room_type);

@@ -36,6 +36,8 @@ export interface RawRoomInput {
   room_type: string | null;
   area_m2: number | null;
   polygon: unknown;
+  /** Parser confidence 0..1 (nullable); forwarded to the editor's flag. */
+  confidence?: number | null;
 }
 
 function asPolygon(v: unknown): Pt[] | null {

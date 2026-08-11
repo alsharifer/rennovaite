@@ -1,7 +1,9 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
+import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { ParseLoading } from "./_components/parse-loading";
@@ -107,11 +109,29 @@ export default async function PlanPage({
     );
   }
 
-  const { data: rooms, error: roomsErr } = await supabase
+  // Prefer selecting `confidence` (migration 025); fall back to the base
+  // columns if the column isn't applied yet so the page still renders. The
+  // confidence column isn't in the generated types, so use the untyped client.
+  const sb = supabase as unknown as SupabaseClient;
+  const withConf = await sb
     .from("rooms")
-    .select("id, name_en, name_ar, room_type, area_m2, polygon")
+    .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence")
     .eq("plan_id", plan.id)
-    .order("name_en");
+    .order("name_en")
+    .returns<RawRoomInput[]>();
+  let roomList: RawRoomInput[];
+  let roomsErr: { message: string } | null = null;
+  if (withConf.error) {
+    const base = await supabase
+      .from("rooms")
+      .select("id, name_en, name_ar, room_type, area_m2, polygon")
+      .eq("plan_id", plan.id)
+      .order("name_en");
+    roomsErr = base.error;
+    roomList = (base.data ?? []) as RawRoomInput[];
+  } else {
+    roomList = withConf.data ?? [];
+  }
 
   if (roomsErr) {
     return (
@@ -121,8 +141,30 @@ export default async function PlanPage({
     );
   }
 
-  const roomList = rooms ?? [];
   const parsedComplete = plan.parsed_json !== null && roomList.length > 0;
+
+  // Real parse-quality KPI: mean room confidence + this plan's correction count
+  // (replaces the old hard-coded "99.2% confidence"). Both best-effort.
+  const confVals = roomList
+    .map((r) => r.confidence)
+    .filter((c): c is number => typeof c === "number");
+  const meanConfidencePct = confVals.length
+    ? Math.round((confVals.reduce((s, c) => s + c, 0) / confVals.length) * 100)
+    : null;
+  let correctionsTotal: number | null = null;
+  try {
+    const pm = await sb
+      .from("parse_metrics")
+      .select("correction_total")
+      .eq("plan_id", plan.id)
+      .eq("kind", "corrections")
+      .returns<{ correction_total: number | null }[]>();
+    if (!pm.error) {
+      correctionsTotal = (pm.data ?? []).reduce((s, r) => s + (r.correction_total ?? 0), 0);
+    }
+  } catch {
+    /* parse_metrics absent pre-025 — leave null */
+  }
 
   // Aggregates for the right column + sticky bar.
   const totalArea = plan.total_area_m2 ?? null;
@@ -339,7 +381,11 @@ export default async function PlanPage({
             </Link>
             <p className="font-body text-body-sm italic text-on-surface-variant">
               Parsed by RennovAIte · {roomList.length} rooms ·{" "}
-              {formatM2(totalArea)} · 99.2% confidence
+              {formatM2(totalArea)}
+              {meanConfidencePct != null ? ` · ${meanConfidencePct}% avg confidence` : ""}
+              {correctionsTotal != null && correctionsTotal > 0
+                ? ` · ${correctionsTotal} correction${correctionsTotal === 1 ? "" : "s"}`
+                : ""}
             </p>
             <Link
               href={`/project/${projectId}/style`}
