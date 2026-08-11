@@ -99,6 +99,7 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
   // Openings per wall (empty in the P1 contract today; handled if present).
   const openingAreaByWall = new Map<string, number>();
   for (const o of graph.openings) {
+    if (!o.wall_id) continue; // unsnapped opening — can't attribute to a wall
     const prev = openingAreaByWall.get(o.wall_id) ?? 0;
     openingAreaByWall.set(o.wall_id, prev + ((o.width_mm || 0) * (o.height_mm || 0)) / 1e6);
   }

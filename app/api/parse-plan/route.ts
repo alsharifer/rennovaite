@@ -114,6 +114,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Persist provider-supplied openings (source='parsed'). The in-house
+    // provider supplies none today — forward-looking for a hosted/vector
+    // provider. Best-effort (plan_openings may be absent pre-026).
+    if (raw.openings && raw.openings.length > 0) {
+      try {
+        await sb.from("plan_openings").insert(
+          raw.openings.map((o) => ({
+            plan_id: planId,
+            room_id: null,
+            wall_ref: o.wall_ref ?? null,
+            kind: o.type,
+            width_mm: o.width_mm ?? null,
+            height_mm: o.height_mm ?? null,
+            sill_mm: o.sill_mm ?? null,
+            position: o.position,
+            along_offset: o.along_offset ?? null,
+            source: "parsed",
+            derived: o.derived ?? (o.width_mm == null || o.height_mm == null),
+          })),
+        );
+      } catch {
+        /* plan_openings not applied yet — non-fatal */
+      }
+    }
+
     // Best-effort parse metrics (table may be absent pre-025).
     try {
       const confs = repaired.map((r) => r.confidence);

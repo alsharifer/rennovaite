@@ -6,9 +6,49 @@
 // geometry.ts has zero DB/runtime deps and stays unit-testable.
 // =============================================================================
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { buildPlanGraph, type PlanGraph, type RawRoom } from "./geometry";
+import { buildPlanGraph, type PlanGraph, type RawOpening, type RawRoom } from "./geometry";
+
+/** Read persisted openings for a plan (migration 026). `[]` if the table is
+ *  absent, so derivePlanGraph works before 026 is applied. */
+async function loadOpenings(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  planId: string,
+): Promise<RawOpening[]> {
+  try {
+    const sb = supabase as unknown as SupabaseClient;
+    const { data, error } = await sb
+      .from("plan_openings")
+      .select("id, wall_ref, room_id, kind, width_mm, height_mm, sill_mm, position, along_offset, source, derived")
+      .eq("plan_id", planId)
+      .returns<
+        {
+          id: string; wall_ref: string | null; room_id: string | null; kind: string;
+          width_mm: number | null; height_mm: number | null; sill_mm: number | null;
+          position: unknown; along_offset: number | null; source: string | null; derived: boolean | null;
+        }[]
+      >();
+    if (error) return [];
+    return (data ?? []).map((o) => ({
+      id: o.id,
+      wall_ref: o.wall_ref,
+      room_id: o.room_id,
+      type: o.kind,
+      width_mm: o.width_mm,
+      height_mm: o.height_mm,
+      sill_mm: o.sill_mm,
+      position: o.position,
+      along_offset: o.along_offset,
+      source: o.source,
+      derived: o.derived,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 type ParsedJson = { scale?: string | null; units?: string | null } | null;
 
@@ -45,6 +85,7 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
   if (roomsErr) throw new Error(`derivePlanGraph: rooms load failed — ${roomsErr.message}`);
 
   const parsed = plan.parsed_json as ParsedJson;
+  const openings = await loadOpenings(supabase, plan.id);
 
   return buildPlanGraph({
     projectId,
@@ -52,5 +93,6 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
     scale: parsed?.scale ?? null,
     total_area_m2: plan.total_area_m2,
     rooms: (rooms ?? []) as RawRoom[],
+    openings,
   });
 }
