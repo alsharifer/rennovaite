@@ -1,16 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
-import { AppShell } from "@/components/app/AppShell";
 import { AnalyticsIdentify } from "@/app/_components/analytics-identify";
+import { AppShell } from "@/components/app/AppShell";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { cn } from "@/lib/utils";
 
+import { PortfolioBrowser } from "./_components/portfolio-browser";
+import {
+  ALL_PHASES,
+  PHASE_ORDER,
+  type Phase,
+  type PortfolioProject,
+  type SortKey,
+} from "./_components/portfolio-types";
+
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
-// Types
+// Row shapes
 // ---------------------------------------------------------------------------
 
 type ProjectRow = {
@@ -21,33 +30,13 @@ type ProjectRow = {
   status: string | null;
   created_at: string | null;
 };
-
-type PlanRow = { id: string; project_id: string | null; parsed_json: unknown };
-type BoqRow = {
-  id: string;
-  project_id: string | null;
-  total_aed: number | null;
-  sections: unknown;
-  created_at: string | null;
-};
-type RenderRow = {
-  id: string;
-  project_id: string | null;
-  room_id: string | null;
-  image_url: string | null;
-  created_at: string | null;
-};
-type SelectionRow = {
-  id: string;
-  project_id: string;
-  boq_line_id: string;
-  created_at: string | null;
-};
-
-type Phase = "Intake" | "Design" | "Technical" | "Execution" | "Done";
+type PlanRow = { id: string; project_id: string | null; parsed_json: unknown; created_at: string | null };
+type BoqRow = { id: string; project_id: string | null; total_aed: number | null; created_at: string | null };
+type RenderRow = { id: string; project_id: string | null; image_url: string | null; created_at: string | null };
+type SelectionRow = { id: string; project_id: string; boq_line_id: string; created_at: string | null };
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers — dashboard summary
 // ---------------------------------------------------------------------------
 
 function formatAedShort(n: number | null | undefined): string {
@@ -73,7 +62,7 @@ function relativeTime(iso: string | null | undefined): string {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function evening(): string {
+function greetingWord(): string {
   const h = new Date().getHours();
   if (h < 5) return "Good evening";
   if (h < 12) return "Good morning";
@@ -81,9 +70,6 @@ function evening(): string {
   return "Good evening";
 }
 
-// Best-effort first name from the Supabase user: prefer a metadata name (set
-// via OAuth/profile later), else derive a friendly token from the email local
-// part. Returns null when there's nothing usable.
 function firstNameFromUser(user: {
   email?: string | null;
   user_metadata?: Record<string, unknown> | null;
@@ -98,15 +84,10 @@ function firstNameFromUser(user: {
   return token.charAt(0).toUpperCase() + token.slice(1);
 }
 
-// Wrapped so the impure Date.now() call doesn't live in the component body
-// (react-hooks/purity flags top-level Date.now() reads, but not calls inside
-// helpers that are then invoked).
+// Impure now()s kept in helpers (react-hooks/purity flags them in the body).
 function thirtyDaysAgoIso(): string {
   return new Date(Date.now() - 30 * 86_400_000).toISOString();
 }
-
-// Helper to compute "start of month" without putting `new Date()` directly in
-// the component body.
 function startOfThisMonth(): number {
   const d = new Date();
   d.setDate(1);
@@ -114,50 +95,96 @@ function startOfThisMonth(): number {
   return d.getTime();
 }
 
-// Returns the active phase for a project given the data we have on it.
-function inferPhase(state: {
-  planComplete: boolean;
+// ---------------------------------------------------------------------------
+// Helpers — portfolio (grid/list) phase + URL params
+// ---------------------------------------------------------------------------
+
+function inferPortfolioPhase(state: {
+  status: string | null;
+  hasPlan: boolean;
   hasRender: boolean;
   hasBoq: boolean;
-  hasVendorSelections: boolean;
+  hasSelections: boolean;
 }): Phase {
-  if (state.hasVendorSelections) return "Done";
-  if (state.hasBoq) return "Execution";
-  if (state.hasRender) return "Technical";
-  if (state.planComplete) return "Design";
-  return "Intake";
+  const s = (state.status ?? "").toLowerCase();
+  if (s === "completed" || s === "complete" || s === "done") return "Completed";
+  if (s === "on_hold" || s === "hold" || s === "paused") return "On hold";
+  if (s === "construction" || s === "in_construction") return "In Construction";
+  if (s === "handover") return "Handover";
+  if (state.hasSelections) return "Bidding";
+  if (state.hasBoq) return "BoQ";
+  if (state.hasRender || state.hasPlan) return "Design";
+  return "Active";
 }
 
-function nextStepFor(state: {
-  planComplete: boolean;
-  hasStyle: boolean;
-  hasRender: boolean;
-  hasBoq: boolean;
-  hasVendorSelections: boolean;
-}): string {
-  if (!state.planComplete) return "Confirm the parsed plan";
-  if (!state.hasStyle) return "Pick a design direction";
-  if (!state.hasRender) return "Create the first render";
-  if (!state.hasBoq) return "Generate the BoQ";
-  if (!state.hasVendorSelections) return "Pick your vendors";
-  return "Send scope to contractors";
+function latestActivityIso(
+  project: ProjectRow,
+  latestBoq: BoqRow | null,
+  latestRender: RenderRow | null,
+  latestSelection: SelectionRow | null,
+  latestPlan: PlanRow | null,
+): string | null {
+  const candidates = [
+    project.created_at,
+    latestPlan?.created_at ?? null,
+    latestRender?.created_at ?? null,
+    latestBoq?.created_at ?? null,
+    latestSelection?.created_at ?? null,
+  ].filter((v): v is string => !!v);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((a, b) => (a > b ? a : b));
+}
+
+function parseFilterParam(raw: string | string[] | undefined): Set<Phase> {
+  if (!raw) return new Set();
+  const flat = Array.isArray(raw) ? raw.join(",") : raw;
+  const tokens = flat.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+  const result = new Set<Phase>();
+  const lookup = new Map(ALL_PHASES.map((p) => [p.toLowerCase(), p] as const));
+  for (const t of tokens) {
+    const matched = lookup.get(t);
+    if (matched) result.add(matched);
+  }
+  return result;
+}
+function parseSortParam(raw: string | string[] | undefined): SortKey {
+  const flat = Array.isArray(raw) ? raw[0] : raw;
+  switch (flat) {
+    case "budget":
+    case "pipeline":
+    case "name":
+      return flat;
+    default:
+      return "updated";
+  }
+}
+function parseViewParam(raw: string | string[] | undefined): "grid" | "list" {
+  const flat = Array.isArray(raw) ? raw[0] : raw;
+  return flat === "list" ? "list" : "grid";
 }
 
 // ---------------------------------------------------------------------------
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const filter = parseFilterParam(sp.filter);
+  const sort = parseSortParam(sp.sort);
+  const view = parseViewParam(sp.view);
+
   const supabase = getSupabaseAdmin();
   const sb = supabase as unknown as SupabaseClient;
 
-  // Auth session (anon, cookie-scoped) — drives the greeting + PostHog
-  // identify. Independent of the admin client used for data reads below.
+  // Auth session (anon, cookie-scoped) — drives the greeting + PostHog identify.
   const authClient = await createSupabaseServerClient();
   const {
     data: { user },
   } = await authClient.auth.getUser();
   const firstName = firstNameFromUser(user);
 
-  // Window for "renders generated · last 30 days".
   const thirtyDaysAgo = thirtyDaysAgoIso();
 
   const [
@@ -167,21 +194,22 @@ export default async function DashboardPage() {
     rendersRes,
     rendersLast30Res,
     selectionsRes,
-    styleChoicesRes,
   ] = await Promise.all([
     supabase
       .from("projects")
       .select("id, name, city, budget_aed, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(12),
-    supabase.from("plans").select("id, project_id, parsed_json"),
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("plans")
+      .select("id, project_id, parsed_json, created_at")
+      .order("created_at", { ascending: false }),
     supabase
       .from("boqs")
-      .select("id, project_id, total_aed, sections, created_at")
+      .select("id, project_id, total_aed, created_at")
       .order("created_at", { ascending: false }),
     supabase
       .from("renders")
-      .select("id, project_id, room_id, image_url, created_at")
+      .select("id, project_id, image_url, created_at")
       .order("created_at", { ascending: false }),
     supabase
       .from("renders")
@@ -190,10 +218,8 @@ export default async function DashboardPage() {
     sb
       .from("vendor_selections")
       .select("id, project_id, boq_line_id, created_at")
+      .order("created_at", { ascending: false })
       .returns<SelectionRow[]>(),
-    supabase
-      .from("style_choices")
-      .select("project_id"),
   ]);
 
   const projects: ProjectRow[] = projectsRes.data ?? [];
@@ -202,242 +228,134 @@ export default async function DashboardPage() {
   const renders: RenderRow[] = (rendersRes.data ?? []) as RenderRow[];
   const selections: SelectionRow[] = selectionsRes.data ?? [];
 
-  // ----- Indexes (per project) -------------------------------------------
-  const planByProject = new Map<string, PlanRow>();
-  for (const p of plans) if (p.project_id) planByProject.set(p.project_id, p);
-
+  // Latest row per project (queries are pre-sorted desc by created_at).
+  const latestPlanByProject = new Map<string, PlanRow>();
+  for (const p of plans) if (p.project_id && !latestPlanByProject.has(p.project_id)) latestPlanByProject.set(p.project_id, p);
   const latestBoqByProject = new Map<string, BoqRow>();
-  for (const b of boqs) {
-    if (b.project_id && !latestBoqByProject.has(b.project_id)) {
-      latestBoqByProject.set(b.project_id, b);
-    }
-  }
-
+  for (const b of boqs) if (b.project_id && !latestBoqByProject.has(b.project_id)) latestBoqByProject.set(b.project_id, b);
   const latestRenderByProject = new Map<string, RenderRow>();
-  for (const r of renders) {
-    if (r.project_id && !latestRenderByProject.has(r.project_id)) {
-      latestRenderByProject.set(r.project_id, r);
-    }
-  }
+  for (const r of renders) if (r.project_id && !latestRenderByProject.has(r.project_id)) latestRenderByProject.set(r.project_id, r);
+  const latestSelectionByProject = new Map<string, SelectionRow>();
+  for (const s of selections) if (!latestSelectionByProject.has(s.project_id)) latestSelectionByProject.set(s.project_id, s);
 
   const projectsWithSelections = new Set<string>();
   for (const s of selections) projectsWithSelections.add(s.project_id);
 
-  const projectsWithStyle = new Set<string>();
-  for (const s of styleChoicesRes.data ?? []) {
-    if (s.project_id) projectsWithStyle.add(s.project_id);
-  }
-
-  // ----- Stats ------------------------------------------------------------
-  const activeProjects = projects.filter((p) => {
-    const phase = inferPhase({
-      planComplete: !!planByProject.get(p.id)?.parsed_json,
-      hasRender: latestRenderByProject.has(p.id),
-      hasBoq: latestBoqByProject.has(p.id),
-      hasVendorSelections: projectsWithSelections.has(p.id),
-    });
-    return phase !== "Done";
-  }).length;
-
-  // Projects created this month (proxy for "+N this month").
+  // ----- Stat row --------------------------------------------------------
+  // "Active" = anything not yet at vendor selection (its terminal phase here).
+  const activeProjects = projects.filter((p) => !projectsWithSelections.has(p.id)).length;
   const startOfMonthMs = startOfThisMonth();
-  const newThisMonth = projects.filter((p) => {
-    if (!p.created_at) return false;
-    return new Date(p.created_at).getTime() >= startOfMonthMs;
-  }).length;
-
-  const totalBoqValue = [...latestBoqByProject.values()].reduce(
-    (sum, b) => sum + (b.total_aed ?? 0),
-    0,
-  );
-
+  const newThisMonth = projects.filter(
+    (p) => p.created_at && new Date(p.created_at).getTime() >= startOfMonthMs,
+  ).length;
+  const totalBoqValue = [...latestBoqByProject.values()].reduce((sum, b) => sum + (b.total_aed ?? 0), 0);
   const rendersLast30 = rendersLast30Res.count ?? 0;
-
-  // "Pending decisions" — has a BoQ but no vendor selections yet.
   const pendingDecisions = projects.filter(
-    (p) =>
-      latestBoqByProject.has(p.id) && !projectsWithSelections.has(p.id),
+    (p) => latestBoqByProject.has(p.id) && !projectsWithSelections.has(p.id),
   ).length;
 
-  // ----- Top 3 villa cards ------------------------------------------------
-  const topProjects = projects.slice(0, 3);
-
-  // ----- Activity feed: synthesize from recent rows ----------------------
-  type Event = {
-    id: string;
-    kind: "plan" | "render" | "boq" | "selection";
-    when: string;
-    projectId: string;
-    icon: string;
-    description: string;
-  };
-  const projectNameById = new Map(
-    projects.map((p) => [p.id, p.name?.trim() || "Untitled"]),
-  );
+  // ----- Activity feed ---------------------------------------------------
+  type Event = { id: string; when: string; projectId: string; icon: string; description: string };
+  const projectNameById = new Map(projects.map((p) => [p.id, p.name?.trim() || "Untitled"]));
   const events: Event[] = [];
-  for (const p of plans) {
-    if (p.project_id && p.parsed_json) {
-      // plans don't have created_at queried; use latest associated render/boq date as a proxy or skip
-    }
-  }
-  // Renders: most recent across all projects
   for (const r of renders.slice(0, 8)) {
     if (!r.created_at || !r.project_id) continue;
-    events.push({
-      id: `r-${r.id}`,
-      kind: "render",
-      when: r.created_at,
-      projectId: r.project_id,
-      icon: "auto_fix_high",
-      description: `Render generated for ${projectNameById.get(r.project_id) ?? "a project"}`,
-    });
+    events.push({ id: `r-${r.id}`, when: r.created_at, projectId: r.project_id, icon: "auto_fix_high", description: `Render generated for ${projectNameById.get(r.project_id) ?? "a project"}` });
   }
-  // BoQs
   for (const b of boqs.slice(0, 4)) {
     if (!b.created_at || !b.project_id) continue;
-    events.push({
-      id: `b-${b.id}`,
-      kind: "boq",
-      when: b.created_at,
-      projectId: b.project_id,
-      icon: "receipt_long",
-      description: `BoQ priced at ${formatAedShort(b.total_aed)} for ${projectNameById.get(b.project_id) ?? "a project"}`,
-    });
+    events.push({ id: `b-${b.id}`, when: b.created_at, projectId: b.project_id, icon: "receipt_long", description: `BoQ priced at ${formatAedShort(b.total_aed)} for ${projectNameById.get(b.project_id) ?? "a project"}` });
   }
-  // Vendor selections
   for (const s of selections.slice(0, 4)) {
     if (!s.created_at || !s.project_id) continue;
-    events.push({
-      id: `s-${s.id}`,
-      kind: "selection",
-      when: s.created_at,
-      projectId: s.project_id,
-      icon: "swap_horiz",
-      description: `Vendor swap on ${s.boq_line_id.replace(/-/g, " ")} · ${projectNameById.get(s.project_id) ?? "a project"}`,
-    });
+    events.push({ id: `s-${s.id}`, when: s.created_at, projectId: s.project_id, icon: "swap_horiz", description: `Vendor swap on ${s.boq_line_id.replace(/-/g, " ")} · ${projectNameById.get(s.project_id) ?? "a project"}` });
   }
-  events.sort(
-    (a, b) => new Date(b.when).getTime() - new Date(a.when).getTime(),
-  );
+  events.sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime());
   const activity = events.slice(0, 6);
 
-  // Header greeting — from the signed-in user's first name; falls back to a
-  // name-less greeting for guest / no-session visits.
-  const greeting = firstName ? `${evening()}, ${firstName}.` : `${evening()}.`;
+  // ----- Portfolio (grid/list) shaping -----------------------------------
+  const shaped: PortfolioProject[] = projects.map((p) => {
+    const plan = latestPlanByProject.get(p.id) ?? null;
+    const boq = latestBoqByProject.get(p.id) ?? null;
+    const render = latestRenderByProject.get(p.id) ?? null;
+    const selection = latestSelectionByProject.get(p.id) ?? null;
+    return {
+      id: p.id,
+      name: p.name?.trim() || "Untitled",
+      city: p.city ?? null,
+      budget_aed: p.budget_aed ?? null,
+      phase: inferPortfolioPhase({
+        status: p.status,
+        hasPlan: !!plan?.parsed_json,
+        hasRender: !!render,
+        hasBoq: !!boq,
+        hasSelections: !!selection,
+      }),
+      hero_url: render?.image_url ?? null,
+      boq_total_aed: boq?.total_aed ?? null,
+      last_updated_at: latestActivityIso(p, boq, render, selection, plan),
+      created_at: p.created_at,
+    };
+  });
+
+  const counts: Record<"all" | Phase, number> = {
+    all: shaped.length, Active: 0, Design: 0, BoQ: 0, Bidding: 0,
+    "In Construction": 0, Handover: 0, "On hold": 0, Completed: 0,
+  };
+  for (const p of shaped) counts[p.phase]++;
+
+  const filtered = filter.size === 0 ? shaped : shaped.filter((p) => filter.has(p.phase));
+  const sorted = [...filtered];
+  switch (sort) {
+    case "budget":
+      sorted.sort((a, b) => (b.budget_aed ?? 0) - (a.budget_aed ?? 0));
+      break;
+    case "pipeline":
+      sorted.sort((a, b) => PHASE_ORDER.indexOf(b.phase) - PHASE_ORDER.indexOf(a.phase));
+      break;
+    case "name":
+      sorted.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+      break;
+    default:
+      sorted.sort((a, b) => (b.last_updated_at ?? "").localeCompare(a.last_updated_at ?? ""));
+  }
+
+  const greeting = firstName ? `${greetingWord()}, ${firstName}.` : `${greetingWord()}.`;
 
   return (
     <AppShell pageName="Dashboard">
-      {user && (
-        <AnalyticsIdentify
-          distinctId={user.id}
-          email={user.email}
-          name={firstName}
-        />
-      )}
-      <div className="mx-auto max-w-[1440px] pb-2xl">
-        {/* HEADER ----------------------------------------------------- */}
+      {user && <AnalyticsIdentify distinctId={user.id} email={user.email} name={firstName} />}
+
+      {/* Summary — welcome header, stat row, activity feed (above the grid) */}
+      <div className="mx-auto max-w-[1440px]">
         <header className="mb-xl">
           <p className="label-caps mb-xs text-brass-600">Welcome back</p>
-          <h1 className="mb-md font-display text-headline-lg text-ink-900">
-            {greeting}
-          </h1>
+          <h1 className="mb-md font-display text-headline-lg text-ink-900">{greeting}</h1>
           <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
             Here&apos;s what&apos;s happening across your villas.
           </p>
         </header>
 
-        {/* STATS ROW -------------------------------------------------- */}
         <div className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Active projects"
             value={String(activeProjects)}
-            delta={
-              newThisMonth > 0
-                ? `+${newThisMonth} this month`
-                : "No new projects this month"
-            }
+            delta={newThisMonth > 0 ? `+${newThisMonth} this month` : "No new projects this month"}
             deltaTone={newThisMonth > 0 ? "tertiary" : "muted"}
           />
-          <StatCard
-            label="BoQ value"
-            value={formatAedShort(totalBoqValue)}
-            delta="across all projects"
-            deltaTone="muted"
-          />
-          <StatCard
-            label="Renders generated"
-            value={String(rendersLast30)}
-            delta="last 30 days"
-            deltaTone="muted"
-          />
+          <StatCard label="BoQ value" value={formatAedShort(totalBoqValue)} delta="across all projects" deltaTone="muted" />
+          <StatCard label="Renders generated" value={String(rendersLast30)} delta="last 30 days" deltaTone="muted" />
           <StatCard
             label="Pending decisions"
             value={String(pendingDecisions)}
             delta={pendingDecisions > 0 ? "Review now" : "All caught up"}
             deltaTone={pendingDecisions > 0 ? "brass" : "tertiary"}
-            href={pendingDecisions > 0 ? "/my-projects" : undefined}
           />
         </div>
 
-        {/* MY VILLAS -------------------------------------------------- */}
-        <section className="mt-xl">
-          <header className="mb-lg flex items-baseline justify-between">
-            <h2 className="font-display text-headline-md text-ink-900">
-              My villas
-            </h2>
-            <div className="flex items-center gap-md">
-              <Link
-                href="/my-projects"
-                className="font-body-sm text-body-sm font-semibold text-brass-600 hover:underline"
-              >
-                See all →
-              </Link>
-              <Link
-                href="/project/new"
-                className="focus-ring flex h-10 items-center gap-sm rounded-lg bg-brass-600 px-md font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
-              >
-                <span
-                  className="material-symbols-outlined text-[18px]"
-                  aria-hidden="true"
-                >
-                  add
-                </span>
-                New project
-              </Link>
-            </div>
-          </header>
-
-          {topProjects.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-ink-100 bg-paper p-3xl text-center">
-              <p className="font-body text-body-md text-on-surface-variant">
-                No projects yet — start your first villa.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-gutter md:grid-cols-2 lg:grid-cols-3">
-              {topProjects.map((p) => (
-                <VillaCard
-                  key={p.id}
-                  project={p}
-                  hero={latestRenderByProject.get(p.id) ?? null}
-                  boqTotal={latestBoqByProject.get(p.id)?.total_aed ?? null}
-                  planComplete={!!planByProject.get(p.id)?.parsed_json}
-                  hasStyle={projectsWithStyle.has(p.id)}
-                  hasRender={latestRenderByProject.has(p.id)}
-                  hasBoq={latestBoqByProject.has(p.id)}
-                  hasVendorSelections={projectsWithSelections.has(p.id)}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ACTIVITY FEED ---------------------------------------------- */}
         <section className="mt-xl rounded-xl border border-ink-100 bg-paper p-lg">
           <header className="mb-lg flex items-baseline justify-between">
-            <h2 className="font-display text-headline-md text-ink-900">
-              Recent activity
-            </h2>
+            <h2 className="font-display text-headline-md text-ink-900">Recent activity</h2>
             <span className="label-caps text-ink-500">
               {activity.length} {activity.length === 1 ? "event" : "events"}
             </span>
@@ -449,27 +367,14 @@ export default async function DashboardPage() {
           ) : (
             <ul className="flex flex-col gap-md">
               {activity.map((e) => (
-                <li
-                  key={e.id}
-                  className="flex items-center gap-md rounded-md px-sm py-sm hover:bg-surface-container-low"
-                >
+                <li key={e.id} className="flex items-center gap-md rounded-md px-sm py-sm hover:bg-surface-container-low">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-brass-600">
-                    <span
-                      className="material-symbols-outlined text-[20px]"
-                      aria-hidden="true"
-                    >
-                      {e.icon}
-                    </span>
+                    <span className="material-symbols-outlined text-[20px]" aria-hidden="true">{e.icon}</span>
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-body-sm text-body-sm text-ink-900">
-                      {e.description}
-                    </p>
+                    <p className="truncate font-body-sm text-body-sm text-ink-900">{e.description}</p>
                   </div>
-                  <Link
-                    href={`/project/${e.projectId}`}
-                    className="font-mono text-[12px] text-ink-500 hover:text-brass-600"
-                  >
+                  <Link href={`/project/${e.projectId}`} className="font-mono text-[12px] text-ink-500 hover:text-brass-600">
                     {relativeTime(e.when)}
                   </Link>
                 </li>
@@ -478,6 +383,16 @@ export default async function DashboardPage() {
           )}
         </section>
       </div>
+
+      {/* Portfolio grid/list — the working core (filters/sort/search/bulk). */}
+      <PortfolioBrowser
+        projects={sorted}
+        counts={counts}
+        filter={[...filter]}
+        sort={sort}
+        initialView={view}
+        embedded
+      />
     </AppShell>
   );
 }
@@ -491,20 +406,16 @@ function StatCard({
   value,
   delta,
   deltaTone,
-  href,
 }: {
   label: string;
   value: string;
   delta: string;
   deltaTone: "tertiary" | "muted" | "brass";
-  href?: string;
 }) {
-  const inner = (
-    <>
+  return (
+    <div className="flex h-full flex-col rounded-lg border border-ink-100 bg-paper p-lg">
       <p className="label-caps mb-md text-ink-500">{label}</p>
-      <p className="font-display text-[40px] leading-none tabular-nums text-ink-900">
-        {value}
-      </p>
+      <p className="font-display text-[40px] leading-none tabular-nums text-ink-900">{value}</p>
       <p
         className={cn(
           "mt-sm font-body-sm text-body-sm",
@@ -515,146 +426,6 @@ function StatCard({
       >
         {delta}
       </p>
-    </>
-  );
-  if (href) {
-    return (
-      <Link
-        href={href}
-        className="focus-ring flex h-full flex-col rounded-lg border border-ink-100 bg-paper p-lg transition-shadow hover:shadow-level-1"
-      >
-        {inner}
-      </Link>
-    );
-  }
-  return (
-    <div className="flex h-full flex-col rounded-lg border border-ink-100 bg-paper p-lg">
-      {inner}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Villa card
-// ---------------------------------------------------------------------------
-
-function VillaCard({
-  project,
-  hero,
-  boqTotal,
-  planComplete,
-  hasStyle,
-  hasRender,
-  hasBoq,
-  hasVendorSelections,
-}: {
-  project: ProjectRow;
-  hero: RenderRow | null;
-  boqTotal: number | null;
-  planComplete: boolean;
-  hasStyle: boolean;
-  hasRender: boolean;
-  hasBoq: boolean;
-  hasVendorSelections: boolean;
-}) {
-  const phase = inferPhase({
-    planComplete,
-    hasRender,
-    hasBoq,
-    hasVendorSelections,
-  });
-  const nextStep = nextStepFor({
-    planComplete,
-    hasStyle,
-    hasRender,
-    hasBoq,
-    hasVendorSelections,
-  });
-  const budget = project.budget_aed ?? null;
-
-  return (
-    <Link
-      href={`/project/${project.id}`}
-      className="focus-ring group flex h-[420px] flex-col overflow-hidden rounded-lg border border-ink-100 bg-paper transition-all duration-200 hover:-translate-y-0.5 hover:shadow-level-1"
-    >
-      {/* Hero image — matte-image border per design */}
-      <div className="p-2">
-        <div className="matte-image">
-          <div className="relative aspect-[16/9] w-full overflow-hidden rounded bg-bone">
-            {hero?.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={hero.image_url}
-                alt={`${project.name ?? "Project"} hero render`}
-                className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center text-center">
-                <span className="label-caps text-ink-500">
-                  No render yet
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="flex flex-1 flex-col p-lg">
-        <div className="mb-md flex items-start justify-between gap-md">
-          <h3 className="font-display text-headline-md leading-tight text-ink-900">
-            {project.name?.trim() || "Untitled"}
-          </h3>
-          <span className="shrink-0 rounded-full bg-primary-fixed px-sm py-[2px] text-[10px] font-semibold uppercase tracking-widest text-on-primary-fixed">
-            {phase}
-          </span>
-        </div>
-        <p className="mb-md font-body-sm text-body-sm text-on-surface-variant">
-          {project.city ?? "Dubai"}
-        </p>
-        <dl className="mt-auto flex flex-col gap-xs">
-          <StatRow label="Budget" value={formatAedShort(budget)} mono />
-          <StatRow
-            label="BoQ"
-            value={boqTotal != null ? formatAedShort(boqTotal) : "Not generated"}
-            mono={boqTotal != null}
-          />
-          <StatRow label="Next step" value={nextStep} />
-        </dl>
-        <span className="mt-md inline-flex items-center gap-xs font-body-sm text-body-sm font-semibold text-brass-600 group-hover:underline">
-          Open project
-          <span
-            className="material-symbols-outlined text-[16px]"
-            aria-hidden="true"
-          >
-            arrow_forward
-          </span>
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-function StatRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-md">
-      <dt className="label-caps text-ink-500">{label}</dt>
-      <dd
-        className={cn(
-          "truncate text-right text-body-sm text-ink-900",
-          mono && "font-mono tabular-nums",
-        )}
-      >
-        {value}
-      </dd>
     </div>
   );
 }

@@ -33,6 +33,9 @@ type Props = {
   filter: Phase[];
   sort: SortKey;
   initialView: "grid" | "list";
+  /** When embedded below other dashboard content, drop the flush-to-top
+   *  negative margin (keep the horizontal full-bleed). */
+  embedded?: boolean;
 };
 
 export function PortfolioBrowser({
@@ -41,6 +44,7 @@ export function PortfolioBrowser({
   filter,
   sort,
   initialView,
+  embedded = false,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -170,7 +174,7 @@ export function PortfolioBrowser({
   const paged = view === "list" ? visible.slice(pageStart, pageEnd) : visible;
 
   return (
-    <div className="mx-auto -mx-12 -mt-12 max-w-none">
+    <div className={cn("mx-auto -mx-12 max-w-none", embedded ? "mt-xl" : "-mt-12")}>
       {/* HEADER (96px tall, hairline bottom) ----------------------------- */}
       <header className="border-b border-ink-100 bg-paper">
         <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-lg px-12 py-lg">
