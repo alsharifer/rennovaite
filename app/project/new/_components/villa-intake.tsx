@@ -598,7 +598,7 @@ export function VillaIntake() {
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => router.push("/my-projects")}
+          onClick={() => router.push("/dashboard")}
           className="focus-ring flex h-12 items-center rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
         >
           Save and continue later

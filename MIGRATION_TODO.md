@@ -21,3 +21,12 @@ factors (e.g. demolition debris = area × 0.20 m³, bathroom wet-wall = 28 m²/b
 These are deliberate estimates, not placeholders — improving their accuracy is a
 separate QS/pricing workstream and should **not** be lumped in with the cosmetic
 stubs above.
+
+## G1 — dashboard + my-projects merge (no orphans)
+
+`/my-projects` was merged into `/dashboard` (welcome header + stat row + activity
+feed above the portfolio grid). **No orphaned components** resulted:
+`portfolio-browser.tsx` + `portfolio-types.ts` were **moved** to
+`app/dashboard/_components/` (still used); the dashboard's inline `VillaCard`,
+`StatRow`, and `nextStepFor` (the duplicated "My villas" top-3 widget) were
+**removed**; `/my-projects` is now a permanent redirect. Nothing left unused.

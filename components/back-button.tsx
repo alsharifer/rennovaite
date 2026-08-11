@@ -4,16 +4,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 
 // Routes considered "top-level" — BackButton renders nothing on these.
-const TOP_LEVEL = ["/", "/my-projects"];
+const TOP_LEVEL = ["/", "/dashboard"];
 
 // Where to land if there's no browser history (deep-link, hard refresh, etc.).
 function computeFallback(pathname: string): string {
-  if (pathname === "/project") return "/my-projects";
+  if (pathname === "/project") return "/dashboard";
   // /project/[id]/<anything> → fall back to that project's plan page,
   // since there's no project-level dashboard yet.
   const inner = pathname.match(/^\/project\/([^/]+)\/[^/]+/);
   if (inner) return `/project/${inner[1]}/plan`;
-  if (/^\/project\/[^/]+$/.test(pathname)) return "/my-projects";
+  if (/^\/project\/[^/]+$/.test(pathname)) return "/dashboard";
   return "/";
 }
 

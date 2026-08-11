@@ -12,14 +12,9 @@ type NavItem = {
 };
 
 const PRIMARY: NavItem[] = [
+  // Dashboard now hosts the portfolio grid too (My Projects was merged in, G1).
   { label: "Dashboard", href: "/dashboard", icon: "dashboard", match: ["/dashboard"] },
   { label: "AI Designer", href: "/project", icon: "magic_button", match: ["/project"] },
-  {
-    label: "My Projects",
-    href: "/my-projects",
-    icon: "folder_open",
-    match: ["/my-projects"],
-  },
   {
     label: "Marketplace",
     href: "/marketplace",
