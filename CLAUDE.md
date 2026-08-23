@@ -435,6 +435,25 @@ Two compounding pieces off one staging vocabulary, gated by `STAGING_ENABLED`.
 | `BOQ_ENGINE`                      | server — optional; unset = deterministic `lib/boq` engine, `"llm"` = legacy Claude-priced path |
 | `PERMIT_CHECK_ENABLED`            | server — `"true"` turns on the P6 Dubai permit-trigger checklist |
 | `STAGING_ENABLED`                | server — `"true"` turns on P7 furniture staging (render prompt + optional BoQ section) |
+| `PROPERTY_OS_LANDING`             | server — `"true"` makes `/` the Property OS intro page (visitors) and moves the RennovAIte homepage to `/rennovaite`; unset/false = `/` is the homepage (as before) |
+
+### Feature flags — read at server start (flip → restart)
+
+**All server feature flags in this app are read from `process.env` at server
+start** (`process.env.X === "true"`), so changing one in `.env.local` requires a
+**dev-server restart** to take effect — there is no runtime toggle. This covers
+the Pilot-Seven flags below and `PROPERTY_OS_LANDING`. Every flag defaults off,
+and off = pre-flag behaviour.
+
+**`PROPERTY_OS_LANDING` (G1 / landing)** — off: `/` renders the RennovAIte
+marketing homepage exactly as before. On: `/` renders the four-pillar Property
+OS intro (`app/_components/property-os-landing.tsx`) for visitors; a signed-in
+visitor is redirected to their portal (`/project`, the auth-callback default);
+both the nav "Open RennovAIte" and the card "Enter RennovAIte" CTAs link to
+`/rennovaite`, which always hosts the homepage (`components/marketing/home-landing.tsx`).
+The three non-RennovAIte pillars are inert roadmap tiles (badges + copy, no
+links). The root becomes dynamic (`force-dynamic` behaviour) because of the
+auth-aware redirect.
 
 ### Pilot Seven feature flags (reserved)
 
