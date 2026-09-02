@@ -321,10 +321,25 @@ prediction_id, status, qa, kind, staging_set`.
   `["mid","premium","luxury"]`, and the style map — `contemporary-majlis`,
   `modern-hijazi`, `coastal-emirati`, `scandi-arabic`, `andalusian-heritage`
   each to their own `style:<key>` node, and **`luxe-minimal` → `style:minimalist`**.
-- **Caveat unchanged:** the KG seed/loader/docker live in a **separate
-  standalone module** (`../RennovAIte/kg`); this repo only vendors
-  `kg/retrieval/agent.ts`. The nodes those slugs resolve against are not
+- **Caveat unchanged:** the KG seed / loader / `docker-compose.yml` live in a
+  **separate standalone module with its own git repo** at
+  `C:\Users\alsha\OneDrive\Desktop\RennovAIte\RennovAIte\kg`. This repo's `kg/`
+  holds **only** the vendored consumer copy `kg/retrieval/agent.ts` (1 tracked
+  file) — **there is no compose file here**, so `cd kg && docker compose up -d`
+  from the repo root fails. The nodes those slugs resolve against are not
   version-controlled here.
+- **Starting Neo4j** — the container `rennovaite-neo4j` (`neo4j:5-community`)
+  already exists and its named volumes `kg_neo4j_data` / `kg_neo4j_logs`
+  persist the seed across restarts, so the reliable start needs no compose file
+  and works from any directory: **`docker start rennovaite-neo4j`** (allow
+  ~40 s to reach `healthy`). Use compose only from the OneDrive module path
+  above.
+- **Verified live 2026-09-02**: Bolt reachable at `bolt://localhost:7687` with
+  the `.env.local` credentials; **204 nodes**; 15 labels (`Community`,
+  `PropertyType`, `Style`, `Material`, `Fixture`, `Vendor`, `Regulation`,
+  `Space`, `CostBand`, `ClimateProfile`, `ColorPalette`, `CulturalContext`,
+  `Project`, `ProjectOutcome`, `ReferenceAsset`); **all 8 resolver slugs
+  present**, matched on the **`id`** property (not `slug`, not `key`).
 - `kg_bundle_id` is persisted on `renders` / `boqs` / `feedback_events` only
   when grounding actually ran.
 

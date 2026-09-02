@@ -464,6 +464,17 @@ pre-flight (`PILOT_SEVEN_PREFLIGHT.md`). As wired: `DRAWINGS_ENABLED` (P1),
 `COMPLIANCE_ENABLED`), `STAGING_ENABLED` (P7). All default off.
 
 KG grounding (render + BoQ prompts) only activates when `KG_ENABLED="true"`
-**and** Neo4j is running — start it from the KG module with
-`cd kg && docker compose up -d`. If Neo4j is down or `KG_ENABLED` is anything
-else, the app falls back to its pre-KG behaviour with no error.
+**and** Neo4j is running. If Neo4j is down or `KG_ENABLED` is anything else,
+the app falls back to its pre-KG behaviour with no error — but note the
+fallback costs a **10 s timeout per call**, so turn `KG_ENABLED` off rather
+than leaving it on against a stopped database.
+
+**Starting Neo4j:** `docker start rennovaite-neo4j` (allow ~40 s to reach
+`healthy`). The container and its named volumes `kg_neo4j_data` /
+`kg_neo4j_logs` already exist and persist the seed, so this needs no compose
+file and works from any directory. **`cd kg && docker compose up -d` does NOT
+work from this repo** — `kg/` here holds only the vendored consumer copy
+`kg/retrieval/agent.ts`; the seed, loader, and `docker-compose.yml` live in the
+separate KG module (its own git repo) at
+`C:\Users\alsha\OneDrive\Desktop\RennovAIte\RennovAIte\kg`. Use compose only
+from that directory.
