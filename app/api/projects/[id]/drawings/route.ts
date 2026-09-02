@@ -12,6 +12,7 @@ const KINDS: SheetKind[] = [
   "as_built",
   "proposed",
   "finish_schedule",
+  "opening_schedule",
   "electrical",
   "plumbing",
 ];

@@ -300,6 +300,93 @@ function deriveRawWalls(edges: Edge[], eps: number): RawWall[] {
   return walls;
 }
 
+// --- shared raw-space wall derivation (A5 editor + builder) -------------------
+//
+// The openings editor has to let the user pick the SAME wall the take-off will
+// price, so wall derivation must have exactly one implementation. This runs in
+// the raw/normalised space of `rooms.polygon` (no metric conversion) and hands
+// back ids identical to the ones `buildPlanGraph` emits (`wall-1`, `wall-2`, …)
+// because both walk `deriveRawWalls` in the same order.
+//
+// Wall ids stay VOLATILE by contract — an edit that changes room geometry
+// renumbers them — so an opening's `wall_ref` is only ever a hint. The graph
+// re-snaps every opening to its nearest wall at build time. This export exists
+// so the hint is a good one and the editor's hit-testing matches the engine.
+
+export const WALL_DERIVE_EPS = 0.0025; // parse coords are 2-decimal
+
+export interface RawWallSegment {
+  /** Matches the `Wall.id` buildPlanGraph assigns to the same segment. */
+  id: string;
+  /** Endpoints in the SAME space as the input polygons (not metres). */
+  a: [number, number];
+  b: [number, number];
+  /** 1 id = boundary wall; 2 = party wall between two rooms. */
+  roomIds: string[];
+}
+
+/** Reconstruct a raw wall's endpoints from its line identity + interval. */
+function rawWallEndpoints(w: RawWall): { a: [number, number]; b: [number, number] } {
+  const rx = w.c * w.nx;
+  const ry = w.c * w.ny;
+  const ux = -w.ny;
+  const uy = w.nx;
+  return {
+    a: [rx + w.t0 * ux, ry + w.t0 * uy],
+    b: [rx + w.t1 * ux, ry + w.t1 * uy],
+  };
+}
+
+/**
+ * Derive wall segments from room polygons in raw (un-converted) space. Pure.
+ * Used by the A5 openings editor client-side; `buildPlanGraph` uses the same
+ * `deriveRawWalls` core, so ids and ordering agree.
+ */
+export function deriveWallSegments(
+  rooms: { id: string; polygon: unknown }[],
+  eps: number = WALL_DERIVE_EPS,
+): RawWallSegment[] {
+  const parsed = rooms
+    .map((r) => ({ id: r.id, poly: toNormalisedPolygon(r.polygon) }))
+    .filter((r): r is { id: string; poly: [number, number][] } => r.poly !== null);
+  const edges = parsed.flatMap(({ id, poly }) => edgesOf(id, poly, eps));
+  return deriveRawWalls(edges, eps).map((w, i) => {
+    const { a, b } = rawWallEndpoints(w);
+    return { id: `wall-${i + 1}`, a, b, roomIds: w.roomIds };
+  });
+}
+
+/**
+ * Project a point onto a segment, returning the clamped foot, the 0..1
+ * parameter along it, and the perpendicular distance. Shared by the editor
+ * (drag-along-wall) and the nearest-wall snap.
+ */
+export function projectOntoSegment(
+  p: [number, number],
+  a: [number, number],
+  b: [number, number],
+): { point: [number, number]; t: number; dist: number } {
+  const { dist, t } = pointToSegment(p, a, b);
+  return {
+    point: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
+    t,
+    dist,
+  };
+}
+
+/** Nearest wall segment to a raw point (null when there are no walls). */
+export function nearestWall(
+  walls: RawWallSegment[],
+  p: [number, number],
+): { wall: RawWallSegment; t: number; dist: number } | null {
+  let best: { wall: RawWallSegment; t: number; dist: number } | null = null;
+  for (const w of walls) {
+    const { t, dist } = projectOntoSegment(p, w.a, w.b);
+    if (!best || dist < best.dist) best = { wall: w, t, dist };
+  }
+  return best;
+}
+
 // --- main builder (pure, unit-testable, no DB) --------------------------------
 
 export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
@@ -365,20 +452,17 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
     ],
   }));
 
-  // Wall derivation runs in normalised space, then converts to metres.
-  const eps = 0.0025; // parse coords are 2-decimal; this preserves distinct lines
+  // Wall derivation runs in normalised space, then converts to metres. Uses the
+  // same eps + reconstruction as the exported `deriveWallSegments`, so the
+  // editor's wall ids line up with the ones priced here.
+  const eps = WALL_DERIVE_EPS;
   const allEdges = rawRooms.flatMap(({ raw, poly }) => edgesOf(raw.id, poly, eps));
   const rawWalls = deriveRawWalls(allEdges, eps);
 
   const walls: Wall[] = rawWalls.map((w, i) => {
-    // Reconstruct endpoints from line identity: refPoint (foot of the
-    // perpendicular, c·n) + t · direction u=(-ny,nx). Diagonal-capable.
-    const rx = w.c * w.nx;
-    const ry = w.c * w.ny;
-    const ux = -w.ny;
-    const uy = w.nx;
-    const p0: [number, number] = [rx + w.t0 * ux, ry + w.t0 * uy];
-    const p1: [number, number] = [rx + w.t1 * ux, ry + w.t1 * uy];
+    // Endpoints from line identity: refPoint (foot of the perpendicular, c·n)
+    // + t · direction u=(-ny,nx). Diagonal-capable.
+    const { a: p0, b: p1 } = rawWallEndpoints(w);
     return {
       id: `wall-${i + 1}`,
       polyline: [toM(p0), toM(p1)],

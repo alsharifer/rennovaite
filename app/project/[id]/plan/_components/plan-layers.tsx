@@ -12,15 +12,19 @@ import {
 } from "@/lib/viewer/inspect";
 
 import { EditablePlanViewer } from "./editable-plan-viewer";
+import { OpeningsEditor } from "./openings-editor";
 import { OverlayEditor } from "./overlay-editor";
 import type { PlanViewerMode } from "./plan-interaction";
 
-type Layer = "plan" | "electrical" | "plumbing";
+type Layer = "plan" | "openings" | "electrical" | "plumbing";
 
-const LAYERS: { key: Layer; label: string; glyph: string }[] = [
-  { key: "plan", label: "Plan", glyph: "grid_on" },
-  { key: "electrical", label: "Electrical", glyph: "bolt" },
-  { key: "plumbing", label: "Plumbing", glyph: "water_drop" },
+const PLAN_LAYER = { key: "plan" as const, label: "Plan", glyph: "grid_on" };
+// A5 openings are NOT gated by OVERLAYS_ENABLED — doors/windows are part of the
+// plan itself (they change wall quantities), not an MEP overlay.
+const OPENINGS_LAYER = { key: "openings" as const, label: "Openings", glyph: "door_front" };
+const OVERLAY_LAYERS = [
+  { key: "electrical" as const, label: "Electrical", glyph: "bolt" },
+  { key: "plumbing" as const, label: "Plumbing", glyph: "water_drop" },
 ];
 
 /** Read-mode tap-to-inspect data (same shape the 3D host builds). */
@@ -81,19 +85,25 @@ export function PlanLayers({
       />
     ) : null;
 
-  if (!overlaysEnabled) {
-    return (
-      <>
-        {planViewer}
-        {panel}
-      </>
-    );
-  }
+  const openingsEditor = (
+    <OpeningsEditor
+      planId={planId}
+      rooms={initialRooms}
+      totalAreaM2={initialTotalAreaM2}
+      readOnly={mode === "read"}
+    />
+  );
+
+  const layers = [
+    PLAN_LAYER,
+    OPENINGS_LAYER,
+    ...(overlaysEnabled ? OVERLAY_LAYERS : []),
+  ];
 
   return (
     <div className="space-y-3">
       <div className="inline-flex gap-0.5 rounded-lg border border-ink-100 bg-paper p-0.5">
-        {LAYERS.map((l) => {
+        {layers.map((l) => {
           const active = layer === l.key;
           return (
             <button
@@ -119,6 +129,8 @@ export function PlanLayers({
 
       {layer === "plan" ? (
         planViewer
+      ) : layer === "openings" ? (
+        openingsEditor
       ) : (
         <OverlayEditor
           projectId={projectId}
