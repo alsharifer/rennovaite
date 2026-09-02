@@ -416,6 +416,48 @@ Two compounding pieces off one staging vocabulary, gated by `STAGING_ENABLED`.
   once it's applied. Optional: `node scripts/seed-furniture-prices.ts` to seed
   DB-editable price overrides.
 
+## The journey — nine steps, one definition (B1/B2/B3)
+
+`lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.
+Every page derives its own "Step N of M" from it via
+`components/app/JourneyChrome` (`JourneyProgress` for pages that own their
+heading, `JourneyChrome` for the full header) — **never hard-code a step
+number**. A step that is flag-disabled or not yet built **drops out of the
+numbering**, so the denominator always matches what is actually navigable and
+there are no dead ends.
+
+1 Intake · 2 Layout · 3 **Ideation** · 4 **Moodboard** · 5 Renders ·
+6 Costing & BoQ · 7 Scope & timeline *(T4 — unbuilt, currently absent)* ·
+8 Downloads *(`DRAWINGS_ENABLED`)* · 9 Vendors → **8 steps today**.
+
+**Style selection folds into step 3** — the questionnaire recommends a
+direction; `/project/[id]/style` is a second surface on that same step, not a
+step of its own. The **3D viewer is deliberately off the numbered path** (a
+view-only side surface reached from the layout and render steps).
+
+- **B1 questionnaire** (`lib/ideation/questionnaire.ts`, `project_briefs`):
+  six weighted questions scored by a plain weighted sum. **No LLM** — a
+  recommendation must be reproducible, or "re-run" is a dice roll. The route
+  recomputes `recommended_style_key` from `answers` on every write, while a
+  manual pick lives in a **separate `override_style_key` that a re-run never
+  reads or writes**. That separation is what makes the flow safe to redo.
+- **B2 moodboard** (`lib/moodboard/*`, `moodboard_items`): ordered references,
+  each exactly one of a built-in style image, a render, or a user upload via
+  the reusable `components/assets/AssetPicker` (`reference_image` kind, so
+  uploads land in the asset library and stay reusable).
+- **B3 taste seed** (`loadTasteSeed` in `lib/render-grounding.ts`, flagged
+  `TASTE_SEED_ENABLED`): the board's first 3 references become extra image
+  inputs and their descriptors a `References:` clause. **Style descriptions
+  only — never quantities, never dimensions, never plan geometry**, plus an
+  explicit "do not copy their layout": the edit model takes architecture from
+  the source image and a moodboard must not argue with it. Style descriptors
+  are derived deterministically from `lib/styles`; only an upload's descriptor
+  is LLM-writable. Like every prompt block it only appends, so flag-off and
+  flag-on are two cache entries. `renders.reference_refs` records the lineage —
+  `null` = seeding did not run, `[]` = ran against an empty board.
+- **Manual DB step**: apply `scripts/migrations/027_ideation.sql`. Everything
+  degrades gracefully until then (the questionnaire runs locally and says so).
+
 ## Env vars
 
 | Name                              | Where used              |
@@ -436,6 +478,8 @@ Two compounding pieces off one staging vocabulary, gated by `STAGING_ENABLED`.
 | `PERMIT_CHECK_ENABLED`            | server — `"true"` turns on the P6 Dubai permit-trigger checklist |
 | `STAGING_ENABLED`                | server — `"true"` turns on P7 furniture staging (render prompt + optional BoQ section) |
 | `PROPERTY_OS_LANDING`             | server — `"true"` makes `/` the Property OS intro page (visitors) and moves the RennovAIte homepage to `/rennovaite`; unset/false = `/` is the homepage (as before) |
+| `TASTE_SEED_ENABLED`              | server — `"true"` lets a project's moodboard condition its renders (B3). Off = renders behave exactly as before |
+| `PARSE_PROVIDER`                  | server — optional; which floorplan parser to use. Only `"inhouse"` (the default) is configured; any other value throws rather than silently mis-parsing |
 
 ### Feature flags — read at server start (flip → restart)
 
