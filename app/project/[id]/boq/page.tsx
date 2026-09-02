@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppShell } from "@/components/app/AppShell";
+import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -32,7 +33,6 @@ export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Bill of Quantities";
 const FALLBACK_BUDGET_AED = 850000;
-const SEGMENTS = 5;
 
 type SkuRow = {
   id: string;
@@ -255,18 +255,7 @@ export default async function BoqPage({
       <div className="mx-auto max-w-[1440px]">
         {/* Header */}
         <header className="mb-xl">
-          <p className="label-caps mb-md text-brass-600">Step 04 of 05</p>
-          <div className="mb-xl flex gap-sm" aria-hidden="true">
-            {Array.from({ length: SEGMENTS }).map((_, i) => (
-              <span
-                key={i}
-                className={
-                  "h-1 flex-1 rounded-full " +
-                  (i < 4 ? "bg-brass-600" : "bg-bone")
-                }
-              />
-            ))}
-          </div>
+          <JourneyProgress stepKey="costing" projectId={id} />
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Your bill of quantities.
           </h1>

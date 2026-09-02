@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
+import { JourneyProgress } from "@/components/app/JourneyChrome";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -12,7 +13,6 @@ import { PlanLayers } from "./_components/plan-layers";
 export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Plan Analysis";
-const SEGMENTS = 5;
 const HVAC_HABITABLE = new Set([
   "master_bedroom",
   "bedroom",
@@ -181,18 +181,7 @@ export default async function PlanPage({
       <div className="mx-auto max-w-[1440px] pb-32">
         {/* Header ---------------------------------------------------- */}
         <header className="mb-2xl">
-          <p className="label-caps mb-md text-brass-600">Step 02 of 05</p>
-          <div className="mb-xl flex gap-sm" aria-hidden="true">
-            {Array.from({ length: SEGMENTS }).map((_, i) => (
-              <span
-                key={i}
-                className={
-                  "h-1 flex-1 rounded-full " +
-                  (i < 2 ? "bg-brass-600" : "bg-bone")
-                }
-              />
-            ))}
-          </div>
+          <JourneyProgress stepKey="layout" projectId={projectId} />
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Your villa, understood.
           </h1>
