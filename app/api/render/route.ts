@@ -20,6 +20,7 @@ import {
   buildMaterialsClause,
   fetchSelectedMaterials,
   loadMoodboardDataUri,
+  loadTasteSeed,
 } from "@/lib/render-grounding";
 import {
   STYLE_KEYS,
@@ -143,6 +144,20 @@ export async function POST(request: NextRequest) {
 
     if (tweak && tweak.trim()) {
       prompt = `${prompt} — modified: ${tweak.trim()}`;
+    }
+
+    // B3 taste seed (flagged TASTE_SEED_ENABLED). The project's moodboard
+    // contributes reference IMAGES plus short style descriptors — palette,
+    // material and mood only. Appended before the KG context so real KG
+    // fixtures still win on fixed elements, and, like every other block, it
+    // only appends to the prompt: flag off vs on are two distinct prompts and
+    // therefore two distinct cache entries, so nothing cached is invalidated.
+    const tasteSeed = await loadTasteSeed(project_id);
+    if (tasteSeed.clause) {
+      prompt = `${prompt}\n\n${tasteSeed.clause}`;
+      console.log(
+        `[api/render] taste seed: ${tasteSeed.images.length} reference image(s) from moodboard items ${(tasteSeed.refIds ?? []).join(", ")}`,
+      );
     }
 
     // KG grounding (feature-flagged, safe fallback). getKgContext never throws.
@@ -282,9 +297,14 @@ export async function POST(request: NextRequest) {
 
     // Style/restyle pass — kicked off as an async prediction so the client can
     // poll /api/render/status for progress instead of holding one long request.
-    const editImages = moodboardDataUri
-      ? [sourceImageUrl, moodboardDataUri]
-      : [sourceImageUrl];
+    // Source first (the model edits it), then the style's own moodboard art,
+    // then the project's own references — most authoritative last-resort taste
+    // signal, but never ahead of the room being edited.
+    const editImages = [
+      sourceImageUrl,
+      ...(moodboardDataUri ? [moodboardDataUri] : []),
+      ...tasteSeed.images,
+    ];
 
     let prediction;
     try {
@@ -340,6 +360,21 @@ export async function POST(request: NextRequest) {
           .eq("id", renderRow.id);
       } catch {
         /* staging_set column absent → traced only via the prompt */
+      }
+    }
+
+    // B3: record which moodboard items seeded this render — same best-effort
+    // shape, so renders keep working before migration 027 is applied. null
+    // (seeding did not run) is left unwritten; [] (ran, empty board) is
+    // recorded, because those are different facts about the render.
+    if (tasteSeed.refIds !== null) {
+      try {
+        await (supabase as unknown as SupabaseClient)
+          .from("renders")
+          .update({ reference_refs: tasteSeed.refIds })
+          .eq("id", renderRow.id);
+      } catch {
+        /* reference_refs column absent → traced only via the prompt + logs */
       }
     }
 

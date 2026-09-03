@@ -21,6 +21,11 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { renderDemoSheet } from "./demo-sheet";
 import { renderElectricalSheet } from "./electrical-sheet";
 import { renderFinishSchedule, type FinishRow } from "./finish-schedule";
+import {
+  buildOpeningRows,
+  renderOpeningSchedule,
+  type ScheduleSourceOpening,
+} from "./opening-schedule";
 import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
 import { renderPlumbingSheet } from "./plumbing-sheet";
@@ -31,6 +36,7 @@ export type SheetKind =
   | "as_built"
   | "proposed"
   | "finish_schedule"
+  | "opening_schedule"
   | "electrical"
   | "plumbing";
 
@@ -218,6 +224,32 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
       }),
     },
   ];
+
+  // A5: door/window schedule — assembled from the graph like every other
+  // artifact. Omitted entirely when the plan has no openings rather than
+  // printing an empty table (the parse never invents doors, so an empty
+  // schedule would be a statement we can't support).
+  //
+  // Sourced from AS-BUILT, not proposed: `proposed` is a frozen plan_snapshots
+  // graph captured at design lock, so it predates any opening drawn afterwards
+  // (and snapshots written before A5 have no `openings` key at all). Openings
+  // have one live source of truth — the plan_openings table that derivePlanGraph
+  // reads — and that is also what the take-off deducts, so the schedule and the
+  // net wall quantities are guaranteed to reconcile.
+  const scheduleOpenings = (asBuilt.openings ?? []) as ScheduleSourceOpening[];
+  if (scheduleOpenings.length > 0) {
+    const roomNames = new Map(asBuilt.rooms.map((r) => [r.id, r.name_en]));
+    const openingRows = buildOpeningRows(scheduleOpenings, roomNames);
+    sheets.push({
+      kind: "opening_schedule",
+      title: "Door & Window Schedule",
+      sheetNumber: "A-202",
+      svg: renderOpeningSchedule(openingRows, meta, {
+        sheetNumber: "A-202",
+        title: "Door & Window Schedule",
+      }),
+    });
+  }
 
   // P2: append electrical + plumbing services sheets when fixtures exist.
   const fixtures = await loadOverlayFixtures(projectId);

@@ -21,7 +21,100 @@ export type ResolvedRate = {
   rate_band: "low" | "mid" | "high" | "sku" | "allowance";
   wastage: number;
   notes: string | null;
+  /** D1: a selection that could not be applied without deleting install cost. */
+  accessory_undecomposable?: boolean;
 };
+
+/**
+ * D1: a user-chosen accessory that replaces the rule-derived rate for one
+ * item_key. It substitutes the RATE and its provenance only — never the
+ * quantity, which stays the take-off's business. The user picks WHAT; the
+ * engine keeps computing HOW MANY.
+ */
+export type AccessoryOverride = {
+  catalog_item_id: string;
+  name: string;
+  /** The item's own price. For every catalogue row this is a SUPPLY price. */
+  rate_aed: number;
+  scope: "supply_only" | "install_only" | "supply_and_install";
+  source: string | null;
+  spec_class: string;
+  qs_validated: boolean;
+  /**
+   * Supply price of the item the rule default already assumed, when the
+   * catalogue knows it (the `is_rule_default` row for this item_key). This is
+   * what makes an honest substitution possible — see `applyAccessory`.
+   */
+  default_supply_aed: number | null;
+};
+
+/**
+ * Combine a rule-derived rate with a chosen accessory.
+ *
+ * The subtlety that makes this necessary: catalogue rates are SUPPLY prices
+ * (a GROHE mixer at AED 400), while the rule defaults are whatever
+ * labour_rates says — sometimes supply-and-install (a fitted basin at AED
+ * 4,500), sometimes installation labour only (a pendant hung for AED 500),
+ * sometimes an allowance that is itself a supply price. Substituting a supply
+ * price for a supply-and-install rate silently deletes the installation cost:
+ * picking a PREMIUM spec would make the BoQ cheaper, which is nonsense.
+ *
+ * So the adjustment depends on what the default actually contains:
+ *
+ *   supply_and_install  → keep the rule's installation component and move only
+ *                         the specification: default + (chosen − default_supply).
+ *                         Both sides are supply prices from the same source, so
+ *                         the difference is a pure spec delta. Without a known
+ *                         default supply price we CANNOT decompose the rate, so
+ *                         the line is left at the rule rate and flagged for the
+ *                         QS rather than guessed at.
+ *   labour              → the rate is installation only, so the fixture's
+ *                         supply price is genuinely additive: default + chosen.
+ *   allowance/material  → the default is itself a supply price from the same
+ *                         catalogue, so it is a like-for-like swap: chosen.
+ */
+export function applyAccessory(
+  base: ResolvedRate,
+  chosen: AccessoryOverride,
+): ResolvedRate {
+  let rate: number;
+  let basis: string;
+  let undecomposable = false;
+
+  // A KNOWN default supply price is the strongest signal available: it means
+  // the catalogue can name the product the rule already assumed, so the honest
+  // move is always to shift by the specification delta and leave whatever else
+  // the rule rate contains untouched. This takes precedence over `kind`, which
+  // is only a regex over a free-text labour_rates description and mis-reads
+  // some rows (san.shower's "mixer, handset, rain head" scans as labour-only
+  // even though it plainly describes the product).
+  if (chosen.default_supply_aed != null) {
+    rate = base.rate_aed + (chosen.rate_aed - chosen.default_supply_aed);
+    basis = `${base.rate_aed} rule rate + (${chosen.rate_aed} − ${chosen.default_supply_aed} spec delta); the rest of the rule rate is preserved`;
+  } else if (base.kind === "supply_and_install") {
+    rate = base.rate_aed;
+    basis = `rule rate kept: the default's supply component is unknown, so the ${chosen.rate_aed} supply price cannot be substituted without deleting installation — QS to re-price`;
+    undecomposable = true;
+  } else if (base.kind === "labour" || base.kind === "lump") {
+    rate = base.rate_aed + chosen.rate_aed;
+    basis = `${base.rate_aed} installation labour + ${chosen.rate_aed} supply`;
+  } else {
+    rate = chosen.rate_aed;
+    basis = `like-for-like supply swap (default ${base.rate_aed} is itself a supply price)`;
+  }
+
+  return {
+    rate_aed: Math.round(rate * 100) / 100,
+    vendor_or_source: chosen.source ?? `accessory: ${chosen.name}`,
+    // Scope is unchanged by a selection: the engine still emits exactly ONE
+    // line per item_key, so no separate install line can appear.
+    kind: base.kind,
+    rate_band: "sku",
+    wastage: base.wastage,
+    notes: `D1/accessory/${chosen.catalog_item_id}: ${chosen.name} (${chosen.spec_class}) — ${basis}${chosen.qs_validated ? "" : "; rate not QS-validated"}`,
+    accessory_undecomposable: undecomposable,
+  };
+}
 
 export class RateResolver {
   private labourIndex = new Map<string, LabourRate>();
@@ -30,13 +123,26 @@ export class RateResolver {
     labourRates: LabourRate[],
     private skus: PricingSku[],
     private tier: Tier,
+    /** item_key → chosen accessory. Absent key = the R-xx rule applies. */
+    private accessories: Record<string, AccessoryOverride> = {},
   ) {
     for (const r of labourRates) {
       this.labourIndex.set(`${norm(r.work_section)}|${norm(r.description)}`, r);
     }
   }
 
+  /** The rate this item_key would take with no user selection — the default. */
+  resolveDefault(itemKey: string, unit: string): ResolvedRate {
+    return this.resolveFromRules(itemKey, unit);
+  }
+
   resolve(itemKey: string, unit: string): ResolvedRate {
+    const base = this.resolveFromRules(itemKey, unit);
+    const chosen = this.accessories[itemKey];
+    return chosen ? applyAccessory(base, chosen) : base;
+  }
+
+  private resolveFromRules(itemKey: string, unit: string): ResolvedRate {
     const rule = RATE_RULES[itemKey];
     if (!rule) {
       throw new Error(`No rate rule for item_key "${itemKey}".`);

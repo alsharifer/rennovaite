@@ -27,6 +27,8 @@ const SHEET_BLURB: Record<string, string> = {
   as_built: "Dimensioned as-built plan derived from the parsed geometry.",
   proposed: "Proposed plan with demolition (terracotta) and new-work marking.",
   finish_schedule: "Room-by-room floor / wall / ceiling finishes from the locked style.",
+  opening_schedule:
+    "Every door, window and archway by mark — size, sill, and whether the dimensions were measured or defaulted.",
   electrical: "Electrical services plan — sockets, switches, lighting, AC & data points.",
   plumbing: "Plumbing / water services plan — WC, basin, shower, drains & heaters.",
 };

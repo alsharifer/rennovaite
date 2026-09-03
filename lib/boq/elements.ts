@@ -70,6 +70,23 @@ export function assembleMappedSections(items: TakeoffItem[]): MappedSection[] {
     if (its.length === 0) continue;
     const def = WORK_ITEM_DEF[key];
     const quantity = r2(its.reduce((s, i) => s + i.qty, 0));
+
+    // A5: openings deducted anywhere in this line's take-off. Their ids join
+    // element_refs (so tap-to-inspect reaches the door/window that removed the
+    // area) and the deduction is spelled out in `notes` — a net quantity must
+    // never read as gross.
+    const openingRefs = Array.from(
+      new Set(its.flatMap((i) => i.opening_refs ?? [])),
+    );
+    const grossTotal = r2(
+      its.reduce((s, i) => s + (i.gross_qty ?? i.qty), 0),
+    );
+    const deducted = r2(grossTotal - quantity);
+    const notes =
+      openingRefs.length > 0
+        ? `Aggregated from ${its.length} element take-off items. NET of ${openingRefs.length} opening${openingRefs.length === 1 ? "" : "s"}: gross ${grossTotal} m² − ${deducted} m² (doors/windows) = ${quantity} m², floored at 0 per element.`
+        : `Aggregated from ${its.length} element take-off items.`;
+
     lines.push({
       description: def.description,
       quantity,
@@ -77,12 +94,12 @@ export function assembleMappedSections(items: TakeoffItem[]): MappedSection[] {
       rate_aed: def.rate_aed,
       total_aed: r0(quantity * def.rate_aed),
       vendor_or_source: "Deterministic take-off (P4)",
-      notes: `Aggregated from ${its.length} element take-off items.`,
+      notes,
       rule_id: `P4/quantify/${key}`,
       kind: "supply_and_install",
       rate_band: "mid",
       wastage_pct: 0,
-      element_refs: its.map((i) => i.element_id),
+      element_refs: [...its.map((i) => i.element_id), ...openingRefs],
       rate_status: "priced",
       work_item_key: key,
     });

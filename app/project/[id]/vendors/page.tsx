@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppShell } from "@/components/app/AppShell";
+import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   ALL_RELEVANT_CATEGORIES,
@@ -18,7 +19,6 @@ export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Vendors";
 const FALLBACK_BUDGET_AED = 850000;
-const SEGMENTS = 5;
 const TOP_LANES = 8;
 
 type SkuRow = {
@@ -255,15 +255,7 @@ export default async function VendorsPage({
       <div className="mx-auto max-w-[1440px] pb-2xl">
         {/* Header */}
         <header className="mb-xl">
-          <p className="label-caps mb-md text-brass-600">Step 05 of 05</p>
-          <div className="mb-xl flex gap-sm" aria-hidden="true">
-            {Array.from({ length: SEGMENTS }).map((_, i) => (
-              <span
-                key={i}
-                className="h-1 flex-1 rounded-full bg-brass-600"
-              />
-            ))}
-          </div>
+          <JourneyProgress stepKey="marketplace" projectId={id} />
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Pick your vendors.
           </h1>

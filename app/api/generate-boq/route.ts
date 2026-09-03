@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { generateDeterministicBoq } from "@/lib/boq/engine";
+import { loadAccessoryOverrides } from "@/lib/accessories/load";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
@@ -728,6 +729,10 @@ export async function POST(request: NextRequest) {
           }),
         ),
         styleKey: chosenStyleKey,
+        // D1: user-chosen accessories replace the R-xx rate for their own
+        // item_key only. `{}` before migration 028 or with nothing selected,
+        // which reproduces the pre-D1 BoQ byte for byte.
+        accessorySelections: await loadAccessoryOverrides(projectId),
       });
 
       // P4: rebuild mapped POMI sections from the take-off (element_refs + true

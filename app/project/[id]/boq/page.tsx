@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppShell } from "@/components/app/AppShell";
+import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -32,7 +33,6 @@ export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Bill of Quantities";
 const FALLBACK_BUDGET_AED = 850000;
-const SEGMENTS = 5;
 
 type SkuRow = {
   id: string;
@@ -255,18 +255,7 @@ export default async function BoqPage({
       <div className="mx-auto max-w-[1440px]">
         {/* Header */}
         <header className="mb-xl">
-          <p className="label-caps mb-md text-brass-600">Step 04 of 05</p>
-          <div className="mb-xl flex gap-sm" aria-hidden="true">
-            {Array.from({ length: SEGMENTS }).map((_, i) => (
-              <span
-                key={i}
-                className={
-                  "h-1 flex-1 rounded-full " +
-                  (i < 4 ? "bg-brass-600" : "bg-bone")
-                }
-              />
-            ))}
-          </div>
+          <JourneyProgress stepKey="costing" projectId={id} />
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Your bill of quantities.
           </h1>
@@ -282,6 +271,17 @@ export default async function BoqPage({
               supplier SKUs.
             </p>
           )}
+          {/* D1 — the other surface of this step. Accessory categories are
+              rule-priced until someone chooses a specification here. */}
+          <a
+            href={`/project/${id}/accessories`}
+            className="focus-ring mt-lg inline-flex h-11 items-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              tune
+            </span>
+            Choose accessories &amp; specs
+          </a>
         </header>
 
         {permitCheck && (

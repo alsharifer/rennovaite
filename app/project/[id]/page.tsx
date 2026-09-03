@@ -6,6 +6,7 @@ import { ProjectFilesPanel } from "@/components/assets/ProjectFilesPanel";
 import { PermitsCard } from "@/components/compliance/PermitsCard";
 import { loadProjectAssets, toAssetLite } from "@/lib/assets/load";
 import { runPermitCheck, type PermitCheckResult } from "@/lib/compliance/check";
+import { loadMoodboard } from "@/lib/moodboard/load";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { cn } from "@/lib/utils";
 
@@ -248,10 +249,32 @@ export default async function ProjectHubPage({
   }
 
   // ----- Next steps (priority queue, take first 3 incomplete steps) ------
+  // B1/B2 progress for the queue. Both are best-effort: before migration 027
+  // they read as "not started", which is the right thing to show anyway.
+  let briefComplete = false;
+  let moodboardCount = 0;
+  try {
+    const { data: briefRow } = await sb
+      .from("project_briefs")
+      .select("completed_at")
+      .eq("project_id", projectId)
+      .maybeSingle<{ completed_at: string | null }>();
+    briefComplete = !!briefRow?.completed_at;
+  } catch {
+    /* table absent — treat as not started */
+  }
+  try {
+    moodboardCount = (await loadMoodboard(projectId)).length;
+  } catch {
+    /* table absent — treat as empty */
+  }
+
   const nextSteps = buildNextSteps({
     projectId,
     planComplete,
     styleKey: styleRow?.style_key ?? null,
+    briefComplete,
+    moodboardCount,
     hasRender,
     hasBoq: !!boqPayload,
     approvedCount,
@@ -733,6 +756,10 @@ function buildNextSteps(state: {
   projectId: string;
   planComplete: boolean;
   styleKey: string | null;
+  /** B1 — the ideation questionnaire has been finished. */
+  briefComplete: boolean;
+  /** B2 — how many references are pinned. */
+  moodboardCount: number;
   hasRender: boolean;
   hasBoq: boolean;
   approvedCount: number;
@@ -751,14 +778,30 @@ function buildNextSteps(state: {
       cta: "Open",
     });
   }
-  if (!state.styleKey) {
+  // Step 3 — ideation. Style selection lives inside this step, so the queue
+  // points at the questionnaire rather than the bare style grid: answering it
+  // recommends a direction instead of asking a cold question.
+  if (!state.briefComplete || !state.styleKey) {
     queue.push({
-      title: "Pick a design direction",
+      title: state.styleKey
+        ? "Finish your design brief"
+        : "Find your design direction",
       due: "Due in 2 days",
-      icon: "palette",
-      href: `/project/${projectId}/style`,
-      primary: !state.planComplete ? false : true,
-      cta: "Pick",
+      icon: "auto_awesome",
+      href: `/project/${projectId}/ideation`,
+      primary: state.planComplete,
+      cta: state.styleKey ? "Resume" : "Start",
+    });
+  }
+  // Step 4 — moodboard. Only worth asking for once a direction exists.
+  if (state.styleKey && state.moodboardCount === 0) {
+    queue.push({
+      title: "Build your moodboard",
+      due: "Due in 3 days",
+      icon: "gallery_thumbnail",
+      href: `/project/${projectId}/moodboard`,
+      primary: false,
+      cta: "Open",
     });
   }
   if (!state.hasRender) {

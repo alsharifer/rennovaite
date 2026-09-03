@@ -98,10 +98,10 @@ export function StyleGrid({
       <div className="fixed inset-x-0 bottom-0 z-10 h-[88px] border-t border-ink-100 bg-paper">
         <div className="ml-60 flex h-full items-center justify-between px-margin">
           <Link
-            href={`/project/${projectId}/plan`}
+            href={`/project/${projectId}/ideation`}
             className="focus-ring flex h-12 items-center rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
           >
-            Back to plan
+            Back to the questionnaire
           </Link>
           <p className="hidden font-body text-body-sm italic text-on-surface-variant md:block">
             {selected
@@ -110,10 +110,10 @@ export function StyleGrid({
           </p>
           {selected ? (
             <Link
-              href={`/project/${projectId}/render`}
+              href={`/project/${projectId}/moodboard`}
               className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-xl font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
             >
-              Generate my first render
+              Build your moodboard
               <span
                 className="material-symbols-outlined text-[18px]"
                 aria-hidden="true"
@@ -127,7 +127,7 @@ export function StyleGrid({
               disabled
               className="flex h-12 cursor-not-allowed items-center gap-sm rounded-lg bg-brass-600/50 px-xl font-body-sm text-body-sm font-semibold text-on-primary"
             >
-              Generate my first render
+              Build your moodboard
               <span
                 className="material-symbols-outlined text-[18px]"
                 aria-hidden="true"
