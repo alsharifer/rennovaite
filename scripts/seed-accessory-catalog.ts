@@ -1,7 +1,7 @@
 // =============================================================================
 // scripts/seed-accessory-catalog.ts — populate accessory_catalog (D1).
 //
-// Run:  node scripts/seed-accessory-catalog.ts
+// Run:  node --import ./scripts/_alias-hook.mjs scripts/seed-accessory-catalog.ts
 // (tsx is not available in this repo; this file is plain JS-compatible TS run
 // directly by node, same as the other seed scripts.)
 //
@@ -17,7 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { buildCatalog, type SkuRow } from "../lib/accessories/seed-data";
+import { buildCatalog, type SkuRow } from "../lib/accessories/seed-data.ts";
 
 function readEnv(): Record<string, string> {
   const file = path.join(process.cwd(), ".env.local");

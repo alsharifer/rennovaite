@@ -80,8 +80,19 @@ export async function loadSelections(projectId: string): Promise<AccessorySelect
   }
 }
 
-/** Shape a catalogue item into the engine's rate override. */
-export function toOverride(item: AccessoryItem): AccessoryOverride {
+/**
+ * Shape a catalogue item into the engine's rate override.
+ *
+ * `defaultSupply` is the supply price of the item the rule already assumed —
+ * the `is_rule_default` row for the same item_key. The engine needs it to move
+ * a supply-and-install rate by the SPEC delta rather than replacing it with a
+ * bare supply price (which would delete the installation cost). Null when the
+ * catalogue has no default row, in which case the engine refuses to guess.
+ */
+export function toOverride(
+  item: AccessoryItem,
+  defaultSupply: number | null = null,
+): AccessoryOverride {
   return {
     catalog_item_id: item.id,
     name: item.name,
@@ -90,7 +101,19 @@ export function toOverride(item: AccessoryItem): AccessoryOverride {
     source: item.source,
     spec_class: item.spec_class,
     qs_validated: item.qs_validated,
+    default_supply_aed: defaultSupply,
   };
+}
+
+/** The catalogue's rule-default supply price per item_key, where one exists. */
+export function defaultSupplyByItemKey(
+  catalog: AccessoryItem[],
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const c of catalog) {
+    if (c.is_rule_default) out[c.item_key] = c.rate_aed;
+  }
+  return out;
 }
 
 /**
@@ -107,10 +130,13 @@ export async function loadAccessoryOverrides(
   ]);
   if (catalog.length === 0) return {};
   const byId = new Map(catalog.map((c) => [c.id, c]));
+  const defaultSupply = defaultSupplyByItemKey(catalog);
   const out: Record<string, AccessoryOverride> = {};
   for (const [itemKey, catalogId] of Object.entries(selections)) {
     const item = byId.get(catalogId);
-    if (item && item.item_key === itemKey) out[itemKey] = toOverride(item);
+    if (item && item.item_key === itemKey) {
+      out[itemKey] = toOverride(item, defaultSupply[itemKey] ?? null);
+    }
   }
   return out;
 }

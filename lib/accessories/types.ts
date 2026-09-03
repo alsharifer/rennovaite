@@ -251,25 +251,61 @@ export interface SelectionDelta {
 }
 
 /**
+ * The rate a line takes once an accessory is chosen. MUST mirror
+ * `applyAccessory` in lib/boq/rates.ts — the picker's predicted movement and
+ * the regenerated BoQ have to agree to the dirham, so the rule lives here in
+ * a form the client can run and is asserted equal to the engine's in tests.
+ *
+ * Catalogue rates are SUPPLY prices; rule defaults are not always. Replacing a
+ * supply-and-install rate with a bare supply price deletes the installation
+ * cost and makes a premium spec look cheaper, so:
+ *   default supply known → default + (chosen − default supply): shift by the
+ *                          specification only, preserving whatever else the
+ *                          rule rate contains. Takes precedence over kind.
+ *   supply_and_install   → no change; the supply split is unknown and guessing
+ *                          would delete the installation cost
+ *   labour / lump        → default + chosen, the fixture supply being additive
+ *   allowance / material → chosen, a like-for-like supply swap
+ */
+export function effectiveRate(
+  defaultRate: number,
+  defaultKind: string,
+  chosenRate: number,
+  defaultSupply: number | null,
+): number {
+  // A known default supply price wins over the kind heuristic — see
+  // applyAccessory for why.
+  if (defaultSupply != null) {
+    return Math.round((defaultRate + (chosenRate - defaultSupply)) * 100) / 100;
+  }
+  if (defaultKind === "supply_and_install") return defaultRate;
+  if (defaultKind === "labour" || defaultKind === "lump") {
+    return Math.round((defaultRate + chosenRate) * 100) / 100;
+  }
+  return chosenRate;
+}
+
+/**
  * Predicted BoQ movement for a set of selections. Quantities come from the
  * take-off and are never altered here — this only re-prices.
  */
 export function selectionDeltas(
   quantities: Record<string, number>,
-  defaults: Record<string, number>,
-  chosen: { item_key: string; rate_aed: number }[],
+  defaults: Record<string, { rate_aed: number; kind: string }>,
+  chosen: { item_key: string; rate_aed: number; default_supply_aed: number | null }[],
 ): { lines: SelectionDelta[]; total_delta_aed: number } {
   const lines: SelectionDelta[] = [];
   for (const c of chosen) {
     const qty = quantities[c.item_key];
     const def = defaults[c.item_key];
     if (qty === undefined || def === undefined) continue;
-    const delta = Math.round(qty * c.rate_aed) - Math.round(qty * def);
+    const rate = effectiveRate(def.rate_aed, def.kind, c.rate_aed, c.default_supply_aed);
+    const delta = Math.round(qty * rate) - Math.round(qty * def.rate_aed);
     lines.push({
       item_key: c.item_key,
       quantity: qty,
-      default_rate_aed: def,
-      selected_rate_aed: c.rate_aed,
+      default_rate_aed: def.rate_aed,
+      selected_rate_aed: rate,
       delta_aed: delta,
     });
   }

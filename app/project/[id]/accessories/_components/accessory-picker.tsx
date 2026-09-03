@@ -24,6 +24,7 @@ import {
   SPEC_CLASS_LABEL,
   comparableRows,
   formatAttribute,
+  effectiveRate,
   selectionDeltas,
   type AccessoryCategory,
   type AccessoryItem,
@@ -87,17 +88,31 @@ export function AccessoryPicker({
   const byId = useMemo(() => new Map(catalog.map((c) => [c.id, c])), [catalog]);
 
   // Live total movement against the rule defaults — the number the BoQ will move by.
+  const defaultSupply = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const c of catalog) if (c.is_rule_default) out[c.item_key] = c.rate_aed;
+    return out;
+  }, [catalog]);
+
+  // Live movement against the rule defaults, computed with the SAME rule the
+  // engine applies (effectiveRate mirrors applyAccessory), so the figure here
+  // is the figure the regenerated BoQ moves by.
   const delta = useMemo(() => {
     const chosen = Object.entries(selections)
       .map(([item_key, id]) => {
         const it = byId.get(id);
-        return it ? { item_key, rate_aed: it.rate_aed } : null;
+        if (!it) return null;
+        return {
+          item_key,
+          rate_aed: it.rate_aed,
+          default_supply_aed: (defaultSupply[item_key] ?? null) as number | null,
+        };
       })
-      .filter((x): x is { item_key: string; rate_aed: number } => x !== null);
-    const defaultRates: Record<string, number> = {};
-    for (const [k, d] of Object.entries(defaults)) if (d) defaultRates[k] = d.rate_aed;
-    return selectionDeltas(quantities, defaultRates, chosen);
-  }, [selections, byId, defaults, quantities]);
+      .filter((x): x is { item_key: string; rate_aed: number; default_supply_aed: number | null } => x !== null);
+    const defs: Record<string, { rate_aed: number; kind: string }> = {};
+    for (const [k, d] of Object.entries(defaults)) if (d) defs[k] = { rate_aed: d.rate_aed, kind: d.kind };
+    return selectionDeltas(quantities, defs, chosen);
+  }, [selections, byId, defaults, quantities, defaultSupply]);
 
   const choose = useCallback(
     async (itemKey: string, catalogItemId: string | null) => {
@@ -254,7 +269,17 @@ export function AccessoryPicker({
                     <OptionCard
                       title={o.name}
                       subtitle={[o.brand, o.model_code].filter(Boolean).join(" · ") || (o.source ?? "")}
-                      rate={o.rate_aed}
+                      rate={
+                        def
+                          ? effectiveRate(
+                              def.rate_aed,
+                              def.kind,
+                              o.rate_aed,
+                              defaultSupply[itemKey] ?? null,
+                            )
+                          : o.rate_aed
+                      }
+                      supplyRate={o.rate_aed}
                       qty={qty}
                       specClass={o.spec_class}
                       selected={selectedId === o.id}
@@ -288,13 +313,29 @@ export function AccessoryPicker({
                 <p className="mt-md font-body-sm text-body-sm text-on-surface-variant">
                   BoQ line will read{" "}
                   <span className="text-ink-900">{selected.name}</span> at{" "}
-                  <span className="font-mono tabular-nums">{aed(selected.rate_aed)}</span>
-                  {qty !== undefined && (
+                  <span className="font-mono tabular-nums">
+                    {aed(
+                      effectiveRate(
+                        def?.rate_aed ?? 0,
+                        def?.kind ?? "allowance",
+                        selected.rate_aed,
+                        defaultSupply[itemKey] ?? null,
+                      ),
+                    )}
+                  </span>
+                  {qty !== undefined && def && (
                     <>
                       {" "}
                       × {qty} ={" "}
                       <span className="font-mono tabular-nums text-ink-900">
-                        {aed(selected.rate_aed * qty)}
+                        {aed(
+                          effectiveRate(
+                            def.rate_aed,
+                            def.kind,
+                            selected.rate_aed,
+                            defaultSupply[itemKey] ?? null,
+                          ) * qty,
+                        )}
                       </span>
                     </>
                   )}
@@ -365,6 +406,7 @@ function OptionCard({
   title,
   subtitle,
   rate,
+  supplyRate,
   qty,
   specClass,
   selected,
@@ -376,7 +418,10 @@ function OptionCard({
 }: {
   title: string;
   subtitle: string;
+  /** The rate the BoQ line will actually take if this is chosen. */
   rate: number | null;
+  /** The item's own supply price, shown as context when the two differ. */
+  supplyRate?: number;
   qty: number | undefined;
   specClass: SpecClass | null;
   selected: boolean;
@@ -433,6 +478,14 @@ function OptionCard({
           <span className="text-ink-500"> · {aed(rate * qty)} total</span>
         )}
       </span>
+      {/* The catalogue price is a SUPPLY price; the line rate keeps whatever
+          installation the rule already carried, so show both when they differ
+          rather than letting a AED 400 mixer look like a AED 400 line. */}
+      {supplyRate !== undefined && rate !== null && Math.abs(supplyRate - rate) > 0.005 && (
+        <span className="font-body-sm text-[11px] text-ink-500">
+          {aed(supplyRate)} supply · rest of the rule rate preserved
+        </span>
+      )}
     </button>
   );
 }

@@ -17,9 +17,11 @@ import {
   comparableRows,
   formatAttribute,
   ITEM_KEY_LABEL,
+  effectiveRate,
   selectionDeltas,
   type AccessoryItem,
 } from "@/lib/accessories/types";
+import { applyAccessory } from "@/lib/boq/rates";
 import { RATE_RULES } from "@/lib/boq/rules";
 import { SANITARY } from "@/lib/ground-truth/mudon-actuals";
 
@@ -332,39 +334,121 @@ describe("attribute display", () => {
 });
 
 describe("selectionDeltas — the predicted BoQ movement", () => {
-  const quantities = { "san.shower": 3, "light.pendant": 4 };
-  const defaults = { "san.shower": 500, "light.pendant": 195 };
+  const quantities = { "san.shower": 3, "light.pendant": 5 };
+  // What the rule assumes, and what KIND of rate that is — the kind is what
+  // decides whether a supply price replaces, adds to, or shifts the default.
+  const defaults = {
+    "san.shower": { rate_aed: 9000, kind: "supply_and_install" },
+    "light.pendant": { rate_aed: 500, kind: "labour" },
+  };
 
-  it("prices premium sanitary + economy lighting to the dirham", () => {
+  it("moves a supply-and-install line by the SPEC delta, preserving install", () => {
+    // Exposed (500) is what the rule assumed; concealed (1750) is chosen.
+    // Rate 9000 + (1750 − 500) = 10,250 → 3 × 1,250 = +3,750.
     const { lines, total_delta_aed } = selectionDeltas(quantities, defaults, [
-      { item_key: "san.shower", rate_aed: 1750 },
-      { item_key: "light.pendant", rate_aed: 49 },
+      { item_key: "san.shower", rate_aed: 1750, default_supply_aed: 500 },
     ]);
-    // shower: 3 × (1750 − 500) = +3750; pendant: 4 × (49 − 195) = −584.
-    expect(lines.find((l) => l.item_key === "san.shower")!.delta_aed).toBe(3750);
-    expect(lines.find((l) => l.item_key === "light.pendant")!.delta_aed).toBe(-584);
-    expect(total_delta_aed).toBe(3166);
+    expect(lines[0]!.selected_rate_aed).toBe(10_250);
+    expect(total_delta_aed).toBe(3750);
+  });
+
+  it("ADDS the fixture price to an installation-labour-only default", () => {
+    // The pendant rule is "installation labour only", so supply is additive:
+    // 500 + 49 = 549 → 5 × 49 = +245.
+    const { lines, total_delta_aed } = selectionDeltas(quantities, defaults, [
+      { item_key: "light.pendant", rate_aed: 49, default_supply_aed: null },
+    ]);
+    expect(lines[0]!.selected_rate_aed).toBe(549);
+    expect(total_delta_aed).toBe(245);
+  });
+
+  it("never makes a premium specification cheaper than the default", () => {
+    // The bug this whole rule exists to prevent: substituting a bare supply
+    // price for a supply-and-install rate deleted the installation cost and
+    // made premium sanitary REDUCE the BoQ.
+    for (const supply of [400, 500, 525]) {
+      for (const premium of [675, 850, 1750]) {
+        if (premium <= supply) continue;
+        const { total_delta_aed } = selectionDeltas(
+          { "san.shower": 3 },
+          { "san.shower": { rate_aed: 9000, kind: "supply_and_install" } },
+          [{ item_key: "san.shower", rate_aed: premium, default_supply_aed: supply }],
+        );
+        expect(total_delta_aed).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("refuses to re-price when the default's supply split is unknown", () => {
+    // Better a line that did not move than one that silently lost its install.
+    const { lines, total_delta_aed } = selectionDeltas(quantities, defaults, [
+      { item_key: "san.shower", rate_aed: 1750, default_supply_aed: null },
+    ]);
+    expect(lines[0]!.selected_rate_aed).toBe(9000);
+    expect(total_delta_aed).toBe(0);
+  });
+
+  it("swaps like for like when the default is itself a supply price", () => {
+    const { lines } = selectionDeltas(
+      { "san.shattaf": 3 },
+      { "san.shattaf": { rate_aed: 250, kind: "allowance" } },
+      [{ item_key: "san.shattaf", rate_aed: 310, default_supply_aed: 250 }],
+    );
+    expect(lines[0]!.selected_rate_aed).toBe(310);
+    expect(lines[0]!.delta_aed).toBe(180);
   });
 
   it("never alters a quantity — only the rate", () => {
     const { lines } = selectionDeltas(quantities, defaults, [
-      { item_key: "san.shower", rate_aed: 9999 },
+      { item_key: "san.shower", rate_aed: 9999, default_supply_aed: 500 },
     ]);
     expect(lines[0]!.quantity).toBe(3);
   });
 
   it("ignores a selection with no take-off quantity", () => {
     const { lines, total_delta_aed } = selectionDeltas(quantities, defaults, [
-      { item_key: "hvac.office_split", rate_aed: 5000 },
+      { item_key: "hvac.office_split", rate_aed: 5000, default_supply_aed: null },
     ]);
     expect(lines).toEqual([]);
     expect(total_delta_aed).toBe(0);
   });
 
-  it("is zero when the choice matches the default", () => {
+  it("is zero when the choice matches what the rule already assumed", () => {
     const { total_delta_aed } = selectionDeltas(quantities, defaults, [
-      { item_key: "san.shower", rate_aed: 500 },
+      { item_key: "san.shower", rate_aed: 500, default_supply_aed: 500 },
     ]);
     expect(total_delta_aed).toBe(0);
+  });
+});
+
+describe("client and engine agree on the re-priced rate", () => {
+  it("effectiveRate matches applyAccessory for every default kind", () => {
+    const kinds = ["supply_and_install", "labour", "lump", "allowance", "material"] as const;
+    for (const kind of kinds) {
+      for (const defaultSupply of [null, 500]) {
+        const base = {
+          rate_aed: 9000,
+          vendor_or_source: "rule",
+          kind,
+          rate_band: "mid" as const,
+          wastage: 0,
+          notes: null,
+        };
+        const chosen = {
+          catalog_item_id: "c1",
+          name: "Concealed shower",
+          rate_aed: 1750,
+          scope: "supply_and_install" as const,
+          source: null,
+          spec_class: "premium",
+          qs_validated: false,
+          default_supply_aed: defaultSupply,
+        };
+        expect(
+          effectiveRate(base.rate_aed, kind, chosen.rate_aed, defaultSupply),
+          `${kind} / defaultSupply=${defaultSupply}`,
+        ).toBe(applyAccessory(base, chosen).rate_aed);
+      }
+    }
   });
 });
