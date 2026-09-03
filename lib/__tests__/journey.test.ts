@@ -14,7 +14,7 @@ const ON: JourneyFlags = { drawingsEnabled: true };
 const OFF: JourneyFlags = { drawingsEnabled: false };
 
 describe("journey composition", () => {
-  it("runs intake → layout → ideation → moodboard → render → costing → downloads → marketplace", () => {
+  it("runs intake → layout → ideation → moodboard → render → costing → scope & timeline → downloads → marketplace", () => {
     expect(journeySteps(ON).map((s) => s.key)).toEqual([
       "intake",
       "layout",
@@ -22,16 +22,17 @@ describe("journey composition", () => {
       "moodboard",
       "render",
       "costing",
+      "scope_timeline",
       "downloads",
       "marketplace",
     ]);
   });
 
-  it("drops the unbuilt scope & timeline step rather than showing a dead end", () => {
-    // T4 is not built; it must not appear at all, in either flag state.
-    expect(journeySteps(ON).some((s) => s.key === "scope_timeline")).toBe(false);
-    expect(journeySteps(OFF).some((s) => s.key === "scope_timeline")).toBe(false);
-    expect(journeyStep("scope_timeline", ON)).toBeNull();
+  it("includes scope & timeline now that D2 has landed", () => {
+    // This step was absent until the phase estimator existed; the drop-out
+    // mechanism it used to exercise is still covered by the downloads flag.
+    expect(journeySteps(ON).some((s) => s.key === "scope_timeline")).toBe(true);
+    expect(journeyStep("scope_timeline", ON)!.href("p")).toBe("/project/p/timeline");
   });
 
   it("has no separate style step — style folds into ideation", () => {
@@ -47,15 +48,15 @@ describe("journey composition", () => {
 
 describe("flag-aware numbering", () => {
   it("renumbers around a disabled step so the count always matches", () => {
-    expect(journeyLength(ON)).toBe(8);
-    expect(journeyLength(OFF)).toBe(7);
+    expect(journeyLength(ON)).toBe(9);
+    expect(journeyLength(OFF)).toBe(8);
     expect(journeySteps(OFF).some((s) => s.key === "downloads")).toBe(false);
   });
 
   it("closes the gap left by a disabled step", () => {
     // With downloads off, marketplace moves up rather than leaving a hole.
-    expect(journeyStep("marketplace", ON)!.number).toBe(8);
-    expect(journeyStep("marketplace", OFF)!.number).toBe(7);
+    expect(journeyStep("marketplace", ON)!.number).toBe(9);
+    expect(journeyStep("marketplace", OFF)!.number).toBe(8);
   });
 
   it("numbers every available step contiguously from 1", () => {
@@ -68,12 +69,11 @@ describe("flag-aware numbering", () => {
   });
 
   it("formats a zero-padded label matching the existing chrome", () => {
-    expect(stepLabel("ideation", ON)).toBe("Step 03 of 08");
-    expect(stepLabel("marketplace", OFF)).toBe("Step 07 of 07");
+    expect(stepLabel("ideation", ON)).toBe("Step 03 of 09");
+    expect(stepLabel("marketplace", OFF)).toBe("Step 08 of 08");
   });
 
   it("returns an empty label for an unavailable step", () => {
-    expect(stepLabel("scope_timeline", ON)).toBe("");
     expect(stepLabel("downloads", OFF)).toBe("");
   });
 });
@@ -82,13 +82,14 @@ describe("navigation has no dead ends", () => {
   it("walks ideation → moodboard → render, the B1/B2/B3 spine", () => {
     expect(nextStep("ideation", ON)!.key).toBe("moodboard");
     expect(nextStep("moodboard", ON)!.key).toBe("render");
+    expect(nextStep("costing", ON)!.key).toBe("scope_timeline");
     expect(prevStep("moodboard", ON)!.key).toBe("ideation");
   });
 
   it("skips a disabled step when moving forward", () => {
-    // costing → downloads → marketplace becomes costing → marketplace.
-    expect(nextStep("costing", ON)!.key).toBe("downloads");
-    expect(nextStep("costing", OFF)!.key).toBe("marketplace");
+    // scope_timeline → downloads → marketplace becomes … → marketplace.
+    expect(nextStep("scope_timeline", ON)!.key).toBe("downloads");
+    expect(nextStep("scope_timeline", OFF)!.key).toBe("marketplace");
   });
 
   it("terminates cleanly at both ends", () => {

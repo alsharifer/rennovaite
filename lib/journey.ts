@@ -114,8 +114,7 @@ const STEPS: JourneyStepDef[] = [
     blurb: "Phase durations and a dated programme.",
     glyph: "calendar_month",
     href: (id) => `/project/${id}/timeline`,
-    // T4 — not built yet, so it drops out of the numbering entirely.
-    available: () => false,
+    available: () => true,
   },
   {
     key: "downloads",
