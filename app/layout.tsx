@@ -49,7 +49,7 @@ const rubik = Rubik({
 });
 
 export const metadata: Metadata = {
-  title: "RennovAIte — coming soon to Dubai",
+  title: "RennovAIte — AI villa renovation, Dubai",
   description:
     "AI-powered villa renovation, from floorplan to finished home in 5 days.",
 };
