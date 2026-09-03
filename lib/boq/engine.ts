@@ -29,15 +29,23 @@ export function generateDeterministicBoq(
     (input.styleKey && STYLE_FLOORING[input.styleKey]) || DEFAULT_FLOORING;
 
   const takeoff = computeTakeoff(input.rooms, flooring);
-  const resolver = new RateResolver(input.labourRates, input.skus, tier);
+  const resolver = new RateResolver(
+    input.labourRates,
+    input.skus,
+    tier,
+    input.accessorySelections ?? {},
+  );
 
   const bySection = new Map<PomiSection, BoqLine[]>();
 
   for (const item of takeoff.items) {
     const rate = resolver.resolve(item.item_key, item.unit);
+    const chosen = input.accessorySelections?.[item.item_key];
     const pricedQty = round2(item.quantity * (1 + rate.wastage));
     const line: BoqLine = {
-      description: item.description,
+      // A selected accessory renames the line to the thing actually specified —
+      // the quantity and its measurement are untouched.
+      description: chosen ? `${item.description} — ${chosen.name}` : item.description,
       quantity: pricedQty,
       unit: item.unit,
       rate_aed: rate.rate_aed,
@@ -51,6 +59,14 @@ export function generateDeterministicBoq(
       kind: rate.kind,
       rate_band: rate.rate_band,
       wastage_pct: Math.round(rate.wastage * 100),
+      // D1: the chosen catalogue item is the line's element ref, and an
+      // unvalidated rate keeps the terracotta-dot convention.
+      ...(chosen
+        ? {
+            element_refs: [chosen.catalog_item_id],
+            rate_status: chosen.qs_validated ? ("priced" as const) : ("needs_qs" as const),
+          }
+        : {}),
     };
     const lines = bySection.get(item.work_section) ?? [];
     lines.push(line);

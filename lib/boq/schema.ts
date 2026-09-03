@@ -10,6 +10,8 @@
 
 import { z } from "zod";
 
+import type { AccessoryOverride } from "./rates";
+
 export const POMI_SECTIONS = [
   "Demolition",
   "Blockwork",
@@ -72,6 +74,12 @@ export type EngineInput = {
   skus: PricingSku[];
   /** Style key from lib/styles.ts; null → "mid" tier, porcelain flooring. */
   styleKey: string | null;
+  /**
+   * D1: user-chosen accessories, keyed by item_key. Each substitutes that one
+   * line's RATE and provenance; quantities always stay the take-off's.
+   * Absent/empty → every line prices from its R-xx rule, exactly as before.
+   */
+  accessorySelections?: Record<string, AccessoryOverride>;
 };
 
 // --- Take-off (intermediate) ---------------------------------------------------

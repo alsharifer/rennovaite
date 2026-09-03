@@ -61,19 +61,51 @@ export async function loadRateBook(supabase: SupabaseClient): Promise<RateBook> 
 export async function loadLatestScenario(
   supabase: SupabaseClient,
   projectId: string,
-): Promise<{ selections: Selections; total: number | null } | null> {
+): Promise<{
+  selections: Selections;
+  total: number | null;
+  /** D1: item_key → accessory_catalog id this scenario prices with. */
+  accessorySelections: Record<string, string>;
+} | null> {
   try {
     const { data, error } = await supabase
       .from("whatif_scenarios")
-      .select("selections, total")
+      .select("selections, total, accessory_selections")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle<{ selections: Selections | null; total: number | null }>();
+      .maybeSingle<{
+        selections: Selections | null;
+        total: number | null;
+        accessory_selections: Record<string, string> | null;
+      }>();
     if (error || !data) return null;
-    return { selections: data.selections ?? {}, total: data.total != null ? Number(data.total) : null };
+    return {
+      selections: data.selections ?? {},
+      total: data.total != null ? Number(data.total) : null,
+      accessorySelections: data.accessory_selections ?? {},
+    };
   } catch {
-    return null;
+    // Pre-028 the accessory_selections column is absent, which makes the whole
+    // select fail — fall back to the columns that have always existed so
+    // what-if keeps working rather than losing its saved scenario.
+    try {
+      const { data } = await supabase
+        .from("whatif_scenarios")
+        .select("selections, total")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<{ selections: Selections | null; total: number | null }>();
+      if (!data) return null;
+      return {
+        selections: data.selections ?? {},
+        total: data.total != null ? Number(data.total) : null,
+        accessorySelections: {},
+      };
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -82,12 +114,25 @@ export async function saveScenario(
   projectId: string,
   selections: Selections,
   total: number,
+  /** D1: accessory picks this scenario prices with, so a scenario can hold a
+   *  different spec set without disturbing the project's own selections. */
+  accessorySelections?: Record<string, string>,
 ): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from("whatif_scenarios")
-      .insert({ project_id: projectId, selections, total });
-    return !error;
+    const row: Record<string, unknown> = { project_id: projectId, selections, total };
+    if (accessorySelections && Object.keys(accessorySelections).length > 0) {
+      row.accessory_selections = accessorySelections;
+    }
+    const { error } = await supabase.from("whatif_scenarios").insert(row);
+    if (!error) return true;
+    // Pre-028: retry without the new column rather than losing the scenario.
+    if (accessorySelections) {
+      const { error: retry } = await supabase
+        .from("whatif_scenarios")
+        .insert({ project_id: projectId, selections, total });
+      return !retry;
+    }
+    return false;
   } catch {
     return false;
   }

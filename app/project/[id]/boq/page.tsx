@@ -271,6 +271,17 @@ export default async function BoqPage({
               supplier SKUs.
             </p>
           )}
+          {/* D1 — the other surface of this step. Accessory categories are
+              rule-priced until someone chooses a specification here. */}
+          <a
+            href={`/project/${id}/accessories`}
+            className="focus-ring mt-lg inline-flex h-11 items-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              tune
+            </span>
+            Choose accessories &amp; specs
+          </a>
         </header>
 
         {permitCheck && (

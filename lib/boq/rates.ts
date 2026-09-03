@@ -23,6 +23,22 @@ export type ResolvedRate = {
   notes: string | null;
 };
 
+/**
+ * D1: a user-chosen accessory that replaces the rule-derived rate for one
+ * item_key. It substitutes the RATE and its provenance only — never the
+ * quantity, which stays the take-off's business. The user picks WHAT; the
+ * engine keeps computing HOW MANY.
+ */
+export type AccessoryOverride = {
+  catalog_item_id: string;
+  name: string;
+  rate_aed: number;
+  scope: "supply_only" | "install_only" | "supply_and_install";
+  source: string | null;
+  spec_class: string;
+  qs_validated: boolean;
+};
+
 export class RateResolver {
   private labourIndex = new Map<string, LabourRate>();
 
@@ -30,13 +46,39 @@ export class RateResolver {
     labourRates: LabourRate[],
     private skus: PricingSku[],
     private tier: Tier,
+    /** item_key → chosen accessory. Absent key = the R-xx rule applies. */
+    private accessories: Record<string, AccessoryOverride> = {},
   ) {
     for (const r of labourRates) {
       this.labourIndex.set(`${norm(r.work_section)}|${norm(r.description)}`, r);
     }
   }
 
+  /** The rate this item_key would take with no user selection — the default. */
+  resolveDefault(itemKey: string, unit: string): ResolvedRate {
+    return this.resolveFromRules(itemKey, unit);
+  }
+
   resolve(itemKey: string, unit: string): ResolvedRate {
+    const chosen = this.accessories[itemKey];
+    if (chosen) {
+      // A selected accessory is priced as ONE line at the engine's own scope.
+      // The S-pack invariant holds by construction here: the engine emits a
+      // single line per item_key, so substituting a rate cannot introduce the
+      // second (install) line that would double-count.
+      return {
+        rate_aed: chosen.rate_aed,
+        vendor_or_source: chosen.source ?? `accessory: ${chosen.name}`,
+        kind: chosen.scope === "supply_and_install" ? "supply_and_install" : "material",
+        rate_band: "sku",
+        wastage: 0,
+        notes: `D1/accessory/${chosen.catalog_item_id}: ${chosen.name} (${chosen.spec_class}${chosen.qs_validated ? ", QS-validated" : ", rate not QS-validated"}) — user selection replaces the rule default`,
+      };
+    }
+    return this.resolveFromRules(itemKey, unit);
+  }
+
+  private resolveFromRules(itemKey: string, unit: string): ResolvedRate {
     const rule = RATE_RULES[itemKey];
     if (!rule) {
       throw new Error(`No rate rule for item_key "${itemKey}".`);
