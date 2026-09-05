@@ -19,6 +19,8 @@ import * as THREE from "three";
 
 import type { SceneModel, WallSegment } from "@/lib/viewer/scene";
 import { WALL_WHITE } from "@/lib/viewer/scene";
+import type { FinishPlan, SurfaceFinish } from "@/lib/viewer/materials";
+import { applyMetricUVs, disposeTextures, familyTexture, repeatMetres } from "@/lib/viewer/textures";
 import {
   floorTarget,
   wallTarget,
@@ -84,57 +86,199 @@ interface PickProps {
   hoveredId: string | null;
 }
 
-function Floors({ scene, onElement, onHover, selectedId, hoveredId }: { scene: SceneModel } & PickProps) {
+/** "flat" drops every texture and renders base colours only. */
+export type Quality = "textured" | "flat";
+
+type Highlight = "none" | "hover" | "selected";
+
+/**
+ * Materials are SHARED between meshes, and the highlight state is part of the
+ * cache key rather than mutated onto a material at render time.
+ *
+ * That detail is the whole design. A villa is dozens of wall boxes: giving each
+ * its own material means dozens of uploads of the same texture and no batching,
+ * but mutating one shared material to glow would light up every surface that
+ * happens to share the finish. Keying on appearance — family, colour, highlight
+ * — keeps both properties: two bathrooms with the same tile share one material,
+ * and selecting one wall lights only that wall.
+ *
+ * Tiling lives in the vertex UVs (applyMetricUVs), so a family needs exactly
+ * one texture however many surfaces use it.
+ */
+function useMaterialCache(quality: Quality) {
+  const cacheRef = useRef(new Map<string, THREE.MeshStandardMaterial>());
+
+  // Quality is part of the cache KEY rather than something an effect
+  // invalidates. Disposing on a [quality] change would free materials the
+  // current render has already handed to meshes; keying instead means the two
+  // quality settings simply coexist, and the set stays small either way.
+  useEffect(() => {
+    const map = cacheRef.current;
+    return () => {
+      for (const m of map.values()) m.dispose();
+      map.clear();
+      disposeTextures();
+    };
+  }, []);
+
+  return useMemo(
+    () =>
+      function material(spec: {
+        finish: SurfaceFinish | null;
+        clayColor: string;
+        kind: "floor" | "wall";
+        highlight: Highlight;
+        /** Derived (not surveyed) wall — renders semi-transparent. */
+        derived?: boolean;
+      }): THREE.MeshStandardMaterial {
+        const { finish, clayColor, kind, highlight, derived = false } = spec;
+        const textured = quality === "textured" && finish !== null;
+        const look = finish ? finish.family + "|" + finish.color : "clay|" + clayColor;
+        const key = [quality, look, textured ? "t" : "f", highlight, kind, derived ? "der" : "sol"].join("|");
+        const hit = cacheRef.current.get(key);
+        if (hit) return hit;
+
+        // With no finish this must reproduce the pre-F1 material EXACTLY —
+        // roughness and glow included — because flag-off has to be the viewer
+        // people already know, not a near-miss of it.
+        const roughness = finish
+          ? finish.family === "tile"
+            ? 0.5
+            : finish.family === "stone"
+              ? 0.6
+              : 0.9
+          : kind === "floor"
+            ? 0.95
+            : 0.9;
+        const glow =
+          kind === "floor"
+            ? highlight === "selected" ? 0.35 : highlight === "hover" ? 0.15 : 0
+            : highlight === "selected" ? 0.3 : highlight === "hover" ? 0.12 : 0;
+
+        const mat = new THREE.MeshStandardMaterial({
+          color: finish ? finish.color : clayColor,
+          roughness,
+          metalness: 0,
+          side: kind === "floor" ? THREE.DoubleSide : THREE.FrontSide,
+          transparent: derived,
+          opacity: derived ? 0.6 : 1,
+          emissive: new THREE.Color(BRASS),
+          emissiveIntensity: glow,
+        });
+        if (textured && finish) {
+          const tex = familyTexture(finish.family);
+          if (tex) mat.map = tex;
+        }
+        cacheRef.current.set(key, mat);
+        return mat;
+      },
+    [quality],
+  );
+}
+
+function hl(selected: boolean, hovered: boolean): Highlight {
+  return selected ? "selected" : hovered ? "hover" : "none";
+}
+
+function Floors({
+  scene,
+  finishes,
+  quality,
+  onElement,
+  onHover,
+  selectedId,
+  hoveredId,
+}: { scene: SceneModel; finishes?: FinishPlan; quality: Quality } & PickProps) {
+  const material = useMaterialCache(quality);
   const meshes = useMemo(
     () =>
       scene.floors.map((f) => {
         const shape = new THREE.Shape();
         f.points.forEach(([x, z], i) => (i === 0 ? shape.moveTo(x, -z) : shape.lineTo(x, -z)));
         shape.closePath();
-        return { key: f.roomId, geom: new THREE.ShapeGeometry(shape), color: f.color };
+        return { key: f.roomId, shape, color: f.color, finish: finishes?.floorByRoom[f.roomId] ?? null };
       }),
-    [scene],
+    [scene, finishes],
   );
+
   return (
     <group>
-      {meshes.map((m) => {
-        const on = m.key === selectedId;
-        const hov = m.key === hoveredId;
-        return (
-          <mesh
-            key={m.key}
-            geometry={m.geom}
-            rotation={[-Math.PI / 2, 0, 0]}
-            position={[0, 0, 0]}
-            onClick={(e) => { e.stopPropagation(); onElement("floor", m.key, e.point); }}
-            onPointerOver={(e) => { e.stopPropagation(); onHover(m.key); }}
-            onPointerOut={() => onHover(null)}
-          >
-            <meshStandardMaterial
-              color={m.color}
-              roughness={0.95}
-              metalness={0}
-              side={THREE.DoubleSide}
-              emissive={BRASS}
-              emissiveIntensity={on ? 0.35 : hov ? 0.15 : 0}
-            />
-          </mesh>
-        );
-      })}
+      {meshes.map((m) => (
+        <mesh
+          key={m.key}
+          material={material({
+            finish: m.finish,
+            clayColor: m.color,
+            kind: "floor",
+            highlight: hl(m.key === selectedId, m.key === hoveredId),
+          })}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, 0, 0]}
+          onClick={(e) => { e.stopPropagation(); onElement("floor", m.key, e.point); }}
+          onPointerOver={(e) => { e.stopPropagation(); onHover(m.key); }}
+          onPointerOut={() => onHover(null)}
+        >
+          {/* Geometry is declared as a child so react-three-fiber owns its
+              lifecycle. Building it in a useMemo and disposing it from an
+              effect looked tidier but freed live GPU buffers under React
+              StrictMode's double-invoke, and the villa rendered blank.
+              ShapeGeometry lies in XY before the -90 degree X rotation, so its
+              normal is +Z and applyMetricUVs reads x/y — which become world
+              x/z. */}
+          <shapeGeometry
+            args={[m.shape]}
+            onUpdate={(g: THREE.ShapeGeometry) => {
+              if (m.finish) applyMetricUVs(g, repeatMetres(m.finish.family));
+            }}
+          />
+        </mesh>
+      ))}
     </group>
   );
 }
 
-function Walls({ scene, onElement, onHover, selectedId, hoveredId }: { scene: SceneModel } & PickProps) {
+function Walls({
+  scene,
+  finishes,
+  quality,
+  onElement,
+  onHover,
+  selectedId,
+  hoveredId,
+}: { scene: SceneModel; finishes?: FinishPlan; quality: Quality } & PickProps) {
+  const material = useMaterialCache(quality);
+
+  const boxes = useMemo(
+    () =>
+      scene.walls.map((w) => {
+        const posFin = w.roomPos ? finishes?.wallByRoom[w.roomPos] ?? null : null;
+        const negFin = w.roomNeg ? finishes?.wallByRoom[w.roomNeg] ?? null : null;
+        // One UV set serves both faces; scale it to whichever side is finished
+        // (they are usually the same family) so grout stays square.
+        const fam = posFin?.family ?? negFin?.family ?? null;
+        return { w, posFin, negFin, fam };
+      }),
+    [scene, finishes],
+  );
+
   return (
     <group>
-      {scene.walls.map((w) => {
+      {boxes.map(({ w, posFin, negFin, fam }) => {
         const baseId = w.id.split(":")[0]!; // split walls (openings) share a base id
         const on = baseId === selectedId;
         const hov = baseId === hoveredId;
+        const h = hl(on, hov);
+        // BoxGeometry group order: +X, -X, +Y, -Y, +Z, -Z. The two large faces
+        // are +Z / -Z and take the finish of the room on THAT side, so a
+        // bathroom/bedroom party wall is tiled on the bathroom face only.
+        const ends = material({ finish: null, clayColor: WALL_WHITE, kind: "wall", highlight: h, derived: w.derived });
+        const face = (finish: SurfaceFinish | null) =>
+          material({ finish, clayColor: WALL_WHITE, kind: "wall", highlight: h, derived: w.derived });
+        const mats = [ends, ends, ends, ends, face(posFin), face(negFin)];
         return (
           <mesh
             key={w.id}
+            material={mats}
             position={w.center}
             rotation={[0, w.rotationY, 0]}
             castShadow={false}
@@ -142,15 +286,11 @@ function Walls({ scene, onElement, onHover, selectedId, hoveredId }: { scene: Sc
             onPointerOver={(e) => { e.stopPropagation(); onHover(baseId); }}
             onPointerOut={() => onHover(null)}
           >
-            <boxGeometry args={w.size} />
-            <meshStandardMaterial
-              color={WALL_WHITE}
-              roughness={0.9}
-              metalness={0}
-              transparent={w.derived}
-              opacity={w.derived ? 0.6 : 1}
-              emissive={BRASS}
-              emissiveIntensity={on ? 0.3 : hov ? 0.12 : 0}
+            <boxGeometry
+              args={w.size}
+              onUpdate={(g: THREE.BoxGeometry) => {
+                if (fam) applyMetricUVs(g, repeatMetres(fam));
+              }}
             />
             {(w.derived || on) && <Edges threshold={15} color={on ? BRASS : "#CBD5E1"} />}
           </mesh>
@@ -333,12 +473,35 @@ export function Villa3D({
   scene,
   renders,
   inspect,
+  finishes,
 }: {
   scene: SceneModel;
   renders: RoomRenders[];
   inspect?: InspectData;
+  /** StyleBoard finishes. Undefined = flag off, and the viewer stays clay. */
+  finishes?: FinishPlan;
 }) {
   const [mode, setMode] = useState<Mode>("orbit");
+  // Quality is a per-viewer preference, so it lives in localStorage rather than
+  // the URL — it says something about the machine, not about the villa.
+  // Lazy initialiser rather than an effect: this component is only ever
+  // mounted client-side (ssr:false), so localStorage is available on the first
+  // render and there is no hydration mismatch to avoid.
+  const [quality, setQuality] = useState<Quality>(() => {
+    try {
+      return window.localStorage.getItem("rv:viewer-quality") === "flat" ? "flat" : "textured";
+    } catch {
+      return "textured"; // private mode / blocked storage — the default stands
+    }
+  });
+  const setQualityPersisted = (q: Quality) => {
+    setQuality(q);
+    try {
+      window.localStorage.setItem("rv:viewer-quality", q);
+    } catch {
+      /* preference simply will not survive the reload */
+    }
+  };
   const [showAreas, setShowAreas] = useState(true);
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePts, setMeasurePts] = useState<THREE.Vector3[]>([]);
@@ -422,6 +585,20 @@ export function Villa3D({
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">square_foot</span>
           </button>
+          {finishes && (
+            <button
+              type="button"
+              title={quality === "textured" ? "Materials on — switch to flat colour" : "Flat colour — switch materials on"}
+              aria-pressed={quality === "textured"}
+              onClick={() => setQualityPersisted(quality === "textured" ? "flat" : "textured")}
+              className={
+                "focus-ring inline-flex size-9 items-center justify-center rounded-md transition-colors " +
+                (quality === "textured" ? "bg-brass-600 text-on-primary" : "text-ink-700 hover:bg-surface-container")
+              }
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">texture</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -446,8 +623,8 @@ export function Villa3D({
         <directionalLight position={[max, max * 1.5, max * 0.5]} intensity={1.1} />
         <directionalLight position={[-max, max, -max * 0.5]} intensity={0.3} />
 
-        <Floors scene={scene} onElement={onElement} onHover={onHover} selectedId={selectedId} hoveredId={hoveredId} />
-        <Walls scene={scene} onElement={onElement} onHover={onHover} selectedId={selectedId} hoveredId={hoveredId} />
+        <Floors finishes={finishes} quality={quality} scene={scene} onElement={onElement} onHover={onHover} selectedId={selectedId} hoveredId={hoveredId} />
+        <Walls finishes={finishes} quality={quality} scene={scene} onElement={onElement} onHover={onHover} selectedId={selectedId} hoveredId={hoveredId} />
         {showAreas && <RoomAreaLabels scene={scene} />}
         <RenderAnchors scene={scene} renders={renders} onOpen={setActive} />
         <Measurement points={measurePts} />

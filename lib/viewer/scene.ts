@@ -31,6 +31,17 @@ export interface WallBox {
   rotationY: number;
   /** Wall geometry is derived (not surveyed) — render at reduced opacity. */
   derived: boolean;
+  /**
+   * Room on each face of the wall, so the two sides can carry different
+   * finishes. A bathroom/bedroom party wall must be tiled on the bathroom side
+   * only — finishing both sides from `room_ids[0]` would put tile in the
+   * bedroom, which is worse than leaving it clay. null = no room that side
+   * (an external wall, or a room the graph does not resolve).
+   *
+   * "pos" is the +Z face in the box's local frame, "neg" is −Z.
+   */
+  roomPos: string | null;
+  roomNeg: string | null;
 }
 
 export interface FloorSlab {
@@ -46,6 +57,41 @@ export interface RoomLabel {
   area_m2: number;
   /** World XZ centroid (metres). */
   center: [number, number];
+}
+
+/**
+ * Split a wall's rooms onto its two faces.
+ *
+ * With rotationY = −atan2(dz, dx), the box's local +Z axis points along
+ * (−uz, ux) in world XZ, where u is the unit vector a→b. A room is on the +Z
+ * face when its centroid lies on that side of the wall's centre-line.
+ */
+export function assignWallSides(
+  a: [number, number],
+  b: [number, number],
+  roomIds: string[],
+  centroidByRoom: Map<string, [number, number]>,
+): { roomPos: string | null; roomNeg: string | null } {
+  const dx = b[0] - a[0];
+  const dz = b[1] - a[1];
+  const len = Math.hypot(dx, dz);
+  if (len < 1e-9) return { roomPos: null, roomNeg: null };
+  const nx = -dz / len;
+  const nz = dx / len;
+  const mx = (a[0] + b[0]) / 2;
+  const mz = (a[1] + b[1]) / 2;
+  let roomPos: string | null = null;
+  let roomNeg: string | null = null;
+  for (const id of roomIds) {
+    const c = centroidByRoom.get(id);
+    if (!c) continue;
+    const side = (c[0] - mx) * nx + (c[1] - mz) * nz;
+    // A centroid sitting exactly on the line cannot be attributed; skip it
+    // rather than guess, and that face stays clay.
+    if (side > 1e-9) { if (!roomPos) roomPos = id; }
+    else if (side < -1e-9) { if (!roomNeg) roomNeg = id; }
+  }
+  return { roomPos, roomNeg };
 }
 
 export interface WallSegment {
@@ -108,6 +154,9 @@ export function buildScene(
     (openingsByWall.get(o.wall_id) ?? openingsByWall.set(o.wall_id, []).get(o.wall_id)!).push(o);
   }
 
+  const centroidByRoom = new Map<string, [number, number]>();
+  for (const r of graph.rooms) centroidByRoom.set(r.id, toWorldXZ(centroid(r.polygon)));
+
   const walls: WallBox[] = [];
   const wallSegments: WallSegment[] = [];
   for (const w of graph.walls) {
@@ -119,7 +168,8 @@ export function buildScene(
     const wa = toWorldXZ(a);
     const wb = toWorldXZ(b);
     wallSegments.push({ a: wa, b: wb, thickness });
-    pushWallBoxes(walls, w.id, wa, wb, thickness, height, w.derived === true, openingsByWall.get(w.id) ?? []);
+    const sides = assignWallSides(wa, wb, w.room_ids, centroidByRoom);
+    pushWallBoxes(walls, w.id, wa, wb, thickness, height, w.derived === true, openingsByWall.get(w.id) ?? [], sides);
   }
 
   const floors: FloorSlab[] = graph.rooms.map((r) => ({
@@ -159,6 +209,7 @@ function pushWallBoxes(
   height: number,
   derived: boolean,
   openings: Opening[],
+  sides: { roomPos: string | null; roomNeg: string | null },
 ): void {
   const [ax, az] = a;
   const [bx, bz] = b;
@@ -171,7 +222,7 @@ function pushWallBoxes(
   const midZ = (az + bz) / 2;
 
   if (openings.length === 0) {
-    out.push({ id, center: [midX, height / 2, midZ], size: [length, height, thickness], rotationY, derived });
+    out.push({ id, center: [midX, height / 2, midZ], size: [length, height, thickness], rotationY, derived, ...sides });
     return;
   }
 
@@ -191,6 +242,7 @@ function pushWallBoxes(
       size: [segLen, h, thickness],
       rotationY,
       derived,
+      ...sides,
     });
   };
   seg(0, jamb, 0, height, "j0");
