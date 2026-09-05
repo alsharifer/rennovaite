@@ -9,6 +9,63 @@ carried over unverified._
 
 ---
 
+## 00. Standing rules — verification hygiene
+
+Two rules that hold for every sprint, every phase, and every agent working in
+this repo. Both were written after being broken, which is why they are here
+rather than assumed.
+
+### Verification never writes to production data
+
+**Mudon pilot villa (`6b5fda9d`) is calibration ground truth, not a test
+fixture.** It is the only fully-parsed, rendered, priced project that exists,
+and the business case rests on having more calibrated projects to compare
+against, not fewer. Its rows are evidence.
+
+So: **do not write to production data to make a test pass.** If a check needs
+state that does not exist — a different locked style, an overlapping plan, a
+project with no BoQ — create it on a **scratch project** or a **local seed**,
+not on Mudon and not on a real customer project.
+
+This was broken during F1: a `style_choices` row was inserted against Mudon to
+demonstrate that changing the StyleBoard updates the walkthrough. It was
+deleted afterwards and the row count returned to 7, but "I put it back" is not
+the same as "I did not touch it" — a crash between the write and the delete
+leaves the pilot villa in a state nobody chose. Read production; fabricate
+elsewhere.
+
+Where a write is genuinely unavoidable, the pre-destructive-operation ritual in
+`POST_DEMO_FOLLOWUPS.md` applies in full: count the blast radius before, state
+it, and re-count after.
+
+### Never edit `.env.local`
+
+It holds live secrets, it is the one file whose loss cannot be recovered from
+git, and it is shared with whatever else is running on the machine. **Do not
+add flags to it, even briefly, even with a backup.**
+
+To run with a flag on, pass it inline — the process gets the variable and the
+file is never touched:
+
+```bash
+TEXTURED_WALKTHROUGH=true npm run dev
+```
+
+```bash
+TASTE_SEED_ENABLED=true BOQ_ENGINE=llm npm run dev
+```
+
+Flags are read from `process.env` at server start, so an inline variable
+behaves identically to one in the file — including needing a restart to change.
+This also keeps the two states honestly separable: nothing lingers in a file to
+be forgotten about and mistaken for the default later.
+
+This was broken during F1 too: `TEXTURED_WALKTHROUGH=true` was appended to
+`.env.local` to verify the flag, then removed and confirmed byte-identical. The
+inline form makes the backup-and-restore dance unnecessary.
+
+---
+
 ## 0. Repo state at pre-flight
 
 - Base is **`master` @ `da0394d`** (merge of `feat/property-os-landing`).

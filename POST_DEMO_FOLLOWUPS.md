@@ -216,7 +216,45 @@ overwhelm that instruction. For a product whose promise is "this is *your*
 villa", inventing a different room is a worse failure than losing the palette
 benefit.
 
+**Re-verified 2026-09-06** on the controlled pair (same room, same source
+photo, same model `google/nano-banana`, same mode `photo`, same locked style
+`luxe-minimal` — the flag the only variable). Two further findings, both
+mechanical and both fixable, which is why this is deferred rather than dead:
+
+  · **The reference block is pure insertion.** Diffing the two stored prompts
+    shows one added paragraph, 987 -> 1549 chars, nothing displaced and nothing
+    truncated. The "Keep the room's architecture, wall positions, window and door
+    locations, and camera angle exactly the same" instruction survives verbatim,
+    and the block carries no quantities, dimensions or plan geometry. **The text
+    is not the problem, so no amount of prompt editing will fix this** — the
+    IMAGES outvote it.
+  · **The three descriptors are near-duplicates.** All three board items are the
+    same style (`contemporary-majlis`, differing only in the room label), so the
+    block repeats one palette three times and sends three whole-room images of
+    one direction. That triples its weight against the single source photo. A
+    dedupe pass — one descriptor per distinct style, and drop references whose
+    style already matches the locked style — costs little and would materially
+    reduce the pull, before any of the more expensive options below.
+  · **The prompt asks for two palettes at once.** The style clause specifies
+    Luxe Minimal (#F5F2ED, #4A3F35, #C9A66B, #2A2826) and the reference block
+    specifies Contemporary Majlis (#F5F1EA, #2C2A28, #B08D57, #6B6F50). Nothing
+    reconciles a board against the locked style, so a user who picks a direction
+    and then boards a different one gets a prompt arguing with itself. That is a
+    product gap, not a model failure.
+  · **Aspect ratio is a reliable tell.** Source photo 16320x9180 (1.78), flag-off
+    render 1344x768 (1.75 — tracks the source), flag-on render 1024x1024 (1.00).
+    The edit model reshaped the frame to its references. Worth asserting in any
+    future re-test: if the output aspect stops tracking the source, the
+    references have taken over the composition.
+
+**Lineage verified.** `renders.reference_refs` on the conditioned render holds
+all three `moodboard_items` ids in board order and each resolves; the unconditioned
+render is `null`, correctly meaning "seeding did not run" rather than "ran against
+an empty board".
+
 **What would make it shippable**, roughly in order of cost:
+  · Dedupe descriptors and skip references matching the locked style (cheapest,
+    and the new finding above).
   · Send fewer references — one, not three — and re-test.
   · Crop references to material/palette swatches rather than whole rooms, so
     there is no competing composition to copy.

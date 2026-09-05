@@ -5,6 +5,7 @@
 
 import dynamic from "next/dynamic";
 
+import type { FinishPlan } from "@/lib/viewer/materials";
 import type { SceneModel } from "@/lib/viewer/scene";
 
 import type { InspectData, RoomRenders } from "./Villa3D";
@@ -22,10 +23,12 @@ export function Villa3DLoader({
   scene,
   renders,
   inspect,
+  finishes,
 }: {
   scene: SceneModel;
   renders: RoomRenders[];
   inspect?: InspectData;
+  finishes?: FinishPlan;
 }) {
-  return <Villa3D scene={scene} renders={renders} inspect={inspect} />;
+  return <Villa3D scene={scene} renders={renders} inspect={inspect} finishes={finishes} />;
 }

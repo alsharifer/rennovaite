@@ -8,6 +8,7 @@ import { derivePlanGraph } from "@/lib/plan/derive";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildScene } from "@/lib/viewer/scene";
 import { styleFinishes, styleFloorColor } from "@/lib/viewer/finishes";
+import { buildFinishPlan } from "@/lib/viewer/materials";
 import type { InspectBoq, RoomMeta, WallMeta } from "@/lib/viewer/inspect";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,21 @@ export default async function ViewerPage({
   const floorColorByRoom = Object.fromEntries(graph.rooms.map((r) => [r.id, floorColor]));
 
   const scene = buildScene(graph, { floorColorByRoom });
+
+  // F1 textured walkthrough. Flag off => `finishes` is undefined and the
+  // viewer renders exactly the clay model it rendered before this existed —
+  // same scene object, same materials, same pixels.
+  //
+  // Note this reads the SAME `styleKey` the clay floor tint already used, so
+  // changing the StyleBoard selection changes the walkthrough on next load with
+  // no extra wiring and no cache to invalidate.
+  const finishes =
+    process.env.TEXTURED_WALKTHROUGH === "true"
+      ? buildFinishPlan(
+          styleKey,
+          graph.rooms.map((r) => ({ id: r.id, type: r.type })),
+        )
+      : undefined;
 
   // Latest render per room (+ small gallery) for the brass anchors.
   const { data: renderRows } = await supabase
@@ -147,7 +163,7 @@ export default async function ViewerPage({
   return (
     <AppShell pageName={PAGE_NAME} noPadding>
       <div className="p-6">
-        <Villa3DLoader scene={scene} renders={renders} inspect={inspect} />
+        <Villa3DLoader scene={scene} renders={renders} inspect={inspect} finishes={finishes} />
       </div>
     </AppShell>
   );
