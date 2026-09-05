@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AppShell } from "@/components/app/AppShell";
+import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { loadProjectPhotoAssets } from "@/lib/assets/load";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
@@ -268,6 +269,7 @@ export default async function RenderPage({
         roomBoqTotals={roomBoqTotals}
         stagingEnabled={stagingEnabled}
         initialFurnitureOptIns={initialFurnitureOptIns}
+        journeySlot={<JourneyProgress stepKey="render" projectId={project.id} />}
       />
     </AppShell>
   );
