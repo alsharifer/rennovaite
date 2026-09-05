@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { generateDeterministicBoq } from "@/lib/boq/engine";
 import { loadAccessoryOverrides } from "@/lib/accessories/load";
+import { findOverlaps } from "@/lib/plan/overlaps";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
@@ -635,6 +636,38 @@ export async function POST(request: NextRequest) {
           error: "Plan has no rooms. Re-run /api/parse-plan.",
         },
         { status: 400 },
+      );
+    }
+
+    // D3: refuse to price a plan whose rooms overlap.
+    //
+    // This is the right blocking point. Overlapping rooms are fine to SAVE —
+    // they are a normal transient state mid-edit — but they double-count floor
+    // area (two rooms claiming the same m²) and wall area (shared-edge
+    // derivation sees walls that are not there). A BoQ built on them is wrong
+    // in a way no downstream check would catch. Here the user is asking for an
+    // output rather than editing, so refusing is information, not interruption.
+    //
+    // Assessed live from the rooms just loaded, not read from plans.has_overlaps
+    // — that column is a cache for the UI, and a stale cache must never be the
+    // thing that decides whether a quantity is trustworthy.
+    const overlaps = findOverlaps(
+      rooms.map((r) => ({
+        id: r.id,
+        name: r.name_en ?? "Room",
+        polygon: r.polygon,
+      })),
+    );
+    if (overlaps.has_overlaps) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This plan has ${overlaps.room_names.length} overlapping rooms. Resolve them on the plan before costing — overlapping rooms double-count floor and wall area.`,
+          code: "plan_has_overlaps",
+          overlap_pairs: overlaps.pairs,
+          overlap_room_names: overlaps.room_names,
+        },
+        { status: 409 },
       );
     }
 
