@@ -1,6 +1,6 @@
 # Post-demo follow-ups
 
-## 0. Production has no backups — due diligence, and it has no undo
+## 0. Backups: a verified manual snapshot, no automation, and no auth-schema dump
 
 **Priority item.** As of 2026-09-05 the production Supabase project has no
 verified backup configured, and because development shares that same project
@@ -18,21 +18,112 @@ is a paid add-on above that. Those tiers and prices change, so read the
 dashboard rather than trusting this paragraph — the point is that *whatever it
 says today, nobody has looked*. If the project is on Free, that is the finding.
 
-**Manual, and already started.** A logical export exists at
-`C:\Users\alsha\backups\rennovaite\<timestamp>\` — 29 table JSON files
-(1,781 rows) plus a storage-bucket manifest. Its restore has been **verified**:
-migrations 001–029 replay cleanly onto vanilla Postgres 16 and the data loads
-back with "Mudon pilot villa" and all of its rows intact.
+**Manual, and done — with one gap left.** A verified off-platform snapshot lives
+at `C:\Users\alsha\backups\rennovaite\<timestamp>\`:
 
-Known limits of that export, which is why it is a stopgap and not the answer:
-  · It is **not a `pg_dump`** — no sequences, functions, triggers, RLS policies,
-    or anything created ad hoc in the SQL editor. A true dump needs the database
-    password (Settings → Database → Connection string), which is not in
-    `.env.local`; the service-role JWT cannot produce one.
-  · The storage manifest **lists** objects, it does not copy their bytes. The
-    floorplans and renders themselves are not backed up.
-  · It lives on one laptop. That is off-platform, but it is not offsite.
-  · It is a point-in-time snapshot taken by hand, not a schedule.
+  · `tables/` — 29 table JSON files (1,767 rows as of 2026-09-05, after the one
+    deletion; the earlier 16-11-14 snapshot holds 1,781 and is the pre-deletion
+    copy).
+  · `storage/` — the actual BYTES of all 70 storage objects, 101.4 MB across
+    `moodboards`, `plan-uploads`, `renders` and the private `drawings` bucket,
+    with a sha256 per object in `storage-manifest.json`. An earlier pass only
+    listed these; floorplans and renders are the one class of data here that
+    cannot be regenerated, so listing them was not a backup.
+
+**Restore verified**, not assumed: migrations 001–030 replay cleanly onto a
+vanilla Postgres 16 container (30/30) and all 1,767 rows reload, with "Mudon
+pilot villa" returning at 13 rooms and 31 renders. The 70 storage files were
+checked by magic bytes — 67 images/PDFs and 3 SVG drawing sheets, no truncated
+downloads and no error pages saved as files.
+
+**The remaining gap is the dump itself.** This is still NOT a `pg_dump`: no
+sequences, functions, triggers, RLS policies or grants, and nothing created ad
+hoc in the SQL editor. That needs the database password (Supabase dashboard →
+Settings → Database → Connection string), which is not in `.env.local` and
+cannot be derived from the service-role JWT. `backups/rennovaite/pg-dump.sh`
+is written and ready — it runs `pg_dump` out of the `postgres:16` Docker image,
+so nothing needs installing; it only needs `SUPABASE_DB_URL` exported. Until
+that is run, the snapshot is data-only.
+
+It also still lives on one laptop — off-platform, but not offsite — and it is a
+point-in-time copy taken by hand, not a schedule.
+
+**The auth schema is NOT captured, and that is why the dump is required.**
+`auth.users` is managed by Supabase, is created by no numbered migration, and
+PostgREST refuses the schema outright (`PGRST106: Only the following schemas are
+exposed: public, graphql_public`). The logical export therefore contains none of
+it. `auth-users.json` in each snapshot now captures the identities via the Auth
+admin API — but that endpoint does **not** return `encrypted_password`, so it
+restores who existed, not their ability to log in. Everyone would need a reset.
+
+How bad that is, precisely, today: there is **one** account
+(`alsharifer@gmail.com`, created 2026-05-19, email provider) and **nothing in
+`public` references it** — no table has a `user_id` foreign key, `projects` has
+no owner column, and the one bare `feedback_events.user_id` uuid is null in all
+23 rows. So a restore today returns every project intact and loses one login.
+That is survivable exactly once, and stops being survivable the moment projects
+gain an owner.
+
+**RLS and hand-made objects — checked, and clean.** Migrations explicitly
+`disable row level security` on every table and create **no** policies,
+functions or triggers. Cross-checking PostgREST's live schema against the
+migrations found **29 live tables and 29 declared, with no ad-hoc table in
+either direction** — so nothing was created in the SQL editor outside version
+control. Policies and functions cannot be enumerated through the REST API at
+all, so "none exist" is inference from the migrations plus the table match, not
+proof. Only a `pg_dump` proves it.
+
+**Verdict: the dump is required, not optional.** It is the only thing that
+captures auth credentials, sequences, functions, triggers, policies and grants.
+
+**Off-machine copy — done.** Both snapshots are mirrored to
+`C:\Users\alsha\OneDrive\Documents\rennovaite-backups\`, which syncs off the
+laptop. All 70 storage objects re-verified there by sha256 against the manifest:
+70 matched, 0 mismatched, 0 missing. A `README.txt` in that folder marks it as
+customer data — not to be shared, linked or committed. Consider moving it into
+OneDrive Personal Vault, which is encrypted at rest.
+
+**Cadence — this is a snapshot, not a backup.** It is stale the moment anything
+writes. Supabase's own documented tiers (read 2026-09-05):
+
+| Plan | Daily backups | Retention | PITR add-on |
+| --- | --- | --- | --- |
+| Free | **none** | — | not available |
+| Pro | yes | 7 days | ~$100/mo (7-day) |
+| Team | yes | 14 days | ~$200/mo (14-day) |
+| Enterprise | yes | up to 30 days | ~$400/mo (28-day) |
+
+Supabase explicitly tells Free-tier projects to export their own data and keep
+off-site copies, which is what the snapshot above is. Enabling PITR **replaces**
+daily backups rather than adding to them, and requires at least a Small compute
+add-on.
+
+**Which tier this project is actually on is still unanswered** — it cannot be
+read through the service-role key or the Vercel env, only from the dashboard
+(Settings → Database → Backups). Read it and record the answer here: tier,
+whether daily backups are listed, the retention shown, and the PITR quote if
+it is offered. If it says Free, that is the finding, and the manual snapshot is
+the only backup that exists.
+
+### Ritual — run before any destructive operation
+
+Until automated backups are confirmed on, this is a rule, not a memory. A
+"destructive operation" is any delete, any `update` touching rows you did not
+just create, any migration that drops or alters a column, and any script run
+against production with a `DELETE`/`UPDATE` verb in it.
+
+1. Take a fresh snapshot — table export **and** storage bytes **and**
+   `auth-users.json`. A snapshot older than the last write is not an undo.
+2. Verify the restore, do not assume it: replay the migrations onto a scratch
+   Postgres container and reload the rows. Confirm a known project returns with
+   its child-row counts.
+3. Copy it off the machine and verify the copy by hash, not by file count.
+4. Count the exact rows the operation will affect, and state the number, before
+   running it.
+5. Only then run it — and re-count afterwards to prove the blast radius matched.
+
+Steps 1–3 are what `4a` did. Step 4 is what caught that the "13 rows" figure
+was actually 14. Skipping step 5 is how a cascade goes unnoticed.
 
 **Also check while in there: region and data residency.** The project's region
 has never been confirmed, and for a Dubai product handling client floorplans and
@@ -151,3 +242,38 @@ line ~768, while `getKgContext` is at ~783, so it is unreachable unless
 **Fix:** host Neo4j somewhere reachable from Vercel (Aura, or a small VM), set
 `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` in production, then flip `KG_ENABLED`
 back to `true`. Until then, leaving it off costs nothing but render grounding.
+
+## 6. Overlap census at the time the 409 shipped
+
+Recorded so it is not lost once the scratch projects are archived and the number
+silently becomes zero.
+
+On 2026-09-05, when the `plan_has_overlaps` gate shipped, **6 of 7 plans in the
+database carried overlapping rooms**, between 3 and 8 pairs each:
+
+| Project | Overlapping pairs |
+| --- | --- |
+| `3793a5af` Untitled | 8 |
+| `c41c6189` Untitled | 6 |
+| `9512695f` Untitled | 6 |
+| `e44956f2` Untitled | 5 |
+| `e4b66381` Untitled | 4 |
+| `0089e18a` Untitled | 3 |
+| `6b5fda9d` **Mudon pilot villa** | **0** |
+
+Every affected plan is a scratch parse predating the editor's overlap repair, so
+the blast radius of the gate is contained — no named project is blocked from
+costing. But the census is the reason the gate was worth shipping rather than a
+reason it wasn't: the failure mode it prevents was present in 86% of plans, and
+a BoQ generated from any of them would have double-counted floor and wall area
+while looking like a finished price.
+
+None were auto-fixed. Repair is a user action in the plan editor, and it moves
+rooms apart without reshaping them, so area — and therefore every BoQ quantity —
+is preserved.
+
+The gate was verified against production on 2026-09-05: `POST /api/generate-boq`
+for `e44956f2` returned **409 `plan_has_overlaps`** naming all 7 rooms, and row
+counts across `boqs`, `takeoff_items`, `feedback_events`, `boq_outcomes`,
+`approved_designs`, `whatif_scenarios`, `plans`, `rooms` and `renders` were
+byte-identical before and after.
