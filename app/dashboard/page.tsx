@@ -258,10 +258,15 @@ export default async function DashboardPage({
   for (const s of selections) projectsWithSelections.add(s.project_id);
 
   // ----- Stat row --------------------------------------------------------
-  // "Active" = anything not yet at vendor selection (its terminal phase here).
-  const activeProjects = projects.filter((p) => !projectsWithSelections.has(p.id)).length;
+  // "Active" = anything not yet at vendor selection (its terminal phase here),
+  // and not archived. An archived project is one the owner has put away;
+  // counting it here would contradict the list directly below.
+  const liveProjects = projects.filter((p) => !archivedAt.has(p.id));
+  const activeProjects = liveProjects.filter(
+    (p) => !projectsWithSelections.has(p.id),
+  ).length;
   const startOfMonthMs = startOfThisMonth();
-  const newThisMonth = projects.filter(
+  const newThisMonth = liveProjects.filter(
     (p) => p.created_at && new Date(p.created_at).getTime() >= startOfMonthMs,
   ).length;
   const totalBoqValue = [...latestBoqByProject.values()].reduce((sum, b) => sum + (b.total_aed ?? 0), 0);
@@ -314,12 +319,6 @@ export default async function DashboardPage({
       created_at: p.created_at,
     };
   });
-
-  const counts: Record<"all" | Phase, number> = {
-    all: shaped.length, Active: 0, Design: 0, BoQ: 0, Bidding: 0,
-    "In Construction": 0, Handover: 0, "On hold": 0, Completed: 0,
-  };
-  for (const p of shaped) counts[p.phase]++;
 
   const filtered = filter.size === 0 ? shaped : shaped.filter((p) => filter.has(p.phase));
   const sorted = [...filtered];
@@ -404,7 +403,6 @@ export default async function DashboardPage({
       {/* Portfolio grid/list — the working core (filters/sort/search/bulk). */}
       <PortfolioBrowser
         projects={sorted}
-        counts={counts}
         filter={[...filter]}
         sort={sort}
         initialView={view}

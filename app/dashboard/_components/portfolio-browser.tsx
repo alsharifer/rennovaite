@@ -29,7 +29,6 @@ const PAGE_SIZE = 12;
 
 type Props = {
   projects: PortfolioProject[];
-  counts: Record<"all" | Phase, number>;
   filter: Phase[];
   sort: SortKey;
   initialView: "grid" | "list";
@@ -40,7 +39,6 @@ type Props = {
 
 export function PortfolioBrowser({
   projects,
-  counts,
   filter,
   sort,
   initialView,
@@ -83,6 +81,21 @@ export function PortfolioBrowser({
       return blob.includes(q);
     });
   }, [projects, debouncedSearch, showArchived]);
+
+  // Chip and header counts are derived from the SAME array the list filters,
+  // never passed in separately. A count computed server-side over every project
+  // said "7 active" while the list showed one, because it had no idea archived
+  // rows were being hidden. One source, so the numbers cannot disagree with
+  // what is on screen.
+  const counts = useMemo(() => {
+    const base = showArchived
+      ? projects
+      : projects.filter((p) => !p.archived_at);
+    const out = { all: base.length } as Record<"all" | Phase, number>;
+    for (const phase of ALL_PHASES) out[phase] = 0;
+    for (const p of base) out[p.phase]++;
+    return out;
+  }, [projects, showArchived]);
 
   // Treat any selected id that's no longer in `projects` as deselected.
   // Derive at render time instead of resetting via an effect (which trips
