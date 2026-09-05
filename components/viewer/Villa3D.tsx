@@ -19,7 +19,8 @@ import * as THREE from "three";
 
 import type { SceneModel, WallSegment } from "@/lib/viewer/scene";
 import { WALL_WHITE } from "@/lib/viewer/scene";
-import type { FinishPlan, SurfaceFinish } from "@/lib/viewer/materials";
+import type { FinishPlan, Highlight, MaterialSpecInput, Quality, SurfaceFinish } from "@/lib/viewer/materials";
+import { materialCacheKey, surfaceMaterialSpec } from "@/lib/viewer/materials";
 import { applyMetricUVs, disposeTextures, familyTexture, repeatMetres } from "@/lib/viewer/textures";
 import {
   floorTarget,
@@ -86,10 +87,7 @@ interface PickProps {
   hoveredId: string | null;
 }
 
-/** "flat" drops every texture and renders base colours only. */
-export type Quality = "textured" | "flat";
-
-type Highlight = "none" | "hover" | "selected";
+export type { Quality } from "@/lib/viewer/materials";
 
 /**
  * Materials are SHARED between meshes, and the highlight state is part of the
@@ -123,50 +121,26 @@ function useMaterialCache(quality: Quality) {
 
   return useMemo(
     () =>
-      function material(spec: {
-        finish: SurfaceFinish | null;
-        clayColor: string;
-        kind: "floor" | "wall";
-        highlight: Highlight;
-        /** Derived (not surveyed) wall — renders semi-transparent. */
-        derived?: boolean;
-      }): THREE.MeshStandardMaterial {
-        const { finish, clayColor, kind, highlight, derived = false } = spec;
-        const textured = quality === "textured" && finish !== null;
-        const look = finish ? finish.family + "|" + finish.color : "clay|" + clayColor;
-        const key = [quality, look, textured ? "t" : "f", highlight, kind, derived ? "der" : "sol"].join("|");
+      function material(input: Omit<MaterialSpecInput, "quality">): THREE.MeshStandardMaterial {
+        // Every visible value comes from surfaceMaterialSpec, which is pure and
+        // unit-tested. Nothing about how a surface looks is decided here.
+        const spec = surfaceMaterialSpec({ ...input, quality });
+        const key = materialCacheKey(spec);
         const hit = cacheRef.current.get(key);
         if (hit) return hit;
 
-        // With no finish this must reproduce the pre-F1 material EXACTLY —
-        // roughness and glow included — because flag-off has to be the viewer
-        // people already know, not a near-miss of it.
-        const roughness = finish
-          ? finish.family === "tile"
-            ? 0.5
-            : finish.family === "stone"
-              ? 0.6
-              : 0.9
-          : kind === "floor"
-            ? 0.95
-            : 0.9;
-        const glow =
-          kind === "floor"
-            ? highlight === "selected" ? 0.35 : highlight === "hover" ? 0.15 : 0
-            : highlight === "selected" ? 0.3 : highlight === "hover" ? 0.12 : 0;
-
         const mat = new THREE.MeshStandardMaterial({
-          color: finish ? finish.color : clayColor,
-          roughness,
+          color: spec.color,
+          roughness: spec.roughness,
           metalness: 0,
-          side: kind === "floor" ? THREE.DoubleSide : THREE.FrontSide,
-          transparent: derived,
-          opacity: derived ? 0.6 : 1,
+          side: spec.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+          transparent: spec.transparent,
+          opacity: spec.opacity,
           emissive: new THREE.Color(BRASS),
-          emissiveIntensity: glow,
+          emissiveIntensity: spec.emissiveIntensity,
         });
-        if (textured && finish) {
-          const tex = familyTexture(finish.family);
+        if (spec.textureFamily) {
+          const tex = familyTexture(spec.textureFamily);
           if (tex) mat.map = tex;
         }
         cacheRef.current.set(key, mat);

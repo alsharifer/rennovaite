@@ -167,3 +167,88 @@ export function buildFinishPlan(
   }
   return { floorByRoom, wallByRoom, unfinishedRoomIds };
 }
+
+// ---------------------------------------------------------------------------
+// Surface material spec
+//
+// The numbers that decide how a surface LOOKS, extracted from the renderer so
+// they can be asserted without mounting three.js.
+//
+// This exists because a regression got through: the derived-wall 60% opacity
+// was dropped during F1 and unsurveyed walls silently rendered solid, claiming
+// to be measured. Nothing caught it, because the values lived inside a React
+// hook closure where no unit test could reach them. Appearance rules that carry
+// meaning — and "this wall was never surveyed" is meaning, not decoration —
+// belong somewhere testable.
+// ---------------------------------------------------------------------------
+
+export type SurfaceKind = "floor" | "wall";
+export type Highlight = "none" | "hover" | "selected";
+/** "flat" drops every texture and renders base colours only. */
+export type Quality = "textured" | "flat";
+
+export interface MaterialSpec {
+  color: string;
+  roughness: number;
+  doubleSided: boolean;
+  transparent: boolean;
+  opacity: number;
+  emissiveIntensity: number;
+  /** Texture family to map, or null for a flat material. */
+  textureFamily: FinishFamily | null;
+}
+
+export interface MaterialSpecInput {
+  finish: SurfaceFinish | null;
+  /** Colour used when there is no finish — the clay model's own tone. */
+  clayColor: string;
+  kind: SurfaceKind;
+  highlight: Highlight;
+  /** Wall geometry derived from room polygons rather than surveyed. */
+  derived?: boolean;
+  quality: Quality;
+}
+
+/** Pre-F1 clay values. Flag-off must reproduce these exactly. */
+const CLAY_ROUGHNESS: Record<SurfaceKind, number> = { floor: 0.95, wall: 0.9 };
+const GLOW: Record<SurfaceKind, Record<Highlight, number>> = {
+  floor: { none: 0, hover: 0.15, selected: 0.35 },
+  wall: { none: 0, hover: 0.12, selected: 0.3 },
+};
+const FINISH_ROUGHNESS: Partial<Record<FinishFamily, number>> = { tile: 0.5, stone: 0.6 };
+
+/** Opacity of a wall whose geometry is derived, not surveyed. */
+export const DERIVED_WALL_OPACITY = 0.6;
+
+export function surfaceMaterialSpec(input: MaterialSpecInput): MaterialSpec {
+  const { finish, clayColor, kind, highlight, derived = false, quality } = input;
+  const textured = quality === "textured" && finish !== null;
+  return {
+    color: finish ? finish.color : clayColor,
+    roughness: finish ? (FINISH_ROUGHNESS[finish.family] ?? 0.9) : CLAY_ROUGHNESS[kind],
+    doubleSided: kind === "floor",
+    // Derived walls stay translucent whatever finish they carry: a tiled
+    // surface is not evidence that anybody measured the wall under it.
+    transparent: derived,
+    opacity: derived ? DERIVED_WALL_OPACITY : 1,
+    emissiveIntensity: GLOW[kind][highlight],
+    textureFamily: textured && finish ? finish.family : null,
+  };
+}
+
+/**
+ * Cache key for a spec. Derived from the spec's own values, so two surfaces
+ * that look identical share one material by construction and one that differs
+ * in any visible way cannot accidentally reuse another's.
+ */
+export function materialCacheKey(s: MaterialSpec): string {
+  return [
+    s.color,
+    s.roughness,
+    s.doubleSided ? "d" : "s",
+    s.transparent ? "t" : "o",
+    s.opacity,
+    s.emissiveIntensity,
+    s.textureFamily ?? "none",
+  ].join("|");
+}
