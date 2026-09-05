@@ -14,6 +14,7 @@ import { Layers, Plus, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { polygonArea } from "@/lib/plan/polygon";
+import { separateOverlappingRooms } from "@/lib/plan/separate";
 import { cn } from "@/lib/utils";
 
 import {
@@ -142,91 +143,11 @@ function pixelToM(px: number, scale: number): number {
   return Math.round(px * Math.sqrt(scale) * 10) / 10;
 }
 
-function applyOffset(room: Room, dx: number, dy: number): Room {
-  return {
-    ...room,
-    polygon: room.polygon.map(([x, y]) => [x + dx, y + dy] as Point),
-  };
-}
-
-// Keep a room inside [0, vw] x [0, vh]. If it's larger than the viewBox
-// it is shrunk; if it spills past an edge it is shifted (preserving size).
-// Caller is responsible for recomputing area_m2 if width/height changed.
-function clampToViewBox(room: Room, vw: number, vh: number): Room {
-  const [x, y, w, h] = polygonToRect(room.polygon);
-  const nw = Math.min(w, vw);
-  const nh = Math.min(h, vh);
-  let nx = x;
-  let ny = y;
-  if (nx < 0) nx = 0;
-  if (ny < 0) ny = 0;
-  if (nx + nw > vw) nx = vw - nw;
-  if (ny + nh > vh) ny = vh - nh;
-  if (nx === x && ny === y && nw === w && nh === h) return room;
-  return {
-    ...room,
-    polygon: rectFromBbox(nx, ny, nx + nw, ny + nh),
-  };
-}
-
-// Iteratively push apart any axis-aligned rectangles that overlap.
-// Pushes along the axis of LEAST overlap (less disruptive). Bounded by
-// MAX_ITERATIONS so it always terminates even on pathological inputs.
-function separateOverlappingRooms(
-  rooms: Room[],
-  vw: number,
-  vh: number,
-): Room[] {
-  const MAX_ITERATIONS = 80;
-  const PADDING_GAP = 4;
-  let next = rooms.map((r) => ({ ...r }));
-
-  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-    let movedAny = false;
-
-    for (let i = 0; i < next.length - 1; i++) {
-      for (let j = i + 1; j < next.length; j++) {
-        const [ax, ay, aw, ah] = polygonToRect(next[i].polygon);
-        const [bx, by, bw, bh] = polygonToRect(next[j].polygon);
-
-        const overlapX = Math.min(ax + aw, bx + bw) - Math.max(ax, bx);
-        const overlapY = Math.min(ay + ah, by + bh) - Math.max(ay, by);
-
-        if (overlapX > 0 && overlapY > 0) {
-          movedAny = true;
-          if (overlapX < overlapY) {
-            const push = (overlapX + PADDING_GAP) / 2;
-            const aCenterX = ax + aw / 2;
-            const bCenterX = bx + bw / 2;
-            if (aCenterX < bCenterX) {
-              next[i] = applyOffset(next[i], -push, 0);
-              next[j] = applyOffset(next[j], push, 0);
-            } else {
-              next[i] = applyOffset(next[i], push, 0);
-              next[j] = applyOffset(next[j], -push, 0);
-            }
-          } else {
-            const push = (overlapY + PADDING_GAP) / 2;
-            const aCenterY = ay + ah / 2;
-            const bCenterY = by + bh / 2;
-            if (aCenterY < bCenterY) {
-              next[i] = applyOffset(next[i], 0, -push);
-              next[j] = applyOffset(next[j], 0, push);
-            } else {
-              next[i] = applyOffset(next[i], 0, push);
-              next[j] = applyOffset(next[j], 0, -push);
-            }
-          }
-        }
-      }
-    }
-
-    next = next.map((r) => clampToViewBox(r, vw, vh));
-    if (!movedAny) break;
-  }
-
-  return next;
-}
+// The separation algorithm itself lives in lib/plan/separate.ts so it can be
+// unit-tested outside this client component — that is where "zero overlaps +
+// every area preserved" is pinned, and where the one non-shape-preserving case
+// (the viewBox clamp flattening an N-vertex room to its bbox) is documented.
+// `Room` structurally satisfies the module's generic `SeparableRoom`.
 
 // True iff two axis-aligned rectangles share interior area.
 function rectsOverlap(
@@ -755,6 +676,46 @@ export function EditablePlanViewer({
 
   return (
     <div className="space-y-3">
+      {/* D3: persistent and non-dismissible while overlaps exist. Saving stays
+          ENABLED — an overlap is a normal transient state mid-edit, and
+          blocking the save would leave unsaved work one refresh from being
+          lost. What overlaps actually block is COSTING, so the banner says
+          exactly that rather than nagging. */}
+      {editing && overlappingIds.size > 0 && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-md rounded-lg border border-[#E8C9A0] bg-[#FEF6EC] px-lg py-md"
+        >
+          <span
+            className="material-symbols-outlined text-[20px] text-[#92400E]"
+            aria-hidden="true"
+          >
+            layers
+          </span>
+          <div className="min-w-[18rem] flex-1">
+            <p className="font-body-sm text-body-sm font-semibold text-ink-900">
+              {overlappingIds.size} overlapping{" "}
+              {overlappingIds.size === 1 ? "room" : "rooms"} — this plan
+              can&apos;t be costed until they&apos;re resolved.
+            </p>
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              Overlaps double-count floor and wall area, so the BoQ would be
+              wrong. Your changes still save normally. Fixing moves the rooms
+              apart rather than reshaping them, so every room keeps its area.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={fixOverlaps}
+            className="bg-brass-600 text-on-primary hover:bg-primary"
+          >
+            <Layers />
+            Fix overlaps
+          </Button>
+        </div>
+      )}
+
       {editing && (
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">

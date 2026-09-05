@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app/AppShell";
+import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { PlanLayers, type PlanInspectData } from "@/app/project/[id]/plan/_components/plan-layers";
 import { generateDrawingSet } from "@/lib/drawings/export";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
@@ -117,6 +118,7 @@ export default async function DrawingsPage({
     <AppShell pageName={PAGE_NAME}>
       <div className="mx-auto max-w-[1440px] pb-24">
         <header className="mb-xl">
+          <JourneyProgress stepKey="downloads" projectId={projectId} />
           <p className="label-caps mb-md text-brass-600">Drawing set · A3 · 1:100</p>
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Auto-generated drawings

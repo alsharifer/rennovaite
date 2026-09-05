@@ -223,6 +223,22 @@ export default async function DashboardPage({
   ]);
 
   const projects: ProjectRow[] = projectsRes.data ?? [];
+
+  // Archived projects (migration 030). Read separately through the untyped
+  // client because `archived_at` is not in database.types.ts, and best-effort
+  // so the list still renders — with everything visible — before 030 is
+  // applied. Archiving hides a project from the list; it never deletes it.
+  const archivedAt = new Map<string, string>();
+  try {
+    const { data } = await sb
+      .from("projects")
+      .select("id, archived_at")
+      .not("archived_at", "is", null)
+      .returns<{ id: string; archived_at: string }[]>();
+    for (const r of data ?? []) archivedAt.set(r.id, r.archived_at);
+  } catch {
+    /* pre-030: nothing is archived yet */
+  }
   const plans: PlanRow[] = (plansRes.data ?? []) as PlanRow[];
   const boqs: BoqRow[] = (boqsRes.data ?? []) as BoqRow[];
   const renders: RenderRow[] = (rendersRes.data ?? []) as RenderRow[];
@@ -291,6 +307,7 @@ export default async function DashboardPage({
         hasBoq: !!boq,
         hasSelections: !!selection,
       }),
+      archived_at: archivedAt.get(p.id) ?? null,
       hero_url: render?.image_url ?? null,
       boq_total_aed: boq?.total_aed ?? null,
       last_updated_at: latestActivityIso(p, boq, render, selection, plan),

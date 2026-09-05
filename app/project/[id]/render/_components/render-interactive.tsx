@@ -65,6 +65,15 @@ type Props = {
   /** P7: whether furniture staging is on (server flag) + already-opted rooms. */
   stagingEnabled?: boolean;
   initialFurnitureOptIns?: string[];
+  /**
+   * Journey step chrome, rendered on the SERVER and handed in as a slot.
+   * `JourneyProgress` reads env flags, so it cannot be imported into this
+   * client component directly. It sits at the top of the rooms rail rather
+   * than above the studio: the studio root is `h-[calc(100vh-4rem)]`, so
+   * anything stacked above it would push the bottom of the workspace
+   * off-screen.
+   */
+  journeySlot?: React.ReactNode;
 };
 
 type GenerateResponse = {
@@ -184,6 +193,7 @@ export function RenderInteractive({
   roomBoqTotals = {},
   stagingEnabled = false,
   initialFurnitureOptIns = [],
+  journeySlot = null,
 }: Props) {
   const seededState = useMemo<Record<string, RoomState>>(() => {
     const result: Record<string, RoomState> = {};
@@ -448,6 +458,7 @@ export function RenderInteractive({
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-canvas">
       {/* LEFT COL — rooms & style picker -------------------------------- */}
       <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-r border-ink-100 bg-paper px-lg py-lg">
+        {journeySlot}
         <p className="label-caps mb-md text-ink-500">Rooms</p>
         <ul className="flex flex-col gap-xs">
           {rooms.map((room) => (

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { findOverlaps } from "@/lib/plan/overlaps";
 import { ensureAsBuiltSnapshot } from "@/lib/plan/snapshots";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -64,11 +66,36 @@ export async function POST(request: NextRequest) {
     const total = rooms.reduce((sum, r) => sum + r.area_m2, 0);
     const totalRounded = Math.round(total * 10) / 10;
 
+    // D3: the save ALWAYS succeeds. Overlapping rooms are a legitimate
+    // transient state while editing — refusing the write would leave unsaved
+    // work one refresh from being lost, and a 400 after the click is the same
+    // failure with extra steps. So we record what we saw instead, and BoQ
+    // generation is where the invariant is actually enforced, because that is
+    // where overlaps do their damage (double-counted floor and wall area).
+    const overlaps = findOverlaps(
+      rooms.map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
+    );
+
     const { error: planErr } = await supabase
       .from("plans")
       .update({ total_area_m2: totalRounded })
       .eq("id", plan_id);
     if (planErr) throw planErr;
+
+    // Separate best-effort write: migration 029 may not be applied yet, and a
+    // missing column must never cost the user their save.
+    try {
+      await (supabase as unknown as SupabaseClient)
+        .from("plans")
+        .update({
+          has_overlaps: overlaps.has_overlaps,
+          overlap_pairs: overlaps.pairs,
+          overlaps_checked_at: new Date().toISOString(),
+        })
+        .eq("id", plan_id);
+    } catch {
+      /* pre-029 — generation assesses overlaps live instead */
+    }
 
     // Parse-confirm → persist the as-built plan_snapshot once (P1). Idempotent
     // (write-if-absent), flagged, and best-effort so it never blocks the save.
@@ -92,6 +119,9 @@ export async function POST(request: NextRequest) {
       success: true,
       total_area_m2: totalRounded,
       room_count: rooms.length,
+      // The save succeeded either way; this tells the editor what to show.
+      has_overlaps: overlaps.has_overlaps,
+      overlap_pairs: overlaps.pairs,
     });
   } catch (err) {
     console.error("[api/update-plan] error", err);
