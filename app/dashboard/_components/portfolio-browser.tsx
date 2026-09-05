@@ -55,6 +55,7 @@ export function PortfolioBrowser({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
 
   // Debounce the search input (250ms) — client-side filter, no URL sync per
   // spec.
@@ -63,16 +64,25 @@ export function PortfolioBrowser({
     return () => clearTimeout(t);
   }, [search]);
 
-  // Apply the in-memory search filter.
+  // Archived projects are hidden by default. They are never deleted — a parsed
+  // plan with renders and a BoQ is calibration data — so this is a view filter,
+  // not a lifecycle.
+  const archivedCount = useMemo(
+    () => projects.filter((p) => p.archived_at).length,
+    [projects],
+  );
+
+  // Apply the archive filter, then the in-memory search filter.
   const visible = useMemo(() => {
+    const base = showArchived ? projects : projects.filter((p) => !p.archived_at);
     const q = debouncedSearch.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => {
+    if (!q) return base;
+    return base.filter((p) => {
       const blob =
         `${p.name} ${p.city ?? ""} ${p.phase}`.toLowerCase();
       return blob.includes(q);
     });
-  }, [projects, debouncedSearch]);
+  }, [projects, debouncedSearch, showArchived]);
 
   // Treat any selected id that's no longer in `projects` as deselected.
   // Derive at render time instead of resetting via an effect (which trips
@@ -211,6 +221,26 @@ export function PortfolioBrowser({
                 className="h-full flex-1 bg-transparent font-body text-body-sm text-ink-900 placeholder:text-on-surface-variant focus:outline-none"
               />
             </label>
+
+            {archivedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowArchived((v) => !v)}
+                aria-pressed={showArchived}
+                className={
+                  "focus-ring inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-md font-body-sm text-body-sm transition-colors " +
+                  (showArchived
+                    ? "border-brass-600 bg-primary-fixed text-ink-900"
+                    : "border-ink-100 bg-paper text-ink-700 hover:bg-surface-container")
+                }
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  {showArchived ? "visibility_off" : "inventory_2"}
+                </span>
+                {showArchived ? "Hide archived" : "Show archived"}
+                <span className="text-ink-500">({archivedCount})</span>
+              </button>
+            )}
             <Link
               href="/project/new"
               className="focus-ring flex h-10 shrink-0 items-center gap-sm rounded-lg bg-brass-600 px-md font-body text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
@@ -641,7 +671,11 @@ function GridCard({
           >
             Open project →
           </Link>
-          <RowActionsMenu projectId={project.id} projectName={project.name} />
+          <RowActionsMenu
+            projectId={project.id}
+            projectName={project.name}
+            archivedAt={project.archived_at}
+          />
         </div>
       </div>
     </div>
@@ -951,7 +985,11 @@ function ListRow({
               chevron_right
             </span>
           </Link>
-          <RowActionsMenu projectId={project.id} projectName={project.name} />
+          <RowActionsMenu
+            projectId={project.id}
+            projectName={project.name}
+            archivedAt={project.archived_at}
+          />
         </div>
       </td>
     </tr>
@@ -968,13 +1006,42 @@ const MENU_EST_HEIGHT = 268; // ~6 items + divider; used only for flip decision
 function RowActionsMenu({
   projectId,
   projectName,
+  archivedAt,
 }: {
   projectId: string;
   projectName: string;
+  archivedAt: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+
+  // Archive is the safe half of this menu: reversible, and it destroys nothing.
+  // It sits directly above the separator so the irreversible item below is
+  // never the first thing reached for when a list needs tidying.
+  async function toggleArchive() {
+    setArchiving(true);
+    setArchiveError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: !archivedAt }),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!res.ok) throw new Error(body?.error ?? `Failed (${res.status}).`);
+      setOpen(false);
+      router.refresh();
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : "Archive failed.");
+    } finally {
+      setArchiving(false);
+    }
+  }
   const [coords, setCoords] = useState<{ left: number; top: number } | null>(
     null,
   );
@@ -1063,7 +1130,23 @@ function RowActionsMenu({
               icon="picture_as_pdf"
               label="Export BoQ as PDF"
             />
-            <MenuItem icon="archive" label="Archive" tone="terracotta" />
+            <MenuItem
+              icon={archivedAt ? "unarchive" : "archive"}
+              label={
+                archiving
+                  ? "Working…"
+                  : archivedAt
+                    ? "Restore from archive"
+                    : "Archive"
+              }
+              tone="terracotta"
+              onClick={toggleArchive}
+            />
+            {archiveError && (
+              <p className="px-md pb-sm font-body text-body-sm text-error">
+                {archiveError}
+              </p>
+            )}
             <div className="my-xs h-px bg-ink-100" role="separator" />
             <MenuItem
               icon="delete"

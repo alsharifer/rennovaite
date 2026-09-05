@@ -46,4 +46,11 @@ export type PortfolioProject = {
   boq_total_aed: number | null;
   last_updated_at: string | null;
   created_at: string | null;
+  /**
+   * Non-null = archived. Hidden from the list unless "Show archived" is on.
+   * Archiving never deletes: a parsed plan with renders and a BoQ is
+   * calibration data, and the business case rests on having more completed
+   * projects to calibrate against, not fewer.
+   */
+  archived_at: string | null;
 };
