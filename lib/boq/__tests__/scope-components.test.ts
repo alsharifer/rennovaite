@@ -187,6 +187,14 @@ describe("component dedupe", () => {
     expect(findComponentDuplicates(lines)).toEqual([]);
   });
 
+  it("does not report the fitting and its wiring allowance as a duplicate", () => {
+    const found = findComponentDuplicates([
+      line({ item_key: "elec.downlight", description: "LED downlights" }),
+      line({ rule_id: "P2/overlay/light_point", description: "Ceiling light point", total_aed: 1870 }),
+    ]);
+    expect(found).toEqual([]);
+  });
+
   it("catches the same component priced by a rule AND an overlay", () => {
     const lines = [
       line({ item_key: "elec.point", description: "Power sockets and switches" }),
@@ -294,7 +302,10 @@ describe("dedupe against a STORED BoQ (rule_id only, no item_key)", () => {
     const components = new Set(found.map((f) => f.component));
     expect(components).toContain("socket");
     expect(components).toContain("water_heater");
-    expect(components).toContain("spotlight");
+    // Spotlights are NOT a duplicate: R-14 prices the fitting, the overlay
+    // light_point line is the wiring allowance feeding it. Reporting that pair
+    // would put a false claim in front of the QS.
+    expect(components).not.toContain("spotlight");
     // Sockets duplicate across three overlay keys; the money is the sum.
     const socketExposure = found
       .filter((f) => f.component === "socket")

@@ -58,10 +58,19 @@ export const COMPONENT_OWNERS: ComponentOwner[] = [
     owner: "section_rule",
     owner_key: "elec.downlight",
     owner_rule_id: "R-14",
-    conflicts: [{ mechanism: "overlay", key: "light_point" }],
+    // NOT a conflict. R-14 prices the FITTING (supply + install); the P2
+    // overlay "light_point" is the WIRING allowance that feeds it. Two
+    // complementary halves of one installation, the same way R-31 cove labour
+    // and R-45 strip material are complementary.
+    //
+    // This was briefly listed as a conflict and the BoQ duly told the QS that
+    // spotlights were priced twice. A false duplicate is worse than a missed
+    // one: it costs review time and it teaches people to distrust the notice
+    // that carries the two real findings.
+    conflicts: [],
     source_cell: "G10",
     note:
-      "R-14 prices the fitting supply+install. The P2 overlay 'light_point' is the WIRING allowance to that fitting, not a second fitting — kept distinct on purpose, and flagged here so nobody merges them into one line by mistake.",
+      "Owner of the fitting itself. The overlay light_point line is the wiring allowance to it, deliberately separate — do not merge them into one line.",
   },
   {
     component: "led_strip",
