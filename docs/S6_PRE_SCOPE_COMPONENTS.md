@@ -65,7 +65,11 @@ the P2 overlay section prices them again with no dedupe:
 The water-heater duplicate is free only because the overlay rate is
 `0 / needs_qs`. Price it and the villa buys six heaters for three bathrooms.
 
-Both pairs now surface **in the BoQ itself** as "duplicate detected, pending QS
+Spotlights are deliberately NOT reported: R-14 prices the fitting and the
+overlay `light_point` line is the wiring allowance feeding it — complementary
+halves of one installation, not two fittings.
+
+Both real pairs now surface **in the BoQ itself** as "duplicate detected, pending QS
 scope ruling", with the duplicated amount named. Nothing is removed
 automatically: which line survives depends on what each rate is meant to cover,
 and that is a QS decision, not a developer one.
