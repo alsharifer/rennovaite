@@ -1015,6 +1015,13 @@ function LineRow({
                 className="inline-block size-1.5 shrink-0 rounded-full bg-tertiary"
               />
             )}
+            {line.rate_status === "indicative" && (
+              <span
+                title="Indicative rate — a defensible estimate, not a transaction. Pending QS review."
+                aria-label="Indicative rate — pending QS review"
+                className="inline-block size-1.5 shrink-0 rounded-full bg-tertiary"
+              />
+            )}
             {line.rate_status === "site_assessment" && (
               <span
                 title="Allowance only — requires site measurement"

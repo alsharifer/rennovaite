@@ -20,8 +20,10 @@ import {
   ALUMINUM_ALLOWANCE_CAVEAT,
 } from "@/lib/ground-truth/mudon-actuals";
 import { enforceScope, type ScopedLine } from "./scope";
+import { RATE_RULES } from "./rules";
+import { mirrorCount, showerGlassCount, vanitySlabCount } from "./scope-components";
 
-export type GtRateStatus = "actual_transaction" | "site_assessment";
+export type GtRateStatus = "actual_transaction" | "site_assessment" | "indicative";
 
 export interface GtBoqLine {
   description: string;
@@ -73,6 +75,9 @@ function line(
 
 export interface RoomTypeCount {
   room_type: string | null;
+  /** Optional — only the S6-pre component counts read it. Nullable because the
+   *  route passes DB rows straight through. */
+  area_m2?: number | null;
 }
 
 /**
@@ -110,6 +115,26 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
     lines.push(line(`Solid meranti door frame, painted + fixed`, doors, "no", rate("joinery_door_frame"), src, "actual_transaction", `${doors} frames (Atrium 5.2)`));
   }
 
+  // --- S6-pre (G19): "Excludes slabs for vanity of the 2 bedrooms" ---------
+  //
+  // One slab per vanity unit in the joinery scope. Deliberately NOT folded into
+  // tile area, which would hide an unpriced component inside a QS-validated
+  // rate. Dimensions are unknown, so it is a site_assessment allowance.
+  if (bathrooms > 0) {
+    const slabs = vanitySlabCount(bathrooms);
+    lines.push(
+      line(
+        "Vanity counter slab — allowance, requires site measurement",
+        slabs.quantity,
+        "no",
+        RATE_RULES["join.vanity_slab"]!.allowance_aed!,
+        "S6-pre G19 — excluded from the RAK tiles quotation; indicative allowance",
+        "site_assessment",
+        slabs.measurement,
+      ),
+    );
+  }
+
   return finalize("Joinery", lines);
 }
 
@@ -117,7 +142,7 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
  * Aluminum & glass section — room-scoped ALLOWANCES (site_assessment), from the
  * Global Creation quote's per-item lump values. Never a measured quantity.
  */
-export function buildAluminumSection(): GtSection | null {
+export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | null {
   if (ALUMINUM.length === 0) return null;
   const src = "Global Creation Services ref 3936/R1 (allowance)";
   const lines: GtBoqLine[] = ALUMINUM.map((a) =>
@@ -131,6 +156,53 @@ export function buildAluminumSection(): GtSection | null {
       ALUMINUM_ALLOWANCE_CAVEAT,
     ),
   );
+  // --- S6-pre (G21): "This excludes shower glass and mirrors" ---------------
+  //
+  // Appended to the ACTUALS section rather than emitted by the engine, for the
+  // same reason the stair tile is re-appended in element-map.ts: the aluminum
+  // section is rebuilt from the Global Creation quote, so anything the engine
+  // put in "Aluminum & Glass" would be discarded on the way through.
+  //
+  // These are the only lines in this section that are NOT from the quotation,
+  // and they are flagged "indicative" to say exactly that.
+  const componentRooms = rooms.map((r, i) => ({
+    id: String(i),
+    type: r.room_type,
+    area_m2: r.area_m2 ?? 0,
+  }));
+  if (componentRooms.length > 0) {
+    const glass = showerGlassCount(componentRooms);
+    const vanities = componentRooms.filter(
+      (r) => r.type === "bathroom" || r.type === "ensuite" || r.type === "powder",
+    ).length;
+    const mirrors = mirrorCount(componentRooms, vanities);
+    if (glass.quantity > 0) {
+      lines.push(
+        line(
+          "Frameless shower glass partition — supply and install",
+          glass.quantity,
+          "no",
+          RATE_RULES["alum.shower_glass"]!.allowance_aed!,
+          "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+          "indicative",
+          glass.measurement,
+        ),
+      );
+    }
+    if (mirrors.quantity > 0) {
+      lines.push(
+        line(
+          "Bathroom mirror — supply and install",
+          mirrors.quantity,
+          "no",
+          RATE_RULES["alum.mirror"]!.allowance_aed!,
+          "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+          "indicative",
+          mirrors.measurement,
+        ),
+      );
+    }
+  }
   return finalize("Aluminum & Glass", lines);
 }
 
@@ -167,7 +239,7 @@ interface BoqLike {
  */
 export function appendJoineryAluminumSections<T extends BoqLike>(boq: T, rooms: RoomTypeCount[]): T {
   const joinery = buildJoinerySection(rooms);
-  const aluminum = buildAluminumSection();
+  const aluminum = buildAluminumSection(rooms);
   const extra = [joinery, aluminum].filter((s): s is GtSection => s !== null);
   if (extra.length === 0) return boq;
 

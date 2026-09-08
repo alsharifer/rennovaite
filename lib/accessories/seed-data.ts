@@ -17,10 +17,13 @@
 //
 // WHAT IS DELIBERATELY MISSING: the Mudon ground truth has no AC or water
 // heater EQUIPMENT quotation — only a lump "HVAC Works" labour figure of AED
-// 31,500. So AC attributes come from the vendor catalogue above, and
-// `plumb.water_heater` gets no alternatives at all: there is not one water
-// heater SKU in the catalogue. Both facts are surfaced rather than papered
-// over with invented specifications.
+// 31,500. So AC attributes come from the vendor catalogue above.
+//
+// S6-pre: `plumb.water_heater` and `elec.downlight` DID have that gap and no
+// longer do. Delta Log G12 and G10 are the evidence that the platform must let
+// these be specified, so lib/accessories/s6-components.ts supplies spec-class
+// rows for both. Those rows are `indicative`, not vendor SKUs, and say so —
+// which is a different thing from having nothing at all.
 //
 // Pure module: takes SKU rows in, returns catalogue rows out. Unit-tested.
 // =============================================================================
@@ -379,19 +382,20 @@ export function buildElectricalCatalog(skus: SkuRow[]): CatalogSeedRow[] {
  * picker so an empty category reads as a known gap rather than a broken screen.
  */
 export const NO_CATALOGUE_REASON: Record<string, string> = {
-  "plumb.water_heater":
-    "No water-heater SKU exists in the vendor catalogue and the Mudon ground truth has no heater quotation — only a lump HVAC labour figure. Priced by rule until a supplier list is ingested.",
   "hvac.fcu_service":
     "A service operation, not a product — there is nothing to specify. Priced by the R-22 labour rule.",
-  "elec.downlight":
-    "The catalogue has no downlight SKUs (only pendants). Priced by the R-14 labour rule until a lighting supplier list is ingested.",
 };
 
+import { buildS6ComponentCatalog, markSocketRuleDefault } from "./s6-components";
+
 export function buildCatalog(skus: SkuRow[]): CatalogSeedRow[] {
-  return [
+  // S6-pre rows close the gaps NO_CATALOG_REASON used to describe in prose, and
+  // markSocketRuleDefault makes the standing socket assumption explicit.
+  return markSocketRuleDefault([
     ...buildSanitaryCatalog(),
     ...buildHvacCatalog(skus),
     ...buildLightingCatalog(skus),
     ...buildElectricalCatalog(skus),
-  ];
+    ...buildS6ComponentCatalog(),
+  ]);
 }

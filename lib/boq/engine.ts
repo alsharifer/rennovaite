@@ -61,6 +61,12 @@ export function generateDeterministicBoq(
       wastage_pct: Math.round(rate.wastage * 100),
       // D1: the chosen catalogue item is the line's element ref, and an
       // unvalidated rate keeps the terracotta-dot convention.
+      //
+      // A take-off item may declare its own provenance (S6-pre components,
+      // whose rates are indicative rather than transacted). An explicit
+      // accessory selection still wins: choosing a real product is stronger
+      // evidence than the rule's default.
+      ...(item.rate_status ? { rate_status: item.rate_status } : {}),
       ...(chosen
         ? {
             element_refs: [chosen.catalog_item_id],

@@ -17,14 +17,26 @@ const MUDON_ROOMS = [
 describe("Joinery section (Step 4)", () => {
   const section = buildJoinerySection(MUDON_ROOMS)!;
 
-  it("produces joinery lines, all supply_and_install with actual provenance", () => {
+  it("produces joinery lines, all supply_and_install, quoted lines from actuals", () => {
     expect(section.work_section).toBe("Joinery");
     expect(section.lines.length).toBeGreaterThan(0);
     for (const l of section.lines) {
       expect(l.scope).toBe("supply_and_install");
-      expect(l.rate_status).toBe("actual_transaction");
       expect(l.total_aed).toBe(Math.round(l.quantity * l.rate_aed));
     }
+    // Everything the Atrium quotation covered is an actual. The S6-pre vanity
+    // slab (G19) is the one line it did NOT cover, so it must NOT claim to be
+    // one — that distinction is the whole point of recording the exclusion.
+    const quoted = section.lines.filter((l) => !/vanity counter slab/i.test(l.description));
+    expect(quoted.length).toBeGreaterThan(0);
+    for (const l of quoted) expect(l.rate_status).toBe("actual_transaction");
+  });
+
+  it("adds the G19 vanity slab as an allowance, never as an actual", () => {
+    const slab = section.lines.find((l) => /vanity counter slab/i.test(l.description));
+    expect(slab, "G19 vanity slab line missing").toBeDefined();
+    expect(slab!.rate_status).toBe("site_assessment");
+    expect(slab!.rate_status).not.toBe("actual_transaction");
   });
 
   it("never emits an install/labour line (composites price their own install)", () => {

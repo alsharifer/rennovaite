@@ -142,3 +142,99 @@ export const RATE_CALIBRATION: { label: string; seed: number; list: number | nul
 
 // Net rate helper: cart net = list × 0.60, rounded to fils.
 export const netRate = (list: number): number => Math.round(list * TILE_NET_FACTOR * 100) / 100;
+
+// --- Variations against the actuals (S6-pre, Delta Log column G) -------------
+//
+// A variation is a real transaction that happened AFTER the quotation it sits
+// against. It is recorded, not merged: folding AED 3,000 of extra tiles back
+// into the tiles rate would make one villa's site condition look like a market
+// price, and the next project would inherit it silently.
+//
+// One variation on one villa is not evidence to move a rate. Nothing here
+// changes a rate or a rule.
+
+export interface Variation {
+  /** Trade whose actual this varies. */
+  trade: keyof typeof TRADE_TOTALS | string;
+  /** AED, excl. VAT. A VALUE, not a quantity. */
+  amount_aed: number;
+  provenance: Provenance;
+  /** Always true — that is what makes this a variation and not a base rate. */
+  variation: true;
+  /** Delta Log cell this came from. */
+  source_cell: string;
+  /** Verbatim note. */
+  source_text: string;
+  note: string;
+}
+
+export const MUDON_VARIATIONS: Variation[] = [
+  {
+    trade: "tiles",
+    amount_aed: 3_000,
+    provenance: "actual_transaction",
+    variation: true,
+    source_cell: "G22",
+    source_text: "Additional tiles were required amounting to 3000",
+    note:
+      "AED 3,000 is the VALUE of extra tiles required on site, not a quantity — no m² is recoverable from the note. Written on the sanitary row in the Delta Log, but it concerns the tiles package; recorded against tiles for that reason. Deliberately NOT added to the tiles rate: RAK cart 0000160602 remains the rate source, unchanged.",
+  },
+];
+
+/** Actuals plus variations, for reporting the true out-turn of a trade. */
+export function tradeActualWithVariations(trade: string): {
+  base_aed: number;
+  variations_aed: number;
+  total_aed: number;
+} {
+  const base =
+    trade === "tiles" ? TRADE_TOTALS.tiles.excl_vat
+    : trade === "joinery" ? TRADE_TOTALS.joinery.excl_vat
+    : trade === "aluminum" ? TRADE_TOTALS.aluminum.excl_vat
+    : trade === "sanitary" ? TRADE_TOTALS.sanitary.excl_vat
+    : 0;
+  const variations = MUDON_VARIATIONS.filter((v) => v.trade === trade).reduce(
+    (s, v) => s + v.amount_aed,
+    0,
+  );
+  return {
+    base_aed: base,
+    variations_aed: variations,
+    total_aed: Math.round((base + variations) * 100) / 100,
+  };
+}
+
+// --- Market-fairness pre-signals (S6-pre) ------------------------------------
+//
+// A pre-signal is the contractor's own opinion about a rate, logged BEFORE the
+// QS gives theirs. It carries no authority and changes nothing — it exists so
+// that when Friday's QS column disagrees, the disagreement is visible and dated
+// rather than discovered later.
+
+export interface RatePreSignal {
+  /** rate_book / rule item keys the signal attaches to. */
+  item_keys: string[];
+  direction: "above_market" | "below_market" | "unclear";
+  source: string;
+  source_cell: string;
+  source_text: string;
+  /** Contractor actual for the line, AED. */
+  actual_aed: number | null;
+  /** What the platform priced, AED. */
+  platform_aed: number | null;
+  note: string;
+}
+
+export const MUDON_RATE_PRE_SIGNALS: RatePreSignal[] = [
+  {
+    item_keys: ["demo.soft_strip", "demo.floor_removal", "demo.wall_tile_removal"],
+    direction: "above_market",
+    source: "Newspace (Abdallah), Delta Log annotation",
+    source_cell: "G7",
+    source_text: "This is more expensive than the usual",
+    actual_aed: 22_500,
+    platform_aed: 50_031,
+    note:
+      "Attaches to 'Demolition & Strip-Out' (Labour SOW section 3, AED 22,500). The contractor is saying their OWN actual ran above normal — while the platform prices demolition at AED 50,031, 2.2x that actual. Two signals pointing opposite ways on one line. NO RATE CHANGES from this: it is logged for the QS column on Friday, which is the thing entitled to move it.",
+  },
+];

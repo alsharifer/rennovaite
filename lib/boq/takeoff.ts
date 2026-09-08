@@ -27,6 +27,7 @@ import {
   WARDROBE_LM,
 } from "./rules";
 import { polygonArea, type Pt } from "@/lib/plan/polygon";
+import { ledStripAllowance, type ComponentRoom } from "./scope-components";
 
 import type { EngineRoom, ScopeItem } from "./schema";
 
@@ -196,6 +197,19 @@ export function computeTakeoff(
     (s, g) => s + Math.ceil(g.room.area_m2 * POINTS_PER_M2),
     0,
   );
+
+  // --- S6-pre: components Newspace's scoping left out (Delta Log column G) ---
+  //
+  // Only the components the platform did NOT already price appear here.
+  // Spotlights (R-14), sockets (R-15) and water heaters (R-17) are already in
+  // the take-off above; column G says the CONTRACT excluded them, not that we
+  // did, and adding them again would double-count three components.
+  const componentRooms: ComponentRoom[] = geos.map((g) => ({
+    id: g.room.id,
+    type: g.room.room_type,
+    area_m2: g.room.area_m2,
+  }));
+  const ledStrip = ledStripAllowance(componentRooms);
 
   // F-08
   const wardrobeLm = round2(
@@ -449,6 +463,20 @@ export function computeTakeoff(
       unit: "no",
       measurement: `F-07: Σ interior ceil(area × ${POINTS_PER_M2}) = ${points}`,
     },
+    ...(ledStrip.quantity > 0
+      ? [
+          {
+            rule_id: "S6-02",
+            work_section: "Lighting" as const,
+            item_key: "light.led_strip",
+            description: "Cove LED strip — supply (living/dining/master)",
+            quantity: ledStrip.quantity,
+            unit: ledStrip.unit,
+            measurement: ledStrip.measurement,
+            rate_status: "indicative" as const,
+          },
+        ]
+      : []),
     {
       rule_id: "Q-19",
       work_section: "Plumbing",

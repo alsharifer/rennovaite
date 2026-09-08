@@ -277,10 +277,24 @@ describe("vendor-catalogue rows — attributes parsed, never inferred", () => {
     }
   });
 
-  it("has no water-heater alternatives, and says why", () => {
+  it("now offers water-heater and spotlight spec classes (S6-pre, G12/G10)", () => {
+    // This test used to assert the OPPOSITE — that neither had alternatives,
+    // with NO_CATALOGUE_REASON explaining why. Newspace's G12 and G10 notes are
+    // the evidence that the gap had to close, so the assertion is inverted
+    // rather than the feature reverted.
     const rows = buildCatalog(ALL_SKUS);
-    expect(rows.some((r) => r.item_key === "plumb.water_heater")).toBe(false);
-    expect(NO_CATALOGUE_REASON["plumb.water_heater"]).toMatch(/no water-heater SKU/i);
+    for (const key of ["plumb.water_heater", "elec.downlight"]) {
+      const forKey = rows.filter((r) => r.item_key === key);
+      expect(forKey.length, key).toBeGreaterThan(0);
+      // Nothing here was transacted on Villa 94, so nothing may claim it was.
+      expect(forKey.every((r) => r.provenance === "indicative"), key).toBe(true);
+      expect(forKey.filter((r) => r.is_rule_default).length, key).toBe(1);
+      expect(NO_CATALOGUE_REASON[key], key).toBeUndefined();
+    }
+  });
+
+  it("keeps a stated reason for the categories that genuinely have none", () => {
+    expect(NO_CATALOGUE_REASON["hvac.fcu_service"]).toMatch(/service operation/i);
   });
 });
 

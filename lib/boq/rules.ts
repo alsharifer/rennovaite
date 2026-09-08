@@ -415,7 +415,8 @@ export const RATE_RULES: Record<string, RateRule> = {
     rule_id: "R-36",
     allowance_aed: 6000,
     allowance_note:
-      "Staircase renovation allowance — tread tiling + LED nosing circuit, excl. handrail (Villa 94 §5: AED 6k). QS to confirm.",
+      "Staircase renovation allowance — LABOUR ONLY: tread/riser preparation, tile fixing labour and LED nosing circuit, excl. handrail (Villa 94 §5: AED 6k). " +
+      "Delta Log G15 (\"Only labor\") confirms the Villa 94 staircase line carried no material. The tile MATERIAL comes solely from Q-11b/R-44 floor.stair_tile — this note previously read \"tread tiling\", which would have described the same material twice. Rate unchanged. QS to confirm.",
   },
   "prelim.floor_protection": {
     rule_id: "R-37",
@@ -434,6 +435,37 @@ export const RATE_RULES: Record<string, RateRule> = {
     allowance_aed: 1500,
     allowance_note:
       "Final site clearance + professional handover clean, lump. QS to confirm.",
+  },
+
+  // --- S6-pre: components Newspace's scoping left out (Delta Log column G) ---
+  //
+  // Every rate below is INDICATIVE. None is a Villa 94 transaction — that is
+  // the whole point of column G, these components were never quoted — so each
+  // carries its reasoning and expects to be overwritten by Friday's QS column.
+
+  "light.led_strip": {
+    rule_id: "R-45",
+    allowance_aed: 85,
+    allowance_note:
+      "G10 — cove LED strip SUPPLY, AED 85/lm indicative (24V 14.4W/m COB strip + driver + profile, Dubai trade counter mid-2026). Complements R-31, which prices the cove LABOUR at 45/lm and explicitly assumes 'strips client-supplied' — this is the material that assumption left out. QS to confirm.",
+  },
+  "join.vanity_slab": {
+    rule_id: "R-46",
+    allowance_aed: 1450,
+    allowance_note:
+      "G19 — vanity counter slab, AED 1,450/no ALLOWANCE (engineered quartz ~1.5 lm incl. cut-out, edge and fixing). The RAK tiles quotation excludes these. Dimensions unknown, so this is an allowance requiring site measurement, deliberately NOT folded into tile area. QS to confirm.",
+  },
+  "alum.shower_glass": {
+    rule_id: "R-47",
+    allowance_aed: 2200,
+    allowance_note:
+      "G21 — frameless 10mm tempered shower partition, AED 2,200/no indicative (Dubai supply+install, typical 900-1200mm screen). Excluded from the Global Creation aluminum package. QS to confirm.",
+  },
+  "alum.mirror": {
+    rule_id: "R-48",
+    allowance_aed: 650,
+    allowance_note:
+      "G21 — bathroom mirror, AED 650/no indicative (5mm silvered, polished edge, concealed fixing, ~900x700). Excluded from the aluminum package; the sanitary accessory set carries no mirror either. QS to confirm.",
   },
 };
 
