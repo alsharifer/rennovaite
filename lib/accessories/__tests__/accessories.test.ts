@@ -293,6 +293,21 @@ describe("vendor-catalogue rows — attributes parsed, never inferred", () => {
     }
   });
 
+  it("files every catalogue row under the category the picker will show it in", () => {
+    // The picker groups by CATEGORY_ITEM_KEYS, not by the row category column.
+    // A row whose category disagrees renders under a heading it does not claim
+    // — and a row whose item_key is in NO category is unreachable entirely,
+    // which is how three LED-strip rows were seeded into a screen that could
+    // never display them.
+    for (const row of buildCatalog(ALL_SKUS)) {
+      const shownUnder = categoryForItemKey(row.item_key);
+      expect(shownUnder, `${row.item_key} is in no category — unreachable`).not.toBeNull();
+      expect(row.category, `${row.item_key} category disagrees with CATEGORY_ITEM_KEYS`).toBe(
+        shownUnder,
+      );
+    }
+  });
+
   it("keeps a stated reason for the categories that genuinely have none", () => {
     expect(NO_CATALOGUE_REASON["hvac.fcu_service"]).toMatch(/service operation/i);
   });
