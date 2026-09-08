@@ -129,6 +129,25 @@ export interface AccessoryAttributes {
   material?: string;
   /** e.g. "38 cm" */
   dimensions?: string;
+  // --- lighting (S6-pre). Lighting is specified on different axes than
+  // sanitary or HVAC, and forcing "10W" into `capacity` would make the
+  // comparison view lie about what it is showing.
+  /** e.g. "10W" */
+  wattage?: string;
+  /** e.g. "3000K" */
+  colour_temp?: string;
+  /** Colour rendering index, e.g. ">95" */
+  cri?: string;
+  /** e.g. "IP20", "IP65" */
+  ip_rating?: string;
+  /** e.g. "24V" */
+  voltage?: string;
+  /** Light output per metre, e.g. "14.4W/m" */
+  output?: string;
+  /** e.g. "Yes", "No" */
+  dimmable?: string;
+  /** Product sub-type, e.g. "COB (dotless)", "Heat pump" */
+  type?: string;
   /** Supplier lead time in days. */
   lead_time_days?: number;
   /** ISO date the price was last checked. */
@@ -142,6 +161,14 @@ export const ATTRIBUTE_ROWS: { key: keyof AccessoryAttributes; label: string }[]
   { key: "mounting", label: "Mounting" },
   { key: "finish", label: "Finish" },
   { key: "material", label: "Material" },
+  { key: "wattage", label: "Wattage" },
+  { key: "colour_temp", label: "Colour temperature" },
+  { key: "cri", label: "CRI" },
+  { key: "ip_rating", label: "IP rating" },
+  { key: "voltage", label: "Voltage" },
+  { key: "output", label: "Output" },
+  { key: "dimmable", label: "Dimmable" },
+  { key: "type", label: "Type" },
   { key: "dimensions", label: "Dimensions" },
   { key: "refrigerant", label: "Refrigerant" },
   { key: "warranty", label: "Warranty" },

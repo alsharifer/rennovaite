@@ -93,6 +93,14 @@ export type ScopeItem = {
   unit: string; // m2 | lm | no | m3 | project
   /** Human-readable derivation, e.g. "Σ net wall area × 0.15". Shown to the QS. */
   measurement: string;
+  /**
+   * Provenance of the RATE, when it is not a plain priced rule.
+   *
+   * Set by S6-pre components, whose rates are judgement calls rather than
+   * transactions: they must reach the BoQ visibly pending review, never
+   * indistinguishable from a rate somebody actually paid.
+   */
+  rate_status?: "indicative" | "site_assessment" | "needs_qs";
 };
 
 // --- Output --------------------------------------------------------------------
@@ -113,8 +121,17 @@ export const BoqLineSchema = z.object({
   // -- P2/P4/P5 additive (optional so pre-P2 lines validate unchanged) --
   /** Fixture / element ids this line's quantity was counted from (P2 overlays). */
   element_refs: z.array(z.string()).nullable().optional(),
-  /** 'needs_qs' = no default rate; the QS must price it. */
-  rate_status: z.enum(["priced", "needs_qs"]).optional(),
+  /**
+   * Rate provenance, driving the coloured dot in the BoQ table.
+   *   priced             a resolved rule rate
+   *   needs_qs           no default rate; the QS must price it
+   *   indicative         a defensible judgement call, not a transaction (S6-pre)
+   *   site_assessment    allowance only; needs site measurement
+   *   actual_transaction priced from a real contract or quotation
+   */
+  rate_status: z
+    .enum(["priced", "needs_qs", "indicative", "site_assessment", "actual_transaction"])
+    .optional(),
 });
 
 export const BoqSectionSchema = z.object({
