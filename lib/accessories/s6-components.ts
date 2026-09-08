@@ -134,8 +134,13 @@ const rows: Row[] = [
   },
 
   // --- G12: water heaters (rule R-17 already prices the LINE) --------------
+  //
+  // Category is "hvac", not "sanitary". CATEGORY_ITEM_KEYS already files
+  // plumb.water_heater under AC & heating, and the picker groups by that map —
+  // so a row tagged "sanitary" would render under a heading its own category
+  // column contradicts.
   {
-    category: "sanitary",
+    category: "hvac",
     item_key: "plumb.water_heater",
     spec_class: "economy",
     name: "Electric storage water heater 50L, surface mounted",
@@ -152,7 +157,7 @@ const rows: Row[] = [
     is_rule_default: false,
   },
   {
-    category: "sanitary",
+    category: "hvac",
     item_key: "plumb.water_heater",
     spec_class: "standard",
     name: "Electric storage water heater 80L, concealed ceiling void",
@@ -170,7 +175,7 @@ const rows: Row[] = [
     is_rule_default: true,
   },
   {
-    category: "sanitary",
+    category: "hvac",
     item_key: "plumb.water_heater",
     spec_class: "premium",
     name: "Heat-pump water heater 100L, concealed, high efficiency",

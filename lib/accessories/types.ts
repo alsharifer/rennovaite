@@ -61,7 +61,7 @@ export const CATEGORY_ITEM_KEYS: Record<AccessoryCategory, string[]> = {
     "san.towel_rail",
     "san.actuator",
   ],
-  lighting: ["elec.downlight", "light.pendant"],
+  lighting: ["elec.downlight", "light.pendant", "light.led_strip"],
   electrical_points: ["elec.point"],
   hvac: [
     "hvac.ducted_replace",
@@ -82,6 +82,7 @@ export const ITEM_KEY_LABEL: Record<string, string> = {
   "san.actuator": "WC actuator plate",
   "elec.downlight": "LED downlights",
   "light.pendant": "Decorative pendants",
+  "light.led_strip": "Cove LED strip",
   "elec.point": "Sockets & switches",
   "hvac.ducted_replace": "Ducted AC replacement",
   "hvac.office_split": "Split AC unit",
