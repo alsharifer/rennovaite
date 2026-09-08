@@ -12,6 +12,7 @@ import {
   type ScenarioBoq,
   type Selections,
 } from "@/lib/whatif/engine";
+import { findComponentDuplicates } from "@/lib/boq/component-dedupe";
 import { itemKeyFromRuleId, type Grade, type GradeableItem } from "@/lib/whatif/grades";
 import type { FurnitureSection } from "@/lib/staging/furniture-boq";
 
@@ -347,8 +348,93 @@ export function BoqView({
     }));
   }, [boq.sections]);
 
+  // A component priced by two mechanisms at once is money charged twice. The
+  // detector reports; it deliberately does NOT pick a winner, because which
+  // line survives depends on what each rate is meant to cover — a QS judgement,
+  // not a rendering one. Surfaced here so it is adjudicated in the open rather
+  // than discovered in a contractor's markup.
+  const duplicateFindings = useMemo(
+    () =>
+      findComponentDuplicates(
+        boq.sections.flatMap((sec) =>
+          sec.lines.map((l) => ({
+            work_section: sec.work_section,
+            description: l.description,
+            rule_id: l.rule_id ?? null,
+            item_key: null,
+            quantity: l.quantity,
+            total_aed: l.total_aed,
+          })),
+        ),
+      ),
+    [boq.sections],
+  );
+
   return (
     <>
+      {/* DUPLICATE-COMPONENT NOTICE -------------------------------------- */}
+      {duplicateFindings.length > 0 && (
+        <section className="-mx-12 border-y border-[#E8C9A0] bg-[#FEF6EC] px-margin py-md">
+          <div className="flex items-start gap-sm">
+            <span
+              className="material-symbols-outlined mt-0.5 shrink-0 text-[20px] text-[#A4793A]"
+              aria-hidden="true"
+            >
+              content_copy
+            </span>
+            <div className="min-w-0">
+              <p className="font-body text-body-sm font-semibold text-ink-900">
+                {duplicateFindings.length === 1
+                  ? "1 component is priced twice"
+                  : `${duplicateFindings.length} components are priced twice`}{" "}
+                — duplicate detected, pending QS scope ruling
+              </p>
+              <p className="mt-1 font-body text-body-sm text-ink-700">
+                Each of these is charged by two different mechanisms in the same
+                BoQ. Nothing has been removed automatically: which line survives
+                depends on what each rate is meant to cover, and that is a QS
+                decision.
+              </p>
+              <ul className="mt-sm space-y-1.5">
+                {duplicateFindings.map((f) => (
+                  <li
+                    key={`${f.component}-${f.duplicate_key}`}
+                    className="font-body text-body-sm text-ink-900"
+                  >
+                    <span className="font-semibold">{f.label}</span>
+                    {" — "}
+                    <span className="font-mono text-[12px]">{f.owner_key}</span>
+                    {" in "}
+                    {f.owner_line.work_section}
+                    {" also priced as "}
+                    <span className="font-mono text-[12px]">{f.duplicate_key}</span>
+                    {" in "}
+                    {f.duplicate_line.work_section}
+                    {f.duplicate_total_aed > 0 ? (
+                      <>
+                        {" · "}
+                        <span className="font-mono tabular-nums">
+                          AED {Math.round(f.duplicate_total_aed).toLocaleString()}
+                        </span>
+                        {" duplicated"}
+                      </>
+                    ) : (
+                      <>
+                        {" · "}
+                        <span className="text-on-surface-variant">
+                          AED 0 today (the duplicate line is unpriced — it costs
+                          nothing only until someone prices it)
+                        </span>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* TOP SUMMARY BAND ----------------------------------------------- */}
       <section className="-mx-12 grid grid-cols-12 items-center gap-gutter border-y border-ink-100 bg-paper px-margin py-md">
         {/* Left: total + headroom */}

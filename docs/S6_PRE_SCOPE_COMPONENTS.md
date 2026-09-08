@@ -52,26 +52,85 @@ these lines would have been invisible as pending review.
 - **Shower glass** — per bathroom/ensuite (powder rooms excluded).
   **Mirrors** — `max(wet rooms, vanity units)`.
 
-## Two things to raise on Friday
+## 1. Sockets, switches and water heaters are priced twice today
 
-**1. Sockets, switches and water heaters are priced twice today.** Not by this
-work — it is pre-existing. The engine prices them (R-15, R-17) and the P2
-overlay section prices them again with no dedupe:
+Not by this work — it is pre-existing. The engine prices them (R-15, R-17) and
+the P2 overlay section prices them again with no dedupe:
 
 | Component | Rule line | Overlay line | Exposure |
 |---|---|---|---|
 | Sockets/switches | R-15, 58 no, AED 12,760 | `socket_13a` + `switch_1g` + `switch_2way`, 41 no | **AED 4,750** |
 | Water heaters | R-17, 3 no, AED 15,000 | `water_heater`, 2 no @ 0 | AED 0 **today** |
 
-The water-heater duplicate is free only because the overlay rate is 0 /
-`needs_qs`. Price it and the villa buys six heaters for three bathrooms.
-`lib/boq/component-dedupe.ts` now detects both; **neither is fixed** — which
-line to keep is a QS decision, not a developer one.
+The water-heater duplicate is free only because the overlay rate is
+`0 / needs_qs`. Price it and the villa buys six heaters for three bathrooms.
 
-**2. The Delta Log's platform column is stale.** It shows AED 460,470 against a
-453,228 actual, a +1.6% delta. Regenerating today gives **AED 636,440 — +40.4%**.
-The +1.6% figure predates the current engine and should not be quoted on Friday.
-**No rule was tuned toward the actual**, and none should be until the QS column
-says which side is wrong. The largest single contributor is demolition, where
-the platform prices AED 50,031 against a 22,500 actual — the same line G7 flags
-as having run expensive.
+Both pairs now surface **in the BoQ itself** as "duplicate detected, pending QS
+scope ruling", with the duplicated amount named. Nothing is removed
+automatically: which line survives depends on what each rate is meant to cover,
+and that is a QS decision, not a developer one.
+
+## 2. The delta — correcting my own earlier number
+
+**I reported "+1.6% → +40.4%" as if the platform had moved. It had not.** Those
+are two different comparisons, and the movement that phrasing implied does not
+exist.
+
+Column C of the Delta Log was never the platform's subtotal. Running the engine
+at `2c79556` — the commit whose message is literally "reconcile delta table",
+i.e. the moment column C was filled — gives a platform subtotal of
+**AED 554,842** against column C's **460,470**. It was already 94,372 short on
+the day it was written, because it was filled row-by-row against the
+contractor's 14 SOW sections, and every platform line with no contractor
+counterpart was simply never entered: DM/DEWA permits, skips, floor protection,
+scaffold, handover clean, the sanitary INSTALL lines, the AC equipment, and
+later the two P2 overlay sections.
+
+So:
+
+- **+1.6%** compares a partial mapping (460,470) with the contractor's actual.
+- **+40.4%** compares the platform's FULL BoQ (636,440) with the same actual.
+
+Neither is "the true number" until the scope basis is agreed. That is the first
+thing Friday should settle.
+
+### Genuine platform movement, and where every dirham of it goes
+
+Engine at `2c79556` → the stored BoQ of 2026-09-05, before any S6-pre work:
+**554,842 → 637,815, a movement of +82,973.** Every row attributes:
+
+| Section | Then | 05-Sep | Δ | Attribution |
+|---|---:|---:|---:|---|
+| Plaster | 2,752 | 30,129 | **+27,377** | P4 element mapping replaced the engine's 15 % make-good with the full wall area — a definitional change, not a rate change |
+| Sanitaryware | 38,000 | 60,510 | **+22,510** | `ba6b01c` powder room reclassified as a full wet room, 2→3 (38,000 ÷ 2 × 3 = 57,000) + `5cd2275` accessory set R-40…R-43 (3,510). Exact. |
+| Demolition | 30,820 | 50,031 | **+19,211** | Element mapping took the quantity from the P4 wall area (555.9 m²), which itself moved with `fedbc88` true polygon perimeter and the A5 opening deductions |
+| Plumbing | 38,400 | 57,600 | **+19,200** | `ba6b01c`, 2→3 wet rooms (38,400 ÷ 2 × 3 = 57,600). Exact. |
+| Electrical Installations | — | 8,380 | **+8,380** | P2 overlay section, seeded from `plan_fixtures` after column C was filled |
+| Plumbing & Sanitary | — | 6,440 | **+6,440** | P2 overlay section, same cause |
+| Wall Finishes | 18,595 | 24,235 | **+5,640** | `ba6b01c` — a third wet room adds perimeter × height of tiling |
+| Ceilings | 18,232 | 21,593 | **+3,361** | Element mapping: ceiling area from the P4 take-off (166.1 m²) |
+| Decoration & Painting | 19,310 | 19,173 | −137 | Element mapping + A5 opening deductions |
+| Floor Finishes | 73,479 | 44,470 | **−29,009** | Element mapping replaced separate material + labour lines with one 190/m² supply-and-install over 152.8 m²; partly offset by `5cd2275` stair tile (+15,438) |
+| Blockwork · Electrical · MEP/HVAC · Lighting · Preliminaries · Joinery · Aluminum | | | **0** | unchanged |
+| **Total** | **554,842** | **637,815** | **+82,973** | |
+
+**Nothing is unattributed.** No existing rate was altered in the period — the
+only rules added were R-40…R-44 (sanitary accessories, stair tile) and R-45…R-48
+(S6-pre). The movement is entirely (a) the P4 element-mapping path taking over
+quantity derivation, and (b) the powder room becoming a wet room.
+
+### On demolition specifically
+
+**Demolition has not moved at all relative to column C.** Column C shows 50,031;
+today shows 50,031 — identical. My earlier note calling it "the largest
+contributor" referred to the platform-vs-ACTUAL gap (50,031 against a 22,500
+actual), not to any movement, and that phrasing invited exactly the wrong
+reading.
+
+It also shows column C is of **mixed vintage**: several of its rows match
+today's lines exactly (demolition 50,031, civil works 15,000, flooring 29,032)
+while its total corresponds to no single platform state. It cannot be read as a
+point-in-time platform total, which is why it should be rebuilt on an agreed
+scope basis rather than patched.
+
+S6-pre itself adds **+13,445** on top, all four lines flagged.
