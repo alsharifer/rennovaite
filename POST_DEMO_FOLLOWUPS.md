@@ -315,3 +315,124 @@ for `e44956f2` returned **409 `plan_has_overlaps`** naming all 7 rooms, and row
 counts across `boqs`, `takeoff_items`, `feedback_events`, `boq_outcomes`,
 `approved_designs`, `whatif_scenarios`, `plans`, `rooms` and `renders` were
 byte-identical before and after.
+
+## 7. Party walls are measured on one face — an under-count waiting for shared edges
+
+Found while checking the 3D walkthrough's two-sided wall materials (F1), which
+raised the same topology question on the money path. **Reported, not fixed** —
+deliberately, because the fix has a right answer per work item and picking the
+wrong one silently moves a price.
+
+### The defect
+
+`lib/plan/geometry.ts` documents `Wall.room_ids` as *"1 id = exterior/boundary
+wall; 2 ids = party wall between two rooms"* — so a wall shared between two
+rooms is **one** `Wall` object.
+
+`quantifyPlan` (`lib/boq/quantify.ts`) emits **one** `wall_plaster` and **one**
+`wall_paint` per wall element, at `length × height` — that is **one face**:
+
+```ts
+const gross = length * h;
+items.push({ work_item_key: "wall_plaster", ..., qty: net });
+items.push({ work_item_key: "wall_paint",  ..., qty: net });
+```
+
+A party wall has **two** faces, one in each room, and both need plaster and
+paint. So every party wall is measured at half.
+
+Note the direction: this is an **under-count, not a double-count**. The instinct
+on hearing "shared wall" is to worry about counting it twice; the code has the
+opposite bug.
+
+### Why nothing is wrong today
+
+Every wall in the pilot villa has exactly one `room_id` — rooms are independent
+polygons that do not share edges, so each room is enclosed by its own walls and
+every face is counted exactly once. Verified 2026-09-08:
+
+```
+graph walls            52
+walls with 2 room_ids   0
+```
+
+The bug is therefore **latent**: it activates the first time `buildPlanGraph`
+derives a wall from a genuinely shared polygon edge — which is exactly what the
+geometry contract says it should do, and what better parses or a shared-edge
+editor will produce.
+
+### What it is worth
+
+Measured on the pilot villa by finding wall pairs that are parallel, within one
+wall thickness (0.35 m), and overlapping along their length — the pairs that
+would collapse into one party wall under shared-edge derivation:
+
+| | |
+| --- | --- |
+| Total wall length | 191.7 m |
+| Plaster + paint area today | 555.9 m² |
+| Coincident wall pairs | 20 |
+| Overlapping length | 58.8 m |
+| **Face area that would disappear** | **170.6 m²** |
+| At plaster 55 + paint 35 AED/m² | **AED 15,358** |
+| Share of plaster + paint | **30.7 %** |
+
+On one four-bedroom first-floor refit. It scales with how interior-heavy the
+plan is.
+
+### The part that makes it hard to notice
+
+There are two pricing paths and they disagree.
+
+- The deterministic engine's own rule **F-01** computes net wall area as
+  *room perimeter × height* (`lib/boq/rules.ts`). That is **face-correct** by
+  construction: two adjacent rooms each contribute their own perimeter, so a
+  shared physical wall is counted once per face, which is right.
+- `applyElementMapping` (`lib/boq/element-map.ts`) then **replaces** every
+  `MAPPED_SECTIONS` entry — Plaster and Decoration & Painting among them — with
+  the per-element take-off.
+
+The take-off wins. So a shared-edge plan would price *below what the engine's
+own rules say*, with nothing in the output flagging the disagreement. The pilot
+villa has 52 `wall_plaster` and 52 `wall_paint` rows live in `takeoff_items`,
+so this path is not hypothetical — it is the one producing the numbers.
+
+### What a fix must not break
+
+**Demolition is already correct and must not be doubled.** It is emitted per
+wall element, gross, and you strip one physical wall once — not twice. Any
+change that multiplies wall items by face count has to exclude `demolition`.
+
+`wet_tiling` is also already correct and independent of this: it is measured per
+**room** as perimeter × height, so a bathroom/bedroom party wall correctly gets
+tile on the bathroom face only.
+
+**No priced item uses wall thickness or volume anywhere.** The take-off is
+purely area-based; `thickness_mm` is consumed only by the 3D scene and the
+drawing sheets, and the demolition debris allowance (C-06) is a floor-area
+proxy. So there is no volume double-count to worry about — the exposure is
+entirely the missing second face.
+
+### Two smaller things found alongside
+
+- **Party-wall height uses `max` of its rooms' ceilings.** For a party wall
+  between rooms of different ceiling heights, the lower room's face is measured
+  at the taller room's height.
+- **`room_id` is `w.room_ids[0]`.** A party wall's plaster and paint are
+  attributed entirely to its first room, so per-room cost reporting and any
+  what-if that filters by room would put the whole wall in one of the two.
+
+Both are harmless while every wall has a single room, and both need deciding as
+part of the same fix.
+
+### Suggested shape
+
+Emit one item **per face** for the finish items (`wall_plaster`, `wall_paint`),
+keyed by `(wall_id, room_id)` so each face carries its own room attribution and
+its own ceiling height — and leave `demolition` per element. That also makes the
+take-off agree with F-01 rather than silently overriding it. Openings would then
+deduct per face, which matches physical reality: a door removes finish from both
+sides.
+
+A regression test should assert that a two-room wall produces two plaster items
+and **one** demolition item, so the distinction cannot quietly collapse again.
