@@ -251,3 +251,54 @@ describe("component dedupe", () => {
     expect(found.map((f) => f.component)).toContain("stair_tile");
   });
 });
+
+describe("dedupe against a STORED BoQ (rule_id only, no item_key)", () => {
+  // A persisted BoQ line carries no item_key — only "Q-18/R-15". Matching on
+  // item_key alone found the owner in a freshly built take-off and never in a
+  // stored one, so the notice silently never rendered. These pin the shape the
+  // BoQ actually stores.
+  const storedLine = (rule_id: string, work_section: string, total_aed = 0): DedupeLine => ({
+    work_section,
+    description: rule_id,
+    rule_id,
+    total_aed,
+  });
+
+  it("finds the socket duplicate from stored rule ids", () => {
+    const found = findComponentDuplicates([
+      storedLine("Q-18/R-15", "Electrical", 12760),
+      storedLine("P2/overlay/socket_13a", "Electrical Installations", 2640),
+    ]);
+    expect(found.map((f) => f.component)).toContain("socket");
+  });
+
+  it("finds the water-heater duplicate from stored rule ids", () => {
+    const found = findComponentDuplicates([
+      storedLine("Q-20/R-17", "Plumbing", 15000),
+      storedLine("P2/overlay/water_heater", "Plumbing & Sanitary", 0),
+    ]);
+    expect(found.map((f) => f.component)).toContain("water_heater");
+  });
+
+  it("reports both pairs together, as the live Mudon BoQ contains them", () => {
+    const found = findComponentDuplicates([
+      storedLine("Q-17/R-14", "Electrical", 12000),
+      storedLine("Q-18/R-15", "Electrical", 12760),
+      storedLine("Q-20/R-17", "Plumbing", 15000),
+      storedLine("P2/overlay/socket_13a", "Electrical Installations", 2640),
+      storedLine("P2/overlay/switch_1g", "Electrical Installations", 810),
+      storedLine("P2/overlay/switch_2way", "Electrical Installations", 1300),
+      storedLine("P2/overlay/light_point", "Electrical Installations", 1870),
+      storedLine("P2/overlay/water_heater", "Plumbing & Sanitary", 0),
+    ]);
+    const components = new Set(found.map((f) => f.component));
+    expect(components).toContain("socket");
+    expect(components).toContain("water_heater");
+    expect(components).toContain("spotlight");
+    // Sockets duplicate across three overlay keys; the money is the sum.
+    const socketExposure = found
+      .filter((f) => f.component === "socket")
+      .reduce((s, f) => s + f.duplicate_total_aed, 0);
+    expect(socketExposure).toBe(2640 + 810 + 1300);
+  });
+});
