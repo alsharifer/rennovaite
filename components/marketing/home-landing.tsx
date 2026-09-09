@@ -8,7 +8,11 @@ import { TopNav } from "@/components/marketing/TopNav";
 // rendered both at `/rennovaite` (its permanent home) and at `/` when the
 // PROPERTY_OS_LANDING flag is off (unchanged from before the flag).
 
-const TRUSTED = [
+// Catalogue sources, NOT commercial partners. These names appear because
+// their published prices feed the BoQ — nothing more. The strip is labelled to
+// say exactly that; a bare logo wall would imply a relationship none of them
+// has agreed to.
+const CATALOGUE_SOURCES = [
   "BRKZ",
   "DANUBE HOME",
   "IKEA UAE",
@@ -38,9 +42,9 @@ const STEPS = [
 ];
 
 const STATS = [
-  { label: "BoQ Precision", value: "AED 587,400" },
-  { label: "Design Delivery", value: "6 hours" },
-  { label: "Execution Team", value: "3 vetted" },
+  { label: "BoQ format", value: "POMI sections" },
+  { label: "Currency", value: "AED, local rates" },
+  { label: "Calibrated against", value: "1 completed villa" },
 ];
 
 export function HomeLanding() {
@@ -56,12 +60,13 @@ export function HomeLanding() {
               Renovation, reimagined
             </span>
             <h1 className="font-display text-display-hero text-ink-900">
-              From your floorplan to a built villa, in five days.
+              From your floorplan to a tender-ready renovation package in five
+              days.
             </h1>
             <p className="mt-xs max-w-[540px] font-body text-body-lg text-on-surface-variant">
-              RennovAIte turns your villa&apos;s drawings into photoreal
-              designs, a real bill of quantities in AED, and three vetted
-              contractors ready to bid. Built for Dubai owners.
+              Tender-ready means: design renders, an itemised bill of quantities
+              in AED, drawings and a permit check &mdash; ready for contractors
+              to bid. Built for Dubai owners.
             </p>
             <div className="mt-xl flex flex-wrap items-center gap-md">
               <Link
@@ -73,7 +78,7 @@ export function HomeLanding() {
               <WatchDemoButton />
             </div>
             <p className="label-caps mt-md text-ink-500">
-              No card required. Average first-render in under 6 minutes.
+              No card required. You pay only when you lock a BoQ.
             </p>
           </div>
 
@@ -90,12 +95,15 @@ export function HomeLanding() {
         </section>
 
         {/* TRUSTED STRIP ---------------------------------------------- */}
-        <div className="flex h-24 items-center justify-center border-y border-ink-100 px-margin">
-          <div className="flex items-center gap-xl font-body text-body-sm text-on-surface-variant">
-            {TRUSTED.map((name, i) => (
+        <div className="flex flex-col items-center justify-center gap-xs border-y border-ink-100 px-margin py-lg">
+          <span className="label-caps text-ink-500">
+            Priced from supplier catalogues and real project quotations
+          </span>
+          <div className="flex flex-wrap items-center justify-center gap-xl font-body text-body-sm text-on-surface-variant">
+            {CATALOGUE_SOURCES.map((name, i) => (
               <span key={name} className="flex items-center gap-xl">
                 <span className="tracking-widest">{name}</span>
-                {i < TRUSTED.length - 1 && (
+                {i < CATALOGUE_SOURCES.length - 1 && (
                   <span
                     className="size-1 rounded-full bg-bone"
                     aria-hidden="true"
@@ -107,13 +115,13 @@ export function HomeLanding() {
         </div>
 
         {/* HOW IT WORKS ----------------------------------------------- */}
-        <section className="px-margin py-3xl">
+        <section id="how-it-works" className="px-margin py-3xl">
           <div className="mb-xl">
             <span className="label-caps text-brass-600 tracking-[0.2em]">
               The flow
             </span>
             <h2 className="mt-xs font-display text-headline-lg italic text-ink-900">
-              Five steps. One villa. Zero spreadsheets.
+              One villa. Zero spreadsheets.
             </h2>
           </div>
           <div className="grid grid-cols-12 gap-gutter">
@@ -179,33 +187,32 @@ export function HomeLanding() {
                   </div>
                 ))}
               </div>
-              <p className="font-body text-body-md italic text-ink-700">
-                &ldquo;The accuracy of the bill of quantities allowed us to
-                start construction two weeks earlier than our previous manual
-                processes.&rdquo;
+              <p className="font-body text-body-md text-ink-700">
+                Every rate traces to a supplier catalogue, a real project
+                quotation, or a flagged allowance awaiting QS review &mdash;
+                and the BoQ shows you which.
               </p>
             </div>
           </div>
         </section>
 
         {/* PRICING ---------------------------------------------------- */}
-        <section className="px-margin py-3xl text-center">
+        <section id="pricing" className="px-margin py-3xl text-center">
           <div className="mx-auto max-w-[720px]">
             <span className="label-caps text-brass-600 tracking-[0.2em]">
               Pricing
             </span>
             <h2 className="mb-xl mt-xs font-display text-headline-lg text-ink-900">
-              One platform fee. No design retainer.
+              One project fee. No subscription, no design retainer.
             </h2>
             <div className="w-full rounded-xl border border-ink-100 bg-paper p-xl shadow-level-1">
-              <span className="label-caps text-ink-500">
-                Standard Project Fee
-              </span>
+              <span className="label-caps text-ink-500">Project fee</span>
               <div className="my-md font-display text-[56px] leading-none text-ink-900">
-                AED 2,500
+                AED 1,000
               </div>
               <p className="mb-xl font-body text-body-md text-ink-700">
-                paid once your BoQ is locked and contractors are invited.
+                at BoQ lock, credited in full when you execute through the
+                platform.
               </p>
               <div className="flex flex-col gap-md">
                 <Link
@@ -214,12 +221,12 @@ export function HomeLanding() {
                 >
                   Start a project
                 </Link>
-                <Link
-                  href="#"
+                <a
+                  href="mailto:hello@rennovaite.fit"
                   className="focus-ring flex h-[56px] items-center justify-center rounded-lg border border-ink-100 bg-paper px-xl font-body-sm text-body-sm text-ink-900 transition-all hover:bg-canvas"
                 >
                   Talk to a designer first
-                </Link>
+                </a>
               </div>
             </div>
           </div>

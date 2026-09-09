@@ -457,7 +457,8 @@ export function VillaIntake() {
               Existing drawings (MEP · electrical · HVAC)
             </p>
             <p className="mt-xs font-body-sm text-body-sm text-on-surface-variant">
-              Optional — stored for later. We don&apos;t process these yet.
+              Optional. Stored with your project today; revised MEP,
+              electrical and HVAC drawings are a roadmap deliverable.
             </p>
           </div>
           {/* Discipline the next dropped files are filed under. */}

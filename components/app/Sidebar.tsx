@@ -75,7 +75,7 @@ export function Sidebar() {
           RennovAIte
         </Link>
         <p className="mt-xs font-body-sm text-body-sm text-on-surface-variant">
-          Pro Plan
+          Project fee &middot; AED 1,000
         </p>
       </div>
 
