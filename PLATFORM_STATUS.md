@@ -190,10 +190,11 @@ money path — `screenshots/ops-hardening/README.md`.
 
 ## Open, not blocked
 
-- **PR #42** (BoQ section export + `rule_id` invariant) is still unmerged.
-- **Migration 029** is unapplied in production. `npx supabase link
-  --project-ref efrcgktrlsjnzkzzuhof && npx supabase db push` applies it.
-  Additive; safe any time.
+- ~~**PR #42**~~ — merged. No open PRs remain.
+- ~~**Migration 029** unapplied~~ — **applied 2026-09-09** via `supabase db
+  push`, the first migration in this project applied by the runner rather than
+  by hand. Re-verified: a shadow database built from all 30 migrations now
+  differs from production in **nothing** (29 tables, 257 columns, zero drift).
 - **`/privacy` and `/terms`** are honest stubs and need real legal drafting.
 - **Screenshot directories** hold text records, not PNGs — the preview pane
   returns images to the conversation, and adding a headless browser for this was
