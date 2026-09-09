@@ -1,4 +1,11 @@
 -- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
+-- =============================================================================
 -- 007: Vendor selections — user's per-line SKU pick from /project/[id]/vendors
 -- =============================================================================
 -- Persists the customer's chosen pricing_skus row for a given BoQ line. The

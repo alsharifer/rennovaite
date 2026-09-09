@@ -77,9 +77,9 @@ This is the big one. Split it into **three Claude Code prompts** (1A schema+uplo
 1B render path, 1C eval harness) so each change is reviewable.
 
 ### Your steps
-1. Run prompt 1A. When it finishes, apply the migration it produced against Supabase
-   (it will tell you the command — typically paste the SQL into the Supabase dashboard
-   SQL editor, same as migrations 001–009).
+1. Run prompt 1A. When it finishes, apply the migration it produced with
+   `npx supabase db push` (see `docs/MIGRATIONS.md`). Do not paste SQL into the
+   dashboard — that path is obsolete.
 2. In the app, upload the three `/assets` before photos to the matching demo rooms.
 3. Run prompt 1B. Then render the living room in Contemporary Majlis and sanity-check:
    is it recognisably YOUR room?

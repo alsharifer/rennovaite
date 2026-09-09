@@ -1,4 +1,11 @@
 -- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
+-- =============================================================================
 -- 011: Upscaled export URL for approved designs (Phase 3)
 -- =============================================================================
 -- On design approval we run the locked render through a 2× upscaler

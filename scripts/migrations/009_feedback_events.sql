@@ -1,4 +1,11 @@
 -- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
+-- =============================================================================
 -- 009: feedback_events — the KG feedback-loop substrate
 -- =============================================================================
 -- Records every user signal (accept / reject / iterate / swap / edit) against

@@ -21,10 +21,9 @@ Branch `pilot-seven`. All seven features are **flag-gated and default off**.
 | P6 | Dubai permit-trigger checklist over the plan diff | `PERMIT_CHECK_ENABLED` | **020 permit_checks — NOT YET APPLIED** |
 | P7 | Style-consistent furniture staging + optional priced furniture section | `STAGING_ENABLED` | **021 staging — NOT YET APPLIED** |
 
-**Open manual DB steps:** apply `scripts/migrations/020_permit_checks.sql` and
-`021_staging.sql` in the Supabase SQL editor (no migration runner; service-role
-JWT cannot run DDL). Both features degrade gracefully until then. Optional:
-`node scripts/seed-furniture-prices.ts` after 021.
+**Open DB steps:** `npx supabase db push` (see `docs/MIGRATIONS.md`) — both
+features degrade gracefully until it runs. Optional:
+`node scripts/seed-furniture-prices.ts` afterwards.
 
 ---
 
@@ -154,7 +153,7 @@ not run to avoid spend — screenshot `09` covers it when captured.
 
 ## 7. Open items going into the QS + consultant sessions
 
-1. Apply migrations **020** + **021** (Supabase SQL editor).
+1. Apply outstanding migrations with `npx supabase db push`.
 2. QS: confirm the 2 `needs_qs` overlay point rates + the 3 pending `rate_book`
    grade rates (§4).
 3. Consultant: confirm the 6 weak permit rules + the authority routing table (§5).

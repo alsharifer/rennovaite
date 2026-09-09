@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- 016_renders_kind.sql — Pilot Seven / P3 3D viewer.
 --
 -- Adds a `kind` discriminator to renders so the 3D viewer can distinguish a

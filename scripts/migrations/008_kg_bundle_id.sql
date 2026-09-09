@@ -1,4 +1,11 @@
 -- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
+-- =============================================================================
 -- 008: KG bundle id — links a render / BoQ to the Knowledge Graph retrieval
 -- =============================================================================
 -- When KG grounding is active (KG_ENABLED=true and Neo4j reachable), the render

@@ -246,8 +246,8 @@ intake is **reusable at the render step** instead of being re-uploaded per room
 - **Hub** (`/project/[id]`): a **"Project files"** panel
   (`components/assets/ProjectFilesPanel`) lists all assets grouped by kind with
   download links; it renders nothing when the library is empty.
-- **Manual DB step**: apply `scripts/migrations/024_project_assets.sql` in the
-  Supabase SQL editor (no runner). Everything degrades gracefully until then —
+- **DB step**: `supabase db push` (see `docs/MIGRATIONS.md`). Everything
+  degrades gracefully until the migration runs —
   intake still works, the render picker shows the upload path, and the hub panel
   is hidden.
 
@@ -299,8 +299,7 @@ unchanged.
   uploads to a **private** Storage bucket named **`drawings`** and stores
   long-lived **signed** URLs in `sheet_urls` (the bucket is private, so public
   URLs would not resolve).
-- **Manual DB steps** (no migration runner — DDL can't be run with the
-  service-role JWT; apply in the Supabase SQL editor, same as 001–012): apply
+- **DB steps** (`supabase db push` — see `docs/MIGRATIONS.md`) : apply
   `scripts/migrations/013…` and `014…`, and create a **private** Storage bucket
   named `drawings`. Live generation + PDF download work without them.
 
@@ -335,10 +334,9 @@ two new BoQ sections deterministically. Gated by `OVERLAYS_ENABLED`.
 - **Drawings**: `lib/drawings/electrical-sheet.ts` + `plumbing-sheet.ts` add
   services sheets (symbols + legend + count table) to the drawing set when
   fixtures exist (needs `DRAWINGS_ENABLED` too).
-- **Manual DB step**: apply `scripts/migrations/015_plan_fixtures.sql` in the
-  Supabase SQL editor (no runner; service-role JWT can't run DDL). The unit
-  tests + flag-off behaviour work without it; seeding/editing/BoQ-feed activate
-  once it's applied.
+- **DB step**: `supabase db push` (see `docs/MIGRATIONS.md`). The unit tests +
+  flag-off behaviour work without it; seeding/editing/BoQ-feed activate once it
+  has run.
 
 ## 3D viewer — walkthrough from the plan graph (P3)
 
@@ -372,8 +370,8 @@ Gated by `VIEWER_3D_ENABLED`.
   pipeline` marks where it would branch.
 - **Entry**: "Walk your villa in 3D" (`view_in_ar`) on the plan page + project
   hub, shown only when the flag is on and a confirmed plan exists.
-- **Manual DB step**: apply `scripts/migrations/016_renders_kind.sql` (Supabase
-  SQL editor). The viewer works without it (defaults `kind` to `'still'`).
+- **DB step**: `supabase db push` (see `docs/MIGRATIONS.md`). The viewer works
+  without it (defaults `kind` to `'still'`).
 
 ## Furniture staging — style-consistent renders + optional priced section (P7)
 
@@ -409,7 +407,7 @@ Two compounding pieces off one staging vocabulary, gated by `STAGING_ENABLED`.
   construction. Rendered visually apart with an `OPTIONAL — NOT IN CONTRACTOR
   SCOPE` eyebrow; toggling it off (what-if panel or the section header) subtracts
   its total exactly, restoring the prior figure.
-- **Manual DB step**: apply `scripts/migrations/021_staging.sql` (Supabase SQL
+- **DB step** (`supabase db push` — see `docs/MIGRATIONS.md`): apply `scripts/migrations/021_staging.sql` (Supabase SQL
   editor) — adds `renders.staging_set`, `furniture_opt_ins`, and the optional
   `furniture_prices` table. Unit tests + flag-off/degraded behaviour work without
   it; opt-in persistence + the live BoQ section + `staging_set` tracing activate
@@ -455,7 +453,7 @@ view-only side surface reached from the layout and render steps).
   is LLM-writable. Like every prompt block it only appends, so flag-off and
   flag-on are two cache entries. `renders.reference_refs` records the lineage —
   `null` = seeding did not run, `[]` = ran against an empty board.
-- **Manual DB step**: apply `scripts/migrations/027_ideation.sql`. Everything
+- **DB step** (`supabase db push` — see `docs/MIGRATIONS.md`): apply `scripts/migrations/027_ideation.sql`. Everything
   degrades gracefully until then (the questionnaire runs locally and says so).
 
 ## Env vars

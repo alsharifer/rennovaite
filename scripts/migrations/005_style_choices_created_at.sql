@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- The original style_choices table didn't track creation time. Adding it
 -- so the project dashboard can show "Completed 12 Mar 2026" for the Style
 -- phase symmetrically with Plan / Render / BoQ, and so we can pick the

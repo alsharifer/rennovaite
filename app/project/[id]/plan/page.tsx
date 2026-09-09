@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -79,11 +80,8 @@ export default async function PlanPage({
     );
   }
   if (!project) {
-    return (
-      <CenteredMessage tone="muted">
-        Project {projectId} not found.
-      </CenteredMessage>
-    );
+    // Shared boundary. The old copy printed the raw project UUID at the user.
+    notFound();
   }
 
   const { data: plan, error: planErr } = await supabase

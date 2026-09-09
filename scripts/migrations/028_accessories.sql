@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- 028_accessories.sql — accessory / spec selection (backlog D1, D1b).
 --
 -- Until now the accessory categories (lighting, sanitary, sockets & switches,

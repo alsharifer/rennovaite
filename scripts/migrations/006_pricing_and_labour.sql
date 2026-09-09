@@ -1,4 +1,11 @@
 -- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
+-- =============================================================================
 -- 006: Pricing SKUs + Labour rates
 -- =============================================================================
 -- Two reference tables that feed the BoQ engine. They're seeded from QS-vetted

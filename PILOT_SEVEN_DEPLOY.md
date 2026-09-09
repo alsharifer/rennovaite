@@ -15,9 +15,12 @@ environment.**
 - [ ] `npm run build` exit 0
 - [ ] `node scripts/verify-graph-integrity.ts` → all 4 checks pass (needs prod-or-pilot DB env)
 
-## 1. Database migrations (manual — no runner; Supabase SQL editor)
-Apply **in order**, idempotent (`if not exists`). The pilot DB is already done;
-this is for any **other** environment (staging/prod project).
+## 1. Database migrations (`supabase db push`)
+
+> **Obsolete as written.** Migrations are no longer applied by hand — see
+> `docs/MIGRATIONS.md`. For any environment: `npx supabase link --project-ref
+> <ref>` then `npx supabase db push`, which applies everything not yet run, in
+> order, and records what it did.
 - [ ] 013 plan_snapshots · 014 drawing_sets (P1)
 - [ ] 015 plan_fixtures (P2)
 - [ ] 016 renders_kind (P3)

@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- 019_whatif_scenarios.sql — Pilot Seven / P5 what-if scenarios.
 --
 -- A saved grade selection over a project's QS baseline BoQ, so a scenario

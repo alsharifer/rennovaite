@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app/AppShell";
@@ -141,15 +142,8 @@ export default async function ProjectHubPage({
 
   const project = projectRes.data;
   if (!project) {
-    return (
-      <AppShell pageName="Project Hub">
-        <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-          <p className="text-on-surface-variant">
-            Project {projectId} not found.
-          </p>
-        </main>
-      </AppShell>
-    );
+    // Shared boundary. The old copy printed the raw project UUID at the user.
+    notFound();
   }
 
   const plan = planRes.data;

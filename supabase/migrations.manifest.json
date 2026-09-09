@@ -1,0 +1,187 @@
+{
+  "note": "Checksums of every migration at conversion time (I7). scripts/check-migrations.mjs fails if any of these files changes, because a migration that has run somewhere can never be edited — it can only be superseded by a new one.",
+  "generated": "2026-09-09",
+  "source": "scripts/migrations (historical record, frozen)",
+  "migrations": [
+    {
+      "legacy": "001_initial.sql",
+      "version": "20260101000100",
+      "name": "initial",
+      "sha256": "a83cd0b10fb784b75633e2689422764980bddc355c47e3c300e1b7789dc2a232"
+    },
+    {
+      "legacy": "002_plan_notes.sql",
+      "version": "20260101000200",
+      "name": "plan_notes",
+      "sha256": "64d0d2b58e44685dcfa0beea6e0c83a2b28949e71fea58c1ca51eeea6e5708a8"
+    },
+    {
+      "legacy": "003_renders.sql",
+      "version": "20260101000300",
+      "name": "renders",
+      "sha256": "8b58818fd3a2b2222030de883d35ebb62d5ffc401121f90999c60645f84b7437"
+    },
+    {
+      "legacy": "004_approved_designs.sql",
+      "version": "20260101000400",
+      "name": "approved_designs",
+      "sha256": "5e670d830d60da3587e43eaf78b90fcd496241e1322f732f8cf73e26010c845c"
+    },
+    {
+      "legacy": "005_style_choices_created_at.sql",
+      "version": "20260101000500",
+      "name": "style_choices_created_at",
+      "sha256": "741fae3b31b76f11af9e736c036c20bb3d35a59edb6be9143d45108e881516aa"
+    },
+    {
+      "legacy": "006_pricing_and_labour.sql",
+      "version": "20260101000600",
+      "name": "pricing_and_labour",
+      "sha256": "ae997fdf658275784212dcdb0aabca1d6f7c76f129a0741e167a2d0593cb3f55"
+    },
+    {
+      "legacy": "007_vendor_selections.sql",
+      "version": "20260101000700",
+      "name": "vendor_selections",
+      "sha256": "6b3373c7a4d3d5fcea82f3096f34c0e583a0487ce01a05dd3c259d586c8ec234"
+    },
+    {
+      "legacy": "008_kg_bundle_id.sql",
+      "version": "20260101000800",
+      "name": "kg_bundle_id",
+      "sha256": "92024cc73ee12e4f9ad953ed49fdbd51d110529975b1a9943ccd8a3e3ade42c4"
+    },
+    {
+      "legacy": "009_feedback_events.sql",
+      "version": "20260101000900",
+      "name": "feedback_events",
+      "sha256": "ca0521d9a10b3f59a8f48e66f719b5b1eaacd73e9ad1227d218d1a214a84fc1a"
+    },
+    {
+      "legacy": "010_room_photos.sql",
+      "version": "20260101001000",
+      "name": "room_photos",
+      "sha256": "cf32bd9105914777d9842d3bd60b8ec66fc571217cc5c140eb736c4dd973218a"
+    },
+    {
+      "legacy": "011_approved_designs_upscaled.sql",
+      "version": "20260101001100",
+      "name": "approved_designs_upscaled",
+      "sha256": "08d84bee6d67727863cf84399ae0bdcf87eb199d4cbe2f7a4c056a465f9014af"
+    },
+    {
+      "legacy": "012_renders_async_qa.sql",
+      "version": "20260101001200",
+      "name": "renders_async_qa",
+      "sha256": "97df7ae900eb6410c4518089cd202475d76d87b3f47960d8fa99b5401780ccf0"
+    },
+    {
+      "legacy": "013_plan_snapshots.sql",
+      "version": "20260101001300",
+      "name": "plan_snapshots",
+      "sha256": "6cff31621b30d1d3dbb8868def541680ce3f8ef430945c798bece56aaf6e9659"
+    },
+    {
+      "legacy": "014_drawing_sets.sql",
+      "version": "20260101001400",
+      "name": "drawing_sets",
+      "sha256": "ec0d2753bb7654aa1924b73af48da6501b1e65ff6f7a2c2e709089bacaf62169"
+    },
+    {
+      "legacy": "015_plan_fixtures.sql",
+      "version": "20260101001500",
+      "name": "plan_fixtures",
+      "sha256": "6121d64477bebeda3b56486a8a78ff8a17bb50c6ba02c8a3b2e40513c2bbf18b"
+    },
+    {
+      "legacy": "016_renders_kind.sql",
+      "version": "20260101001600",
+      "name": "renders_kind",
+      "sha256": "28af299f0be4ce6e0ba5c6a7365b7b79fdc68e9119a61e34f0dc6943338daa04"
+    },
+    {
+      "legacy": "017_takeoff_items.sql",
+      "version": "20260101001700",
+      "name": "takeoff_items",
+      "sha256": "b43faf1c3c7a871c8ec272d1de8463b7f745c9d89b8784eee17557889a28c4da"
+    },
+    {
+      "legacy": "018_rate_book.sql",
+      "version": "20260101001800",
+      "name": "rate_book",
+      "sha256": "19e39de69d5a072ea8956b809da3288b9b6dc235aea4f7c349f7f8dc92f733de"
+    },
+    {
+      "legacy": "019_whatif_scenarios.sql",
+      "version": "20260101001900",
+      "name": "whatif_scenarios",
+      "sha256": "fad649e4dfc21e176ae9fe4159fd69eaaf7073ceb792ced8246ea51316d42f46"
+    },
+    {
+      "legacy": "020_permit_checks.sql",
+      "version": "20260101002000",
+      "name": "permit_checks",
+      "sha256": "d94aa52fdc3c1cb2105feeae7889bbc2bdd31160c00e079ea16b96fd7f159a8e"
+    },
+    {
+      "legacy": "021_staging.sql",
+      "version": "20260101002100",
+      "name": "staging",
+      "sha256": "9b1c92ecd514b851735e46f795cfc58a14b70b41240e86a12a919609cef862b7"
+    },
+    {
+      "legacy": "022_rate_book_actuals.sql",
+      "version": "20260101002200",
+      "name": "rate_book_actuals",
+      "sha256": "2dc4f6cc607896280162c62368770c1a25649e7a8c8b19cf9fa3a36359515b0a"
+    },
+    {
+      "legacy": "023_boq_outcomes.sql",
+      "version": "20260101002300",
+      "name": "boq_outcomes",
+      "sha256": "7c7689d2839e3e2e6684dd237cb26834c3b3f08c590283c9e346fa811a2b9e24"
+    },
+    {
+      "legacy": "024_project_assets.sql",
+      "version": "20260101002400",
+      "name": "project_assets",
+      "sha256": "0d9031c5e6ff056538cd6794dc81b44ca4a4af47873d620d1b971922b7ad0908"
+    },
+    {
+      "legacy": "025_parse.sql",
+      "version": "20260101002500",
+      "name": "parse",
+      "sha256": "d3779ecf171c051e27c641032251ae5e3950a4e85f2be66c75c47cb623aac311"
+    },
+    {
+      "legacy": "026_plan_openings.sql",
+      "version": "20260101002600",
+      "name": "plan_openings",
+      "sha256": "b0bc38219b8211ffec14a3e8608f82d68d7cc4c0782c5bbbc582e910c3baf123"
+    },
+    {
+      "legacy": "027_ideation.sql",
+      "version": "20260101002700",
+      "name": "ideation",
+      "sha256": "f2b5f9e03e816eb3e234188b62772980c46681e2ed84a1aa79c9a11b72485449"
+    },
+    {
+      "legacy": "028_accessories.sql",
+      "version": "20260101002800",
+      "name": "accessories",
+      "sha256": "ac3dc70a9bbe1824e81cb4d699119b23d2e6b285c182c06aaf84396f11dfcd2a"
+    },
+    {
+      "legacy": "029_plan_overlaps.sql",
+      "version": "20260101002900",
+      "name": "plan_overlaps",
+      "sha256": "d5139b3bd9880e6e24d8da1dc853229fc5c03e183ebf8c156b5dfcd053124fe2"
+    },
+    {
+      "legacy": "030_project_archive.sql",
+      "version": "20260101003000",
+      "name": "project_archive",
+      "sha256": "b98e2af109076b9f66f812916419a68b8cf812e62fb4566246a2ebe9e37f5674"
+    }
+  ]
+}
