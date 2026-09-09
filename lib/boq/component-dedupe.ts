@@ -121,7 +121,9 @@ export const COMPONENT_OWNERS: ComponentOwner[] = [
     ],
     source_cell: "G19",
     note:
-      "Must not be folded into tile area (which would hide it in a QS-validated rate) and must not be assumed inside join.vanity, which the G20 coverage list shows covered the vanity CARCASS only.",
+      "Must not be folded into tile area (which would hide it in a QS-validated rate) and must not be assumed inside join.vanity, which the G20 coverage list shows covered the vanity CARCASS only. " +
+      "Both declared conflicts are currently ABSENT from a generated BoQ and the check runs clean: R-24 join.vanity is superseded by the actuals joinery section, and R-07 floor.porcelain_material by P4 element mapping. They are kept as REGRESSION GUARDS — remove either supersede and the duplicate returns. " +
+      "The vanity CARCASS that does ship (GT/joinery/vanity, \"Bathroom vanity box\") is deliberately NOT listed as a conflict: G20 says the Atrium package covered the box and G19 says the slab was excluded from the tiles quote, so carcass and slab are complementary. Listing it would be a false duplicate of the same kind as the spotlight/wiring pair.",
   },
   {
     component: "shower_glass",

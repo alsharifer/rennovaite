@@ -313,3 +313,27 @@ describe("dedupe against a STORED BoQ (rule_id only, no item_key)", () => {
     expect(socketExposure).toBe(2640 + 810 + 1300);
   });
 });
+
+describe("vanity slab vs vanity carcass — complementary, not duplicate", () => {
+  // G20: the Atrium joinery package covered the vanity BOX.
+  // G19: the RAK tiles quotation excluded the vanity SLAB.
+  // So both belong in the BoQ, and flagging them would be a false duplicate of
+  // the same kind as the spotlight fitting and its wiring allowance.
+  it("does not flag the shipped carcass line against the slab", () => {
+    const found = findComponentDuplicates([
+      { work_section: "Joinery", description: "Vanity counter slab", rule_id: "S6-05/R-46", total_aed: 4350 },
+      { work_section: "Joinery", description: "Bathroom vanity box, MR melamine", rule_id: "GT/joinery/vanity", total_aed: 5400 },
+    ]);
+    expect(found).toEqual([]);
+  });
+
+  it("still fires if the superseded engine vanity line ever comes back", () => {
+    // R-24 is absent today because the actuals section supersedes it. The
+    // conflict entry is a regression guard, so it must still work.
+    const found = findComponentDuplicates([
+      { work_section: "Joinery", description: "Vanity counter slab", rule_id: "S6-05/R-46", total_aed: 4350 },
+      { work_section: "Joinery & Carpentry", description: "Vanity unit", rule_id: "Q-28/R-24", total_aed: 9000 },
+    ]);
+    expect(found.map((f) => f.component)).toContain("vanity_slab");
+  });
+});

@@ -2,18 +2,18 @@ section,total_aed,rule_ids,matches_v2_row
 Demolition,50031,P4/quantify/demolition,Demolition
 Blockwork,15000,Q-05/R-35,"Blockwork AND Civil works - one section, not two"
 Plaster,30129,P4/quantify/wall_plaster,Wall plaster/skim coat
-Floor Finishes,44470,P4/quantify/floor_finish ; Q-11b/R-44,Floor Finishes; also holds stair tile Q-11b/R-44 (15438). Staircase R-36 is NOT here - see findings
+Floor Finishes,44470,P4/quantify/floor_finish ; Q-11b/R-44,"Floor Finishes; also holds stair tile Q-11b/R-44 (15438). Staircase R-36 is NOT here - it is dropped by element mapping, leave that cell empty"
 Wall Finishes,24235,P4/quantify/wet_tiling,Wall Finishes
 Ceilings,21593,P4/quantify/ceiling_finish,Ceilings
 Sanitaryware,60510,Q-22/R-19 ; Q-23/R-20 ; Q-24/R-21 ; Q-24a/R-40 ; Q-24b/R-41 ; Q-24c/R-42 ; Q-24d/R-43,Sanitaryware
 Electrical,24760,Q-17/R-14 ; Q-18/R-15,Electrical incl. R-15 (12760) AND the Lighting R-14 fittings row (12000)
 Plumbing,57600,Q-19/R-16 ; Q-20/R-17 ; Q-21/R-18,Plumbing
 MEP / HVAC,45200,Q-25/R-32 ; Q-27/R-22,MEP/HVAC
-Lighting,5245,S6-02/R-45 ; Q-31/R-26,LED strip R-45 (2745) + pendants R-26 (2500). NOT the R-14 fittings row
+Lighting,5245,S6-02/R-45 ; Q-31/R-26,LED strip S6-02/R-45 (2745) + pendants R-26 (2500). NOT the R-14 fittings row
 Decoration & Painting,19173,P4/quantify/wall_paint,Decoration & Painting
 Preliminaries,69329,Q-32/R-27 ; Q-33/R-28 ; Q-34/R-29 ; Q-35/R-37 ; Q-36/R-38 ; Q-37/R-39,"Preliminaries & site management; also holds the DM/DEWA row (Q-33/R-28, 15000)"
 Electrical Installations,8380,P2/overlay/socket_13a ; P2/overlay/switch_1g ; P2/overlay/switch_2way ; P2/overlay/light_point ; P2/overlay/ac_point ; P2/overlay/dp_isolator ; P2/overlay/data_point,Overlay Electrical Installations
 Plumbing & Sanitary,6440,P2/overlay/wc_point ; P2/overlay/basin_point ; P2/overlay/shower_mixer ; P2/overlay/water_heater ; P2/overlay/floor_drain,Overlay Plumbing & Sanitary
-Joinery,70366,(none) ; (none) ; (none) ; (none) ; (none) ; (none) ; (none) ; (none),Joinery + Vanity slabs R-46 (4350; the line carries no rule_id)
-Aluminum & Glass,98799,(none) ; (none) ; (none) ; (none) ; (none) ; (none) ; (none) ; (none) ; (none) ; (none),Aluminum & Glass + Shower glass R-47 (4400) + Mirrors R-48 (1950); neither line carries a rule_id
+Joinery,70366,GT/joinery/dresser ; GT/joinery/cladding ; GT/joinery/cabinet ; GT/joinery/bath_cabinet ; GT/joinery/vanity ; GT/joinery/door_leaf ; GT/joinery/door_frame ; S6-05/R-46,Joinery + Vanity slabs S6-05/R-46 (4350)
+Aluminum & Glass,98799,GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d ; GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d ; GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950 ; GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246 ; GT/aluminum/office_thermal_break_sliding_system_dg_1700_230 ; GT/aluminum/office_thermal_break_sliding_system_dg_1830_300 ; GT/aluminum/living_area_skylight_dg_1830_3750 ; GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron ; S6-06/R-47 ; S6-07/R-48,Aluminum & Glass + Shower glass S6-06/R-47 (4400) + Mirrors S6-07/R-48 (1950)
 TOTAL,651260,,expected 651260
