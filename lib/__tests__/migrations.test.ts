@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkMigrations } from "../../scripts/check-migrations.mjs";
+import { checkMigrations } from "@/lib/migrations/history";
 
 // Migration history is append-only. The Supabase CLI stops a version running
 // twice; nothing stops a file being EDITED after it ran, which leaves every
@@ -8,11 +8,7 @@ import { checkMigrations } from "../../scripts/check-migrations.mjs";
 // That drift is silent and permanent, so it is worth a test rather than a
 // convention.
 describe("migration history", () => {
-  const result = checkMigrations(process.cwd()) as {
-    checked: number;
-    errors: string[];
-    untracked: string[];
-  };
+  const result = checkMigrations(process.cwd());
 
   it("has migrations to check", () => {
     expect(result.checked).toBeGreaterThan(0);
