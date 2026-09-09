@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app/AppShell";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
@@ -146,13 +147,8 @@ export default async function BoqPage({
   ]);
 
   if (projectRes.error || !projectRes.data) {
-    return (
-      <AppShell pageName={PAGE_NAME}>
-        <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-          <p className="text-error">Project not found.</p>
-        </main>
-      </AppShell>
-    );
+    // Shared boundary: app/project/[id]/not-found.tsx.
+    notFound();
   }
 
   const project = projectRes.data;

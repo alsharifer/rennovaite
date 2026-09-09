@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app/AppShell";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
@@ -128,14 +129,16 @@ export default async function RenderPage({
     ? (getStyleByKey(styleChoice.style_key) ?? null)
     : null;
 
-  if (!project || !plan) {
+  // A missing PROJECT is a 404 and uses the shared boundary. A missing PLAN is
+  // not: the project exists and the user simply has not confirmed a layout yet,
+  // which is a step in the journey rather than a broken link.
+  if (!project) notFound();
+  if (!plan) {
     return (
       <AppShell pageName="AI Designer">
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
           <p className="text-on-surface-variant">
-            {!project
-              ? `Project ${projectId} not found.`
-              : "No plan attached to this project yet."}
+            No plan attached to this project yet.
           </p>
         </main>
       </AppShell>
