@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- 020_permit_checks.sql — Pilot Seven / P6 compliance surface.
 --
 -- The fired permit-trigger rules for a project's as-built→proposed diff, so the

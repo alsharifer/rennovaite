@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- Tracks which render the user has approved per (project, room). Multiple
 -- rows per room are allowed — the latest by created_at is the "active"
 -- approval. The BoQ step reads from here to know which render's materials

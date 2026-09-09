@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- 029_plan_overlaps.sql — record overlap state on the plan (D3).
 --
 -- Overlapping rooms are a legitimate TRANSIENT state while editing: dragging a

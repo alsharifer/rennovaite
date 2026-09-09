@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- 022_rate_book_actuals.sql — ground-truth ingest (Mudon actuals).
 --
 -- Extends rate_book so a rate can carry its pre-discount list price, its supply/

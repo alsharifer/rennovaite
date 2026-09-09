@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- 013_plan_snapshots.sql — Pilot Seven / P1 geometry contract.
 --
 -- Immutable snapshots of the derived PlanGraph (lib/plan/geometry.ts). The

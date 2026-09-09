@@ -1,3 +1,10 @@
+-- =============================================================================
+-- OBSOLETE — DO NOT APPLY THIS FILE BY HAND.
+--
+-- Superseded by supabase/migrations/ and `supabase db push` (I7).
+-- Kept only as the historical record of how production was built.
+-- See docs/MIGRATIONS.md.
+-- =============================================================================
 -- 023_boq_outcomes.sql — the feedback-loop ledger (delta log).
 --
 -- One row per (project, comparison run): the platform's takeoff-provenance BoQ
