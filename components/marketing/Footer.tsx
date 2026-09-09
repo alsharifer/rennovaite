@@ -1,17 +1,32 @@
 import Link from "next/link";
 
-const COLUMNS: { heading: string; links: string[] }[] = [
+// Only links that GO somewhere. Every entry here previously pointed at "#",
+// which reads as a real site while leading nowhere — worse than a shorter
+// footer, because a visitor discovers the emptiness one click at a time.
+//
+// "Refund Policy", "Careers", "Design Atelier", "About Us", "Cost Calculator"
+// and "Contractors" are gone rather than stubbed: there is nothing behind them
+// to describe yet, and inventing pages to fill a grid is the same overclaim in
+// a smaller font.
+const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] = [
   {
     heading: "Product",
-    links: ["Floorplans", "AI Rendering", "Cost Calculator", "Contractors"],
+    links: [
+      { label: "How it works", href: "/rennovaite#how-it-works" },
+      { label: "Pricing", href: "/rennovaite#pricing" },
+      { label: "Start a project", href: "/project/new" },
+    ],
   },
   {
     heading: "Company",
-    links: ["About Us", "Design Atelier", "Careers", "Contact"],
+    links: [{ label: "Contact", href: "mailto:hello@rennovaite.fit" }],
   },
   {
     heading: "Legal",
-    links: ["Privacy Policy", "Terms of Service", "Refund Policy"],
+    links: [
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+    ],
   },
 ];
 
@@ -41,12 +56,12 @@ export function Footer() {
               </h4>
               <ul className="flex flex-col gap-md text-body-sm text-white/60">
                 {col.links.map((link) => (
-                  <li key={link}>
+                  <li key={link.label}>
                     <Link
-                      href="#"
+                      href={link.href}
                       className="transition-colors hover:text-brass-600"
                     >
-                      {link}
+                      {link.label}
                     </Link>
                   </li>
                 ))}
@@ -57,9 +72,12 @@ export function Footer() {
         <div className="flex flex-col items-center justify-between gap-md font-label-caps text-label-caps uppercase tracking-[0.1em] text-white/40 md:flex-row">
           <div>© 2026 · Dubai, United Arab Emirates</div>
           <div className="flex items-center gap-lg">
-            <Link href="#" className="transition-colors hover:text-white">
-              EN | AR
-            </Link>
+            <a
+              href="mailto:hello@rennovaite.fit"
+              className="transition-colors hover:text-white"
+            >
+              hello@rennovaite.fit
+            </a>
           </div>
         </div>
       </div>

@@ -1439,14 +1439,7 @@ function EmptyState() {
           </span>
           Upload a floorplan
         </Link>
-        <p className="mt-md">
-          <a
-            href="#"
-            className="font-body text-body-sm text-on-surface-variant hover:text-brass-600"
-          >
-            Watch the 3-minute demo first →
-          </a>
-        </p>
+
       </div>
     </div>
   );

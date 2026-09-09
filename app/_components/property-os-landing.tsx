@@ -161,8 +161,9 @@ export function PropertyOsLanding() {
             <div className="flex flex-1 flex-col gap-3 px-5 py-[22px]">
               <h2 className="font-display text-[26px] font-bold text-ink-900">RennovAIte</h2>
               <p className="font-body text-[13px] leading-[1.55] text-on-surface-variant">
-                Redesign and renovate your home. AI design, an itemized cost plan
-                accurate to the line, permits, and trusted execution.
+                Redesign and renovate your home. AI design, an itemised bill of
+                quantities in AED, drawings and a permit check &mdash;
+                tender-ready for contractors to bid.
               </p>
               <p className="hidden font-mono text-[10px] tracking-[0.1em] text-brass-600 sm:block">
                 RENOVATION · DUBAI

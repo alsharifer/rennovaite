@@ -267,8 +267,9 @@ export default async function BoqPage({
             </p>
           ) : (
             <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
-              POMI-formatted, sourced from QS-vetted labour rates and Dubai
-              supplier SKUs.
+              POMI-formatted, priced from Dubai supplier catalogues and real
+              project quotations. Lines still awaiting a quantity
+              surveyor&apos;s review are flagged in the table.
             </p>
           )}
           {/* D1 — the other surface of this step. Accessory categories are

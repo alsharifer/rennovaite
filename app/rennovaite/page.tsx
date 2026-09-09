@@ -5,7 +5,7 @@ import { HomeLanding } from "@/components/marketing/home-landing";
 export const metadata: Metadata = {
   title: "RennovAIte — AI renovation for Dubai villas",
   description:
-    "RennovAIte turns your villa's floorplan into photoreal designs, a real bill of quantities in AED, and vetted contractors ready to bid.",
+    "RennovAIte turns your villa's floorplan into a tender-ready package: design renders, an itemised bill of quantities in AED, drawings and a permit check.",
 };
 
 // The RennovAIte marketing homepage's permanent route. `/` also renders this

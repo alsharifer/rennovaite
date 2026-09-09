@@ -31,11 +31,13 @@ export function SendModal({
           </div>
           <div className="flex flex-col gap-2">
             <DialogTitle className="text-h3 text-on-surface">
-              Ready to send
+              Your scope is ready to share
             </DialogTitle>
             <DialogDescription className="text-body-md text-on-surface-variant">
-              We&apos;ll invite three vetted contractors to bid on this scope. You&apos;ll
-              hear back within 3–5 business days with their quotes against this BoQ.
+              Download the BoQ and drawings and send them to any contractor you
+              choose &mdash; the package is built to be bid against as it
+              stands. Inviting contractors from within the platform is a roadmap
+              deliverable; we don&apos;t have a vetted panel to send this to yet.
             </DialogDescription>
           </div>
           <div className="mt-2 flex justify-end">
