@@ -47,8 +47,38 @@ signed URLs, and a public `drawings` bucket would make them pointless:
 | `drawings` | **private** |
 
 **4 — Point Vercel Preview at dev.** Vercel → project → Settings → Environment
-Variables. For each of the three variables above, add a **Preview**-scoped value
-using the dev project's. Leave **Production** untouched.
+Variables.
+
+> Corrected 2026-09-09. This step previously read "add a Preview-scoped value",
+> which does not work: all three variables currently exist as a SINGLE entry
+> scoped to `Production, Preview, Development`, and Vercel rejects a second
+> entry claiming an environment the first already holds. The existing entry has
+> to be narrowed first.
+
+For each of `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and
+`SUPABASE_SERVICE_ROLE_KEY`, **in this order**:
+
+**A. Narrow the existing entry to Production only**
+1. Find the row — it shows `Production, Preview, Development`
+2. `⋯` → **Edit**
+3. Untick **Preview** and **Development**; leave **Production** ticked
+4. Save. The value is not edited — only its scope.
+
+**B. Add a second entry for dev**
+1. **Add New** → same variable name
+2. Value: the **dev** project's (the same one going into `.env.local`)
+3. Tick **Preview** and **Development**; leave Production unticked
+4. Save
+
+You end with two rows per variable: Production holding prod, Preview+Development
+holding dev. Doing B before A is rejected as a scope conflict.
+
+**Env changes only affect NEW deployments** — existing previews keep the old
+values until redeployed. Open a throwaway PR afterwards and confirm the preview
+builds and reads dev.
+
+This is the half that protects live data day to day: today every PR preview
+reads and writes production.
 
 > This is the half that protects live data day to day: today every PR preview
 > reads and writes production.
