@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { WatchDemoButton } from "@/app/_components/watch-demo";
+import { journeyFlagsFromEnv, journeySteps } from "@/lib/journey";
 import { Footer } from "@/components/marketing/Footer";
 import { TopNav } from "@/components/marketing/TopNav";
 
@@ -20,26 +21,14 @@ const CATALOGUE_SOURCES = [
   "HOME CENTRE",
 ];
 
-const STEPS = [
-  {
-    n: "01",
-    icon: "upload_file",
-    title: "Upload your plan.",
-    body: "Direct digital intake of your technical drawings. Our AI understands every wall, window, and socket.",
-  },
-  {
-    n: "02",
-    icon: "brush",
-    title: "Choose your direction.",
-    body: "Select from curated aesthetics or build your own. AI generates high-fidelity visual renders instantly.",
-  },
-  {
-    n: "03",
-    icon: "receipt_long",
-    title: "Lock the BoQ.",
-    body: "Receive a precise, local-market bill of quantities in AED. Real prices from local suppliers.",
-  },
-];
+// The steps come from lib/journey.ts — the same module the app numbers its
+// pages from. A hand-written list here is how the page ended up announcing five
+// steps above three cards while the product ran nine: two sources, no way for
+// either to notice the other had moved.
+//
+// Reading the real list also makes the count flag-aware for free. Turn
+// DRAWINGS_ENABLED off and the Downloads card disappears from BOTH the app
+// numbering and this page, because there is only one list.
 
 const STATS = [
   { label: "BoQ format", value: "POMI sections" },
@@ -48,6 +37,10 @@ const STATS = [
 ];
 
 export function HomeLanding() {
+  // Flag-aware: journeySteps() drops any step this deployment does not have and
+  // renumbers what remains, so the count below is always what a user will meet.
+  const steps = journeySteps(journeyFlagsFromEnv());
+
   return (
     <div className="min-h-screen bg-canvas">
       <TopNav />
@@ -121,29 +114,36 @@ export function HomeLanding() {
               The flow
             </span>
             <h2 className="mt-xs font-display text-headline-lg italic text-ink-900">
-              One villa. Zero spreadsheets.
+              {steps.length} steps. One villa. Zero spreadsheets.
             </h2>
+            <p className="mt-sm max-w-[620px] font-body text-body-md text-on-surface-variant">
+              The same {steps.length} steps you will see numbered inside the
+              app &mdash; this page reads them from the product, so the two
+              cannot disagree.
+            </p>
           </div>
           <div className="grid grid-cols-12 gap-gutter">
-            {STEPS.map((step) => (
+            {steps.map((step) => (
               <div
-                key={step.n}
-                className="col-span-12 flex flex-col gap-md rounded-lg border border-ink-100 bg-paper p-8 transition-shadow duration-300 hover:shadow-level-1 md:col-span-4"
+                key={step.key}
+                className="col-span-12 flex flex-col gap-sm rounded-lg border border-ink-100 bg-paper p-6 transition-shadow duration-300 hover:shadow-level-1 sm:col-span-6 md:col-span-4"
               >
-                <span className="font-display text-headline-lg-mobile text-brass-600">
-                  {step.n}
-                </span>
-                <span
-                  className="material-symbols-outlined text-[32px] text-brass-600"
-                  aria-hidden="true"
-                >
-                  {step.icon}
-                </span>
+                <div className="flex items-center gap-sm">
+                  <span className="font-mono text-body-sm tabular-nums text-brass-600">
+                    {String(step.number).padStart(2, "0")}
+                  </span>
+                  <span
+                    className="material-symbols-outlined text-[22px] text-brass-600"
+                    aria-hidden="true"
+                  >
+                    {step.glyph}
+                  </span>
+                </div>
                 <h3 className="font-display text-headline-md text-ink-900">
-                  {step.title}
+                  {step.label}
                 </h3>
                 <p className="font-body text-body-md text-ink-700">
-                  {step.body}
+                  {step.blurb}
                 </p>
               </div>
             ))}
