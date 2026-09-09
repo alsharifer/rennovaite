@@ -87,20 +87,24 @@ inline form makes the backup-and-restore dance unnecessary.
   `node_modules/next/dist/docs/` before writing Next code — this is not the
   Next.js in your training data** (per `AGENTS.md`).
 
-## 1. Migrations — high-water mark **030**, all applied EXCEPT 029 [DB]
+## 1. Migrations — high-water mark **030**, ALL APPLIED [DB]
 
 Files `scripts/migrations/001…030`. Re-verified 2026-09-09 by probing one
 artefact per migration against the live database.
 
-**029 is the single unapplied migration.** `plans.has_overlaps` does not exist
-in production. Everything else through 030 is live — including 030, which was
-applied out of order (archive shipped before the overlap reporting columns).
+**029 was applied on 2026-09-09** via `supabase db push` — the first migration
+in this project applied by the runner rather than by hand. Production now
+matches the migrations exactly:
+
+    shadow (all 30, built from zero): 29 tables, 257 columns
+    tables absent in production : none
+    columns absent in production: none
 
 | # | Artefact probed | Live? |
 |---|---|---|
 | 027 | `project_briefs.project_id`, `moodboard_items`, `renders.reference_refs` | yes |
 | 028 | `accessory_catalog`, `accessory_selections` | yes |
-| 029 | `plans.has_overlaps` | **NO** |
+| 029 | `plans.has_overlaps` | yes (2026-09-09, via `db push`) |
 | 030 | `projects.archived_at` | yes |
 
 A correction worth carrying: an earlier probe of this reported 027 as partially
@@ -109,9 +113,9 @@ column — its primary key is `project_id`. A missing column and a missing table
 look identical through PostgREST, so probe a column the migration actually
 creates.
 
-Because 029 is unapplied, the 409 overlap gate reads overlaps live from the
-loaded rooms rather than from `plans.has_overlaps`; the column is a
-reporting cache only, which is why nothing is broken by its absence.
+The 409 overlap gate still reads overlaps LIVE from the loaded rooms rather
+than from `plans.has_overlaps` — deliberately. A stale cache must not decide
+whether a number is trustworthy; the column is for reporting only.
 
 Other live counts [DB]: `projects` 7 · `plans` 7 · `rooms` 93 ·
 `takeoff_items` 184 · `rate_book` 61 · `pricing_skus` 600 ·
