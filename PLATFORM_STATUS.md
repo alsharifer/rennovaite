@@ -81,10 +81,14 @@ and the verbatim steps: **`docs/I8_EXECUTION_STATUS.md`**.
 3. **Create three storage buckets:** `plan-uploads` (public), `renders`
    (public), `drawings` (**private** — the code stores signed URLs, so a public
    drawings bucket makes them pointless).
-4. **Vercel → Settings → Environment Variables:** add the same three as
-   **Preview**-scoped, pointing at dev. Leave Production untouched. *This is the
-   half that protects live data day to day — today every PR preview reads and
-   writes production.*
+4. **Vercel → Settings → Environment Variables.** All three currently exist as
+   ONE entry scoped to `Production, Preview, Development`, so they cannot
+   simply have a Preview value added — Vercel rejects a second entry claiming an
+   environment the first already holds. For each variable: **edit the existing
+   entry down to Production only**, then **add a second entry scoped to Preview
+   + Development** with the dev values. Full steps in
+   `docs/I8_EXECUTION_STATUS.md`. *This is the half that protects live data day
+   to day — today every PR preview reads and writes production.*
 
 Then tell me, and I will run the migrations, seeds and drift check against dev
 and verify the app boots end to end.
