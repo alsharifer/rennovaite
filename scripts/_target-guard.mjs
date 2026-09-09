@@ -34,7 +34,11 @@ export function readEnvFile(file = ".env.local", root = process.cwd()) {
 /** Project ref from a Supabase URL: https://<ref>.supabase.co */
 export function refFromUrl(url) {
   if (!url) return null;
-  const m = /^https?:\/\/([a-z0-9]+)\.supabase\./i.exec(url);
+  // A .env line may carry surrounding quotes or trailing whitespace, and a
+  // project ref may contain hyphens. Neither should read as "unidentifiable" —
+  // that now hard-fails, so being needlessly strict here would block real work.
+  const clean = String(url).trim().replace(/^["']|["']$/g, "");
+  const m = /^https?:\/\/([a-z0-9-]+)\.supabase\./i.exec(clean);
   return m ? m[1] : null;
 }
 
@@ -61,8 +65,34 @@ export function resolveTarget({ script, writes = true } = {}) {
     );
   }
   const ref = refFromUrl(url);
-  const prod = ref === PRODUCTION_REF;
 
+  // FAIL CLOSED. An unrecognisable URL is not evidence of a dev database — it
+  // is evidence that we do not know which database this is, and "I could not
+  // parse it" must never read as "safe to write". The first version returned
+  // null here and printed "dev / non-production (null)", which is exactly the
+  // reassurance a guard should never give.
+  if (ref === null) {
+    console.error(
+      `
+[${script}] CANNOT IDENTIFY THE TARGET DATABASE.
+
+` +
+        `  NEXT_PUBLIC_SUPABASE_URL is not a Supabase project URL.
+` +
+        `  Expected: https://<project-ref>.supabase.co
+` +
+        `  Got     : ${String(url).slice(0, 60)}
+
+` +
+        `  If that looks like a placeholder, .env.local still needs the real
+` +
+        `  values from the dashboard (Settings -> API).
+`,
+    );
+    process.exit(1);
+  }
+
+  const prod = ref === PRODUCTION_REF;
   const banner = prod
     ? `!! PRODUCTION (${ref}) !!`
     : `dev / non-production (${ref})`;
