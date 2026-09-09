@@ -26,6 +26,16 @@ import { mirrorCount, showerGlassCount, vanitySlabCount } from "./scope-componen
 export type GtRateStatus = "actual_transaction" | "site_assessment" | "indicative";
 
 export interface GtBoqLine {
+  /**
+   * Provenance id, required. Ground-truth actuals use "GT/<trade>/<slug>";
+   * S6-pre component rules use "S6-xx/R-yy" like the engine's own lines.
+   *
+   * These lines carried none until now, which broke more than tidiness: the
+   * dedupe detector matches a stored BoQ by rule_id, so the vanity-slab check
+   * against join.vanity could never fire, and the CSV export for the QS had a
+   * blank column for two whole sections.
+   */
+  rule_id: string;
   description: string;
   quantity: number;
   unit: string;
@@ -52,6 +62,7 @@ const rate = (key: string) => JOINERY.find((j) => j.item_key === key)?.rate ?? 0
 const round = (n: number) => Math.round(n * 100) / 100;
 
 function line(
+  rule_id: string,
   description: string,
   quantity: number,
   unit: string,
@@ -61,6 +72,7 @@ function line(
   notes: string | null,
 ): GtBoqLine {
   return {
+    rule_id,
     description,
     quantity: round(quantity),
     unit,
@@ -97,22 +109,36 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
 
   // Master bedroom: dresser (1100/m² × 10.08) + wall cladding (800/m² × 6.16).
   if (masters > 0) {
-    lines.push(line(`Master bedroom dresser cabinet, glass doors + LED`, 10.08 * masters, "m2", rate("joinery_dresser"), src, "actual_transaction", "Heuristic: 10.08 m² per master (Atrium 1.1)"));
-    lines.push(line(`Master bedroom wall cladding with hidden LED`, 6.16 * masters, "m2", rate("joinery_cladding"), src, "actual_transaction", "Heuristic: 6.16 m² per master (Atrium 1.2)"));
+    lines.push(line(
+      "GT/joinery/dresser",
+      `Master bedroom dresser cabinet, glass doors + LED`, 10.08 * masters, "m2", rate("joinery_dresser"), src, "actual_transaction", "Heuristic: 10.08 m² per master (Atrium 1.1)"));
+    lines.push(line(
+      "GT/joinery/cladding",
+      `Master bedroom wall cladding with hidden LED`, 6.16 * masters, "m2", rate("joinery_cladding"), src, "actual_transaction", "Heuristic: 6.16 m² per master (Atrium 1.2)"));
   }
   // Kids bedrooms: fitted cabinet 850/m² × 7 m² each.
   if (kids > 0) {
-    lines.push(line(`Fitted bedroom cabinet, melamine MDF + architrave`, 7 * kids, "m2", rate("joinery_cabinet"), src, "actual_transaction", `Heuristic: 7 m² per bedroom × ${kids} (Atrium 2.1/3.1)`));
+    lines.push(line(
+      "GT/joinery/cabinet",
+      `Fitted bedroom cabinet, melamine MDF + architrave`, 7 * kids, "m2", rate("joinery_cabinet"), src, "actual_transaction", `Heuristic: 7 m² per bedroom × ${kids} (Atrium 2.1/3.1)`));
   }
   // Bathrooms: bath cabinet (item) + vanity (item) each.
   if (bathrooms > 0) {
-    lines.push(line(`Bathroom cabinet with doors, MR melamine`, bathrooms, "item", rate("joinery_bath_cabinet_2d"), src, "actual_transaction", `One per bathroom × ${bathrooms}`));
-    lines.push(line(`Bathroom vanity box, MR melamine`, bathrooms, "item", rate("joinery_vanity"), src, "actual_transaction", `One per bathroom × ${bathrooms}`));
+    lines.push(line(
+      "GT/joinery/bath_cabinet",
+      `Bathroom cabinet with doors, MR melamine`, bathrooms, "item", rate("joinery_bath_cabinet_2d"), src, "actual_transaction", `One per bathroom × ${bathrooms}`));
+    lines.push(line(
+      "GT/joinery/vanity",
+      `Bathroom vanity box, MR melamine`, bathrooms, "item", rate("joinery_vanity"), src, "actual_transaction", `One per bathroom × ${bathrooms}`));
   }
   // Doors: solid leaf + full meranti frame, per bedroom + bathroom.
   if (doors > 0) {
-    lines.push(line(`Solid door leaf, new handle + hinges`, doors, "no", rate("joinery_door_leaf"), src, "actual_transaction", `Bedrooms + bathrooms = ${doors} leaves (Atrium 5.1)`));
-    lines.push(line(`Solid meranti door frame, painted + fixed`, doors, "no", rate("joinery_door_frame"), src, "actual_transaction", `${doors} frames (Atrium 5.2)`));
+    lines.push(line(
+      "GT/joinery/door_leaf",
+      `Solid door leaf, new handle + hinges`, doors, "no", rate("joinery_door_leaf"), src, "actual_transaction", `Bedrooms + bathrooms = ${doors} leaves (Atrium 5.1)`));
+    lines.push(line(
+      "GT/joinery/door_frame",
+      `Solid meranti door frame, painted + fixed`, doors, "no", rate("joinery_door_frame"), src, "actual_transaction", `${doors} frames (Atrium 5.2)`));
   }
 
   // --- S6-pre (G19): "Excludes slabs for vanity of the 2 bedrooms" ---------
@@ -124,6 +150,7 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
     const slabs = vanitySlabCount(bathrooms);
     lines.push(
       line(
+        "S6-05/R-46",
         "Vanity counter slab — allowance, requires site measurement",
         slabs.quantity,
         "no",
@@ -145,8 +172,11 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
 export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | null {
   if (ALUMINUM.length === 0) return null;
   const src = "Global Creation Services ref 3936/R1 (allowance)";
+  const slug = (v: string) =>
+    v.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);
   const lines: GtBoqLine[] = ALUMINUM.map((a) =>
     line(
+      `GT/aluminum/${slug(a.location)}_${slug(a.item)}`,
       `${a.location} — ${a.item}`,
       a.qty,
       a.unit === "LM" ? "lm" : "no",
@@ -179,6 +209,7 @@ export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | n
     if (glass.quantity > 0) {
       lines.push(
         line(
+          "S6-06/R-47",
           "Frameless shower glass partition — supply and install",
           glass.quantity,
           "no",
@@ -192,6 +223,7 @@ export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | n
     if (mirrors.quantity > 0) {
       lines.push(
         line(
+          "S6-07/R-48",
           "Bathroom mirror — supply and install",
           mirrors.quantity,
           "no",

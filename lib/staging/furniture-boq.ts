@@ -21,6 +21,16 @@ import type { StagingSet } from "./sets";
 export const FURNITURE_SECTION_NAME = "Furniture (optional)";
 
 export type FurnitureLine = {
+  /**
+   * Provenance id, required — "P7/furniture/<item key>".
+   *
+   * This section is never written into boqs.sections, so it is outside the
+   * generated BoQ the invariant test guards. It carries an id anyway: leaving
+   * ONE line writer able to omit provenance is how the joinery and aluminum
+   * sections went two sprints with a blank rule_id and a dedupe check that
+   * silently could not fire.
+   */
+  rule_id: string;
   description: string;
   quantity: number;
   unit: string;
@@ -65,6 +75,7 @@ export function buildFurnitureSection(
       const rate = priceFor(book, item.key, room.styleKey);
       if (rate <= 0) continue; // no indicative price → skip, never invent one
       lines.push({
+        rule_id: `P7/furniture/${item.key}`,
         description: `${room.roomName} — ${item.label}`,
         quantity: qty,
         unit: "no",
