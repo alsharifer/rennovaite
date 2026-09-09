@@ -87,31 +87,42 @@ inline form makes the backup-and-restore dance unnecessary.
   `node_modules/next/dist/docs/` before writing Next code — this is not the
   Next.js in your training data** (per `AGENTS.md`).
 
-## 1. Migrations — high-water mark **026**, all applied [DB]
+## 1. Migrations — high-water mark **030**, all applied EXCEPT 029 [DB]
 
-Files `scripts/migrations/001…026`. **There is no migration runner** — DDL is
-pasted into the Supabase SQL editor by hand (the service-role JWT cannot run
-DDL). Every migration through **026 is live**, including the three Sprint-1
-ones:
+Files `scripts/migrations/001…030`. Re-verified 2026-09-09 by probing one
+artefact per migration against the live database.
 
-| # | Table / change | Live? | Rows [DB] |
-|---|---|---|---|
-| 024 | `project_assets` | yes | 3 |
-| 025 | `rooms.confidence` + `parse_metrics` | yes | column present (all `null`); `parse_metrics` 0 |
-| 026 | `plan_openings` | yes | **0** |
+**029 is the single unapplied migration.** `plans.has_overlaps` does not exist
+in production. Everything else through 030 is live — including 030, which was
+applied out of order (archive shipped before the overlap reporting columns).
 
-Other live counts [DB]: `projects` 7 · `plans` 7 · `rooms` 93 · `renders` 48 ·
-`boqs` 14 · `style_choices` 19 · `room_photos` 4 · `plan_fixtures` 151 ·
-`plan_snapshots` 6 · `drawing_sets` 1 · `takeoff_items` 184 · `rate_book` 61 ·
-`boq_outcomes` 1 · `whatif_scenarios` 56 · `permit_checks` 320 ·
-`furniture_opt_ins` 1 · `furniture_prices` **0** (module fallback in use;
-PK is `(item_key, tier)` — **no `id` column**) · `pricing_skus` 600 ·
-`labour_rates` 52 · `vendor_selections` 3 · `approved_designs` 7 ·
-`feedback_events` 23.
+| # | Artefact probed | Live? |
+|---|---|---|
+| 027 | `project_briefs.project_id`, `moodboard_items`, `renders.reference_refs` | yes |
+| 028 | `accessory_catalog`, `accessory_selections` | yes |
+| 029 | `plans.has_overlaps` | **NO** |
+| 030 | `projects.archived_at` | yes |
 
-**A new Sprint-2 table = a new numbered SQL file (`027_…`), applied manually,
-ending in `notify pgrst, 'reload schema';`, with the code degrading gracefully
-until it is applied.** RLS is disabled on every table.
+A correction worth carrying: an earlier probe of this reported 027 as partially
+applied because it selected `project_briefs.id`, and that table has no `id`
+column — its primary key is `project_id`. A missing column and a missing table
+look identical through PostgREST, so probe a column the migration actually
+creates.
+
+Because 029 is unapplied, the 409 overlap gate reads overlaps live from the
+loaded rooms rather than from `plans.has_overlaps`; the column is a
+reporting cache only, which is why nothing is broken by its absence.
+
+Other live counts [DB]: `projects` 7 · `plans` 7 · `rooms` 93 ·
+`takeoff_items` 184 · `rate_book` 61 · `pricing_skus` 600 ·
+`labour_rates` 52 · `plan_fixtures` 151 · `accessory_catalog` 45 ·
+`accessory_selections` 0 · `furniture_prices` **0** (module fallback in use;
+PK is `(item_key, tier)` — **no `id` column**).
+
+**Migrations are no longer applied by hand.** As of I7 the Supabase CLI is the
+only supported path — see `supabase/migrations/` and `docs/MIGRATIONS.md`.
+The `scripts/migrations/*.sql` files are retained as the historical record and
+must not be edited. RLS is disabled on every table.
 
 ## 2. Feature flags — current states [.env.local + code]
 
