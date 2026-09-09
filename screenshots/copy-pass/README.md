@@ -56,17 +56,29 @@ electrical and HVAC drawings are a roadmap deliverable."
 
 ## 3. Step counts
 
-**Before:** the landing page announced *"Five steps"* above three cards.
+**Before:** the landing page announced *"Five steps"* above **three** hand-written
+cards numbered 01/02/03, while the app ran nine.
 
-**After:** "One villa. Zero spreadsheets." — the three cards are a phase summary
-and now carry no number, per the rule that a surface which numbers steps must
-render exactly that many.
+**First attempt was wrong.** Dropping the word "Five" from the heading left three
+numbered cards standing — a surface that still numbered steps, and still said
+three. Removing the number from the sentence did not remove the number from the
+page.
 
-The app journey is unaffected and already correct: it sources every count from
-`lib/journey.ts`. Confirmed live on `/project/new` — **"STEP 01 OF 09"** with
-`DRAWINGS_ENABLED` on, which is `journeyLength()`'s real answer.
+**After:** the section renders `journeySteps(journeyFlagsFromEnv())` from
+`lib/journey.ts` — the same module the app numbers its pages from. Verified
+live in the DOM:
 
-Audit result: no other surface in `app/` or `components/` states a step count.
+> **9 steps. One villa. Zero spreadsheets.**
+> 01 Intake · 02 Layout · 03 Ideation · 04 Moodboard · 05 Renders ·
+> 06 Costing & BoQ · 07 Scope & timeline · 08 Downloads · 09 Vendors
+
+Nine cards, nine numerals, labels identical to the app. The hand-written
+`STEPS` constant is deleted, so the two cannot drift apart again — and the
+count is flag-aware for free: turn `DRAWINGS_ENABLED` off and Downloads leaves
+both the app numbering and this page, because there is only one list.
+
+Confirmed in the app: `/project/new` renders **"STEP 01 OF 09"**, the same
+`journeyLength()`.
 
 ## 4. Pricing label
 
