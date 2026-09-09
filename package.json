@@ -8,9 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "db:check": "node scripts/check-migrations.mjs",
+    "db:check": "node --import ./scripts/_alias-hook.mjs scripts/check-migrations.ts",
     "db:push": "supabase db push",
-    "db:new": "supabase migration new"
+    "db:new": "supabase migration new",
+    "db:manifest": "node --import ./scripts/_alias-hook.mjs scripts/update-migration-manifest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",
