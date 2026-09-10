@@ -3,7 +3,58 @@
 Executing `docs/DEV_PROD_SEPARATION.md`, not redesigning it. This records what
 is built, what is blocked, and where I departed from the proposal and why.
 
-## Blocked on Abdallah — everything below step 1 waits on this
+## COMPLETE — 2026-09-10
+
+Dev project `rennovaite-dev-sg` (`askzyqgcnjmbqegfifxq`, **ap-southeast-1**,
+matching production). Everything below verified after Abdallah created it.
+
+| Check | Result |
+| --- | --- |
+| Schema | `supabase db push` applied all 30 migrations; **29/29 tables** reachable |
+| Drift vs production | **none, either direction** |
+| Storage buckets | `plan-uploads` public · `renders` public · `drawings` **private** |
+| Local `.env.local` | dev ref |
+| Vercel **Preview** | dev ref, and both JWTs carry `ref=askzyqgcnjmbqegfifxq` |
+| Vercel **Production** | `efrcgktrlsjnzkzzuhof`, untouched |
+| App boot | `/project/<id>` + `/plan` `/ideation` `/boq` `/timeline` all 200; hub renders "Demo villa (dev)" |
+
+### Isolation, proven rather than asserted
+
+Different projects, different keys — and empirically, the dev service key
+against the production REST endpoint:
+
+    dev service key -> production GET    : 401 REJECTED
+    dev service key -> production DELETE : 401 REJECTED
+
+A Supabase service key is scoped to its project in the JWT itself, so a
+destructive migration or a runaway script pointed at dev cannot address
+production at all. That is the I8 verification requirement, met.
+
+### Commercial data stayed in production
+
+    rate_book provenance in dev: { seed: 15 }
+    actual_transaction rows    : 0
+
+Dev holds geometry, catalogue prices and 13 rooms. No Atrium, Global Creation,
+Laspinas or RAK quotation reached it, and no BoQ, takeoff, render or outcome
+row. That was the main deviation from the proposal and it holds in practice.
+
+### Two bugs this shook out
+
+- **The target guard failed OPEN.** With a placeholder URL it printed
+  "dev / non-production (null)" — the one answer a guard must never give when it
+  cannot identify the database. Now exits non-zero. (PR #49)
+- **`db push` could hit the wrong database.** The CLI keeps its link in
+  `supabase/.temp/project-ref`, separate from `.env.local`, and they were
+  pointing at different projects. `npm run db:push` now refuses on
+  disagreement. (PR #50)
+- **`seed-dev-demo.mjs` wrote a `plans.status` column that does not exist** —
+  caught on first real run against an empty database, which is exactly where it
+  should be caught.
+
+---
+
+## Blocked on Abdallah — everything below step 1 waits on this (RESOLVED, kept for the record)
 
 The proposal's step 1 is *"Create the `rennovaite-dev` Supabase project"*. That
 cannot be done from here and nothing after it can be verified without it. The

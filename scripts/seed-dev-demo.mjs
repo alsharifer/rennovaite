@@ -68,12 +68,15 @@ async function main() {
     method: "POST",
     headers: { ...H, Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify([
+      // NB: `plans` has no status column — id, project_id, pdf_url,
+      // parsed_json, total_area_m2, scale, created_at, plus notes (002) and the
+      // overlap columns (029). Writing one that does not exist fails the whole
+      // insert with PGRST204.
       {
         id: PLAN_ID,
         project_id: PROJECT_ID,
         scale: MUDON_FIXTURE.scale,
         total_area_m2: MUDON_FIXTURE.total_area_m2,
-        status: "confirmed",
       },
     ]),
   });
