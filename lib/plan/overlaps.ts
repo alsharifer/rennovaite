@@ -10,9 +10,24 @@
 // happens at take-off, so that is where the invariant is enforced: the save
 // records `has_overlaps`, and BoQ generation refuses.
 //
-// This module is the single detector both paths use, so the banner the user
-// sees and the 409 they get can never disagree. Pure: no DB, no React.
+// This module is the single detector every path uses — the editor banner, the
+// save record and the BoQ 409 — so they can never disagree. Pure: no DB, no
+// React.
+//
+// It tests POLYGONS, not bounding boxes. It used to test boxes, on the argument
+// that the editor's rigid-translation "fix overlaps" could always clear what was
+// flagged. That was true but it flagged plans that were already correct: overlap
+// repair carves L-shapes, and an L's bounding box keeps intersecting its
+// neighbour's long after the two rooms stop sharing a square millimetre. On the
+// pilot sheet that reported three overlaps on a plan with zero, and the 409
+// refused to cost it. Box overlap is a strict superset of polygon overlap, so
+// moving to polygons only ever flags LESS, and the editor's fix still clears
+// everything that is flagged.
 // =============================================================================
+
+import polygonClipping from "polygon-clipping";
+
+import { polygonArea } from "./polygon";
 
 export interface OverlapRoom {
   id: string;
@@ -90,31 +105,70 @@ export function boxesOverlap(
   );
 }
 
+/** Shared area below this fraction of the smaller room is a rounding artefact,
+ *  not an overlap. Relative, so the test stays scale-invariant: the same plan
+ *  in normalised [0,1] and in pixels must give the same answer. */
+export const OVERLAP_AREA_EPSILON = 1e-4;
+
+function closedRing(poly: Pt[]): number[][] {
+  const ring: number[][] = poly.map(([x, y]) => [x, y]);
+  const f = ring[0]!;
+  const l = ring[ring.length - 1]!;
+  if (f[0] !== l[0] || f[1] !== l[1]) ring.push([f[0]!, f[1]!]);
+  return ring;
+}
+
+/** Area two polygons share. 0 when they only touch along an edge. */
+export function sharedArea(a: Pt[], b: Pt[]): number {
+  try {
+    const mp = polygonClipping.intersection(
+      [closedRing(a)] as never,
+      [closedRing(b)] as never,
+    ) as unknown as Pt[][][];
+    let out = 0;
+    for (const poly of mp) {
+      for (let i = 0; i < poly.length; i++) {
+        const ring = polygonArea(poly[i]!);
+        out += i === 0 ? ring : -ring; // subtract holes
+      }
+    }
+    return out;
+  } catch {
+    // Clipping failed on a degenerate ring. Fall back to the bounding boxes,
+    // which over-report: a false alarm someone can clear beats a silent
+    // double-count in the take-off.
+    return boxesOverlap(bbox(a), bbox(b)) ? Infinity : 0;
+  }
+}
+
 /**
  * Find every overlapping room pair.
  *
- * Bounding-box test, deliberately: it is exactly what the editor already
- * highlights and what `separateOverlappingRooms` resolves, so the banner, the
- * fix button and the 409 all agree. A polygon-exact test would flag pairs the
- * editor's fix could not clear, which would be worse than a slightly
- * conservative one. Rooms with an unusable polygon are skipped rather than
- * guessed at.
+ * Polygon-exact, with the bounding boxes as a cheap prefilter (box overlap is a
+ * superset of polygon overlap, so the prefilter can never drop a real pair).
+ * Adjacency is not an overlap: adjacent rooms share a wall line by
+ * construction. Rooms with an unusable polygon are skipped rather than guessed
+ * at.
  */
 export function findOverlaps(rooms: OverlapRoom[]): OverlapReport {
   const usable = rooms
     .map((r) => ({ r, poly: toPolygon(r.polygon) }))
     .filter((x): x is { r: OverlapRoom; poly: Pt[] } => x.poly !== null)
-    .map((x) => ({ r: x.r, box: bbox(x.poly) }));
+    .map((x) => ({ r: x.r, poly: x.poly, box: bbox(x.poly), area: polygonArea(x.poly) }));
 
   const pairs: OverlapPair[] = [];
   for (let i = 0; i < usable.length - 1; i++) {
     for (let j = i + 1; j < usable.length; j++) {
-      if (!boxesOverlap(usable[i]!.box, usable[j]!.box)) continue;
+      const a = usable[i]!;
+      const b = usable[j]!;
+      if (!boxesOverlap(a.box, b.box)) continue;
+      const smaller = Math.min(a.area, b.area);
+      if (!(sharedArea(a.poly, b.poly) > smaller * OVERLAP_AREA_EPSILON)) continue;
       pairs.push({
-        a_id: usable[i]!.r.id,
-        a_name: usable[i]!.r.name,
-        b_id: usable[j]!.r.id,
-        b_name: usable[j]!.r.name,
+        a_id: a.r.id,
+        a_name: a.r.name,
+        b_id: b.r.id,
+        b_name: b.r.name,
       });
     }
   }

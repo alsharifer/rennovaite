@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { Layers, Plus, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { findOverlaps } from "@/lib/plan/overlaps";
 import { polygonArea } from "@/lib/plan/polygon";
 import { separateOverlappingRooms } from "@/lib/plan/separate";
 import { cn } from "@/lib/utils";
@@ -149,19 +150,6 @@ function pixelToM(px: number, scale: number): number {
 // (the viewBox clamp flattening an N-vertex room to its bbox) is documented.
 // `Room` structurally satisfies the module's generic `SeparableRoom`.
 
-// True iff two axis-aligned rectangles share interior area.
-function rectsOverlap(
-  a: [number, number, number, number],
-  b: [number, number, number, number],
-): boolean {
-  const [ax, ay, aw, ah] = a;
-  const [bx, by, bw, bh] = b;
-  return (
-    Math.min(ax + aw, bx + bw) - Math.max(ax, bx) > 0 &&
-    Math.min(ay + ah, by + bh) - Math.max(ay, by) > 0
-  );
-}
-
 // Convert any coordinate space (Claude's [0,1] or pixel) to viewBox space,
 // fitting all rooms aspect-preserving with PADDING.
 function fitToViewBox(rooms: RoomInput[]): {
@@ -263,24 +251,22 @@ export function EditablePlanViewer({
   // trigger a second render to sync (the "you might not need an effect"
   // pattern). The lint rule at the old setState-in-effect site was a smell
   // for exactly this case.
-  const overlappingIds = useMemo(() => {
-    const visible = rooms.filter((r) => !r.isDeleted);
-    const ids = new Set<string>();
-    for (let i = 0; i < visible.length - 1; i++) {
-      for (let j = i + 1; j < visible.length; j++) {
-        if (
-          rectsOverlap(
-            polygonToRect(visible[i].polygon),
-            polygonToRect(visible[j].polygon),
-          )
-        ) {
-          ids.add(visible[i].id);
-          ids.add(visible[j].id);
-        }
-      }
-    }
-    return ids;
-  }, [rooms]);
+  // findOverlaps is the single detector the BoQ 409 and the save record also
+  // use. The banner used to run its own bounding-box loop here, which flagged
+  // rooms whose boxes crossed while their polygons did not — every L-shaped
+  // room next to a neighbour — so the banner could say "uncostable" about a
+  // plan the costing route would happily accept.
+  const overlappingIds = useMemo(
+    () =>
+      new Set(
+        findOverlaps(
+          rooms
+            .filter((r) => !r.isDeleted)
+            .map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
+        ).room_ids,
+      ),
+    [rooms],
+  );
   // Rooms the parser flagged low-confidence — surfaced for review in the editor.
   const lowConfidenceIds = useMemo(() => {
     const ids = new Set<string>();
@@ -649,13 +635,35 @@ export function EditablePlanViewer({
         body: JSON.stringify(payload),
       });
       const body = (await res.json().catch(() => null)) as
-        | { success?: boolean; error?: string }
+        | {
+            success?: boolean;
+            error?: string;
+            repaired_rooms?: { id: string; name_en: string; polygon: Point[]; area_m2: number }[];
+          }
         | null;
       if (!res.ok || !body?.success) {
         throw new Error(body?.error ?? `Save failed (${res.status}).`);
       }
       setSaveStatus("saved");
       setHistory([]);
+      // The server trims overlapping rooms on the way in. Show what was stored
+      // rather than what was dragged, and say so — a silent reshape on the next
+      // page load would read as data loss.
+      const fixed = body.repaired_rooms ?? [];
+      if (fixed.length > 0) {
+        const byId = new Map(fixed.map((r) => [r.id, r] as const));
+        setRooms((current) =>
+          current.map((r) => {
+            const f = byId.get(r.id);
+            return f ? { ...r, polygon: f.polygon, area_m2: f.area_m2 } : r;
+          }),
+        );
+        flashInfo(
+          `Trimmed ${fixed.length} overlapping ${fixed.length === 1 ? "room" : "rooms"}: ${fixed
+            .map((r) => r.name_en)
+            .join(", ")}`,
+        );
+      }
       // Record correction counts for the "<3 corrections/plan" KPI, then reset.
       const c = correctionCounts.current;
       const correction_total = c.move + c.vertex + c.relabel + c.delete;
