@@ -15,8 +15,9 @@
 // now survives repair, and geometry only overrides it when the two cannot be
 // describing the same room — and even then only when the area was the model's
 // own ESTIMATE. An area MEASURED off a printed dimension is never overwritten;
-// a disagreement there flags the outline for review (disputed_area_room_ids)
-// instead of replacing the architect's number with a vision model's.
+// a disagreement there is recorded as a `dispute` carrying both numbers, which
+// the editor turns into a question for a human, instead of replacing the
+// architect's number with a vision model's behind their back.
 // =============================================================================
 
 import polygonClipping from "polygon-clipping";
@@ -58,6 +59,21 @@ export type RepairedRoom<T> = T & {
   area_derived: boolean;
 };
 
+/**
+ * A room whose printed dimension and whose outline cannot both be right.
+ *
+ * Carries BOTH numbers, because the point of recording it is to ask a person
+ * which one to believe, and a question that does not quote the two answers is
+ * not answerable.
+ */
+export interface AreaDispute {
+  room_id: string;
+  /** The area the drawing prints for this room. Kept as the room's area. */
+  stated_area_m2: number;
+  /** What the room's outline works out to at the plan's scale. */
+  geometric_area_m2: number;
+}
+
 export interface RepairSummary {
   rooms_in: number;
   rooms_out: number;
@@ -70,9 +86,10 @@ export interface RepairSummary {
   stated_area_room_ids: string[];
   /** Rooms whose area was MEASURED off the drawing but whose polygon
    *  materially disagrees. The measurement is kept — a vision model's estimate
-   *  does not overrule a dimension the architect printed — but the room is
-   *  flagged so someone checks the outline. */
-  disputed_area_room_ids: string[];
+   *  does not overrule a dimension the architect printed — but both numbers are
+   *  recorded so the editor can put the choice in front of a human. A flag
+   *  nobody can act on is half a fix. */
+  disputes: AreaDispute[];
   area_sum_m2: number;
   total_area_m2: number;
 }
@@ -217,7 +234,7 @@ export function repairOverlaps<T extends RepairInputRoom>(
   const outRooms: RepairedRoom<T>[] = [];
   const derivedAreaRoomIds: string[] = [];
   const statedAreaRoomIds: string[] = [];
-  const disputedAreaRoomIds: string[] = [];
+  const disputes: AreaDispute[] = [];
   let areaSum = 0;
   for (const room of rooms) {
     const k = kept.get(room.id);
@@ -248,7 +265,11 @@ export function repairOverlaps<T extends RepairInputRoom>(
       area_derived = false;
       statedAreaRoomIds.push(room.id);
       if (contradicts) {
-        disputedAreaRoomIds.push(room.id);
+        disputes.push({
+          room_id: room.id,
+          stated_area_m2: area_m2,
+          geometric_area_m2: geometric,
+        });
         confidence = Math.min(confidence, LOW_CONFIDENCE_FLAG - 0.05);
       }
     } else if (stated > 0) {
@@ -273,9 +294,31 @@ export function repairOverlaps<T extends RepairInputRoom>(
       carved_room_ids: carvedRoomIds,
       derived_area_room_ids: derivedAreaRoomIds,
       stated_area_room_ids: statedAreaRoomIds,
-      disputed_area_room_ids: disputedAreaRoomIds,
+      disputes,
       area_sum_m2: Math.round(areaSum * 100) / 100,
       total_area_m2: totalAreaM2,
     },
+  };
+}
+
+/**
+ * Map a provider's rooms onto repair's input, carrying every field repair
+ * reads.
+ *
+ * This exists because the route used to build that object by hand, and hand-
+ * built object literals drop fields silently: `area_source` was added to the
+ * provider contract and to repair, and the one line between them still listed
+ * six properties, so in production every area arrived as an "estimated" one and
+ * the never-overwrite rule could not fire. Nothing failed — the areas were
+ * simply unprotected. A mapper that both sides share cannot go quietly out of
+ * date the same way.
+ */
+export function toRepairInput<T extends RepairInputRoom>(room: T): T & RepairInputRoom {
+  return {
+    ...room,
+    polygon: room.polygon,
+    area_m2: room.area_m2 ?? null,
+    area_source: room.area_source ?? null,
+    confidence: room.confidence ?? null,
   };
 }

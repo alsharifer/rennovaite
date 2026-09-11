@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { InspectPanel } from "@/components/viewer/InspectPanel";
+import type { RoomAreaDispute } from "@/lib/parse/disputes";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import {
   roomTarget,
@@ -48,6 +49,7 @@ export function PlanLayers({
   overlaysEnabled,
   mode,
   inspect,
+  areaDisputes,
 }: {
   projectId: string;
   planId: string;
@@ -56,6 +58,8 @@ export function PlanLayers({
   overlaysEnabled: boolean;
   mode: PlanViewerMode;
   inspect?: PlanInspectData;
+  /** Rooms whose printed dimension and whose outline disagree materially. */
+  areaDisputes?: RoomAreaDispute[];
 }) {
   const [layer, setLayer] = useState<Layer>("plan");
   const [target, setTarget] = useState<InspectTarget | null>(null);
@@ -70,6 +74,7 @@ export function PlanLayers({
       planId={planId}
       initialRooms={initialRooms}
       initialTotalAreaM2={initialTotalAreaM2}
+      areaDisputes={areaDisputes}
       mode={mode}
       onInspectRoom={onInspectRoom}
     />

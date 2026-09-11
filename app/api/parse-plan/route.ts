@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { LOW_CONFIDENCE_FLAG } from "@/lib/parse/constants";
 import { getParseProvider, type ParseAsset } from "@/lib/parse/providers";
-import { repairOverlaps } from "@/lib/parse/repair";
+import { repairOverlaps, toRepairInput } from "@/lib/parse/repair";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -61,15 +61,7 @@ export async function POST(request: NextRequest) {
     const raw = await provider.parse(asset);
 
     const { rooms: repaired, summary } = repairOverlaps(
-      raw.rooms.map((r) => ({
-        id: r.id,
-        polygon: r.polygon,
-        area_m2: r.area_m2,
-        confidence: r.confidence,
-        name_en: r.name_en,
-        name_ar: r.name_ar,
-        room_type: r.room_type,
-      })),
+      raw.rooms.map(toRepairInput),
       { totalAreaM2: raw.total_area_m2 },
     );
 
