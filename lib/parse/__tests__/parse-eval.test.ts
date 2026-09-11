@@ -9,6 +9,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { resolveDisputes } from "@/lib/parse/disputes";
+
 import {
   MUDON_DIMENSIONED_AREA_M2,
   MUDON_GROUND_TRUTH,
@@ -20,8 +22,11 @@ import {
   PARSE_2D_CROPPED_DIAGNOSTIC,
   PARSE_2_S4_RAW,
   PARSE_2_S4_REPAIRED,
+  PARSE_3B_DISPUTES,
+  PARSE_3B_SHEET_FIRST_RERUN,
   PARSE_3_SHEET_FIRST,
 } from "./fixtures/mudon-first-floor.parses";
+
 import { evaluateParse, formatEval } from "./parse-eval";
 
 const score = (parse: Parameters<typeof evaluateParse>[1]) =>
@@ -225,5 +230,55 @@ describe("fixture #1 must not regress", () => {
     expect(result.max_abs_delta_pct!).toBeCloseTo(91.4, 1);
     expect(result.overlap_pairs_polygon).toBe(12);
     expect(result.overlap_pairs_gate).toBe(12);
+  });
+});
+
+describe("fixture #2, second sample — the result is not one lucky run", () => {
+  const rerun = score(PARSE_3B_SHEET_FIRST_RERUN);
+
+  it("hits the same bar on an independent run of a non-deterministic model", () => {
+    console.log("\n" + formatEval(rerun));
+    expect(rerun.rooms_found).toBe(13);
+    expect(rerun.missing_tags).toEqual([]);
+    expect(rerun.extra_unexpected).toEqual([]);
+    expect(rerun.area_exact).toBe(8);
+    expect(rerun.overlap_pairs_polygon).toBe(0);
+    expect(rerun.overlap_pairs_gate).toBe(0);
+  });
+
+  it("kept a printed dimension its own outline contradicts", () => {
+    // F08 reads 2700x1750 = 4.72 m². The outline drawn for it is worth 10.2 —
+    // past both halves of the contradiction test. The measurement stands
+    // anyway: a model's guess at where the walls are does not overrule a
+    // dimension the architect printed.
+    const bath = PARSE_3B_SHEET_FIRST_RERUN.rooms.find((r) => r.id === "bathroom-02")!;
+    expect(bath.area_m2).toBe(4.72);
+    expect(bath.area_source).toBe("measured");
+    expect(rerun.matched.find((m) => m.tag === "F08")!.delta_pct).toBeCloseTo(0, 1);
+
+    // …and it is not kept quietly. The room drops below the review threshold
+    // and the dispute carries both figures.
+    expect(bath.confidence!).toBeLessThan(0.6);
+    expect(PARSE_3B_DISPUTES).toHaveLength(1);
+    expect(PARSE_3B_DISPUTES[0]!.stated_area_m2).toBe(4.72);
+    expect(PARSE_3B_DISPUTES[0]!.geometric_area_m2).toBeGreaterThan(4.72 * 2);
+  });
+
+  it("puts that dispute in front of the person editing the plan", () => {
+    // The parse speaks in provider slugs and the editor in database uuids, so
+    // the dispute has to be re-addressed or it reaches a room that is not there.
+    const dbRooms = PARSE_3B_SHEET_FIRST_RERUN.rooms.map((r, i) => ({
+      id: `uuid-${i}`,
+      name_en: r.name_en,
+      room_type: r.room_type,
+      area_m2: r.area_m2,
+    }));
+    const resolved = resolveDisputes(PARSE_3B_DISPUTES, PARSE_3B_SHEET_FIRST_RERUN.rooms, dbRooms);
+    expect(resolved).toEqual([
+      { room_id: "uuid-5", stated_area_m2: 4.72, geometric_area_m2: 10.2 },
+    ]);
+    // The other "Bath" on this sheet is a different type and a different area,
+    // so it is not the one that gets flagged.
+    expect(dbRooms[5]!.area_m2).toBe(4.72);
   });
 });
