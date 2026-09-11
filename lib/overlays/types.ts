@@ -18,6 +18,9 @@ export const ELECTRICAL_TYPES = [
   "ac_point",
   "dp_isolator",
   "data_point",
+  // G1 garden pilot. Distinct from `light_point`: a spike or bollard fitting on
+  // an external circuit, not a ceiling rose.
+  "garden_light",
 ] as const;
 
 export const PLUMBING_TYPES = [
@@ -28,6 +31,9 @@ export const PLUMBING_TYPES = [
   "washing_machine_point",
   "water_heater",
   "floor_drain",
+  // G1 garden pilot. Distinct from `floor_drain`: an external surface gully on
+  // a stormwater or soakaway run, not a wet-room trap.
+  "drainage_point",
 ] as const;
 
 export type ElectricalType = (typeof ELECTRICAL_TYPES)[number];
@@ -35,6 +41,10 @@ export type PlumbingType = (typeof PLUMBING_TYPES)[number];
 export type FixtureType = ElectricalType | PlumbingType;
 
 export type FixtureSource = "rule" | "user";
+
+/** G1: the two types the garden pilot adds. Hidden from the palette when the
+ *  pilot is off, so an interior project's palette is unchanged. */
+export const GARDEN_TYPES: readonly FixtureType[] = ["garden_light", "drainage_point"];
 
 export function layerOf(type: FixtureType): OverlayLayer {
   return (ELECTRICAL_TYPES as readonly string[]).includes(type)

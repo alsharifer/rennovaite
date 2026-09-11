@@ -13,10 +13,10 @@ const graph = buildPlanGraph(MUDON_FIXTURE);
 const MUDON = resolveCommunity({ name: "Mudon pilot villa", city: "Dubai" });
 
 function wall(is_structural: boolean | null): Wall {
-  return { id: "w1", polyline: [[0, 0], [3, 0]], thickness_mm: 200, is_structural, room_ids: ["r1"], derived: true };
+  return { id: "w1", polyline: [[0, 0], [3, 0]], thickness_mm: 200, is_structural, room_ids: ["r1"], derived: true, source: "derived" };
 }
 function room(type: string, id = "r1"): Room {
-  return { id, name_en: type, name_ar: null, type, polygon: [[0, 0], [3, 0], [3, 3], [0, 3]], area_m2: 9, ceiling_h_m: 2.9, derived_fields: [] };
+  return { id, name_en: type, name_ar: null, type, polygon: [[0, 0], [3, 0], [3, 3], [0, 3]], area_m2: 9, ceiling_h_m: 2.9, unroofed: false, derived_fields: [] };
 }
 function opening(type: "door" | "window"): Opening {
   return {

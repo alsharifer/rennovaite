@@ -17,6 +17,9 @@ const RoomPayloadSchema = z.object({
   room_type: z.string().nullable(),
   area_m2: z.number().nonnegative(),
   polygon: z.array(z.array(z.number())).min(3),
+  /** G1 enclosure model. Absent → the room keeps whatever it has (and a new
+   *  room falls back to its type's default in the graph builder). */
+  unroofed: z.boolean().optional(),
 });
 
 const BodySchema = z.object({
@@ -74,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (rooms.length > 0) {
-      const upsertRows = rooms.map((r) => ({
+      const baseRows = rooms.map((r) => ({
         id: r.id,
         plan_id,
         name_en: r.name_en,
@@ -83,10 +86,25 @@ export async function POST(request: NextRequest) {
         area_m2: r.area_m2,
         polygon: r.polygon,
       }));
+      const anyUnroofed = rooms.some((r) => r.unroofed !== undefined);
+      const upsertRows = anyUnroofed
+        ? baseRows.map((row, i) => ({ ...row, unroofed: rooms[i]!.unroofed ?? false }))
+        : baseRows;
+
       const { error: upErr } = await supabase
         .from("rooms")
         .upsert(upsertRows, { onConflict: "id" });
-      if (upErr) throw upErr;
+      if (upErr) {
+        // `unroofed` arrives from migration 031. Before it is applied the save
+        // must still succeed rather than losing the user's geometry over a
+        // column that only outdoor zones use — so retry without it, once.
+        if (!anyUnroofed) throw upErr;
+        console.warn("[api/update-plan] unroofed column absent, retrying:", upErr.message);
+        const { error: retryErr } = await supabase
+          .from("rooms")
+          .upsert(baseRows, { onConflict: "id" });
+        if (retryErr) throw retryErr;
+      }
     }
 
     const total = rooms.reduce((sum, r) => sum + r.area_m2, 0);

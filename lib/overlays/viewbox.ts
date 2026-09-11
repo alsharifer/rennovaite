@@ -5,6 +5,8 @@
 // so switching Plan ↔ Electrical ↔ Plumbing never jumps. Pure — no React.
 // =============================================================================
 
+import { defaultUnroofed } from "@/lib/plan/zones";
+
 export const VIEW_W = 1000;
 export const VIEW_H = 600;
 export const PADDING = 24;
@@ -17,6 +19,8 @@ export interface FitRoom {
   name_ar: string | null;
   room_type: string | null;
   area_m2: number;
+  /** G1: open to the sky — drawn with an open (dashed) edge, no wall. */
+  unroofed: boolean;
   /** viewBox-space polygon points for read-only display. */
   pts: Pt[];
   /** raw bounding box, for point-in-room assignment on add. */
@@ -38,6 +42,8 @@ export interface RawRoomInput {
   polygon: unknown;
   /** Parser confidence 0..1 (nullable); forwarded to the editor's flag. */
   confidence?: number | null;
+  /** G1: open to the sky. Absent → the type's default. */
+  unroofed?: boolean | null;
 }
 
 function asPolygon(v: unknown): Pt[] | null {
@@ -107,6 +113,7 @@ export function fitRooms(rooms: RawRoomInput[]): Fit {
       name_ar: r.name_ar ?? null,
       room_type: r.room_type ?? null,
       area_m2: typeof r.area_m2 === "number" ? r.area_m2 : 0,
+      unroofed: r.unroofed == null ? defaultUnroofed(r.room_type) : r.unroofed === true,
       pts: poly.map(toViewBox),
       raw: { minX: rminX, minY: rminY, maxX: rmaxX, maxY: rmaxY },
     };

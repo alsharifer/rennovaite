@@ -80,12 +80,41 @@ function perimeterM(room: Room): number {
   return p;
 }
 
+/** Surface description for an outdoor zone — its type IS its finish. */
+const ZONE_SURFACES: Record<string, string> = {
+  paving: "Paving to landscape spec",
+  artificial_grass: "Artificial grass on prepared base",
+  planting_bed: "Planting bed — topsoil and edging",
+  deck: "Timber / composite decking",
+  path: "Path finish to landscape spec",
+  structure: "Structure base slab",
+  pool: "Pool — out of scope",
+};
+
+function zoneSurface(type: string | null): string {
+  return (type && ZONE_SURFACES[type]) || "Open zone — surface to be specified";
+}
+
 function buildFinishRows(graph: PlanGraph, styleKey: string | null): FinishRow[] {
   const finishes = (styleKey && STYLE_FINISHES[styleKey]) || DEFAULT_FINISHES;
   const styleNote = styleKey ? `Style: ${styleKey}` : "No locked style — defaults";
   const rows: FinishRow[] = [];
   for (const r of graph.rooms) {
     const floorArea = r.area_m2;
+    // G1: an unroofed zone keeps its surface row and loses the other two. It has
+    // no ceiling, and its walls exist only where somebody drew one — those are
+    // boundary-wall elements with their own lengths, not a room perimeter.
+    if (r.unroofed) {
+      rows.push({
+        room: r.name_en,
+        surface: "Floor",
+        material: zoneSurface(r.type),
+        area_m2: floorArea,
+        notes: "Open to sky — no wall or ceiling finish",
+        groupStart: true,
+      });
+      continue;
+    }
     const wallArea = Math.round(perimeterM(r) * r.ceiling_h_m * 10) / 10;
     rows.push({ room: r.name_en, surface: "Floor", material: finishes.floor, area_m2: floorArea, notes: styleNote, groupStart: true });
     rows.push({ room: r.name_en, surface: "Wall", material: finishes.wall, area_m2: wallArea, notes: `Perimeter × ${r.ceiling_h_m} m (derived h)` });

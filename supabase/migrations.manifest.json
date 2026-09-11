@@ -182,6 +182,12 @@
       "version": "20260101003000",
       "name": "project_archive",
       "sha256": "b98e2af109076b9f66f812916419a68b8cf812e62fb4566246a2ebe9e37f5674"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003100",
+      "name": "authored_plans_and_outdoor_zones",
+      "sha256": "613a7c843d7e1f8f591686b387eeaf996154cf4c7cd6354ab8a19bcd0aeaf098"
     }
   ]
 }

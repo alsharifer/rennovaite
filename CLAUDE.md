@@ -414,6 +414,67 @@ Two compounding pieces off one staging vocabulary, gated by `STAGING_ENABLED`.
   once it's applied. Optional: `node scripts/seed-furniture-prices.ts` to seed
   DB-editable price overrides.
 
+## Authored plans + outdoor zones (garden pilot G1)
+
+A project can start with **no drawing to parse**, and the plan model carries
+**outdoor zones** alongside interior rooms. Gated by `GARDEN_PILOT_ENABLED` —
+off = a project still needs an uploaded floorplan and the room vocabulary is
+exactly the parser's.
+
+- **Authored plans** (`plans.source = 'user_drawn'`, migration `031`).
+  `POST /api/draw-plan` creates a project with no upload; `PATCH` takes over an
+  existing plan whose parse found nothing. Until G1 `/api/upload` was the only
+  code path that inserted a project.
+  **The plot is the scale**: `plans.plot_width_m` / `plot_depth_m` are measured,
+  and normalised space runs x ∈ [0,1] across the plot width, so
+  `unit_to_m === plot_width_m`. `buildPlanGraph` uses it verbatim and sets
+  `derived.metric_scale: false` — a typed dimension is a measurement. This is
+  not cosmetic: the area-derived scale assumes rooms **tile** the plan, which
+  interior floors do and a garden does not, so inferring it would inflate every
+  zone to fill the plot.
+- **No spinner is reachable.** `parsedComplete` used to gate the whole editor on
+  `parsed_json !== null`, so a plan without rooms rendered `ParseLoading`
+  forever — and an authored plan can never satisfy it. The gate is now
+  `authored || (parsed_json && rooms > 0)`, and the else branch is
+  `PlanNotAnalysed`: an actionable card (re-run the analysis / take the plan
+  over by hand) instead of a spinner.
+- **Zone vocabulary** `lib/plan/zones.ts` (pure, unit-tested). Interior tokens
+  mirror the parser prompt exactly; outdoor tokens are `paving`,
+  `artificial_grass`, `planting_bed`, `deck`, `path`, `structure`, `pool`
+  (`pool` is stored but not priced). `balcony`/`terrace` stay **interior** —
+  reclassifying them would change every villa already parsed. The editor's
+  hard-coded `room_type: "other"` is gone: there is a type picker, and the
+  type's default drives `unroofed`.
+- **Enclosure model.** `rooms.unroofed` (default false). An unroofed zone has
+  `ceiling_h_m: 0`, and **a wall interval whose every covering room is unroofed
+  is not emitted** — a lawn meeting a paved area is a change of surface, not a
+  wall. A wall on a garden edge exists only where a `boundary_wall` element was
+  drawn (those append to `walls[]` as `source: 'drawn'`, `derived: false`).
+  A shared edge between an unroofed zone and a roofed room still emits its wall.
+- **Linear elements** `lib/plan/elements.ts` + `plan_elements` (031) +
+  `/api/plan-elements`: `boundary_wall | bench_run | planter_run | counter_run`,
+  polylines in normalised space, length derived in metres at graph-build time
+  (never stored, so it cannot drift). Defaulted cross-sections are flagged
+  `derived`, same rule as openings. Editing surface is the **Elements** layer in
+  `PlanLayers`. Lighting and drainage **points** needed no schema: they are two
+  new `plan_fixtures` types (`garden_light`, `drainage_point`) in a new
+  `garden` overlay rule category, kept separate from `outdoor` so Mudon's
+  terraces seed exactly what they always did.
+- **Consumers.** `quantify.ts` emits no `ceiling_finish` for an unroofed zone;
+  the finish schedule drops its Wall/Ceiling rows and keeps a surface row;
+  dimension chains anchor on zone edges and drawn walls (`gridLines` reads both,
+  so the chain still closes); the 3D scene renders open zones as ground slabs
+  and gives a `structure` zone an explicit canopy height. `lib/boq/rules.ts`
+  gains `LANDSCAPE_TYPES`, excluded from **both** the interior and the
+  terrace/external buckets — folding a lawn into `EXTERNAL_TYPES` would have
+  priced it as waterproofed porcelain. Landscape quantities are G2's; until then
+  a drawn garden reports its area (`takeoff.summary.landscapeAreaM2`) and prices
+  nothing, which is a visible gap rather than a silent wrong number.
+- **DB step**: `supabase db push` (see `docs/MIGRATIONS.md`) for `031`.
+  Everything degrades gracefully until it runs — `derivePlanGraph` falls back to
+  the pre-031 selects, the plan page still renders, and `/api/update-plan`
+  retries the room upsert without `unroofed`.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.
@@ -479,6 +540,7 @@ view-only side surface reached from the layout and render steps).
 | `TASTE_SEED_ENABLED`              | server — `"true"` lets a project's moodboard condition its renders (B3). Off = renders behave exactly as before |
 | `TEXTURED_WALKTHROUGH`            | server — `"true"` lets the 3D walkthrough read StyleBoard finishes onto floors and walls (F1). Off = the clay model, unchanged |
 | `PARSE_PROVIDER`                  | server — optional; which floorplan parser to use. Only `"inhouse"` (the default) is configured; any other value throws rather than silently mis-parsing |
+| `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
 
 ### Feature flags — read at server start (flip → restart)
 

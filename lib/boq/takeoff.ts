@@ -21,6 +21,7 @@ import {
   COVE_LM_PER_M2,
   EXTERNAL_TYPES,
   HVAC_SERVICE_TYPES,
+  LANDSCAPE_TYPES,
   PENDANTS_LIVING,
   PLASTER_MAKEGOOD_FACTOR,
   POINTS_PER_M2,
@@ -41,6 +42,8 @@ type RoomGeometry = {
   isBathroom: boolean;
   isBedroom: boolean;
   isExternal: boolean;
+  /** G1: an outdoor garden zone — neither interior nor terrace. */
+  isLandscape: boolean;
   doorCount: number; // structural door openings into the room
   grossWallM2: number;
   netWallM2: number; // F-01
@@ -93,6 +96,7 @@ function roomGeometry(room: EngineRoom): RoomGeometry {
 
   const isBathroom = BATHROOM_TYPES.has(room.room_type);
   const isBedroom = BEDROOM_TYPES.has(room.room_type);
+  const isLandscape = LANDSCAPE_TYPES.has(room.room_type);
   const isExternal = EXTERNAL_TYPES.has(room.room_type);
   const doorCount = 1; // every room in the refit scope has exactly one door
 
@@ -111,6 +115,7 @@ function roomGeometry(room: EngineRoom): RoomGeometry {
     isBathroom,
     isBedroom,
     isExternal,
+    isLandscape,
     doorCount,
     grossWallM2,
     netWallM2,
@@ -126,6 +131,8 @@ export type Takeoff = {
     bathroomCount: number;
     netWallM2: number;
     bathWetWallM2: number;
+    /** G1: drawn outdoor zone area. Reported, deliberately not yet priced. */
+    landscapeAreaM2: number;
   };
 };
 
@@ -134,22 +141,29 @@ export function computeTakeoff(
   flooring: "porcelain" | "engineered_wood",
 ): Takeoff {
   const geos = rooms.map(roomGeometry);
-  const external = geos.filter((g) => g.isExternal);
-  const interior = geos.filter((g) => !g.isExternal);
+  // G1: outdoor zones leave both pools before anything is measured. Every
+  // quantity below (paint, skirting, ceilings, AC, floor tiling) is interior
+  // or terrace work; a lawn that slipped into either bucket would be priced as
+  // a floor. The landscape rules are G2's.
+  const costable = geos.filter((g) => !g.isLandscape);
+  const landscape = geos.filter((g) => g.isLandscape);
+  const external = costable.filter((g) => g.isExternal);
+  const interior = costable.filter((g) => !g.isExternal);
   // Stairs are NOT flat floor — handled as a developed tile surface below, so
   // exclude them from the dry-floor pool (they were previously priced as flat
   // floor, and their developed tread/riser surface was invisible).
   const stairs = interior.filter((g) => g.room.room_type === "stairs");
   const dry = interior.filter((g) => !g.isBathroom && g.room.room_type !== "stairs"); // bedrooms, living, corridor, storage, office
   const baths = interior.filter((g) => g.isBathroom);
-  const beds = geos.filter((g) => g.isBedroom);
-  const secondaryBeds = geos.filter((g) => g.room.room_type === "bedroom");
-  const offices = geos.filter((g) => g.room.room_type === "office");
-  const fcuServiceRooms = geos.filter((g) =>
+  const beds = costable.filter((g) => g.isBedroom);
+  const secondaryBeds = costable.filter((g) => g.room.room_type === "bedroom");
+  const offices = costable.filter((g) => g.room.room_type === "office");
+  const fcuServiceRooms = costable.filter((g) =>
     HVAC_SERVICE_TYPES.has(g.room.room_type),
   );
 
-  const totalAreaM2 = round2(geos.reduce((s, g) => s + g.room.area_m2, 0));
+  const totalAreaM2 = round2(costable.reduce((s, g) => s + g.room.area_m2, 0));
+  const landscapeAreaM2 = round2(landscape.reduce((s, g) => s + g.room.area_m2, 0));
   const interiorAreaM2 = round2(
     interior.reduce((s, g) => s + g.room.area_m2, 0),
   );
@@ -698,6 +712,7 @@ export function computeTakeoff(
       bathroomCount: baths.length,
       netWallM2,
       bathWetWallM2,
+      landscapeAreaM2,
     },
   };
 }

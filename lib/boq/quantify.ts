@@ -139,7 +139,12 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
     if (room.type !== "stairs") {
       items.push({ work_item_key: "floor_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
     }
-    items.push({ work_item_key: "ceiling_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
+    // G1: an unroofed zone has no ceiling to finish. Its ceiling_h_m is 0, so
+    // the line would have priced a real area against a surface that does not
+    // exist — skip it outright rather than emit a zero.
+    if (!room.unroofed) {
+      items.push({ work_item_key: "ceiling_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
+    }
     if (wet) {
       // Full-height wet-wall tiling: room perimeter × ceiling height, NET of
       // any door/window opening onto this room (A5). Floored at 0.

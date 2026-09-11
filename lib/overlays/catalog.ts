@@ -33,6 +33,10 @@ export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
   ac_point: { label: "AC point", code: "AC", glyph: "ac_unit", boqDescription: "Split-AC indoor unit power + control point", unitRateAed: 350 },
   dp_isolator: { label: "DP isolator", code: "DP", glyph: "bolt", boqDescription: "Double-pole isolator switch — supply & install", unitRateAed: 180 },
   data_point: { label: "Data point", code: "D", glyph: "lan", boqDescription: "Structured-cabling data/TV outlet — supply & install", unitRateAed: null },
+  // G1. No default rate: garden lighting is a calibrated landscape rate, and
+  // inventing one here would put a confident wrong number in front of a QS.
+  // The Villa 94 boundary-light rate arrives with G2.
+  garden_light: { label: "Garden light", code: "GL", glyph: "wb_incandescent", boqDescription: "External garden light point — cabling + fitting allowance", unitRateAed: null },
   // --- Plumbing ---
   wc_point: { label: "WC point", code: "WC", glyph: "wc", boqDescription: "WC supply + soil connection — first & second fix", unitRateAed: 850 },
   basin_point: { label: "Basin point", code: "B", glyph: "wash", boqDescription: "Wash-basin supply + waste — first & second fix", unitRateAed: 650 },
@@ -41,6 +45,8 @@ export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
   washing_machine_point: { label: "Washing machine", code: "WM", glyph: "local_laundry_service", boqDescription: "Washing-machine supply + waste point", unitRateAed: 450 },
   water_heater: { label: "Water heater", code: "WH", glyph: "water_heater", boqDescription: "Electric water heater — supply & install", unitRateAed: null },
   floor_drain: { label: "Floor drain", code: "FD", glyph: "water_drop", boqDescription: "Wet-area floor drain + trap — supply & install", unitRateAed: 220 },
+  // G1. Same reasoning as garden_light — priced with the landscape rate book.
+  drainage_point: { label: "Drainage point", code: "DR", glyph: "water", boqDescription: "External surface drainage point — gully + connection", unitRateAed: null },
 };
 
 export function pomiSectionFor(type: FixtureType): string {

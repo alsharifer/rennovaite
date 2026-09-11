@@ -170,7 +170,14 @@ function Floors({
         const shape = new THREE.Shape();
         f.points.forEach(([x, z], i) => (i === 0 ? shape.moveTo(x, -z) : shape.lineTo(x, -z)));
         shape.closePath();
-        return { key: f.roomId, shape, color: f.color, finish: finishes?.floorByRoom[f.roomId] ?? null };
+        return {
+          key: f.id,
+          roomId: f.roomId,
+          shape,
+          color: f.color,
+          elevation: f.elevation,
+          finish: finishes?.floorByRoom[f.roomId] ?? null,
+        };
       }),
     [scene, finishes],
   );
@@ -184,12 +191,12 @@ function Floors({
             finish: m.finish,
             clayColor: m.color,
             kind: "floor",
-            highlight: hl(m.key === selectedId, m.key === hoveredId),
+            highlight: hl(m.roomId === selectedId, m.roomId === hoveredId),
           })}
           rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, 0, 0]}
-          onClick={(e) => { e.stopPropagation(); onElement("floor", m.key, e.point); }}
-          onPointerOver={(e) => { e.stopPropagation(); onHover(m.key); }}
+          position={[0, m.elevation, 0]}
+          onClick={(e) => { e.stopPropagation(); onElement("floor", m.roomId, e.point); }}
+          onPointerOver={(e) => { e.stopPropagation(); onHover(m.roomId); }}
           onPointerOut={() => onHover(null)}
         >
           {/* Geometry is declared as a child so react-three-fiber owns its

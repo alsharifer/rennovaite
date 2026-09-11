@@ -12,6 +12,7 @@ import {
 import { FIXTURE_META } from "@/lib/overlays/catalog";
 import {
   ELECTRICAL_TYPES,
+  GARDEN_TYPES,
   PLUMBING_TYPES,
   type FixtureType,
   type OverlayLayer,
@@ -44,15 +45,22 @@ export function OverlayEditor({
   rooms,
   layer,
   readOnly = false,
+  gardenPilot = false,
 }: {
   projectId: string;
   rooms: RawRoomInput[];
   layer: OverlayLayer;
   /** read mode: render fixtures but hide the palette + disable drag/add/delete. */
   readOnly?: boolean;
+  /** G1: offer the garden light / drainage types. Off ⇒ the palette is exactly
+   *  what it was before the pilot. */
+  gardenPilot?: boolean;
 }) {
   const fit = useMemo(() => fitRooms(rooms), [rooms]);
-  const types = layer === "electrical" ? ELECTRICAL_TYPES : PLUMBING_TYPES;
+  const types = useMemo(() => {
+    const all = layer === "electrical" ? ELECTRICAL_TYPES : PLUMBING_TYPES;
+    return gardenPilot ? all : all.filter((t) => !GARDEN_TYPES.includes(t));
+  }, [layer, gardenPilot]);
 
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [loading, setLoading] = useState(true);

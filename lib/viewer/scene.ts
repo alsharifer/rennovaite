@@ -20,6 +20,11 @@ export const WALL_WHITE = "#F4EFE6"; // matte clay-white (canvas-adjacent)
 export const FLOOR_BONE = "#EDE6D8";
 export const DEFAULT_CEILING_H_M = 2.9;
 const DOOR_H_M = 2.1;
+/** G1: clear height under a pergola / outdoor-structure canopy. */
+export const STRUCTURE_CANOPY_H_M = 2.6;
+/** G1: fallback height for a plan made only of unroofed zones, so the camera
+ *  and the empty-envelope maths have something sane to work with. */
+export const OPEN_ZONE_ENVELOPE_H_M = 1.8;
 
 export interface WallBox {
   id: string;
@@ -31,6 +36,8 @@ export interface WallBox {
   rotationY: number;
   /** Wall geometry is derived (not surveyed) — render at reduced opacity. */
   derived: boolean;
+  /** G1: a wall the user drew as a boundary_wall element, at its own height. */
+  drawn?: boolean;
   /**
    * Room on each face of the wall, so the two sides can carry different
    * finishes. A bathroom/bedroom party wall must be tiled on the bathroom side
@@ -45,10 +52,17 @@ export interface WallBox {
 }
 
 export interface FloorSlab {
+  /** Unique per slab. Equals roomId for ground surfaces; a structure zone also
+   *  emits a canopy slab, which needs its own key. */
+  id: string;
   roomId: string;
-  /** World XZ polygon (metres) at y = 0. */
+  /** World XZ polygon (metres). */
   points: [number, number][];
   color: string;
+  /** Height above ground in metres. 0 for every floor and every open zone. */
+  elevation: number;
+  /** G1: true for an unroofed zone — a ground surface, not a room floor. */
+  openZone: boolean;
 }
 
 export interface RoomLabel {
@@ -143,10 +157,25 @@ export function buildScene(
   const cz = depth / 2;
   const toWorldXZ = (p: Point): [number, number] => [p[0] - cx, p[1] - cz];
 
+  // G1: an unroofed zone is height 0 and must STAY 0 — the `|| DEFAULT` fallback
+  // below exists for a room whose ceiling never got set, and letting a lawn fall
+  // through it would extrude 2.9 m walls around the garden.
   const ceilingByRoom = new Map<string, number>();
-  for (const r of graph.rooms) ceilingByRoom.set(r.id, r.ceiling_h_m || DEFAULT_CEILING_H_M);
+  for (const r of graph.rooms) {
+    ceilingByRoom.set(r.id, r.unroofed ? 0 : r.ceiling_h_m || DEFAULT_CEILING_H_M);
+  }
+  const roofedCeiling = graph.rooms.reduce(
+    (m, r) => (r.unroofed ? m : Math.max(m, r.ceiling_h_m || 0)),
+    0,
+  );
+  // A plan of nothing but open zones has no ceiling at all; fall back to the
+  // tallest drawn boundary wall, then to a standard boundary-wall height.
+  const tallestDrawnWall = graph.elements.reduce(
+    (m, e) => (e.kind === "boundary_wall" ? Math.max(m, e.height_mm / 1000) : m),
+    0,
+  );
   const globalCeiling =
-    graph.rooms.reduce((m, r) => Math.max(m, r.ceiling_h_m || 0), 0) || DEFAULT_CEILING_H_M;
+    roofedCeiling || tallestDrawnWall || OPEN_ZONE_ENVELOPE_H_M;
 
   const openingsByWall = new Map<string, Opening[]>();
   for (const o of graph.openings) {
@@ -159,24 +188,59 @@ export function buildScene(
 
   const walls: WallBox[] = [];
   const wallSegments: WallSegment[] = [];
+  // A drawn boundary wall carries its own height (it encloses nothing, so there
+  // is no room ceiling to read it from).
+  const drawnWallHeight = new Map<string, number>();
+  for (const el of graph.elements) {
+    if (el.kind !== "boundary_wall") continue;
+    for (let i = 0; i < el.polyline.length - 1; i++) {
+      drawnWallHeight.set(`${el.id}:${i}`, el.height_mm / 1000);
+    }
+  }
+  const drawnHeights = [...drawnWallHeight.values()];
+  let drawnSeen = 0;
+
   for (const w of graph.walls) {
     const [a, b] = w.polyline;
     if (!a || !b) continue;
-    const height =
-      w.room_ids.reduce((m, id) => Math.max(m, ceilingByRoom.get(id) ?? 0), 0) || globalCeiling;
+    const drawn = w.source === "drawn";
+    const height = drawn
+      ? (drawnHeights[drawnSeen++] ?? OPEN_ZONE_ENVELOPE_H_M)
+      : w.room_ids.reduce((m, id) => Math.max(m, ceilingByRoom.get(id) ?? 0), 0) || globalCeiling;
     const thickness = (w.thickness_mm || 200) / 1000;
     const wa = toWorldXZ(a);
     const wb = toWorldXZ(b);
     wallSegments.push({ a: wa, b: wb, thickness });
     const sides = assignWallSides(wa, wb, w.room_ids, centroidByRoom);
-    pushWallBoxes(walls, w.id, wa, wb, thickness, height, w.derived === true, openingsByWall.get(w.id) ?? [], sides);
+    pushWallBoxes(walls, w.id, wa, wb, thickness, height, w.derived === true, openingsByWall.get(w.id) ?? [], sides, drawn);
   }
 
-  const floors: FloorSlab[] = graph.rooms.map((r) => ({
-    roomId: r.id,
-    points: r.polygon.map(toWorldXZ),
-    color: opts.floorColorByRoom?.[r.id] ?? FLOOR_BONE,
-  }));
+  // G1: unroofed zones become ground surfaces — same polygon, no walls around
+  // them, no ceiling above. A `structure` zone (pergola, outdoor counter) also
+  // gets a canopy slab at an explicit clear height, because a pergola that
+  // renders as a patch of paving is not a pergola.
+  const floors: FloorSlab[] = [];
+  for (const r of graph.rooms) {
+    const pts = r.polygon.map(toWorldXZ);
+    floors.push({
+      id: r.id,
+      roomId: r.id,
+      points: pts,
+      color: opts.floorColorByRoom?.[r.id] ?? FLOOR_BONE,
+      elevation: 0,
+      openZone: r.unroofed,
+    });
+    if (r.unroofed && r.type === "structure") {
+      floors.push({
+        id: `${r.id}:canopy`,
+        roomId: r.id,
+        points: pts,
+        color: opts.floorColorByRoom?.[r.id] ?? FLOOR_BONE,
+        elevation: STRUCTURE_CANOPY_H_M,
+        openZone: true,
+      });
+    }
+  }
 
   const labels: RoomLabel[] = graph.rooms.map((r) => {
     const [x, z] = toWorldXZ(centroid(r.polygon));
@@ -190,7 +254,9 @@ export function buildScene(
     labels,
     bounds: { center: [0, 0], size: [width, depth], height: globalCeiling },
     wallCount: graph.walls.length,
-    isEmpty: graph.walls.length === 0,
+    // A garden has no walls and is not empty. What makes the viewer empty is
+    // having nothing to stand on at all.
+    isEmpty: graph.walls.length === 0 && floors.length === 0,
   };
 }
 
@@ -210,6 +276,7 @@ function pushWallBoxes(
   derived: boolean,
   openings: Opening[],
   sides: { roomPos: string | null; roomNeg: string | null },
+  drawn = false,
 ): void {
   const [ax, az] = a;
   const [bx, bz] = b;
@@ -222,7 +289,7 @@ function pushWallBoxes(
   const midZ = (az + bz) / 2;
 
   if (openings.length === 0) {
-    out.push({ id, center: [midX, height / 2, midZ], size: [length, height, thickness], rotationY, derived, ...sides });
+    out.push({ id, center: [midX, height / 2, midZ], size: [length, height, thickness], rotationY, derived, drawn, ...sides });
     return;
   }
 
@@ -242,6 +309,7 @@ function pushWallBoxes(
       size: [segLen, h, thickness],
       rotationY,
       derived,
+      drawn,
       ...sides,
     });
   };

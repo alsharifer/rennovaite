@@ -14,6 +14,7 @@ import { Layers, Plus, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { RoomAreaDispute } from "@/lib/parse/disputes";
+import { defaultUnroofed, roomTypeOptions } from "@/lib/plan/zones";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { polygonArea } from "@/lib/plan/polygon";
 import { separateOverlappingRooms } from "@/lib/plan/separate";
@@ -36,6 +37,8 @@ const BONE_FILL = "#EDE6D8";
 const PRIMARY_FIXED = "#FFDDB3";
 const INK_900 = "#0F1B2D";
 const INK_700 = "#4F4539";
+// G1: open zones read as ground, not as floor — a muted sage against the bone.
+const OPEN_ZONE_FILL = "#DCE3D2";
 
 type Point = [number, number];
 
@@ -48,7 +51,13 @@ type RoomInput = {
   polygon: unknown;
   /** Provider confidence 0..1 (nullable); low values flag the room for review. */
   confidence?: number | null;
+  /** G1: open to the sky. Absent → the type's default. */
+  unroofed?: boolean | null;
 };
+
+/** G1: an authored plan's measured plot. Its presence changes the canvas from
+ *  fit-to-content to fit-to-plot, which is what makes a drawn area exact. */
+export type PlotSize = { width_m: number; depth_m: number };
 
 type Room = {
   id: string;
@@ -59,6 +68,8 @@ type Room = {
   // N-vertex polygon in viewBox space (may be non-rectilinear / diagonal).
   polygon: Point[];
   confidence: number | null;
+  /** G1: open to the sky — no ceiling, and its edges emit no wall. */
+  unroofed: boolean;
   isNew?: boolean;
   isDeleted?: boolean;
 };
@@ -151,16 +162,89 @@ function pixelToM(px: number, scale: number): number {
 // (the viewBox clamp flattening an N-vertex room to its bbox) is documented.
 // `Room` structurally satisfies the module's generic `SeparableRoom`.
 
-// Convert any coordinate space (Claude's [0,1] or pixel) to viewBox space,
-// fitting all rooms aspect-preserving with PADDING.
-function fitToViewBox(rooms: RoomInput[]): {
+type Fit = {
   rooms: Room[];
+  /** m² per viewBox px². */
   unitToM2Factor: number;
   initialTotalViewBoxArea: number;
-} {
+  /**
+   * viewBox point → the space the polygon is PERSISTED in.
+   *
+   * A parsed plan stores viewBox coordinates and re-fits them to content on
+   * every load, so this is the identity there and nothing about that path
+   * changes. An authored plan stores normalised PLOT coordinates, because its
+   * canvas is anchored to the plot rather than to whatever has been drawn so
+   * far — which is the only way a zone's area survives a reload unchanged when
+   * the next zone drawn would otherwise re-fit the whole canvas.
+   */
+  toStored: (p: Point) => Point;
+  /** Inverse of `toStored` — used when the server hands back repaired geometry. */
+  toViewBox: (p: Point) => Point;
+};
+
+function toRoom(r: RoomInput, pts: Point[]): Room {
+  return {
+    id: r.id,
+    name_en: r.name_en?.trim() || "Room",
+    name_ar: r.name_ar ?? null,
+    room_type: r.room_type ?? null,
+    area_m2: typeof r.area_m2 === "number" ? r.area_m2 : 0,
+    polygon: pts,
+    confidence: typeof r.confidence === "number" ? r.confidence : null,
+    unroofed: r.unroofed == null ? defaultUnroofed(r.room_type) : r.unroofed === true,
+  };
+}
+
+/**
+ * G1: fit the PLOT (not the content) into the viewBox. Normalised plot space
+ * has x ∈ [0, 1] spanning the plot width and y scaled by the same factor, so
+ * the mapping is isotropic and matches the metric contract in
+ * lib/plan/geometry.ts, where unit_to_m is exactly the plot width.
+ */
+function fitToPlot(rooms: RoomInput[], plot: PlotSize): Fit {
+  const spanX = 1;
+  const spanY = Math.max(plot.depth_m / plot.width_m, 1e-6);
+  const availW = VIEW_W - 2 * PADDING;
+  const availH = VIEW_H - 2 * PADDING;
+  const scale = Math.min(availW / spanX, availH / spanY);
+  const offsetX = (VIEW_W - spanX * scale) / 2;
+  const offsetY = (VIEW_H - spanY * scale) / 2;
+
+  const fitted = rooms
+    .filter((r) => isPointArray(r.polygon))
+    .map((r) =>
+      toRoom(
+        r,
+        (r.polygon as number[][]).map<Point>(([x, y]) => [
+          x * scale + offsetX,
+          y * scale + offsetY,
+        ]),
+      ),
+    );
+
+  // Metres per viewBox pixel is fixed by the plot, not by what is drawn.
+  const mPerPx = plot.width_m / scale;
+  return {
+    rooms: fitted,
+    unitToM2Factor: mPerPx * mPerPx,
+    initialTotalViewBoxArea: fitted.reduce((s, r) => s + polygonArea(r.polygon), 0),
+    toStored: ([x, y]) => [(x - offsetX) / scale, (y - offsetY) / scale],
+    toViewBox: ([x, y]) => [x * scale + offsetX, y * scale + offsetY],
+  };
+}
+
+// Convert any coordinate space (Claude's [0,1] or pixel) to viewBox space,
+// fitting all rooms aspect-preserving with PADDING.
+function fitToViewBox(rooms: RoomInput[]): Fit {
   const valid = rooms.filter((r) => isPointArray(r.polygon));
   if (valid.length === 0) {
-    return { rooms: [], unitToM2Factor: 1, initialTotalViewBoxArea: 0 };
+    return {
+      rooms: [],
+      unitToM2Factor: 1,
+      initialTotalViewBoxArea: 0,
+      toStored: (p) => p,
+      toViewBox: (p) => p,
+    };
   }
 
   let minX = Infinity,
@@ -190,15 +274,7 @@ function fitToViewBox(rooms: RoomInput[]): {
       (x - minX) * scale + offsetX,
       (y - minY) * scale + offsetY,
     ]);
-    return {
-      id: r.id,
-      name_en: r.name_en?.trim() || "Room",
-      name_ar: r.name_ar ?? null,
-      room_type: r.room_type ?? null,
-      area_m2: typeof r.area_m2 === "number" ? r.area_m2 : 0,
-      polygon: pts,
-      confidence: typeof r.confidence === "number" ? r.confidence : null,
-    };
+    return toRoom(r, pts);
   });
 
   const initialTotalViewBoxArea = fitted.reduce(
@@ -211,7 +287,14 @@ function fitToViewBox(rooms: RoomInput[]): {
       ? totalM2 / initialTotalViewBoxArea
       : 1;
 
-  return { rooms: fitted, unitToM2Factor, initialTotalViewBoxArea };
+  return {
+    rooms: fitted,
+    unitToM2Factor,
+    initialTotalViewBoxArea,
+    // Parsed plans persist viewBox coordinates, exactly as before.
+    toStored: (p) => p,
+    toViewBox: (p) => p,
+  };
 }
 
 type Props = {
@@ -227,6 +310,10 @@ type Props = {
    *  measurement was kept; this is the question that asks a human which to
    *  believe. */
   areaDisputes?: RoomAreaDispute[];
+  /** G1: authored plan — the measured plot. Present ⇒ plot-anchored canvas. */
+  plot?: PlotSize | null;
+  /** G1: offer outdoor zone types in the picker (garden pilot flag). */
+  outdoorEnabled?: boolean;
 };
 
 export function EditablePlanViewer({
@@ -235,10 +322,16 @@ export function EditablePlanViewer({
   mode,
   onInspectRoom,
   areaDisputes,
+  plot,
+  outdoorEnabled = false,
 }: Props) {
   const router = useRouter();
   const editing = editingEnabled(mode);
-  const fitted = useMemo(() => fitToViewBox(initialRooms), [initialRooms]);
+  const fitted = useMemo(
+    () => (plot ? fitToPlot(initialRooms, plot) : fitToViewBox(initialRooms)),
+    [initialRooms, plot],
+  );
+  const typeGroups = useMemo(() => roomTypeOptions(outdoorEnabled), [outdoorEnabled]);
   // m²-per-unit factor is anchored to the initial fit and stays stable
   // across edits because `fitted` is memoised on `[initialRooms]` — resize
   // ops on local state never change it.
@@ -317,8 +410,10 @@ export function EditablePlanViewer({
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const visibleRooms = rooms.filter((r) => !r.isDeleted);
+  const selectedRoom = visibleRooms.find((r) => r.id === selectedId) ?? null;
 
   const liveTotalM2 = visibleRooms.reduce((s, r) => s + r.area_m2, 0);
+  const openZoneCount = visibleRooms.filter((r) => r.unroofed).length;
 
   // Push current state onto history (capped to HISTORY_LIMIT entries).
   const snapshot = useCallback(() => {
@@ -482,18 +577,48 @@ export function EditablePlanViewer({
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `tmp-${Math.random().toString(36).slice(2)}`;
+    // Before G1 this was hard-coded "other" with no way to change it, so every
+    // hand-drawn room was permanently unclassified and silently dropped out of
+    // the render, the takeoff buckets and the overlay seeding. It now starts on
+    // a plausible type for the plan being drawn, and the picker below can
+    // change it.
+    const room_type = plot && outdoorEnabled ? "paving" : "other";
     const next: Room = {
       id,
-      name_en: "New room",
+      name_en: plot && outdoorEnabled ? "New zone" : "New room",
       name_ar: null,
-      room_type: "other",
+      room_type,
       area_m2: recomputeArea(polygon),
       polygon,
       confidence: null,
+      unroofed: defaultUnroofed(room_type),
       isNew: true,
     };
     setRooms((current) => [...current, next]);
     setSelectedId(id);
+  };
+
+  /**
+   * Change a room's type. The enclosure flag follows the new type's default,
+   * because someone re-typing a room from "living" to "artificial_grass" means
+   * it, and leaving a stale roof over a lawn would put a ceiling finish in the
+   * BoQ. The explicit toggle below is how you disagree with the default.
+   */
+  const setRoomType = (roomId: string, room_type: string) => {
+    snapshot();
+    correctionCounts.current.relabel += 1;
+    setRooms((current) =>
+      current.map((r) =>
+        r.id === roomId ? { ...r, room_type, unroofed: defaultUnroofed(room_type) } : r,
+      ),
+    );
+  };
+
+  const toggleUnroofed = (roomId: string) => {
+    snapshot();
+    setRooms((current) =>
+      current.map((r) => (r.id === roomId ? { ...r, unroofed: !r.unroofed } : r)),
+    );
   };
 
   const deleteRoom = (roomId: string) => {
@@ -683,7 +808,8 @@ export function EditablePlanViewer({
         name_ar: r.name_ar,
         room_type: r.room_type,
         area_m2: r.area_m2,
-        polygon: r.polygon,
+        polygon: r.polygon.map(fitted.toStored),
+        unroofed: r.unroofed,
       })),
       deleted_ids: rooms
         .filter((r) => r.isDeleted && !r.isNew)
@@ -716,7 +842,11 @@ export function EditablePlanViewer({
         setRooms((current) =>
           current.map((r) => {
             const f = byId.get(r.id);
-            return f ? { ...r, polygon: f.polygon, area_m2: f.area_m2 } : r;
+            // The server repairs in the space it was sent, so a plot-anchored
+            // plan gets normalised polygons back and has to come home.
+            return f
+              ? { ...r, polygon: f.polygon.map(fitted.toViewBox), area_m2: f.area_m2 }
+              : r;
           }),
         );
         flashInfo(
@@ -834,6 +964,54 @@ export function EditablePlanViewer({
           {lowConfidenceIds.size > 0 && (
             <span className="ml-1 rounded-full bg-[#FEF3C7] px-2 py-0.5 text-xs font-medium text-[#92400E]">
               {lowConfidenceIds.size} to review
+            </span>
+          )}
+          {/* G1: the type picker. Every downstream classifier — render, takeoff
+              bucket, overlay seeding — keys off this one field, and until now a
+              drawn room could not set it at all. */}
+          {selectedRoom && (
+            <span className="ml-2 flex items-center gap-1.5 text-xs text-ink-500">
+              <label htmlFor="room-type-picker" className="sr-only">
+                Room or zone type
+              </label>
+              <select
+                id="room-type-picker"
+                value={selectedRoom.room_type ?? "other"}
+                onChange={(e) => setRoomType(selectedRoom.id, e.target.value)}
+                className="focus-ring rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-xs text-ink-900"
+              >
+                {typeGroups.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                        {o.note ? ` (${o.note})` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => toggleUnroofed(selectedRoom.id)}
+                aria-pressed={selectedRoom.unroofed}
+                title={
+                  selectedRoom.unroofed
+                    ? "Open to the sky: no ceiling, and its edges emit no wall"
+                    : "Enclosed: walls at shared edges, ceiling finish priced"
+                }
+                className={cn(
+                  "focus-ring inline-flex items-center gap-1 rounded border px-1.5 py-0.5",
+                  selectedRoom.unroofed
+                    ? "border-brass-600 bg-primary-fixed/40 text-ink-900"
+                    : "border-ink-100 bg-paper text-ink-700 hover:bg-surface-container",
+                )}
+              >
+                <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
+                  {selectedRoom.unroofed ? "wb_sunny" : "roofing"}
+                </span>
+                {selectedRoom.unroofed ? "Unroofed" : "Roofed"}
+              </button>
             </span>
           )}
           {selectedId && (
@@ -979,7 +1157,9 @@ export function EditablePlanViewer({
               fill="var(--color-ink-500)"
               fontSize="16"
             >
-              No rooms yet — click &quot;Add room&quot; to start.
+              {plot
+                ? "Nothing drawn yet — click “Add room” to place your first zone."
+                : "No rooms yet — click “Add room” to start."}
             </text>
           ) : (
             visibleRooms.map((room, index) => {
@@ -1016,15 +1196,20 @@ export function EditablePlanViewer({
                   }}
                   style={{ transformOrigin: `${cx}px ${cy}px` }}
                 >
+                  {/* G1: an unroofed zone is drawn with an open edge — a dashed
+                      hairline, not a wall line — because its boundary emits no
+                      wall unless one is drawn. The plan should look like what
+                      the geometry actually says. */}
                   <polygon
                     className="room-poly"
                     points={room.polygon
                       .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                       .join(" ")}
-                    fill={BONE_FILL}
-                    fillOpacity={0.5}
-                    stroke={INK_900}
-                    strokeOpacity={1}
+                    fill={room.unroofed ? OPEN_ZONE_FILL : BONE_FILL}
+                    fillOpacity={room.unroofed ? 0.45 : 0.5}
+                    stroke={room.unroofed ? INK_700 : INK_900}
+                    strokeOpacity={room.unroofed ? 0.7 : 1}
+                    strokeDasharray={room.unroofed ? "6 4" : undefined}
                     strokeWidth={editing && selected ? 2.5 : 1.5}
                     style={{ cursor: roomMode === "drag" ? "grab" : "pointer" }}
                     onPointerDown={
@@ -1250,8 +1435,13 @@ export function EditablePlanViewer({
         {editing ? (
           <>
             Click a room to select. Drag the body to move, drag a vertex to
-            reshape, double-click the name to rename. Amber = low confidence;
-            use Flag if a room should be split or merged. Live total:{" "}
+            reshape, double-click the name to rename. Set its type with the
+            picker above.{" "}
+            {openZoneCount > 0
+              ? `${openZoneCount} zone${openZoneCount === 1 ? " is" : "s are"} open to the sky (dashed) — those edges carry no wall. `
+              : ""}
+            Amber = low confidence; use Flag if a room should be split or
+            merged. Live total:{" "}
           </>
         ) : (
           <>Click a room to see what it is and what it costs. Total:{" "}</>
