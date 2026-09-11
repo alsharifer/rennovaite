@@ -5,7 +5,7 @@ import { MUDON_FIXTURE } from "@/lib/plan/__tests__/mudon.fixture";
 import { SYNTHETIC_FIXTURES } from "@/lib/plan/__tests__/synthetic.fixtures";
 import { polygonArea, type Pt } from "@/lib/plan/polygon";
 import { LOW_CONFIDENCE_FLAG, SLIVER_AREA_M2 } from "@/lib/parse/constants";
-import { repairOverlaps, type RepairInputRoom } from "@/lib/parse/repair";
+import { repairOverlaps, toRepairInput, type RepairInputRoom } from "@/lib/parse/repair";
 
 // Normalised overlap area between two rooms (should be ~0 after repair).
 function overlapAreaNorm(a: Pt[], b: Pt[]): number {
@@ -203,5 +203,95 @@ describe("repairOverlaps — the editor's coordinate space", () => {
     const { rooms, summary } = repairOverlaps(viewBox, { totalAreaM2: 72 });
     expect(rooms).toHaveLength(2);
     expect(summary.sliver_parts_dropped).toBe(0);
+  });
+});
+
+describe("repairOverlaps — a printed dimension outranks the geometry", () => {
+  // Same two rooms as above: "b" holds 0.4 of the unit square after the carve,
+  // which at "a"'s stated scale is worth about 36.7 m².
+  const geometry: RepairInputRoom[] = [
+    { id: "a", polygon: [[0, 0], [0.6, 0], [0.6, 1], [0, 1]], confidence: 0.8, area_m2: 55 },
+    { id: "b", polygon: [[0.4, 0], [1, 0], [1, 1], [0.4, 1]], confidence: 0.8, area_m2: 4 },
+  ];
+
+  it("keeps a MEASURED area the geometry contradicts, and records both numbers", () => {
+    // The drawing prints 4 m² for this room and the outline says ~37. One of
+    // them is wrong, and it is not automatically the architect.
+    const { rooms, summary } = repairOverlaps(
+      geometry.map((r) => (r.id === "b" ? { ...r, area_source: "measured" as const } : r)),
+      { totalAreaM2: 100 },
+    );
+    const b = rooms.find((r) => r.id === "b")!;
+    expect(b.area_m2).toBe(4);
+    expect(b.area_derived).toBe(false);
+    expect(summary.derived_area_room_ids).toEqual([]);
+    expect(summary.stated_area_room_ids).toEqual(["a", "b"]);
+
+    // …but it is flagged, and the flag carries the two figures the question is
+    // about, so a person can be asked which to believe.
+    expect(b.confidence).toBeLessThan(LOW_CONFIDENCE_FLAG);
+    expect(summary.disputes).toHaveLength(1);
+    const [dispute] = summary.disputes;
+    expect(dispute!.room_id).toBe("b");
+    expect(dispute!.stated_area_m2).toBe(4);
+    // 23.6, not the 36.67 the same outline is worth in the test above, because
+    // a kept area is part of the scale the geometry is measured against — the
+    // disputed 4 is in the kernel too. A suspect number skewing the ruler used
+    // to judge it is a real wrinkle; with one bad room among a dozen it moves
+    // the figure a little and the verdict not at all.
+    expect(dispute!.geometric_area_m2).toBeCloseTo(23.6, 1);
+  });
+
+  it("still overrides an ESTIMATED area the geometry contradicts", () => {
+    // Same numbers, no printed dimension behind them. Nothing to defer to, so
+    // geometry wins and there is no question to ask anyone.
+    const { rooms, summary } = repairOverlaps(geometry, { totalAreaM2: 100 });
+    const b = rooms.find((r) => r.id === "b")!;
+    expect(b.area_derived).toBe(true);
+    expect(summary.derived_area_room_ids).toEqual(["b"]);
+    expect(summary.disputes).toEqual([]);
+  });
+
+  it("raises no dispute when a measured area and its outline merely differ", () => {
+    const { rooms, summary } = repairOverlaps(
+      geometry.map((r) => ({ ...r, area_source: "measured" as const, area_m2: r.id === "a" ? 55 : 45 })),
+      { totalAreaM2: 100 },
+    );
+    expect(summary.disputes).toEqual([]);
+    // Both areas stand as stated. (Confidence still drops on "b" — the carve
+    // took a third of it — but that is the carve rule, not a dispute.)
+    expect(rooms.every((r) => !r.area_derived)).toBe(true);
+    expect(rooms.map((r) => r.area_m2)).toEqual([55, 45]);
+  });
+});
+
+describe("toRepairInput", () => {
+  // Regression: the parse route built this object by hand and listed six
+  // properties. `area_source` was added to both sides of the boundary and the
+  // literal between them was not, so in production every area arrived as an
+  // estimate and the never-overwrite rule could never fire. Nothing threw.
+  it("carries the area provenance a hand-written literal dropped", () => {
+    const room = {
+      id: "bathroom-01",
+      name_en: "Bath",
+      room_type: "ensuite",
+      area_m2: 8.79,
+      area_source: "measured" as const,
+      confidence: 0.82,
+      polygon: [[0, 0], [1, 0], [1, 1], [0, 1]] as [number, number][],
+    };
+    expect(toRepairInput(room).area_source).toBe("measured");
+    // …and everything the caller put on the room survives for the DB write.
+    expect(toRepairInput(room).name_en).toBe("Bath");
+  });
+
+  it("defaults a room with no provenance to the overridable branch", () => {
+    const room = {
+      id: "x",
+      area_m2: 10,
+      confidence: 0.5,
+      polygon: [[0, 0], [1, 0], [1, 1], [0, 1]] as [number, number][],
+    };
+    expect(toRepairInput(room).area_source).toBeNull();
   });
 });
