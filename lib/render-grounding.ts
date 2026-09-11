@@ -26,6 +26,9 @@ const MOODBOARD_ROOM: Record<RoomType, string> = {
   "secondary-bedroom": "secondary-bedroom",
   bathroom: "bathroom",
   living: "living",
+  // G1b: two more segments, same file naming as the interior 24.
+  "garden-zone": "garden",
+  "outdoor-structure": "structure",
 };
 
 // Read the chosen style's moodboard from public/moodboards and return it as a

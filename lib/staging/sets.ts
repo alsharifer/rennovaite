@@ -13,7 +13,8 @@
 // its `label` carries the per-style flavour shown in the render prompt and BoQ.
 // =============================================================================
 
-import type { StyleKey } from "@/lib/render-prompts";
+// Interior keys only — see lib/staging/prices.ts.
+import type { InteriorStyleKey } from "@/lib/render-prompts";
 
 // Staging distinguishes six key room types. Broader than the 4 render RoomTypes
 // (majlis / dining / kitchen collapse to "living" for the render camera prompt)
@@ -85,7 +86,7 @@ const i = (key: FurnitureKey, label: string, qty?: number): StagingItem =>
 // majlis sofas. Every set is 4–6 items (unit-tested).
 // -----------------------------------------------------------------------------
 
-export const STAGING_SETS: Record<StyleKey, Record<StagingRoomType, StagingSet>> = {
+export const STAGING_SETS: Record<InteriorStyleKey, Record<StagingRoomType, StagingSet>> = {
   "contemporary-majlis": {
     living: [
       i("sofa-3seat", "3-seat sofa in oatmeal linen"),
@@ -378,7 +379,7 @@ export function getStagingSet(
   styleKey: string,
   roomType: StagingRoomType,
 ): StagingSet | null {
-  const byRoom = STAGING_SETS[styleKey as StyleKey];
+  const byRoom = STAGING_SETS[styleKey as InteriorStyleKey];
   if (!byRoom) return null;
   return byRoom[roomType] ?? null;
 }

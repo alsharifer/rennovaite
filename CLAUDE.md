@@ -164,6 +164,10 @@ now no sanctioned non-Atelier palette anywhere in the app.)
 
 ## Render pipeline
 
+(G1b extends this to EXTERIOR zones — two garden directions, a ground-plane
+off-plan shell, and no bare 400 for an unrenderable type. See "Exterior
+rendering" below.)
+
 Room renders are **photo-first, image-edit based** — the old synthetic
 control-image path (`flux-canny-pro` / `flux-depth-pro` + `lib/control-image.ts`)
 was deleted. `app/api/render/route.ts` restyles an image with an edit model
@@ -474,6 +478,54 @@ exactly the parser's.
   Everything degrades gracefully until it runs — `derivePlanGraph` falls back to
   the pre-031 selects, the plan page still renders, and `/api/update-plan`
   retries the room upsert without `unroofed`.
+
+## Exterior rendering — garden styles (garden pilot G1b)
+
+Zones render. Before G1b `roomTypeFromDb` mapped eight interior tokens onto four
+prompt types and everything else was a **bare 400** — every terrace, every
+balcony and every garden zone was simply unrenderable.
+
+- **Two exterior prompt types**: `garden-zone` (paving, artificial grass,
+  planting bed, deck, path, pool — and `terrace` / `balcony`, which were the
+  clearest casualties of the old hard stop) and `outdoor-structure`
+  (`structure`). `isExteriorRoomType` is the branch every builder keys off.
+- **No bare 400.** A type that genuinely has nothing to photograph (stairs,
+  closets, circulation) returns a structured **422** — `{ error, code:
+  "room_type_unsupported", room_type, supported }` — naming the type and
+  listing what is renderable, instead of a sentence about the first-floor scope.
+- **Two exterior directions** in `lib/garden-styles.ts`: **Desert Modern**
+  (`desert-modern`) and **Courtyard Majlis** (`courtyard-majlis`). Deliberately
+  a separate module from `lib/styles.ts` — `STYLES` is not just a list, it is
+  what `lib/ideation/questionnaire` scores and what the moodboard and style
+  pages render, so two more entries there would have changed the ideation
+  recommendation for every interior villa. `GardenStyle extends Style`, so any
+  surface that shows "the project's direction" takes either (`resolveAnyStyle`).
+- **Moodboard art**: four 1024×1024 PNGs at the same path and naming as the
+  interior 24 (`public/moodboards/<style-key>-<garden|structure>.png`), so
+  `loadMoodboardDataUri` needs no special case. Generated once by
+  `scripts/generate-garden-moodboards.mjs` (flux-1.1-pro, idempotent, not wired
+  into any build — regenerating on deploy would quietly change what every
+  garden render is grounded against).
+- **Style pairing, never silent.** A project locks ONE direction. An exterior
+  zone renders in that direction's companion exterior style (`gardenStyleFor`)
+  and an interior room on a garden-led project in the companion interior one
+  (`interiorStyleFor`); the render response carries `style_key` and, when it
+  substituted, `style_substituted_from`. Garden keys are lockable via
+  `/api/style-choice` too.
+- **Photo mode is the pilot path.** A client photo of a zone edits exactly like
+  a room photo — same `room_photos` row, same edit model, same cache rules.
+- **Off-plan shells are ground, not rooms.** `buildOffplanBasePrompt` branches
+  for exterior: flat level ground inside a ~1.8 m blockwork boundary under open
+  sky (a bare base slab for a structure), never a ceiling and primed walls. The
+  edit prompt likewise asks the model to keep the **site's shape, boundary wall
+  positions and levels** rather than wall, window and door positions.
+- **Staging stays interior.** `lib/staging` now keys on `InteriorStyleKey`, and
+  the render route skips the staging block for exterior zones — there is no
+  movable furniture in a lawn to dress.
+- **Interiors are untouched**: all 24 edit prompts, all 24 text-to-image
+  prompts, all 8 off-plan prompts and all 12 interior classifications are
+  byte-identical to the pre-G1b commit. The prompt is the render cache key, so
+  that is what stops every cached interior render being invalidated.
 
 ## The journey — nine steps, one definition (B1/B2/B3)
 

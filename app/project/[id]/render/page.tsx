@@ -6,6 +6,7 @@ import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { loadProjectPhotoAssets } from "@/lib/assets/load";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
+import { resolveAnyStyle } from "@/lib/garden-styles";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -125,9 +126,9 @@ export default async function RenderPage({
     .limit(1);
 
   const styleChoice = styleChoiceRows?.[0] ?? null;
-  const style = styleChoice?.style_key
-    ? (getStyleByKey(styleChoice.style_key) ?? null)
-    : null;
+  // G1b: a project may have locked either family, so resolve both rather than
+  // showing nothing for a garden direction.
+  const style = resolveAnyStyle(styleChoice?.style_key ?? null, getStyleByKey);
 
   // A missing PROJECT is a 404 and uses the shared boundary. A missing PLAN is
   // not: the project exists and the user simply has not confirmed a layout yet,

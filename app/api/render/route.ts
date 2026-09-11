@@ -23,12 +23,19 @@ import {
   loadTasteSeed,
 } from "@/lib/render-grounding";
 import {
+  RENDERABLE_DB_ROOM_TYPES,
   STYLE_KEYS,
   buildEditPrompt,
   buildOffplanBasePrompt,
+  isExteriorRoomType,
   roomTypeFromDb,
   type StyleKey,
 } from "@/lib/render-prompts";
+import {
+  GARDEN_STYLE_KEYS,
+  gardenStyleFor,
+  interiorStyleFor,
+} from "@/lib/garden-styles";
 import { buildStagingBlock } from "@/lib/staging/prompt";
 import { stagingRoomTypeFromDb, type StagingSet } from "@/lib/staging/sets";
 import { roomDimensions } from "@/lib/room-geometry";
@@ -44,7 +51,7 @@ const BodySchema = z.object({
   tweak: z.string().min(1).max(500).optional(),
 });
 
-const VALID_STYLE_KEYS = new Set<string>(STYLE_KEYS);
+const VALID_STYLE_KEYS = new Set<string>([...STYLE_KEYS, ...GARDEN_STYLE_KEYS]);
 
 export async function POST(request: NextRequest) {
   try {
@@ -113,21 +120,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // G1b. This used to be a bare 400 for anything outside four interior room
+    // types, which meant every terrace, every balcony and every garden zone was
+    // simply unrenderable. Zones now map to the exterior types; what remains
+    // unmapped (stairs, closets, circulation) still cannot be rendered, but it
+    // says what it is, what IS renderable, and carries a code the UI can act on
+    // rather than a sentence about a first-floor scope.
     const promptRoomType = roomTypeFromDb(room.room_type);
     if (!promptRoomType) {
       return NextResponse.json(
         {
-          error: `Room type '${room.room_type ?? "unknown"}' is outside the first-floor scope; rendering is only supported for bedroom, bathroom, and living rooms.`,
+          error: `There is no render for a '${room.room_type ?? "unclassified"}' room — it has no interior to photograph and no ground to landscape. Set its type on the plan step if that is wrong.`,
+          code: "room_type_unsupported",
+          room_type: room.room_type ?? null,
+          supported: RENDERABLE_DB_ROOM_TYPES,
         },
-        { status: 400 },
+        { status: 422 },
       );
     }
+
+    // A project locks ONE direction. A garden rendered in a bedroom's style has
+    // no moodboard art and no vocabulary to draw on, so an exterior zone is
+    // rendered in that direction's companion exterior style (and an interior
+    // room on a garden-led project in the companion interior one). The response
+    // says which style actually ran, so a substitution is never silent.
+    const exterior = isExteriorRoomType(promptRoomType);
+    const resolvedStyleKey = exterior
+      ? gardenStyleFor(styleKey)
+      : (interiorStyleFor(styleKey) ?? styleKey);
+    const styleSubstituted = resolvedStyleKey !== styleKey;
 
     // Compose the restyle prompt: style template + selected-SKU materials +
     // (optional) KG context + (optional) tweak. Everything that changes the
     // output goes into `prompt` so the cache key below is exact.
     let prompt = buildEditPrompt({
-      styleKey: styleKey as StyleKey,
+      styleKey: resolvedStyleKey as StyleKey,
       roomType: promptRoomType,
     });
 
@@ -162,7 +189,7 @@ export async function POST(request: NextRequest) {
 
     // KG grounding (feature-flagged, safe fallback). getKgContext never throws.
     const { context: kgContext, bundleId: kgBundleId } = await getKgContext({
-      styleKey,
+      styleKey: resolvedStyleKey,
       project,
     });
     if (kgContext) {
@@ -178,11 +205,13 @@ export async function POST(request: NextRequest) {
     // feed. Staging only appends to the prompt (which is the cache key), so
     // caching + the tweak/iterate flow are untouched: flag off vs on simply
     // produce two distinct prompts → two distinct cache entries.
+    // Staging dresses movable furniture in rooms; an exterior zone has none,
+    // and stagingRoomTypeFromDb already returns null for every garden token.
     let stagingSet: StagingSet | null = null;
-    if (process.env.STAGING_ENABLED === "true") {
+    if (process.env.STAGING_ENABLED === "true" && !exterior) {
       const stagingRoom = stagingRoomTypeFromDb(room.room_type);
       const staging = stagingRoom
-        ? buildStagingBlock(styleKey, stagingRoom)
+        ? buildStagingBlock(resolvedStyleKey, stagingRoom)
         : null;
       if (staging) {
         prompt = `${prompt}\n\n${staging.block}`;
@@ -230,6 +259,8 @@ export async function POST(request: NextRequest) {
         prompt: existing.prompt,
         mode,
         cached: true,
+        style_key: resolvedStyleKey,
+        ...(styleSubstituted ? { style_substituted_from: styleKey } : {}),
       });
     }
 
@@ -257,7 +288,7 @@ export async function POST(request: NextRequest) {
     // The moodboard style reference (data URI) is passed to nano-banana as a
     // second image input. null when the file is missing.
     const moodboardDataUri = await loadMoodboardDataUri(
-      styleKey,
+      resolvedStyleKey,
       promptRoomType,
     );
 
@@ -392,6 +423,8 @@ export async function POST(request: NextRequest) {
       prompt,
       mode,
       model: editModel,
+      style_key: resolvedStyleKey,
+      ...(styleSubstituted ? { style_substituted_from: styleKey } : {}),
     });
   } catch (err) {
     console.error("[api/render] error", err);
