@@ -172,3 +172,36 @@ describe("repairOverlaps — stated vs derived area", () => {
     expect(b.area_derived).toBe(true);
   });
 });
+
+describe("repairOverlaps — the editor's coordinate space", () => {
+  // The plan editor works and saves in viewBox units (1000 x 600), not the
+  // normalised [0,1] the parse produces, while areas stay in m². update-plan
+  // runs repair on exactly that, so the thresholds inside must be derived from
+  // the input rather than assuming either space.
+  const viewBox: RepairInputRoom[] = [
+    { id: "a", polygon: [[0, 0], [600, 0], [600, 600], [0, 600]], area_m2: 36, confidence: 0.8 },
+    { id: "b", polygon: [[400, 0], [1000, 0], [1000, 600], [400, 600]], area_m2: 36, confidence: 0.8 },
+  ];
+
+  it("carves the overlap and leaves the stated areas alone", () => {
+    const { rooms, summary } = repairOverlaps(viewBox, { totalAreaM2: 72 });
+    expect(summary.dropped_room_ids).toEqual([]);
+    expect(rooms.map((r) => r.area_m2)).toEqual([36, 36]);
+    for (let i = 0; i < rooms.length; i++) {
+      for (let j = i + 1; j < rooms.length; j++) {
+        expect(overlapAreaNorm(rooms[i]!.polygon, rooms[j]!.polygon)).toBeLessThan(1e-6);
+      }
+    }
+    // "b" lost a third of itself, so it is carved and flagged even though its
+    // stated area survives — the geometry changed, and someone should see that.
+    expect(summary.carved_room_ids).toEqual(["b"]);
+  });
+
+  it("does not shred a viewBox plan into slivers", () => {
+    // The sliver threshold is in m² and the coordinates are in viewBox units;
+    // getting that conversion backwards would drop every room as too small.
+    const { rooms, summary } = repairOverlaps(viewBox, { totalAreaM2: 72 });
+    expect(rooms).toHaveLength(2);
+    expect(summary.sliver_parts_dropped).toBe(0);
+  });
+});
