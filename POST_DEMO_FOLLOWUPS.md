@@ -436,3 +436,77 @@ sides.
 
 A regression test should assert that a two-room wall produces two plaster items
 and **one** demolition item, so the distinction cannot quietly collapse again.
+
+## 8. Stage 3 — deterministic wall and opening geometry from the vector layer
+
+**Deferred, not rejected.** Stages 1 and 2 taught the parse to read a vector
+CAD sheet's *text*: it crops to the plan region, takes the scale off the title
+block, and lets the printed `F01 / MASTER BEDROOM / 3985X5000` labels outrank
+the vision model on room identity and area. What it still does not do is read
+the sheet's *geometry*. Room outlines are still a vision model's estimate,
+walls are still derived from shared polygon edges at a default 200 mm, and
+`openings` is still empty — the system cannot produce a door or a window at
+all.
+
+The vector layer plainly has all three. Measured on the pilot sheet
+(`lib/parse/__tests__/fixtures/mudon-first-floor.ground-truth.ts`), it carries
+346,837 flattened segments across exactly **six** discrete pen widths and zero
+dash arrays — a classic CAD pen table, and the layers separate cleanly:
+
+| pen | what is on it | segments inside the plan region |
+| --- | --- | --- |
+| 0.48 pt | walls, as double lines | 2,062 |
+| 0.72 pt | doors, windows and their tags | 7,963 |
+| 0.36 pt | dimension digits, sanitary fixtures, stairs | 4,398 |
+| 0.24 pt | grid lines, hatching, extension lines | 6,708 |
+
+Rendered on its own, the 0.48 pt layer *is* the wall drawing, and the 0.72 pt
+layer *is* the door and window schedule. That is the whole unlock: real wall
+thicknesses instead of a 200 mm default, and openings we currently never
+produce, which `lib/boq/quantify.ts` already knows how to deduct from plaster,
+paint and wet tiling the moment they exist.
+
+### The finding that sets the cost: flood fill does not work
+
+The obvious cheap route is to rasterise the wall layer and flood-fill each room
+from its label anchor. **It does not work, and the reason is structural.**
+Doorways are gaps in the walls, so a fill started in any room leaks through
+them into all thirteen. Closing the gaps morphologically destroys the rooms
+first — swept on the pilot sheet:
+
+| dilation | closes gaps up to | rooms that came out as their own region |
+| --- | --- | --- |
+| 0 px | 0 mm | 1 of 13 |
+| 4 px | 94 mm | 2 of 13 |
+| 10 px | 235 mm | 2 of 13 |
+| 12 px | 282 mm | 3 of 13 — but one bathroom had already collapsed from 45 m² to 4.9 m² |
+
+Real doorways are 700–900 mm. There is no dilation radius that closes them and
+leaves the rooms intact, because the radius that closes a doorway is wider than
+the thin spaces (a passage, a wardrobe recess) the plan is full of.
+
+So the build is the real one: merge collinear runs on the wall layer, pair the
+parallel lines into centre-lines with a measured thickness, bridge doorway gaps
+using the 0.72 pt door symbols as evidence rather than guesswork, and extract
+faces from the resulting planar graph. That is what a commercial vectoriser
+does, and it is a bounded but genuine piece of computational geometry.
+
+### Effort and when it is worth it
+
+**3–4 weeks**, and it only pays on PDFs that still carry a vector layer —
+a scan or a phone photo gets nothing from it and keeps the current path.
+
+Two things should happen before it starts:
+
+1. **Count the corpus.** The vector-vs-raster split across real client uploads
+   is unknown; `PARSE_STRATEGY.md` measured 5 plans, all PDF, and never
+   distinguished the two. If most homeowner uploads turn out to be scans, this
+   work helps a minority and the hosted raster adapter (S4b) matters more.
+2. **See whether openings are actually blocking.** Openings are the part of
+   this that nothing else can deliver. If the deductions they enable are what a
+   QS is querying, that argues for starting sooner; if the current gross
+   quantities are being accepted, it does not.
+
+Everything needed to start is already committed: `lib/parse/sheet/pdf.ts`
+returns every segment with its pen width, and the ground-truth fixture gives
+the room table to check a wall extraction against.

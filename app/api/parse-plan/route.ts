@@ -73,17 +73,32 @@ export async function POST(request: NextRequest) {
       { totalAreaM2: raw.total_area_m2 },
     );
 
+    // A plan's total floor area is the sum of its rooms. It used to be the
+    // model's separate guess at the whole floor, which repair then forced the
+    // rooms to add up to; now that a room keeps the area the drawing states,
+    // the total has to follow the rooms instead — buildPlanGraph derives its
+    // metre scale from this number, and a total that disagreed with the areas
+    // beneath it would put geometry and quantities on two different scales.
+    const totalAreaM2 = summary.area_sum_m2 > 0 ? summary.area_sum_m2 : raw.total_area_m2;
+
     const parsedJson = {
       scale: raw.scale,
       units: raw.units,
-      total_area_m2: raw.total_area_m2,
+      total_area_m2: totalAreaM2,
       rooms: repaired,
-      parse: { provider: provider.name, ...summary },
+      parse: {
+        provider: provider.name,
+        ...summary,
+        /** How the source was read — see SheetProvenance. Absent for rasters. */
+        sheet: raw.sheet ?? null,
+        /** What the model alone said the floor came to, kept for comparison. */
+        provider_total_area_m2: raw.total_area_m2,
+      },
     };
 
     const { error: updErr } = await supabase
       .from("plans")
-      .update({ parsed_json: parsedJson, total_area_m2: raw.total_area_m2 })
+      .update({ parsed_json: parsedJson as unknown as never, total_area_m2: totalAreaM2 })
       .eq("id", planId);
     if (updErr) throw updErr;
 
@@ -151,7 +166,7 @@ export async function POST(request: NextRequest) {
         room_count: repaired.length,
         mean_confidence: mean,
         low_confidence_count: confs.filter((c) => c < LOW_CONFIDENCE_FLAG).length,
-        detail: summary,
+        detail: { ...summary, sheet: raw.sheet ?? null },
       });
     } catch {
       /* parse_metrics not applied yet — non-fatal */

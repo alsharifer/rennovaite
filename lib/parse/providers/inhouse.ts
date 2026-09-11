@@ -1,17 +1,39 @@
 // =============================================================================
 // lib/parse/providers/inhouse.ts — default parse provider (Claude vision).
 //
-// Reworked from the old app/api/parse-plan inline logic. The prompt now asks for
-// an ACCURATE room outline (an ordered polygon following the real walls, incl.
+// Reworked from the old app/api/parse-plan inline logic. The prompt asks for an
+// ACCURATE room outline (an ordered polygon following the real walls, incl.
 // diagonals / L-shapes — NOT a bounding box) plus a per-room confidence. Overlap
 // elimination + metric conversion happen downstream (repair → buildPlanGraph),
 // so this provider only produces the raw normalised parse.
+//
+// TWO PATHS, and which one runs depends only on what the source actually is:
+//
+//   cropped     A PDF that still carries its CAD text and vector layers. We find
+//               the plan region on the sheet, rasterise ONLY that, and let the
+//               sheet's own printed room labels outrank whatever the model says
+//               about names and areas. Handing over the whole page instead
+//               spends the image budget on the title block and the key plan: on
+//               the pilot's A2 sheet that left the plan ~400 px across, and the
+//               same model on the same day read 5/8 printed dimensions rather
+//               than 8/8, and lost a balcony entirely.
+//
+//   full-sheet  Everything else — raster PDFs, scans, photos, and any sheet
+//               whose plan region we cannot confidently locate. Byte-for-byte
+//               the behaviour that shipped before, including the prompt.
+//
+// The SYSTEM PROMPT IS UNCHANGED between them on purpose. The difference in
+// results is attributable to what the model was shown, not to wording.
 // =============================================================================
 
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
-import type { ParseAsset, ParseProvider, RawParseResult } from "./types";
+import { reconcileWithSheet } from "../reconcile";
+import { rasterizeRegion, readSheet } from "../sheet/read";
+import type { SheetReading } from "../sheet/types";
+
+import type { ParseAsset, ParseProvider, RawParseResult, SheetProvenance } from "./types";
 
 const RoomSchema = z.object({
   id: z.string(),
@@ -177,6 +199,81 @@ async function analyze(anthropic: Anthropic, asset: ParseAsset): Promise<RawPars
   }
 }
 
+function fullSheetProvenance(reason: string, reading: SheetReading | null): SheetProvenance {
+  return {
+    path: "full-sheet",
+    fallback_reason: reason,
+    region: null,
+    raster_px: null,
+    scale_source: reading?.scale.source === "text-layer" ? "text-layer" : "model",
+    labels_total: reading?.labels.length ?? 0,
+    labels_matched: 0,
+    label_area_room_ids: [],
+    label_only_room_ids: [],
+    unmatched_tags: [],
+  };
+}
+
+/**
+ * Parse a vector CAD sheet by cropping to its plan, then letting the sheet's
+ * printed labels correct the model. Returns null whenever anything about the
+ * sheet is not what we need, so the caller falls back with no special-casing.
+ */
+async function parseAsSheet(
+  anthropic: Anthropic,
+  pdf: Buffer,
+): Promise<{ result: RawParseResult } | { fallback: string; reading: SheetReading | null }> {
+  const reading = await readSheet(pdf);
+  if (!reading) return { fallback: "no usable CAD text layer", reading: null };
+  if (!reading.region) {
+    return { fallback: reading.region_reject_reason ?? "plan region not found", reading };
+  }
+
+  const raster = await rasterizeRegion(pdf, reading.region);
+  if (!raster) return { fallback: "plan region could not be rasterised", reading };
+
+  const vision = await analyze(anthropic, {
+    kind: "image",
+    data: raster.data,
+    mediaType: "image/png",
+  });
+
+  const { rooms, summary } = reconcileWithSheet(
+    vision.rooms,
+    reading.labels,
+    reading.region,
+    reading.scale,
+  );
+
+  // Room areas are now the drawing's own arithmetic, so the plan's total is
+  // their sum — not a second, independent guess by the model. buildPlanGraph
+  // derives its metre scale from this total, and a total that disagreed with
+  // the areas beneath it would put the geometry and the quantities on two
+  // different scales.
+  const total = rooms.reduce((s, r) => s + (r.area_m2 > 0 ? r.area_m2 : 0), 0);
+
+  return {
+    result: {
+      scale: reading.scale.source === "text-layer" ? reading.scale.scale : vision.scale,
+      units: vision.units,
+      total_area_m2: Math.round(total * 100) / 100,
+      rooms,
+      sheet: {
+        path: "cropped",
+        fallback_reason: null,
+        region: reading.region,
+        raster_px: [raster.width, raster.height],
+        scale_source: reading.scale.source === "text-layer" ? "text-layer" : "model",
+        labels_total: summary.labels_total,
+        labels_matched: summary.labels_matched,
+        label_area_room_ids: summary.label_area_room_ids,
+        label_only_room_ids: summary.label_only_room_ids,
+        unmatched_tags: summary.unmatched_tags,
+      },
+    },
+  };
+}
+
 export const inhouseProvider: ParseProvider = {
   name: "inhouse",
   async parse(asset: ParseAsset): Promise<RawParseResult> {
@@ -187,6 +284,22 @@ export const inhouseProvider: ParseProvider = {
       );
     }
     const anthropic = new Anthropic({ apiKey });
-    return analyze(anthropic, asset);
+
+    // Images and photos are not sheets: no text layer, no vector layer, nothing
+    // to be authoritative about. They take the path they always took.
+    if (asset.kind !== "pdf") return analyze(anthropic, asset);
+
+    const attempt = await parseAsSheet(anthropic, Buffer.from(asset.data, "base64"));
+    if ("result" in attempt) return attempt.result;
+
+    console.info(`[parse/inhouse] full-sheet fallback: ${attempt.fallback}`);
+    const vision = await analyze(anthropic, asset);
+    // The stated scale still beats a read one even when the crop did not run.
+    const scale = attempt.reading?.scale;
+    return {
+      ...vision,
+      scale: scale?.source === "text-layer" ? scale.scale : vision.scale,
+      sheet: fullSheetProvenance(attempt.fallback, attempt.reading ?? null),
+    };
   },
 };
