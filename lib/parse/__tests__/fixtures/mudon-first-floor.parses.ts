@@ -14,6 +14,9 @@ export interface EvalRoom {
   room_type: string;
   area_m2: number;
   confidence?: number;
+  /** Where `area_m2` came from: "measured" off a dimension the drawing prints,
+   *  or the model's own estimate. Absent on parses recorded before the split. */
+  area_source?: "measured" | "estimated";
   /** Normalised [0,1] polygon, open ring. */
   polygon: [number, number][];
 }
@@ -150,5 +153,42 @@ export const PARSE_2D_CROPPED_DIAGNOSTIC: RecordedParse = {
     { id: "terrace-01", name_en: "Terrace (Front)", room_type: "terrace", area_m2: 16, confidence: 0.68, polygon: [[0.28, 0.86], [0.6, 0.86], [0.6, 1], [0.28, 1]] },
     { id: "terrace-02", name_en: "Terrace (Top)", room_type: "terrace", area_m2: 18.8, confidence: 0.65, polygon: [[0.68, 0.14], [0.95, 0.14], [0.95, 0.3], [0.68, 0.3]] },
     { id: "stairs-01", name_en: "Stairs", room_type: "stairs", area_m2: 8.5, confidence: 0.72, polygon: [[0.5, 0.3], [0.68, 0.3], [0.68, 0.5], [0.5, 0.5]] },
+  ],
+};
+
+// -- Fixture #2, after the sheet-first rebuild ------------------------------
+// Same PDF, same prompt, same model. What changed is what the model was shown
+// (the plan region, not the whole A2 page) and who wins on names and areas (the
+// sheet's printed labels, not the model). Recorded from the shipped pipeline
+// end to end: readSheet → crop → vision → reconcileWithSheet → repairOverlaps.
+//
+// The eight MEASURED areas are the drawing's own arithmetic and are stable
+// run to run. The ESTIMATED ones — stairs, terraces, balconies, passage, none
+// of which the sheet dimensions — are the model's and will move between runs,
+// so the tests assert on them loosely or not at all.
+export const PARSE_3_SHEET_FIRST: RecordedParse = {
+  label: "#2 after — sheet-first pipeline (what ships)",
+  input: "plan region cropped from the sheet, 782x1470 px, labels reconciled",
+  recorded: "2026-09-11",
+  provider: "inhouse",
+  model: "claude-sonnet-4-6",
+  scale: "1:100",
+  total_area_m2: 139.63,
+  latency_s: 26.2,
+  rooms: [
+    { id: "master-bed-01", name_en: "Master Bedroom", room_type: "master_bedroom", area_m2: 19.93, confidence: 0.85, area_source: "measured", polygon: [[0.139984, 0.379989], [0.420008, 0.379989], [0.420008, 0.619993], [0.139984, 0.619993]] },
+    { id: "closet-01", name_en: "Dress", room_type: "closet", area_m2: 4.65, confidence: 0.82, area_source: "measured", polygon: [[0.139984, 0.619993], [0.300006, 0.619993], [0.300006, 0.720013], [0.139984, 0.720013]] },
+    { id: "bathroom-01", name_en: "Bath", room_type: "ensuite", area_m2: 8.79, confidence: 0.82, area_source: "measured", polygon: [[0.139984, 0.720013], [0.300006, 0.720013], [0.300006, 0.87998], [0.139984, 0.87998]] },
+    { id: "living-01", name_en: "Family Area", room_type: "living", area_m2: 12.54, confidence: 0.83, area_source: "measured", polygon: [[0.420008, 0.619993], [0.420008, 0.519973], [0.600011, 0.519973], [0.600011, 0.720013], [0.420008, 0.720013]] },
+    { id: "stairs-01", name_en: "Stairs", room_type: "stairs", area_m2: 7.5, confidence: 0.75, area_source: "estimated", polygon: [[0.420008, 0.379989], [0.600011, 0.379989], [0.600011, 0.519973], [0.420008, 0.519973]] },
+    { id: "bedroom-01", name_en: "Bedroom 3", room_type: "bedroom", area_m2: 16.8, confidence: 0.85, area_source: "measured", polygon: [[0.619993, 0.379989], [0.87998, 0.379989], [0.87998, 0.569983], [0.619993, 0.569983]] },
+    { id: "terrace-01", name_en: "Terrace", room_type: "terrace", area_m2: 9.5, confidence: 0.75, area_source: "estimated", polygon: [[0.619993, 0.249996], [0.87998, 0.249996], [0.87998, 0.379989], [0.619993, 0.379989]] },
+    { id: "bathroom-02", name_en: "Bath", room_type: "bathroom", area_m2: 4.72, confidence: 0.8, area_source: "measured", polygon: [[0.619993, 0.569983], [0.780015, 0.569983], [0.780015, 0.679995], [0.619993, 0.679995]] },
+    { id: "foyer-01", name_en: "Passage", room_type: "foyer", area_m2: 4, confidence: 0.55, area_source: "estimated", polygon: [[0.600011, 0.569983], [0.619993, 0.569983], [0.619993, 0.650021], [0.600011, 0.650021]] },
+    { id: "powder-01", name_en: "Toilet", room_type: "powder", area_m2: 2.7, confidence: 0.8, area_source: "measured", polygon: [[0.619993, 0.679995], [0.780015, 0.679995], [0.780015, 0.759978], [0.619993, 0.759978]] },
+    { id: "bedroom-02", name_en: "Bedroom-4", room_type: "bedroom", area_m2: 19.2, confidence: 0.85, area_source: "measured", polygon: [[0.619993, 0.759978], [0.87998, 0.759978], [0.87998, 0.919999], [0.619993, 0.919999]] },
+    { id: "balcony-01", name_en: "F-Balcony", room_type: "balcony", area_m2: 3.5, confidence: 0.72, area_source: "estimated", polygon: [[0.139984, 0.319988], [0.400026, 0.319988], [0.400026, 0.379989], [0.139984, 0.379989]] },
+    { id: "balcony-02", name_en: "F-Balcony", room_type: "balcony", area_m2: 3.8, confidence: 0.72, area_source: "estimated", polygon: [[0.619993, 0.919999], [0.87998, 0.919999], [0.87998, 0.970009], [0.619993, 0.970009]] },
+    { id: "terrace-02", name_en: "Terrace", room_type: "terrace", area_m2: 22, confidence: 0.7, area_source: "estimated", polygon: [[0.180003, 0.87998], [0.579974, 0.87998], [0.579974, 0.999982], [0.180003, 0.999982]] },
   ],
 };

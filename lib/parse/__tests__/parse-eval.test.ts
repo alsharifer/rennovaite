@@ -20,6 +20,7 @@ import {
   PARSE_2D_CROPPED_DIAGNOSTIC,
   PARSE_2_S4_RAW,
   PARSE_2_S4_REPAIRED,
+  PARSE_3_SHEET_FIRST,
 } from "./fixtures/mudon-first-floor.parses";
 import { evaluateParse, formatEval } from "./parse-eval";
 
@@ -81,8 +82,11 @@ describe("fixture #1 — legacy persisted parse (pre-S4)", () => {
   });
 
   it("was never overlap-repaired, so rooms still double-count floor area", () => {
-    expect(result.overlap_pairs_polygon).toBeGreaterThan(0);
-    expect(result.overlap_pairs_bbox).toBe(result.overlap_pairs_polygon);
+    expect(result.overlap_pairs_polygon).toBe(12);
+    expect(result.overlap_area_pct).toBeGreaterThan(20);
+    // Every room here is a plain rectangle, so all three tests agree.
+    expect(result.overlap_pairs_gate).toBe(12);
+    expect(result.overlap_pairs_bbox).toBe(12);
   });
 });
 
@@ -121,12 +125,13 @@ describe("fixture #2 — current pipeline on the full A2 sheet", () => {
     expect(repaired.overlap_area_pct).toBe(0);
   });
 
-  it("but the bounding-box detector still reports three — the BoQ gate's view", () => {
-    // Repair carves L-shapes; their bounding boxes keep intersecting. This is a
-    // definitional disagreement between repair and findOverlaps, not geometry
-    // that double-counts. Pinned so it cannot be mistaken for a parse failure.
-    expect(repaired.overlap_pairs_bbox).toBe(3);
+  it("and the gate now agrees with the geometry instead of the boxes", () => {
+    // Repair carves L-shapes; their bounding boxes keep intersecting. The old
+    // box-based gate called that three overlaps and refused to cost a plan with
+    // none. The shipped detector tests polygons, so it sees what repair did.
     expect(repaired.overlap_pairs_polygon).toBe(0);
+    expect(repaired.overlap_pairs_gate).toBe(0);
+    expect(repaired.overlap_pairs_bbox).toBe(3); // what it would have said before
   });
 });
 
@@ -145,5 +150,80 @@ describe("diagnostic — same model shown only the plan region", () => {
   it("and produces almost no overlap to repair", () => {
     expect(cropped.overlap_pairs_polygon).toBeLessThanOrEqual(2);
     expect(cropped.overlap_area_pct).toBeLessThan(2);
+  });
+});
+
+describe("fixture #2 after the sheet-first rebuild — what ships", () => {
+  const after = score(PARSE_3_SHEET_FIRST);
+  const before = score(PARSE_2_S4_REPAIRED);
+
+  it("finds every room the drawing tags", () => {
+    console.log("\n" + formatEval(after));
+    expect(after.rooms_found).toBe(13);
+    expect(after.missing_tags).toEqual([]);
+    expect(after.extra_unexpected).toEqual([]);
+    expect(after.extra_expected).toEqual(["Stairs"]); // drawn, never F-tagged
+  });
+
+  it("reproduces every printed dimension exactly", () => {
+    expect(after.area_scored).toBe(8);
+    expect(after.area_exact).toBe(8);
+    expect(after.max_abs_delta_pct!).toBeLessThan(0.5);
+  });
+
+  it("takes those areas from the sheet, not from the polygons", () => {
+    const measured = PARSE_3_SHEET_FIRST.rooms.filter((r) => r.area_source === "measured");
+    expect(measured).toHaveLength(8);
+    // …and only those. Rooms the sheet leaves undimensioned stay estimates
+    // rather than acquiring a number nobody wrote down.
+    const estimated = PARSE_3_SHEET_FIRST.rooms.filter((r) => r.area_source !== "measured");
+    expect(estimated.map((r) => r.name_en).sort()).toEqual([
+      "F-Balcony",
+      "F-Balcony",
+      "Passage",
+      "Stairs",
+      "Terrace",
+      "Terrace",
+    ]);
+  });
+
+  it("leaves no overlapping geometry and passes the costing gate", () => {
+    expect(after.overlap_pairs_polygon).toBe(0);
+    expect(after.overlap_pairs_gate).toBe(0);
+  });
+
+  it("beats the pipeline it replaces on every metric", () => {
+    expect(after.rooms_found).toBeGreaterThan(before.rooms_found);
+    expect(after.missing_tags.length).toBeLessThan(before.missing_tags.length);
+    expect(after.area_exact).toBeGreaterThan(before.area_exact);
+    expect(after.mean_abs_delta_pct!).toBeLessThan(before.mean_abs_delta_pct!);
+    expect(after.overlap_pairs_gate).toBeLessThanOrEqual(before.overlap_pairs_gate);
+  });
+
+  it("matches the control the diagnostic set", () => {
+    const control = score(PARSE_2D_CROPPED_DIAGNOSTIC);
+    expect(after.rooms_found).toBeGreaterThanOrEqual(control.rooms_found);
+    expect(after.area_exact).toBeGreaterThanOrEqual(control.area_exact);
+    expect(after.overlap_pairs_polygon).toBeLessThanOrEqual(control.overlap_pairs_polygon);
+  });
+});
+
+describe("fixture #1 must not regress", () => {
+  // Fixture #1 is a parse recorded before any of this existed, so nothing in
+  // the rebuild can change it. These pin that: if a future change to the
+  // comparator or the shared detector moves #1's numbers, it moved them for a
+  // reason that has nothing to do with #1.
+  const result = score(PARSE_1_LEGACY_PERSISTED);
+
+  it("scores exactly as it did before the rebuild", () => {
+    expect(result.rooms_found).toBe(12);
+    expect(result.missing_tags).toEqual(["F13"]);
+    expect(result.area_scored).toBe(8);
+    expect(result.area_exact).toBe(4);
+    expect(result.area_within_3pct).toBe(5);
+    expect(result.mean_abs_delta_pct!).toBeCloseTo(17.9, 1);
+    expect(result.max_abs_delta_pct!).toBeCloseTo(91.4, 1);
+    expect(result.overlap_pairs_polygon).toBe(12);
+    expect(result.overlap_pairs_gate).toBe(12);
   });
 });

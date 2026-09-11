@@ -6,11 +6,16 @@
 // which rooms were found, how far each area is off, and how much geometry
 // double-counts.
 //
-// TWO OVERLAP NUMBERS, deliberately. `repairOverlaps` guarantees that room
-// POLYGONS do not intersect; `findOverlaps` — the detector the editor banner
-// and the BoQ gate both use — tests BOUNDING BOXES. The moment repair carves an
-// L-shape, the polygons are disjoint while the boxes still intersect, so the
-// two disagree. Reporting only one would hide exactly that.
+// THREE OVERLAP NUMBERS, deliberately:
+//   polygon  computed here — rooms that actually share floor area, which is what
+//            double-counts in a take-off.
+//   gate     whatever `findOverlaps` says today. This is the number the editor
+//            banner and the BoQ 409 act on, so it is the one with consequences.
+//   bbox     the bounding-box test the gate used to run, kept as a fixed
+//            reference. It is why the gate changed: the moment repair carves an
+//            L-shape the polygons separate and the boxes do not, so a correct
+//            plan was reported as three overlaps and refused costing.
+// `gate` should now equal `polygon`; keeping all three is what proves it.
 // =============================================================================
 
 import polygonClipping from "polygon-clipping";
@@ -54,8 +59,9 @@ export interface EvalResult {
   max_abs_delta_pct: number | null;
   /** Pairs whose POLYGONS share interior area. Should be 0 after repair. */
   overlap_pairs_polygon: number;
-  /** Pairs whose BOUNDING BOXES share interior area — what the editor banner
-   *  and the BoQ gate report. */
+  /** Pairs the shipped detector reports — the editor banner and the BoQ 409. */
+  overlap_pairs_gate: number;
+  /** Pairs whose BOUNDING BOXES share interior area. The gate's old test. */
   overlap_pairs_bbox: number;
   /** Summed polygon intersection as a fraction of summed room area, percent. */
   overlap_area_pct: number;
@@ -180,9 +186,31 @@ export function evaluateParse(
     }
   }
   const totalNorm = polys.reduce((s, p) => s + polygonArea(p), 0);
-  const bbox = findOverlaps(
+  const gate = findOverlaps(
     parse.rooms.map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
   );
+
+  // The detector's old bounding-box test, reimplemented here so the fixture
+  // keeps reporting it after the shipped one moved on.
+  const boxes = polys.map((p) => ({
+    x0: Math.min(...p.map((q) => q[0])),
+    y0: Math.min(...p.map((q) => q[1])),
+    x1: Math.max(...p.map((q) => q[0])),
+    y1: Math.max(...p.map((q) => q[1])),
+  }));
+  let pairsBbox = 0;
+  for (let i = 0; i < boxes.length - 1; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i]!;
+      const b = boxes[j]!;
+      if (
+        Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 1e-9 &&
+        Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 1e-9
+      ) {
+        pairsBbox++;
+      }
+    }
+  }
 
   const isExpectedExtra = (r: EvalRoom) => {
     const n = normalise(r.name_en);
@@ -205,7 +233,8 @@ export function evaluateParse(
       : null,
     max_abs_delta_pct: absDeltas.length ? Math.max(...absDeltas) : null,
     overlap_pairs_polygon: pairsPolygon,
-    overlap_pairs_bbox: bbox.pairs.length,
+    overlap_pairs_gate: gate.pairs.length,
+    overlap_pairs_bbox: pairsBbox,
     overlap_area_pct: totalNorm > 0 ? (sharedArea / totalNorm) * 100 : 0,
   };
 }
@@ -236,7 +265,7 @@ export function formatEval(result: EvalResult): string {
   );
   lines.push(
     `   overlaps: ${result.overlap_pairs_polygon} polygon-exact pair(s) (${result.overlap_area_pct.toFixed(2)}% of room area), ` +
-      `${result.overlap_pairs_bbox} bounding-box pair(s)`,
+      `gate reports ${result.overlap_pairs_gate}, old bounding-box test would report ${result.overlap_pairs_bbox}`,
   );
   return lines.join("\n");
 }
