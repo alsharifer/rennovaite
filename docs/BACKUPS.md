@@ -1,8 +1,8 @@
 # Production backups (I9)
 
-**First real backup taken 2026-09-11.** Verified by restoring it. One item
-remains open and it is a governance decision, not a technical one — see
-"The restore rehearsal" at the end.
+**First real backup taken 2026-09-11, and its restore has been rehearsed into a
+real Supabase Postgres — every row came back.** One item remains: the backup is
+not yet on a schedule.
 
 ## The first backup, measured
 
@@ -127,25 +127,85 @@ Abdallah so the credentials file is readable:
 from the credentials file, so it never enters the task definition. Until this
 runs, there is exactly one backup and no cadence.
 
-## The restore rehearsal — needs a decision, not more code
+## The restore rehearsal — DONE, 2026-09-11
 
-I9 asks for the restore to be tested **against the dev project**. Doing that
-literally would load production into dev, and that collides head-on with the I8
-deviation you approved: dev deliberately holds no commercial data — no Atrium,
-Global Creation, Laspinas or RAK quotation, no BoQ, no real account.
+**A real Supabase Postgres took the production dump and gave every row back.**
 
-Restoring the production dump into dev would put all of it there, and **Vercel
-Preview points at dev**, so during the window every preview deployment would be
-reading live customer data. Wiping afterwards does not undo that window.
+### What was actually used, and why it is not the scratch project
 
-So this is a data-governance call, and it is yours:
+The chosen option was a throwaway cloud project. Supabase refused it:
 
-| Option | What it proves | Cost |
-| --- | --- | --- |
-| **A · Scratch project** (recommended) — spin up `rennovaite-restore-test`, restore into it, verify, delete it | Everything dev would prove: real Supabase roles, extensions, auth schema | ~15 min, free tier, and production data never touches an environment anything is pointed at |
-| **B · Into dev, then reset** | Same, but dev holds production data for the duration | Preview reads live data during the window; dev must then be dropped, re-pushed and re-seeded |
-| **C · Container only** (what runs today) | The dump is readable and complete | Already automatic per run; does not prove a *live Supabase project* will take it |
+    2 project limit ... reached their maximum limits for the number of
+    active free projects
 
-**A is the recommendation.** It gets the full value of the rehearsal without
-ever pointing a live environment at customer data, and it costs one throwaway
-project. Say which and I will run it.
+Production and `rennovaite-dev-sg` already occupy both free slots. Nothing was
+created, so there is nothing to delete.
+
+The substitute is **better for the stated goal**, not a compromise:
+`supabase start` runs the genuine Supabase stack locally — the same Postgres
+image, the same roles (`supabase_admin`, `authenticator`, `anon`,
+`service_role`), the same extensions, and GoTrue. The dump was restored into a
+**clean database inside it**, so nothing pre-existing could mask a gap. And
+production data never left the machine, which a cloud scratch project could not
+have promised.
+
+### Row counts — restored vs LIVE production
+
+| Table | Production | Restored | Match |
+| --- | ---: | ---: | --- |
+| projects | 8 | 8 | ✅ |
+| plans | 8 | 8 | ✅ |
+| rooms | 107 | 107 | ✅ |
+| renders | 49 | 49 | ✅ |
+| boqs | 24 | 24 | ✅ |
+| takeoff_items | 184 | 184 | ✅ |
+| rate_book | 61 | 61 | ✅ |
+| pricing_skus | 600 | 600 | ✅ |
+| labour_rates | 52 | 52 | ✅ |
+| accessory_catalog | 45 | 45 | ✅ |
+
+**Every table matches.** Production counts were read live from the REST API at
+the time of comparison, not taken from the dump's own metadata — a dump agreeing
+with itself proves nothing.
+
+### Schema and RLS
+
+    public tables      29
+    auth tables        23      auth.users restored with all 35 columns
+    storage tables      8
+    auth.users rows     1      the account the REST export could never see
+
+    RLS enabled: auth 16 · storage 8 · public 0
+    policies: 0
+
+The RLS **state** round-tripped exactly: Supabase's own auth and storage tables
+come back with row security on, and every application table comes back with it
+off — which is production's design, not an omission.
+
+Said plainly: **the RLS half of this test is vacuously true today**, because
+there are no user-defined policies to lose. It becomes a real test the day the
+first one is written, and `rls_policies` in `VERIFIED.txt` is what will notice
+if it ever stops coming back.
+
+### Teardown — confirmed
+
+    drop database restore_test        -> 0 databases named restore_test remain
+    supabase stop --no-backup         -> stack stopped, data discarded
+    docker containers named supabase  -> none
+    docker volumes named supabase     -> none
+    cloud projects                    -> 2 (production, rennovaite-dev-sg)
+    scratch/restore-test projects     -> NONE
+
+The rehearsal log was also deleted from the backup directory. **No copy of
+production data outlives the test.** The only remaining copy is the intended
+backup itself, in `~/OneDrive/rennovaite-backups`.
+
+### The one thing this does not prove
+
+A local stack does not exercise the hosted platform's own restore path —
+Supabase's dashboard restore, its connection pooler, or its storage-object
+recovery. If that matters before an investor conversation, it needs a paid
+project slot or a temporary pause of dev. What it does prove is the part that
+was actually at risk: the dump is complete, loadable, and gives back every row
+and the account that owns them.
+
