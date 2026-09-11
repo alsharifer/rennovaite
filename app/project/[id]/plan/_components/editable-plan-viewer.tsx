@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { Layers, Plus, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { RoomAreaDispute } from "@/lib/parse/disputes";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { polygonArea } from "@/lib/plan/polygon";
 import { separateOverlappingRooms } from "@/lib/plan/separate";
@@ -222,6 +223,10 @@ type Props = {
   mode: PlanViewerMode;
   /** read mode only: fired when a room is clicked (opens the inspect panel). */
   onInspectRoom?: (roomId: string) => void;
+  /** Rooms whose printed dimension and whose outline disagree materially. The
+   *  measurement was kept; this is the question that asks a human which to
+   *  believe. */
+  areaDisputes?: RoomAreaDispute[];
 };
 
 export function EditablePlanViewer({
@@ -229,6 +234,7 @@ export function EditablePlanViewer({
   initialRooms,
   mode,
   onInspectRoom,
+  areaDisputes,
 }: Props) {
   const router = useRouter();
   const editing = editingEnabled(mode);
@@ -279,6 +285,25 @@ export function EditablePlanViewer({
   }, [rooms]);
   // Rooms the user has flagged (split/merge/other) this session — shown marked.
   const [flaggedIds, setFlaggedIds] = useState<Set<string>>(() => new Set());
+  // Area disputes the parse recorded, minus the ones answered this session.
+  // Answering is not a preference to remember: if someone keeps the label and
+  // leaves the outline alone, the contradiction is still there next time, and
+  // the plan should say so. Correcting either one clears it for good, because
+  // the room's area stops matching the stated figure the dispute was keyed on.
+  const [answeredDisputeIds, setAnsweredDisputeIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const openDisputes = useMemo(() => {
+    const byRoom = new Map<string, RoomAreaDispute>();
+    for (const d of areaDisputes ?? []) {
+      if (answeredDisputeIds.has(d.room_id)) continue;
+      const room = rooms.find((r) => r.id === d.room_id && !r.isDeleted);
+      // Once the area no longer matches what the dispute was raised against,
+      // somebody has already resolved it by editing.
+      if (room && Math.abs(room.area_m2 - d.stated_area_m2) < 0.005) byRoom.set(d.room_id, d);
+    }
+    return byRoom;
+  }, [areaDisputes, answeredDisputeIds, rooms]);
   // Per-session correction counts → posted to parse_metrics on save (the KPI).
   const correctionCounts = useRef({ move: 0, vertex: 0, relabel: 0, delete: 0 });
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
@@ -611,6 +636,42 @@ export function EditablePlanViewer({
     [postParseMetrics, flashInfo],
   );
 
+  // A dispute is answered one of two ways, and both are real answers worth
+  // recording: the drawing's dimension stands and the outline needs redrawing,
+  // or the outline is right and the label was misread. Neither is a dismissal.
+  const resolveDispute = useCallback(
+    (roomId: string, choice: "label" | "outline") => {
+      const dispute = openDisputes.get(roomId);
+      if (!dispute) return;
+      if (choice === "outline") {
+        snapshot();
+        setRooms((prev) =>
+          prev.map((r) =>
+            r.id === roomId ? { ...r, area_m2: dispute.geometric_area_m2 } : r,
+          ),
+        );
+        correctionCounts.current.relabel += 1;
+      }
+      setAnsweredDisputeIds((prev) => new Set(prev).add(roomId));
+      void postParseMetrics({
+        kind: "corrections",
+        detail: {
+          flag: "area_dispute",
+          room_id: roomId,
+          choice,
+          stated_area_m2: dispute.stated_area_m2,
+          geometric_area_m2: dispute.geometric_area_m2,
+        },
+      });
+      flashInfo(
+        choice === "outline"
+          ? `Area set to ${dispute.geometric_area_m2.toFixed(2)} m² from the outline`
+          : "Kept the drawing's dimension — check the outline",
+      );
+    },
+    [openDisputes, snapshot, postParseMetrics, flashInfo],
+  );
+
   const save = async () => {
     setSaveStatus("saving");
     setSaveError(null);
@@ -826,6 +887,69 @@ export function EditablePlanViewer({
       </div>
       )}
 
+      {/* Area disputes. The drawing prints a dimension for this room and the
+          outline works out to something materially different; both cannot be
+          right, and only a person can say which. The parse kept the printed
+          figure — it does not get overruled by a vision model's guess at where
+          the walls are — so what is left is a question, asked here with both
+          numbers in it rather than a flag nobody can act on. */}
+      {editing && openDisputes.size > 0 && (
+        <div className="mb-3 rounded-md border border-[#FDE68A] bg-[#FFFBEB] p-3">
+          <p className="mb-2 text-xs font-medium text-[#92400E]">
+            {openDisputes.size === 1
+              ? "1 room where the drawing and the outline disagree"
+              : `${openDisputes.size} rooms where the drawing and the outline disagree`}
+          </p>
+          <ul className="space-y-2">
+            {[...openDisputes.values()].map((d) => {
+              const room = visibleRooms.find((r) => r.id === d.room_id);
+              if (!room) return null;
+              return (
+                <li
+                  key={d.room_id}
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-700"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(d.room_id)}
+                    className="font-medium text-ink-900 underline decoration-dotted underline-offset-2"
+                  >
+                    {room.name_en}
+                  </button>
+                  <span>
+                    drawing says{" "}
+                    <span className="font-mono tabular-nums">
+                      {d.stated_area_m2.toFixed(2)}
+                    </span>{" "}
+                    m², outline measures{" "}
+                    <span className="font-mono tabular-nums">
+                      {d.geometric_area_m2.toFixed(2)}
+                    </span>{" "}
+                    m².
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => resolveDispute(d.room_id, "label")}
+                      className="rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+                    >
+                      Keep the drawing
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resolveDispute(d.room_id, "outline")}
+                      className="rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+                    >
+                      Use the outline
+                    </button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-ink-100 bg-paper">
         <svg
           ref={svgRef}
@@ -862,7 +986,10 @@ export function EditablePlanViewer({
               const selected = selectedId === room.id;
               const renaming = renamingId === room.id;
               const overlapping = overlappingIds.has(room.id);
-              const flagged = lowConfidenceIds.has(room.id) || flaggedIds.has(room.id);
+              const flagged =
+                lowConfidenceIds.has(room.id) ||
+                flaggedIds.has(room.id) ||
+                openDisputes.has(room.id);
               const bb = bboxOf(room.polygon);
               // Mode gate: edit → body-drag, read → inspect-on-click.
               const roomMode = roomInteraction(mode);

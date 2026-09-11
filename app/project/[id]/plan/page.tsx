@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app/AppShell";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
+import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -139,6 +140,16 @@ export default async function PlanPage({
     );
   }
 
+  // A room whose printed dimension and whose outline disagree materially. The
+  // measurement was kept; the editor puts the choice in front of whoever is
+  // reviewing the plan rather than leaving a flag nobody can act on.
+  const parsedDisputes = disputesFromParsedJson(plan.parsed_json);
+  const areaDisputes = resolveDisputes(
+    parsedDisputes.disputes,
+    parsedDisputes.rooms,
+    roomList,
+  );
+
   const parsedComplete = plan.parsed_json !== null && roomList.length > 0;
 
   // Real parse-quality KPI: mean room confidence + this plan's correction count
@@ -207,6 +218,7 @@ export default async function PlanPage({
                   planId={plan.id}
                   initialRooms={roomList}
                   initialTotalAreaM2={totalArea}
+                  areaDisputes={areaDisputes}
                   overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
                   mode="edit"
                 />
