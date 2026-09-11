@@ -18,6 +18,10 @@ export interface RawParsedRoom {
   name_ar: string | null;
   room_type: string;
   area_m2: number;
+  /** Where `area_m2` came from. "measured" = read off a dimension the drawing
+   *  prints, which outranks any polygon. "estimated" (the default) = the
+   *  provider's own guess, which geometry may overrule. */
+  area_source?: "measured" | "estimated";
   /** Normalised [0,1] polygon following the real walls; N-vertex, may be
    *  diagonal. Not a bounding box. */
   polygon: [number, number][];
@@ -39,11 +43,32 @@ export interface RawProvidedOpening {
   derived?: boolean | null;
 }
 
+/** How a PDF sheet's own text and vector layers were used, for tracing. Absent
+ *  when the input was a raster/photo or the sheet could not be read. */
+export interface SheetProvenance {
+  /** "cropped" = the model saw only the plan region and the sheet's printed
+   *  labels were folded in. "full-sheet" = the whole document went to the
+   *  model, exactly as before. */
+  path: "cropped" | "full-sheet";
+  /** Why the crop path was not taken. null when it was. */
+  fallback_reason: string | null;
+  region: [number, number, number, number] | null;
+  raster_px: [number, number] | null;
+  scale_source: "text-layer" | "model" | "unknown";
+  labels_total: number;
+  labels_matched: number;
+  label_area_room_ids: string[];
+  label_only_room_ids: string[];
+  unmatched_tags: string[];
+}
+
 export interface RawParseResult {
   scale: string;
   units: "metric" | "imperial";
   total_area_m2: number;
   rooms: RawParsedRoom[];
+  /** Set by a provider that read the source as a vector CAD sheet. */
+  sheet?: SheetProvenance;
   /** Optional: providers that detect doors/windows supply them here (the
    *  in-house Claude provider does not — it's forward-looking for a hosted /
    *  vector-extraction provider). Persisted to plan_openings. */
