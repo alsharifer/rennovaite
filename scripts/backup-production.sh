@@ -14,19 +14,75 @@
 # output. Put it in the environment or a password manager; do not commit it and
 # do not paste it into a chat window.
 #
-# pg_dump runs from the postgres:16 Docker image, so nothing needs installing
-# and the client version always matches the server major.
+# pg_dump runs from a pinned Postgres Docker image, so nothing needs installing
+# and the client major always matches the server (see PG_IMAGE below).
 # =============================================================================
 set -euo pipefail
 
-: "${SUPABASE_DB_URL:?set SUPABASE_DB_URL (Supabase dashboard -> Settings -> Database -> Connection string -> URI)}"
+# The connection string may come from the environment OR from a credentials file
+# outside the repo. The file exists so the password can be supplied without ever
+# passing through a terminal argument, a shell history, or a chat window — a
+# secret pasted into any of those is disclosed, and the only fix afterwards is a
+# reset.
+#
+# The file is read, never printed, never copied into the backup directory, and
+# never committed (it lives outside the repo entirely).
+CRED_FILE="${CRED_FILE:-$HOME/backups/rennovaite/.db-url}"
+if [ -z "${SUPABASE_DB_URL:-}" ] && [ -f "$CRED_FILE" ]; then
+  SUPABASE_DB_URL="$(head -n1 "$CRED_FILE" | tr -d '\r\n')"
+  export SUPABASE_DB_URL
+  echo "[backup] connection string read from $CRED_FILE (value not shown)"
+fi
+
+: "${SUPABASE_DB_URL:?no connection string. Put it in $CRED_FILE, or export SUPABASE_DB_URL}"
 : "${BACKUP_DIR:?set BACKUP_DIR — an absolute path OUTSIDE this repo and outside Supabase}"
+
+# Refuse a URL that still contains the doc's placeholder — same fail-closed rule
+# as the target guard, for the same reason.
+case "$SUPABASE_DB_URL" in
+  *"<"*|*">"*)
+    echo "[backup] the connection string still contains a placeholder (< or >). Aborting." >&2
+    exit 1 ;;
+esac
 
 STAMP="$(date +%Y-%m-%dT%H-%M-%SZ)"
 DEST="${BACKUP_DIR}/${STAMP}"
 mkdir -p "$DEST"
 
 log() { echo "[backup $(date +%H:%M:%S)] $*"; }
+
+# Docker needs a HOST path it understands. Under Git Bash on Windows a path like
+# /c/Users/... is an MSYS invention that dockerd has never heard of, so the bind
+# mount silently produces an empty container directory and pg_dump fails with
+# "could not open output file" — which reads like a permissions problem and is
+# not one.
+#
+# cygpath -m gives C:/Users/... , which Docker Desktop accepts. MSYS_NO_PATHCONV
+# stops Git Bash rewriting the container-side path (/out) on the way through.
+host_path() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi
+}
+# pg_dump REFUSES to dump a server newer than itself. Both Supabase projects run
+# Postgres 17, so a postgres:16 image aborts with "server version mismatch" —
+# which is why this is pinned rather than left to float. Override if the server
+# major ever moves.
+PG_IMAGE="${PG_IMAGE:-postgres:17}"
+
+docker_run() { MSYS_NO_PATHCONV=1 docker "$@"; }
+
+# Supabase's session pooler drops long connections: an observed run died with
+# "SSL error: unexpected eof while reading" partway through the second dump. It
+# is transient, so retry rather than lose the whole run — but cap it, because a
+# dump that needs five attempts is telling you something and should fail loudly.
+retry() {
+  n=0
+  until "$@"; do
+    n=$((n + 1))
+    if [ "$n" -ge 3 ]; then log "failed after 3 attempts"; return 1; fi
+    log "attempt $n failed (pooler drop?) — retrying in 10s"
+    sleep 10
+  done
+}
 
 # --- 1. dump ------------------------------------------------------------------
 # --schema '*' is the point of this script: it takes AUTH and STORAGE too, not
@@ -38,12 +94,12 @@ log() { echo "[backup $(date +%H:%M:%S)] $*"; }
 # the same reason: they are schema, and the REST export was never able to see
 # them either.
 log "dumping (custom format, all schemas incl. auth + storage)"
-docker run --rm -e PGURL="$SUPABASE_DB_URL" -v "$DEST:/out" postgres:16 \
+retry docker_run run --rm -e PGURL="$SUPABASE_DB_URL" -v "$(host_path "$DEST"):/out" "$PG_IMAGE" \
   sh -c 'pg_dump "$PGURL" --format=custom --no-owner --no-privileges \
            --schema="*" -f /out/full.dump'
 
 log "dumping (schema only, for diffing)"
-docker run --rm -e PGURL="$SUPABASE_DB_URL" -v "$DEST:/out" postgres:16 \
+retry docker_run run --rm -e PGURL="$SUPABASE_DB_URL" -v "$(host_path "$DEST"):/out" "$PG_IMAGE" \
   sh -c 'pg_dump "$PGURL" --schema-only --no-owner --no-privileges \
            --schema="*" -f /out/schema.sql'
 
@@ -54,29 +110,29 @@ docker run --rm -e PGURL="$SUPABASE_DB_URL" -v "$DEST:/out" postgres:16 \
 # is needed.
 log "verifying: restoring into a scratch container"
 CHECK="rv-restore-check-$$"
-docker rm -f "$CHECK" >/dev/null 2>&1 || true
-docker run -d --name "$CHECK" -e POSTGRES_HOST_AUTH_METHOD=trust postgres:16 >/dev/null
+docker_run rm -f "$CHECK" >/dev/null 2>&1 || true
+docker_run run -d --name "$CHECK" -e POSTGRES_HOST_AUTH_METHOD=trust "$PG_IMAGE" >/dev/null
 for _ in $(seq 1 40); do
-  docker exec "$CHECK" pg_isready -U postgres >/dev/null 2>&1 && break
+  docker_run exec "$CHECK" pg_isready -U postgres >/dev/null 2>&1 && break
   sleep 1
 done
 
-docker cp "$DEST/full.dump" "$CHECK:/tmp/full.dump"
+docker_run cp "$(host_path "$DEST")/full.dump" "$CHECK:/tmp/full.dump"
 # Roles and some extensions do not exist in a bare container; those errors are
 # expected and not a failed restore. Anything else is.
-docker exec "$CHECK" pg_restore -U postgres -d postgres --no-owner --no-privileges \
+docker_run exec "$CHECK" pg_restore -U postgres -d postgres --no-owner --no-privileges \
   /tmp/full.dump 2>"$DEST/restore.log" || true
 
-PUBLIC_TABLES=$(docker exec "$CHECK" psql -U postgres -At -c \
+PUBLIC_TABLES=$(docker_run exec "$CHECK" psql -U postgres -At -c \
   "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE';")
-PROJECTS=$(docker exec "$CHECK" psql -U postgres -At -c \
+PROJECTS=$(docker_run exec "$CHECK" psql -U postgres -At -c \
   "select count(*) from public.projects;" 2>/dev/null || echo 0)
-AUTH_USERS=$(docker exec "$CHECK" psql -U postgres -At -c \
+AUTH_USERS=$(docker_run exec "$CHECK" psql -U postgres -At -c \
   "select count(*) from auth.users;" 2>/dev/null || echo "n/a")
-POLICIES=$(docker exec "$CHECK" psql -U postgres -At -c \
+POLICIES=$(docker_run exec "$CHECK" psql -U postgres -At -c \
   "select count(*) from pg_policies;" 2>/dev/null || echo 0)
 
-docker rm -f "$CHECK" >/dev/null 2>&1 || true
+docker_run rm -f "$CHECK" >/dev/null 2>&1 || true
 
 {
   echo "taken_at=$STAMP"

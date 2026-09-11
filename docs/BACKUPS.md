@@ -1,6 +1,61 @@
 # Production backups (I9)
 
-**Status: built, not yet running. Two things are needed from Abdallah, below.**
+**First real backup taken 2026-09-11.** Verified by restoring it. One item
+remains open and it is a governance decision, not a technical one — see
+"The restore rehearsal" at the end.
+
+## The first backup, measured
+
+    taken_at       = 2026-09-11T07-22-09Z
+    public_tables  = 29
+    projects_rows  = 8
+    auth_users     = 1        <- the whole point
+    rls_policies   = 0
+
+Archive: **5,165 TOC entries**, custom format, gzip. `full.dump` 2.5 MB,
+`schema.sql` 1.3 MB, 4.6 MB for the run.
+
+**`auth_users = 1` is the finding.** The REST export this replaces could see
+only `public`, so it captured every project and zero accounts — restoring it
+would have returned the villas and lost the person who owns them. The dump now
+carries the `auth` schema (23 tables) and the `storage` schema.
+
+**`rls_policies = 0` is correct, not a gap.** There are no user-defined
+policies in production to capture: RLS is disabled on every application table
+(`CLAUDE.md`), and all access runs through the service role. The schema dump
+does carry 25 `ENABLE ROW LEVEL SECURITY` statements for the Supabase-managed
+auth and storage tables. Worth stating plainly: **the RLS half of the I9
+verification is vacuously true today.** It becomes a real test the moment the
+first policy is written, and the count in `VERIFIED.txt` is what will notice.
+
+The restore into the scratch container logged 2,981 errors, all benign —
+`collation already exists`, `operator class already exists`, and Supabase's
+event-trigger functions, which a bare Postgres image already has or cannot
+accept. The restore is still judged on what came back: 29 tables, 8 projects,
+1 account.
+
+## Three things that had to be fixed to get one dump
+
+Each failed in a way that looked like something else:
+
+1. **Docker bind mount.** Under Git Bash a `/c/Users/...` path is an MSYS
+   invention dockerd has never heard of. The mount silently produced an empty
+   directory and `pg_dump` failed with *"could not open output file"*, which
+   reads like a permissions problem. Fixed with `cygpath -m` +
+   `MSYS_NO_PATHCONV`.
+2. **Wrong pooler host.** I extrapolated production's connection string from
+   dev's, assuming the same region meant the same pooler cluster. It does not —
+   dev is on `aws-0`, production on `aws-1`. The error, *"tenant/user
+   postgres.<ref> not found"*, reads like a bad password.
+3. **Postgres major mismatch.** The script used `postgres:16`; both projects
+   run 17.6. `pg_dump` refuses to dump a server newer than itself. Pinned to
+   `postgres:17` via `PG_IMAGE`.
+
+A fourth is handled rather than fixed: the session pooler drops long
+connections (*"SSL error: unexpected eof while reading"* mid-dump). Both dumps
+now retry up to three times.
+
+---
 
 ## What existed before
 
@@ -49,69 +104,48 @@ the Supabase project: it survives the project being deleted, suspended, or
 billed into read-only, which is precisely the failure a platform-side backup
 does not cover.
 
-## Blocked on Abdallah
+## Resolved — what was blocked, and what still is
 
-### 1 — The database password
+**Password: done.** Rotated 2026-09-11 after being disclosed in a chat window,
+and supplied through `~/backups/rennovaite/.db-url` — read by the script,
+never printed, never copied into a backup directory, and outside any git tree.
+Passing it on a command line or in chat is what created the need to rotate.
 
-`pg_dump` needs it. It is not in `.env.local` and cannot be derived from the
-service-role JWT.
+**Location: chosen — OneDrive.** `~/OneDrive/rennovaite-backups`. Off the
+laptop disk and syncing today. It remains a default rather than the right
+long-term answer: a personal account holding customer data. Cloudflare R2 or
+Backblaze B2 at roughly AED 1/month is the upgrade when it matters.
 
-- <https://supabase.com/dashboard> → project `efrcgktrlsjnzkzzuhof` →
-  **Settings → Database → Connection string → URI**
-- Reveal and copy the password
-- **Do not paste it into a chat window.** Put it in your password manager, then
-  in your own shell:
+**Still open: the schedule.** Backups are not yet automatic. One task, run as
+Abdallah so the credentials file is readable:
 
-```bash
-export SUPABASE_DB_URL='postgresql://postgres.efrcgktrlsjnzkzzuhof:<password>@<host>:5432/postgres'
-```
+    schtasks /create /tn "RennovAIte backup" /sc daily /st 03:00 ^
+      /tr "bash C:devennovaitescriptsackup-production.sh"
 
-If you also create the dev project (I8), save that password at the same time —
-it cannot be recovered later, only reset.
+`BACKUP_DIR` must be set as a **user** environment variable
+(`%USERPROFILE%OneDriveennovaite-backups`); the connection string comes
+from the credentials file, so it never enters the task definition. Until this
+runs, there is exactly one backup and no cadence.
 
-### 2 — Where the backups live: choose one
+## The restore rehearsal — needs a decision, not more code
 
-**My default recommendation: OneDrive.** It is already on this machine, already
-syncing, private to your account, and costs nothing extra. It gets the dumps off
-the laptop's disk today, which is the gap that matters most.
+I9 asks for the restore to be tested **against the dev project**. Doing that
+literally would load production into dev, and that collides head-on with the I8
+deviation you approved: dev deliberately holds no commercial data — no Atrium,
+Global Creation, Laspinas or RAK quotation, no BoQ, no real account.
 
-```bash
-export BACKUP_DIR="$HOME/OneDrive/rennovaite-backups"
-```
+Restoring the production dump into dev would put all of it there, and **Vercel
+Preview points at dev**, so during the window every preview deployment would be
+reading live customer data. Wiping afterwards does not undo that window.
 
-It is a default, not the right long-term answer: OneDrive is a personal account,
-not company-controlled, and it holds customer data. Two alternatives, if you
-would rather:
+So this is a data-governance call, and it is yours:
 
-| Option | For | Against |
+| Option | What it proves | Cost |
 | --- | --- | --- |
-| **OneDrive** (default) | Zero setup, already syncing, offsite today | Personal account; customer data on consumer storage |
-| **Cloudflare R2 / Backblaze B2** | Company-owned, no egress fees, ~AED 1/month at this size | Needs an account and a key; ~1 hour |
-| **A second physical disk** | Cheapest, fully controlled | Not offsite — fire and theft take both copies |
+| **A · Scratch project** (recommended) — spin up `rennovaite-restore-test`, restore into it, verify, delete it | Everything dev would prove: real Supabase roles, extensions, auth schema | ~15 min, free tier, and production data never touches an environment anything is pointed at |
+| **B · Into dev, then reset** | Same, but dev holds production data for the duration | Preview reads live data during the window; dev must then be dropped, re-pushed and re-seeded |
+| **C · Container only** (what runs today) | The dump is readable and complete | Already automatic per run; does not prove a *live Supabase project* will take it |
 
-Once chosen, schedule it (Windows Task Scheduler, daily 03:00):
-
-```
-schtasks /create /tn "RennovAIte backup" /sc daily /st 03:00 ^
-  /tr "bash C:\dev\rennovaite\scripts\backup-production.sh"
-```
-
-The task needs `SUPABASE_DB_URL` and `BACKUP_DIR` in its environment — set them
-as **user** environment variables so the password is not in the task definition.
-
-## The restore test is the deliverable, and it is not done
-
-I9 asks for the restore to be **tested against the dev project from I8**. That
-project does not exist yet, so:
-
-- **Blocked on:** the dev Supabase project (I8 step 1) **and** the database
-  password (above).
-- **What will be verified when both exist:** restore the dump into dev; compare
-  row counts per table against production; confirm `auth.users` restores with
-  its rows; confirm `pg_policies` count matches. Restoring into dev rather than
-  a scratch container is what makes it a real rehearsal — same Supabase
-  extensions, same roles, same shape of failure.
-
-Until then the per-run container restore in the script is a genuine check that
-the dump is *readable and complete*, but it is not the same as proving it
-restores into a live Supabase project.
+**A is the recommendation.** It gets the full value of the rehearsal without
+ever pointing a live environment at customer data, and it costs one throwaway
+project. Say which and I will run it.
