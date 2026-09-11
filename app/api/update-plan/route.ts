@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { repairOverlaps } from "@/lib/parse/repair";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { ensureAsBuiltSnapshot } from "@/lib/plan/snapshots";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -34,7 +35,32 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { plan_id, rooms, deleted_ids } = parsed.data;
+    const { plan_id, rooms: posted, deleted_ids } = parsed.data;
+
+    // Re-run overlap repair on what the editor sent. The parse guarantees rooms
+    // do not overlap; editing could quietly undo that and nothing downstream
+    // would ever put it back, leaving a plan permanently uncostable. Repair is
+    // a no-op for rooms that do not overlap — only the offending pair is
+    // carved, and the response names what changed so the editor can say so
+    // rather than silently reshaping someone's work.
+    const totalPosted = posted.reduce((sum, r) => sum + r.area_m2, 0);
+    const { rooms: repaired } = repairOverlaps(
+      posted.map((r) => ({
+        id: r.id,
+        polygon: r.polygon as [number, number][],
+        area_m2: r.area_m2,
+      })),
+      { totalAreaM2: totalPosted },
+    );
+    const repairedById = new Map(repaired.map((r) => [r.id, r]));
+    const trimmed = posted.filter((r) => {
+      const fixed = repairedById.get(r.id);
+      return fixed !== undefined && JSON.stringify(fixed.polygon) !== JSON.stringify(r.polygon);
+    });
+    const rooms = posted.map((r) => {
+      const fixed = repairedById.get(r.id);
+      return fixed ? { ...r, polygon: fixed.polygon as number[][], area_m2: fixed.area_m2 } : r;
+    });
 
     const supabase = getSupabaseAdmin();
 
@@ -69,9 +95,8 @@ export async function POST(request: NextRequest) {
     // D3: the save ALWAYS succeeds. Overlapping rooms are a legitimate
     // transient state while editing — refusing the write would leave unsaved
     // work one refresh from being lost, and a 400 after the click is the same
-    // failure with extra steps. So we record what we saw instead, and BoQ
-    // generation is where the invariant is actually enforced, because that is
-    // where overlaps do their damage (double-counted floor and wall area).
+    // failure with extra steps. Repair above resolves them rather than
+    // refusing, and this records the state of what was actually written.
     const overlaps = findOverlaps(
       rooms.map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
     );
@@ -122,6 +147,18 @@ export async function POST(request: NextRequest) {
       // The save succeeded either way; this tells the editor what to show.
       has_overlaps: overlaps.has_overlaps,
       overlap_pairs: overlaps.pairs,
+      // Rooms whose geometry repair changed on the way in, with the shape that
+      // was actually stored — so the editor shows what is in the database
+      // rather than what the user last dragged.
+      repaired_rooms: trimmed.map((r) => {
+        const fixed = repairedById.get(r.id)!;
+        return {
+          id: r.id,
+          name_en: r.name_en,
+          polygon: fixed.polygon,
+          area_m2: fixed.area_m2,
+        };
+      }),
     });
   } catch (err) {
     console.error("[api/update-plan] error", err);
