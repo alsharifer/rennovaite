@@ -37,6 +37,10 @@ export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
   // inventing one here would put a confident wrong number in front of a QS.
   // The Villa 94 boundary-light rate arrives with G2.
   garden_light: { label: "Garden light", code: "GL", glyph: "wb_incandescent", boqDescription: "External garden light point — cabling + fitting allowance", unitRateAed: null },
+  // G2. The landscape take-off prices these from the rate book (cabling +
+  // fittings, or the boundary-light rate); the overlay BoQ feed is the interior
+  // path and leaves them to the QS rather than pricing the same point twice.
+  boundary_light: { label: "Boundary light", code: "BL", glyph: "highlight", boqDescription: "Boundary wall light point — supply & install", unitRateAed: null },
   // --- Plumbing ---
   wc_point: { label: "WC point", code: "WC", glyph: "wc", boqDescription: "WC supply + soil connection — first & second fix", unitRateAed: 850 },
   basin_point: { label: "Basin point", code: "B", glyph: "wash", boqDescription: "Wash-basin supply + waste — first & second fix", unitRateAed: 650 },

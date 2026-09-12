@@ -527,6 +527,75 @@ balcony and every garden zone was simply unrenderable.
   byte-identical to the pre-G1b commit. The prompt is the render cache key, so
   that is what stops every cached interior render being invalidated.
 
+## Landscape rate book + garden takeoff (garden pilot G2)
+
+Ground-truth project **#2**: a real Dubai garden renovation, ingested from
+`data/garden pilot/Garden_Ground_Truth_Villa94.xlsx`. Not flag-gated — a rate
+book and a set of pure rules change nothing until something calls them.
+
+- **Identity is a hard rule, not a preference.** The contractor is an
+  independent firm with no relationship to the client this pilot serves, and
+  these are their negotiated prices. Their name appears in exactly one place:
+  `INTERNAL_REF` in `lib/ground-truth/villa94-garden.ts`, written to
+  `rate_book.internal_ref` (migration `032`) and rendered nowhere.
+  `rate_book.source` — which reaches the what-if engine, the BoQ line and
+  therefore the client — carries `PUBLIC_SOURCE_LABEL`
+  (*"market reference — Dubai garden 2026"*) instead. A test asserts the name is
+  absent from every rendered string.
+- **`lib/ground-truth/villa94-garden.ts`** is the transcription (read by
+  unzipping the workbook and parsing sheet XML, never retyped): 20 contract
+  lines, the 20-item rate calibration, totals, the timeline, and the
+  invariants. **Three rates arrive ALREADY NET** — client-purchased tile, the
+  boundary-light variation, the client-supplied grill — and re-applying the 12%
+  to them would understate every future garden on exactly the lines a client
+  pays directly. `ratesAreConsistent()` is the guard; the seeder refuses to run
+  if it trips.
+- **`scripts/seed-rate-book-garden.ts`** upserts the 20 rows as
+  `provenance: 'actual_transaction'`, `qs_validated: false`, net in `rate_aed`
+  and pre-discount in `list_rate_aed` (null where the rate was already net, so
+  it cannot read as discounted). Idempotent and narrow: it deletes only
+  `item_key LIKE 'garden.%'`, so a re-run cannot reach the Mudon interior
+  actuals.
+- **`lib/boq/garden-takeoff.ts`** is a SEPARATE take-off from
+  `lib/boq/takeoff.ts`, and its rates come from the ground-truth module rather
+  than `lib/boq/rates.ts`. The interior `RateResolver` is driven by `RATE_RULES`
+  over `labour_rates` + `pricing_skus` and throws on an unknown key, so routing
+  garden keys through it would have meant inventing labour rows or editing
+  interior rules. Rules **GL-01…GL-19** cover project lumps, hardscape
+  (PCC + install + tile supply), softscape, runs per lm, discrete units,
+  pergola by plan area, irrigation, lighting and boundary lights.
+- **Two kinds of inclusion, and the distinction is load-bearing.**
+  `INCLUSIVE_SCOPE` suppresses a LINE (a BBQ counter's sockets: there is no such
+  thing as "the sockets the counter doesn't cover"). `QUANTITY_INCLUSIONS`
+  reduces a QUANTITY (a pergola carries eight downlights, not every light in the
+  garden). The first version listed the lighting keys as line-level, which would
+  have zeroed a garden's entire lighting the moment somebody drew a pergola —
+  the test caught it. `findDoubleCounts()` enforces the line-level rule plus
+  `ABSORBED_SCOPE` (manhole covers, drainage points, sweet soil, edging,
+  fertilizer were quoted at zero and absorbed; a line for any of them invents a
+  cost).
+- **Honesty flags.** Tile supply carries `rate_status: 'site_assessment'`
+  because the rate is per m² PURCHASED and the reference order covered all
+  paving *and* cladding from 66.24 m² against 87 m² of quoted paving. The
+  irrigation lump carries the new `ScopeItem.qty_derived` — its rate is a
+  transacted actual but its quantity is scaled from one reference project, and
+  the scale is clamped to 0.5–2.0 because a lump stretched five times over is
+  not a lump.
+- **Sections**: `External Works`, `Landscape Structures`, `Irrigation`,
+  `External Lighting` are added to `POMI_SECTIONS` and `SECTION_ORDER`. Purely
+  additive — the engine emits a section only when a take-off item lands in it.
+- **`scripts/record-garden-outcome.ts`** writes delta-log entry **#2** against a
+  `Villa 94 garden (ground truth)` project: `actual_total` 152,059.44
+  (contractor 138,146.44 + client-supplied 13,913), per-section net, and the
+  90-day duration anchor. The platform side is left **null** — that BoQ does not
+  exist until the G3 dry-run, and a fabricated figure would be worse than none.
+  Unlike Mudon's flat AED 36,500, this 12% was applied uniformly to the quoted
+  subtotal, so distributing it per section is exact; the script asserts the
+  split reconciles to the project total before writing.
+- **DB step**: `supabase db push` for `032`, then
+  `node --import ./scripts/_alias-hook.mjs scripts/seed-rate-book-garden.ts` and
+  the same for `scripts/record-garden-outcome.ts`.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

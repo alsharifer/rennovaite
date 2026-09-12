@@ -188,6 +188,12 @@
       "version": "20260101003100",
       "name": "authored_plans_and_outdoor_zones",
       "sha256": "613a7c843d7e1f8f591686b387eeaf996154cf4c7cd6354ab8a19bcd0aeaf098"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003200",
+      "name": "rate_book_internal_ref",
+      "sha256": "fc9e0c34d9d7b13ef62be39563d2c502b5bf56470890bcb07acfc9f58bab0c6b"
     }
   ]
 }

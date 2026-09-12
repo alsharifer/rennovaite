@@ -21,6 +21,9 @@ export const ELECTRICAL_TYPES = [
   // G1 garden pilot. Distinct from `light_point`: a spike or bollard fitting on
   // an external circuit, not a ceiling rose.
   "garden_light",
+  // G2. Priced from its own rate, not the garden-light rate: the reference
+  // project bought these as a variation whose price was already net.
+  "boundary_light",
 ] as const;
 
 export const PLUMBING_TYPES = [
@@ -44,7 +47,11 @@ export type FixtureSource = "rule" | "user";
 
 /** G1: the two types the garden pilot adds. Hidden from the palette when the
  *  pilot is off, so an interior project's palette is unchanged. */
-export const GARDEN_TYPES: readonly FixtureType[] = ["garden_light", "drainage_point"];
+export const GARDEN_TYPES: readonly FixtureType[] = [
+  "garden_light",
+  "boundary_light",
+  "drainage_point",
+];
 
 export function layerOf(type: FixtureType): OverlayLayer {
   return (ELECTRICAL_TYPES as readonly string[]).includes(type)

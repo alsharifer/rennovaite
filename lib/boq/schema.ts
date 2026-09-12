@@ -30,6 +30,13 @@ export const POMI_SECTIONS = [
   "Plumbing & Sanitary",
   "Decoration & Painting",
   "Preliminaries",
+  // G2 landscape sections. Additive: the engine emits a section only when a
+  // take-off item lands in it (SECTION_ORDER.filter(bySection.has)), so an
+  // interior BoQ is unchanged by their existence.
+  "External Works",
+  "Landscape Structures",
+  "Irrigation",
+  "External Lighting",
 ] as const;
 
 export type PomiSection = (typeof POMI_SECTIONS)[number];
@@ -101,6 +108,15 @@ export type ScopeItem = {
    * indistinguishable from a rate somebody actually paid.
    */
   rate_status?: "indicative" | "site_assessment" | "needs_qs";
+  /**
+   * G2: the QUANTITY was inferred rather than measured off the drawing.
+   *
+   * Distinct from `rate_status`, which is about the price. A scaled lump — the
+   * garden irrigation line — has a rate somebody actually paid and a quantity
+   * extrapolated from a single reference project. Those are different claims
+   * and a QS needs to see both.
+   */
+  qty_derived?: boolean;
 };
 
 // --- Output --------------------------------------------------------------------
