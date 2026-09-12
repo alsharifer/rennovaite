@@ -194,6 +194,18 @@
       "version": "20260101003200",
       "name": "rate_book_internal_ref",
       "sha256": "fc9e0c34d9d7b13ef62be39563d2c502b5bf56470890bcb07acfc9f58bab0c6b"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003300",
+      "name": "plan_element_variant",
+      "sha256": "521d4fac8b7301ae18c73291a942d7f86b39b80d8aec9e8b50ff4629e945d9e4"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003400",
+      "name": "landscape_fixtures",
+      "sha256": "ae5ab9907b4641bb24341ca0eb261d4d0bbbc3b3b81376bfc7aa2cf65062cc9c"
     }
   ]
 }

@@ -7,7 +7,7 @@
 // PlanGraph.meta.norm_origin + unit_to_m).
 // =============================================================================
 
-export type OverlayLayer = "electrical" | "plumbing";
+export type OverlayLayer = "electrical" | "plumbing" | "landscape";
 
 export const ELECTRICAL_TYPES = [
   "socket_13a",
@@ -39,9 +39,22 @@ export const PLUMBING_TYPES = [
   "drainage_point",
 ] as const;
 
+/**
+ * G3: discrete landscape items, priced per unit.
+ *
+ * Not zones (a zone is a surface) and not runs (a run is linear metres) —
+ * things that stand in one place, which is what a fixture already is.
+ */
+export const LANDSCAPE_TYPES = [
+  "planter_box",
+  "wall_feature",
+  "bbq_grill",
+] as const;
+
 export type ElectricalType = (typeof ELECTRICAL_TYPES)[number];
 export type PlumbingType = (typeof PLUMBING_TYPES)[number];
-export type FixtureType = ElectricalType | PlumbingType;
+export type LandscapeType = (typeof LANDSCAPE_TYPES)[number];
+export type FixtureType = ElectricalType | PlumbingType | LandscapeType;
 
 export type FixtureSource = "rule" | "user";
 
@@ -54,9 +67,9 @@ export const GARDEN_TYPES: readonly FixtureType[] = [
 ];
 
 export function layerOf(type: FixtureType): OverlayLayer {
-  return (ELECTRICAL_TYPES as readonly string[]).includes(type)
-    ? "electrical"
-    : "plumbing";
+  if ((ELECTRICAL_TYPES as readonly string[]).includes(type)) return "electrical";
+  if ((LANDSCAPE_TYPES as readonly string[]).includes(type)) return "landscape";
+  return "plumbing";
 }
 
 /** Persisted plan_fixtures row (migration 015). */

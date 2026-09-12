@@ -34,7 +34,15 @@ export type BoqLine = {
   // P7 adds "indicative" for furniture; ground-truth adds "actual_transaction"
   // (priced from a real contract/quote) and "site_assessment" (allowance only).
   element_refs?: string[] | null;
-  rate_status?: "priced" | "needs_qs" | "indicative" | "actual_transaction" | "site_assessment";
+  rate_status?:
+    | "priced"
+    | "needs_qs"
+    | "indicative"
+    | "actual_transaction"
+    | "site_assessment"
+    | "needs_selection";
+  /** G3: the quantity was inferred, not measured off the drawing. */
+  qty_derived?: boolean;
   // P4/P5: engine rule id (P4/quantify/<key> marks a gradeable line).
   rule_id?: string;
 };
@@ -1122,8 +1130,24 @@ function LineRow({
                 className="inline-block size-1.5 shrink-0 rounded-full bg-brass-600"
               />
             )}
+            {/* G3. A real rate, but the DEFAULT of a choice nobody has made —
+                and the cheaper of the two. It carries the same terracotta dot
+                as the other unsettled states precisely so it cannot read as
+                finished. */}
+            {line.rate_status === "needs_selection" && (
+              <span
+                title="Priced at the cheaper default — someone still has to choose which it is"
+                aria-label="Awaiting a selection"
+                className="inline-block size-1.5 shrink-0 rounded-full bg-error"
+              />
+            )}
             {line.description}
           </p>
+          {line.qty_derived && (
+            <p className="mt-1 font-body-sm text-[12px] text-error">
+              Quantity inferred, not measured — confirm on site.
+            </p>
+          )}
           {line.notes && (
             <p className="mt-1 font-body-sm text-[12px] text-on-surface-variant">
               {line.notes}

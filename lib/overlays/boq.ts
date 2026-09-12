@@ -15,7 +15,7 @@ import {
   POMI_ELECTRICAL,
   POMI_PLUMBING,
 } from "./catalog";
-import type { FixtureType } from "./types";
+import { GARDEN_TYPES, type FixtureType } from "./types";
 
 export interface OverlayBoqLine {
   description: string;
@@ -75,7 +75,13 @@ function lineForType(type: FixtureType, ids: string[]): OverlayBoqLine {
  */
 export function buildOverlaySections(fixtures: FixtureLike[]): OverlayBoqSection[] {
   const idsByType = new Map<FixtureType, string[]>();
+  // G3: garden lighting and drainage points are priced by the LANDSCAPE take-off
+  // from the rate book, not here. Leaving them in would put the same point on
+  // two lines — once needs_qs in Electrical Installations and once priced in
+  // Electrical & Lighting — which reads as two points to anyone counting.
+  const gardenOwned = new Set<string>(GARDEN_TYPES);
   for (const f of fixtures) {
+    if (gardenOwned.has(f.type)) continue;
     const arr = idsByType.get(f.type) ?? [];
     arr.push(f.id);
     idsByType.set(f.type, arr);

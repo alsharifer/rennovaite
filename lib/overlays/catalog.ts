@@ -51,6 +51,10 @@ export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
   floor_drain: { label: "Floor drain", code: "FD", glyph: "water_drop", boqDescription: "Wet-area floor drain + trap — supply & install", unitRateAed: 220 },
   // G1. Same reasoning as garden_light — priced with the landscape rate book.
   drainage_point: { label: "Drainage point", code: "DR", glyph: "water", boqDescription: "External surface drainage point — gully + connection", unitRateAed: null },
+  // --- G3 landscape items (priced per unit from the landscape rate book) ---
+  planter_box: { label: "Planter box", code: "PB", glyph: "potted_plant", boqDescription: "Standalone planter box — blockwork, waterproofed and clad", unitRateAed: null },
+  wall_feature: { label: "Wall feature", code: "WF", glyph: "water_drop", boqDescription: "Wall feature with seating bench — blockwork, waterproofed and clad", unitRateAed: null },
+  bbq_grill: { label: "BBQ grill", code: "BQ", glyph: "outdoor_grill", boqDescription: "Built-in BBQ grill (client-supplied equipment)", unitRateAed: null },
 };
 
 export function pomiSectionFor(type: FixtureType): string {

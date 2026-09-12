@@ -596,6 +596,82 @@ book and a set of pure rules change nothing until something calls them.
   `node --import ./scripts/_alias-hook.mjs scripts/seed-rate-book-garden.ts` and
   the same for `scripts/record-garden-outcome.ts`.
 
+## Garden BoQ + the calibration dry-run (garden pilot G3)
+
+G1's drawn zones wired to G2's rules, and the result checked line by line
+against the project that produced those rates.
+
+- **Sections** (POMI-style): Preliminaries · Demolition · Hardscape &
+  Structures · Soft Landscaping · Irrigation · Electrical & Lighting. Garden
+  work reuses the first two rather than duplicating them;
+  `appendGardenSections` merges into an existing section when a project has
+  both.
+- **`lib/boq/garden-boq-feed.ts`** reads the drawn garden — zones from `rooms`,
+  runs from `plan_elements`, discrete items and points from `plan_fixtures` —
+  runs the take-off, prices it, appends the sections and recomputes the
+  contingency/VAT chain. Called from BOTH BoQ paths, exactly like the P2
+  overlay feed. A project with no outdoor zones gets its BoQ back unchanged.
+- **`takeoff_items` per zone × work item**: every area- and length-driven rule
+  records a per-element row, so an aggregated line is the Σ of the zones that
+  produced it and `element_refs` traces it back to the drawing. Lumps emit no
+  element rows — a lump has nothing to attribute.
+- **Counter variant picker** (migration `033`): one control in the elements
+  editor, `bar | bbq`. `null` is the unanswered state, priced at the cheaper bar
+  rate and flagged **`needs_selection`** — a new `rate_status` with the
+  terracotta dot, because a real rate that is the default of an unmade choice is
+  not the same thing as a rate nobody has. It matters twice over: AED 968/lm,
+  and the BBQ rate is what carries the MEP inclusion that stops its sockets
+  being counted again.
+- **Irrigation is an allowance, not a formula.** One comparable project cannot
+  support a per-metre driver, and dressing it as one would make the line look
+  measured. It is a lump at three coarse size bands, carrying `site_assessment`
+  (confirm the rate against this garden) **and** `qty_derived` (the band is
+  inferred). It earns a real driver at n ≥ 3.
+- **Discrete landscape items** (migration `034`) are `plan_fixtures` on a new
+  `landscape` layer: a planter box, a wall feature and a BBQ grill are not
+  surfaces and not linear metres, and a fourth shape would have been one too
+  many.
+
+### What the dry-run found
+
+Villa 94's garden traced from the setting-out drawing at 1:50 (PDF → SVG path
+extraction, not eyeballed), priced, compared against the actuals:
+**AED 148,202.60 against 152,059.44 — −2.5%**, with 10 of 14 quantity-driven
+lines inside ±10% and every delta classified. `scripts/garden-dry-run.ts` prints
+the table; `scripts/garden-dry-run-live.ts` runs the same garden through the
+real routes and records the platform side of delta-log entry #2.
+
+**The pre-registered expectation was falsified, in the more useful direction.**
+It said PCC measured off geometry would land ~12 m² ABOVE the contracted 75 m²,
+on the premise that the drawing supports the contract's own 87 m² of paving. It
+does not: the drawn paved surface is **64.27 m²**. The corroboration is the tile
+actually bought — **66.24 m², within 3% of what we measure and 31% below what
+was quoted**. The contract over-measured both lines, and the contract's own
+quantities (87 m² paving + 71 m² grass = 158 m²) exceed the drawn open garden
+(~136 m²). No rate was touched to close any of it.
+
+Three rule bugs the dry-run caught, all fixed in the rules rather than tuned
+away:
+
+1. **A structure does not remove the paving beneath it.** Hardscape was
+   measured as "paved zones minus structures", which under-measured PCC, paving
+   install and tile supply by the pergola footprint. The paved *surface*
+   includes it; only the superstructure is in the pergola's all-in rate.
+2. **Interior preliminaries on a garden-only project.** `computeTakeoff` emitted
+   project-level prelims — the scaffold and floor protection of an interior
+   fit-out — with zero interior rooms, charging site establishment twice. It now
+   returns nothing when there are no costable interior rooms.
+3. **Interior floor finishes and the aluminum allowance on outdoor zones.**
+   `quantifyPlan` now skips outdoor zones entirely (their surface is priced as
+   PCC + paving + tile, or as grass), and `buildAluminumSection` returns null
+   when every room is a landscape zone. `terrace` and `balcony` are untouched —
+   they are interior rooms and stay that way.
+
+Mudon's quantities, take-off and priced BoQ across three styles are
+byte-identical to the pre-G3 commit. What-if works and deliberately does not
+regrade landscape lines: the landscape rate book has one grade, so garden lines
+count toward the scenario total but cannot be swapped.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

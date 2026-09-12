@@ -19,7 +19,10 @@ function db(): SupabaseClient {
 
 /** Columns the editor reads back — keep in sync with migration 031. */
 const SELECT_COLS =
-  "id, plan_id, room_id, kind, polyline, height_mm, width_mm, source, derived, created_at";
+  "id, plan_id, room_id, kind, polyline, height_mm, width_mm, variant, source, derived, created_at";
+
+/** Counter runs only. `null` is the unanswered state and must stay reachable. */
+const VariantSchema = z.enum(["bar", "bbq"]);
 
 const KindSchema = z.enum(
   LINEAR_ELEMENT_KINDS as unknown as [string, ...string[]],
@@ -64,6 +67,7 @@ const CreateSchema = z.object({
   polyline: PolylineSchema,
   height_mm: z.number().positive().nullish(),
   width_mm: z.number().positive().nullish(),
+  variant: VariantSchema.nullish(),
 });
 
 export async function POST(request: NextRequest) {
@@ -85,6 +89,9 @@ export async function POST(request: NextRequest) {
         polyline: b.polyline,
         height_mm: b.height_mm ?? meta.defaultHeightMm,
         width_mm: b.width_mm ?? meta.defaultWidthMm,
+        // Only a counter can have one. Left null everywhere else so the column
+        // never implies a choice that does not exist for that kind.
+        variant: b.kind === "counter_run" ? (b.variant ?? null) : null,
         source: "user_drawn",
         derived: dimsDefaulted,
       })
@@ -105,6 +112,8 @@ const UpdateSchema = z.object({
   polyline: PolylineSchema.optional(),
   height_mm: z.number().positive().nullish(),
   width_mm: z.number().positive().nullish(),
+  /** `null` clears the choice back to unanswered; omitted leaves it alone. */
+  variant: VariantSchema.nullable().optional(),
 });
 
 /**

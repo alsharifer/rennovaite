@@ -535,11 +535,11 @@ export const SECTION_ORDER: readonly PomiSection[] = [
   "MEP / HVAC",
   "Lighting",
   "Preliminaries",
-  // G2 landscape sections, ordered after the interior trades. A section with no
-  // lines is filtered out before rendering, so adding them changes nothing for
-  // an interior project.
-  "External Works",
-  "Landscape Structures",
+  // G2/G3 landscape sections, ordered after the interior trades. A section with
+  // no lines is filtered out before rendering, so adding them changes nothing
+  // for an interior project.
+  "Hardscape & Structures",
+  "Soft Landscaping",
   "Irrigation",
-  "External Lighting",
+  "Electrical & Lighting",
 ];

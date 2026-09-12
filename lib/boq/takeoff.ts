@@ -147,6 +147,26 @@ export function computeTakeoff(
   // a floor. The landscape rules are G2's.
   const costable = geos.filter((g) => !g.isLandscape);
   const landscape = geos.filter((g) => g.isLandscape);
+
+  // A plan with no interior rooms has no interior take-off — not even the
+  // project-level preliminaries, which are the scaffold, floor protection and
+  // skip hire of an INTERIOR fit-out. A garden project has its own
+  // preliminaries line from the landscape rules, and emitting both charged for
+  // site establishment twice. Caught by the G3 calibration dry-run.
+  if (costable.length === 0) {
+    return {
+      items: [],
+      summary: {
+        totalAreaM2: 0,
+        interiorAreaM2: 0,
+        bedroomCount: 0,
+        bathroomCount: 0,
+        netWallM2: 0,
+        bathWetWallM2: 0,
+        landscapeAreaM2: round2(landscape.reduce((s, g) => s + g.room.area_m2, 0)),
+      },
+    };
+  }
   const external = costable.filter((g) => g.isExternal);
   const interior = costable.filter((g) => !g.isExternal);
   // Stairs are NOT flat floor — handled as a developed tile surface below, so

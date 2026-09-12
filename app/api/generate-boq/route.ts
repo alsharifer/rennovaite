@@ -9,6 +9,7 @@ import { findOverlaps } from "@/lib/plan/overlaps";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
+import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
 import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { getProposedGraph } from "@/lib/plan/snapshots";
@@ -780,7 +781,11 @@ export async function POST(request: NextRequest) {
       );
       // Ground-truth: append Joinery + Aluminum & Glass sections (Atrium/Global
       // Creation actuals; aluminum = site_assessment allowances). Core, additive.
-      const boq = appendJoineryAluminumSections(overlaid, rooms);
+      const withJoinery = appendJoineryAluminumSections(overlaid, rooms);
+      // G3: append the landscape sections from the drawn garden (zones, runs,
+      // units, points) priced at the calibrated landscape rates. No-op for a
+      // project with no outdoor zones, which is every interior project.
+      const boq = await appendGardenSections(withJoinery, projectId, supabaseUntyped);
 
       const { data: inserted, error: insertErr } = await supabase
         .from("boqs")
@@ -892,7 +897,8 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
     // ground-truth Joinery + Aluminum & Glass sections.
     const mappedLlm = applyElementMapping(llmBoq, takeoffItems);
     const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
-    const boq = appendJoineryAluminumSections(overlaidLlm, rooms);
+    const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabaseUntyped);
+    const boq = appendJoineryAluminumSections(gardenedLlm, rooms);
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase

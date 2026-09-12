@@ -37,8 +37,15 @@ interface Element {
   polyline: Pt[];
   height_mm: number | null;
   width_mm: number | null;
+  /** Counter runs only. null = nobody has chosen yet. */
+  variant: "bar" | "bbq" | null;
   derived: boolean;
 }
+
+const COUNTER_VARIANTS = [
+  { value: "bar" as const, label: "Bar counter", hint: "Blockwork and cladding only." },
+  { value: "bbq" as const, label: "BBQ counter", hint: "Adds sink, water, drainage and sockets — priced inclusive of them." },
+];
 
 /**
  * G1 linear-element layer: boundary walls and bench / planter / counter runs.
@@ -180,6 +187,26 @@ export function ElementsEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [finish, readOnly]);
 
+  /**
+   * Type a counter run. Until this is answered the take-off prices the run as a
+   * bar counter — the cheaper of the two — and flags the BoQ line, because the
+   * two differ by AED 968/lm and the BBQ rate is what carries its MEP.
+   */
+  const setVariant = async (id: string, variant: "bar" | "bbq") => {
+    setElements((cur) => cur.map((el) => (el.id === id ? { ...el, variant } : el)));
+    try {
+      const res = await fetch("/api/plan-elements", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, variant }),
+      });
+      const body = await res.json();
+      if (body.error) setError(body.error);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const deleteSelected = async () => {
     if (!selectedId) return;
     const id = selectedId;
@@ -202,6 +229,10 @@ export function ElementsEditor({
   }, [elements, metresPerUnit]);
 
   const drawPts = cursor && draft.length > 0 ? [...draft, cursor] : draft;
+  const selected = elements.find((el) => el.id === selectedId) ?? null;
+  const untypedCounters = elements.filter(
+    (el) => el.kind === "counter_run" && el.variant == null,
+  ).length;
 
   return (
     <div className="space-y-3">
@@ -250,6 +281,40 @@ export function ElementsEditor({
               Delete selected
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Properties for the selected run. Today the only property that changes
+          a price is the counter variant, so that is what this holds. */}
+      {!readOnly && selected?.kind === "counter_run" && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-ink-100 bg-canvas px-md py-sm">
+          <span className="label-caps text-ink-500">Counter type:</span>
+          {COUNTER_VARIANTS.map((v) => {
+            const active = selected.variant === v.value;
+            return (
+              <button
+                key={v.value}
+                type="button"
+                onClick={() => setVariant(selected.id, v.value)}
+                aria-pressed={active}
+                title={v.hint}
+                className={
+                  "focus-ring rounded-lg border px-2 py-1 text-[12px] transition-colors " +
+                  (active
+                    ? "border-brass-600 bg-primary-fixed/40 font-semibold text-ink-900"
+                    : "border-ink-100 bg-paper text-ink-700 hover:bg-surface-container")
+                }
+              >
+                {v.label}
+              </button>
+            );
+          })}
+          {selected.variant == null && (
+            <span className="flex items-center gap-1 text-[12px] text-[#9A3412]">
+              <span className="inline-block h-2 w-2 rounded-full bg-[#C2410C]" aria-hidden="true" />
+              Not chosen — priced as a bar counter and flagged on the BoQ.
+            </span>
+          )}
         </div>
       )}
 
@@ -383,6 +448,9 @@ export function ElementsEditor({
                   .join(" · ")}
         {!loading && !error && metresPerUnit == null && elements.length > 0
           ? " — lengths need a measured plot, which only a drawn plan has."
+          : ""}
+        {untypedCounters > 0 && !readOnly
+          ? ` · ${untypedCounters} counter run${untypedCounters === 1 ? "" : "s"} still need a type — select one to choose.`
           : ""}
       </p>
     </div>

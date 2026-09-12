@@ -160,13 +160,30 @@ describe("open-edge enclosure", () => {
 });
 
 describe("open zones downstream", () => {
-  it("prices no ceiling over a zone that has no ceiling", () => {
+  it("leaves an outdoor zone entirely to the landscape take-off", () => {
     const items = quantifyPlan(buildPlanGraph(GARDEN));
+    // G3: the interior quantifier emits nothing at all for an outdoor zone —
+    // not a ceiling (there is none) and not a floor either, because the zone's
+    // surface is priced as PCC + paving + tile or as grass. An interior
+    // floor_finish line here charged for the same ground twice.
     expect(items.some((i) => i.work_item_key === "ceiling_finish")).toBe(false);
-    // The surface itself is still a real quantity.
-    expect(items.filter((i) => i.work_item_key === "floor_finish")).toHaveLength(2);
+    expect(items.some((i) => i.work_item_key === "floor_finish")).toBe(false);
     // No walls means no plaster or paint, without anyone filtering for it.
     expect(items.some((i) => i.work_item_key === "wall_plaster")).toBe(false);
+    expect(items).toEqual([]);
+  });
+
+  it("still quantifies a terrace as the interior room it is", () => {
+    // `terrace` and `balcony` are enclosed rooms the parser already emits and
+    // EXTERNAL_TYPES already prices. They must not follow outdoor zones out of
+    // the interior quantifier, or every villa parsed before the garden pilot
+    // would lose its terrace floor.
+    const t = buildPlanGraph({
+      ...GARDEN,
+      rooms: [{ ...zone("terr", "terrace", 0.1, 0.5, 48), unroofed: false }],
+    });
+    const items = quantifyPlan(t);
+    expect(items.some((i) => i.work_item_key === "floor_finish")).toBe(true);
   });
 
   it("renders open zones as ground and a structure with a canopy", () => {

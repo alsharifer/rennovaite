@@ -7,6 +7,8 @@ import {
   type GardenTakeoffInput,
 } from "@/lib/boq/garden-takeoff";
 import { LANDSCAPE_TYPES, SECTION_ORDER } from "@/lib/boq/rules";
+import { computeTakeoff } from "@/lib/boq/takeoff";
+import { buildGardenSections } from "@/lib/boq/garden-boq-feed";
 import { POMI_SECTIONS } from "@/lib/boq/schema";
 import {
   ABSORBED_SCOPE,
@@ -135,10 +137,22 @@ describe("garden take-off — quantities", () => {
     expect(takeoff.summary.pavedAreaM2).toBe(87); // 27 + 60
     expect(takeoff.summary.grassAreaM2).toBe(71);
     expect(takeoff.summary.structurePlanAreaM2).toBe(12.25);
-    expect(line("garden.pcc_base")!.quantity).toBe(87);
-    expect(line("garden.paving_install")!.quantity).toBe(87);
     expect(line("garden.grass_supply")!.quantity).toBe(71);
     expect(line("garden.grass_install")!.quantity).toBe(71);
+    expect(line("garden.pergola")!.quantity).toBe(12.25);
+  });
+
+  it("paves the ground under a structure, because the structure did not remove it", () => {
+    // A pergola stands ON a terrace. The slab is still poured and the tile is
+    // still laid beneath it; only the superstructure is in the pergola's all-in
+    // rate. Measuring "paved zones minus structures" under-measured every
+    // hardscape line by the footprint — caught by the calibration dry-run.
+    const surface = 87 + 12.25;
+    expect(line("garden.pcc_base")!.quantity).toBe(surface);
+    expect(line("garden.paving_install")!.quantity).toBe(surface);
+    expect(line("garden.tile_supply")!.quantity).toBe(surface);
+    expect(line("garden.pcc_base")!.measurement).toMatch(/under structures/);
+    // The pergola is still priced once, as a structure.
     expect(line("garden.pergola")!.quantity).toBe(12.25);
   });
 
@@ -170,20 +184,63 @@ describe("garden take-off — quantities", () => {
     expect(tile.rate_aed).toBe(128.1);
   });
 
-  it("marks the scaled irrigation lump as derived, and clamps a runaway scale", () => {
+  it("prices no hardscape at all when there is only a lawn", () => {
+    const t = computeGardenTakeoff({
+      zones: [{ id: "g", name: "Lawn", kind: "artificial_grass", area_m2: 40 }],
+    });
+    for (const key of ["garden.pcc_base", "garden.paving_install", "garden.tile_supply"]) {
+      expect(t.items.some((i) => i.item_key === key), key).toBe(false);
+    }
+  });
+
+  it("prices irrigation as a banded allowance, never a per-metre formula", () => {
+    // One comparable project cannot support a driver that scales. Presenting it
+    // as one would make the line look measured, so it stays a lump at three
+    // coarse sizes and says both things about itself: the rate needs confirming
+    // on site, and the size band is inferred.
     const irr = line("garden.irrigation")!;
     expect(irr.qty_derived).toBe(true);
-    // Villa 94's own driver is the reference, so it scales to exactly 1.
-    expect(irr.quantity).toBe(1);
+    expect(irr.rate_status).toBe("site_assessment");
+    expect(irr.unit).toBe("lump");
+    expect(irr.quantity).toBe(1); // the reference garden sits in the middle band
     expect(irr.rate_aed).toBe(11_000);
+    expect(irr.measurement).toMatch(/NOT measured/);
 
-    const huge = computeGardenTakeoff({
+    const big = computeGardenTakeoff({
       zones: [{ id: "p", name: "Beds", kind: "planting_bed", area_m2: 400 }],
       runs: [{ id: "r", kind: "planter_run", length_m: 60 }],
     });
-    const scaled = huge.items.find((i) => i.item_key === "garden.irrigation")!;
-    expect(scaled.quantity).toBe(2); // clamped from ~59
-    expect(scaled.measurement).toMatch(/clamped/);
+    const scaled = big.items.find((i) => i.item_key === "garden.irrigation")!;
+    expect(scaled.quantity).toBe(1.6); // the large band, not 59×
+    expect(scaled.measurement).toMatch(/large garden/);
+
+    const small = computeGardenTakeoff({
+      zones: [{ id: "p", name: "Bed", kind: "planting_bed", area_m2: 2 }],
+    });
+    expect(small.items.find((i) => i.item_key === "garden.irrigation")!.quantity).toBe(0.6);
+  });
+
+  it("flags an untyped counter instead of silently pricing it as a bar", () => {
+    // A bar counter and a BBQ counter are both counter_run and differ by AED
+    // 968/lm. Defaulting is right; defaulting SILENTLY is not.
+    const t = computeGardenTakeoff({
+      zones: [],
+      runs: [
+        { id: "a", kind: "counter_run", length_m: 2 },
+        { id: "b", kind: "counter_run", length_m: 3, variant: "bar" },
+      ],
+    });
+    const bar = t.items.find((i) => i.item_key === "garden.counter_bar")!;
+    expect(bar.quantity).toBe(5); // both, totalled once
+    expect(bar.rate_status).toBe("needs_selection");
+    expect(bar.measurement).toMatch(/not yet typed/);
+
+    // Once every counter is typed the flag clears.
+    const typed = computeGardenTakeoff({
+      zones: [],
+      runs: [{ id: "b", kind: "counter_run", length_m: 3, variant: "bar" }],
+    });
+    expect(typed.items.find((i) => i.item_key === "garden.counter_bar")!.rate_status).toBeUndefined();
   });
 
   it("emits no irrigation when there is nothing to irrigate", () => {
@@ -268,7 +325,7 @@ describe("anti-double-count invariants", () => {
     }
     const bad = findDoubleCounts([
       ...takeoff.items,
-      { rule_id: "X", work_section: "External Works", item_key: "garden.manhole_cover", description: "Manhole covers", quantity: 2, unit: "no", measurement: "" },
+      { rule_id: "X", work_section: "Hardscape & Structures", item_key: "garden.manhole_cover", description: "Manhole covers", quantity: 2, unit: "no", measurement: "" },
     ]);
     expect(bad.some((v) => v.kind === "absorbed" && v.offender === "garden.manhole_cover")).toBe(true);
   });
@@ -306,10 +363,10 @@ describe("nothing interior moves", () => {
       "Preliminaries",
     ]);
     expect(SECTION_ORDER.slice(14)).toEqual([
-      "External Works",
-      "Landscape Structures",
+      "Hardscape & Structures",
+      "Soft Landscaping",
       "Irrigation",
-      "External Lighting",
+      "Electrical & Lighting",
     ]);
     for (const s of SECTION_ORDER) expect(POMI_SECTIONS).toContain(s);
   });
@@ -339,5 +396,94 @@ describe("quantity inclusions are declared, not hard-coded", () => {
     for (const q of QUANTITY_INCLUSIONS["garden.pergola"]!) {
       expect(q.qty_per_unit).toBe(PERGOLA_INCLUDED_DOWNLIGHTS);
     }
+  });
+});
+
+describe("per-element breakdown", () => {
+  it("splits every area and length rule back to the zone or run that produced it", () => {
+    // This is what makes a garden line traceable: the aggregated quantity is
+    // the SUM of these rows, so a zone can be asked what it costs.
+    const byKey = new Map<string, number>();
+    for (const e of takeoff.elements) {
+      byKey.set(e.item_key, Math.round(((byKey.get(e.item_key) ?? 0) + e.qty) * 100) / 100);
+    }
+    for (const [key, total] of byKey) {
+      const line = takeoff.items.find((i) => i.item_key === key)!;
+      expect(total, `Σ elements for ${key}`).toBeCloseTo(line.quantity, 2);
+    }
+    // Paving splits across both paved zones, not one lumped row.
+    // Two paved zones plus the pergola footprint.
+    expect(takeoff.elements.filter((e) => e.item_key === "garden.pcc_base")).toHaveLength(3);
+    expect(takeoff.elements.filter((e) => e.item_key === "garden.counter_bbq")).toHaveLength(1);
+    expect(takeoff.elements.filter((e) => e.item_key === "garden.wall_feature")).toHaveLength(1);
+  });
+
+  it("emits no element rows for the project lumps", () => {
+    // A lump has no element to attribute it to, and inventing one would make
+    // "what does this zone cost" wrong for every zone.
+    for (const key of ["garden.preliminaries", "garden.mobilization", "garden.demolition", "garden.irrigation"]) {
+      expect(takeoff.elements.some((e) => e.item_key === key), key).toBe(false);
+    }
+  });
+});
+
+describe("a garden-only project gets no interior take-off", () => {
+  it("emits nothing, not even preliminaries, when there are no interior rooms", () => {
+    // Interior preliminaries are the scaffold, floor protection and skip hire of
+    // an INTERIOR fit-out. A garden has its own preliminaries from the landscape
+    // rules, and emitting both charged for site establishment twice — which is
+    // exactly what the calibration dry-run found.
+    const t = computeTakeoff(
+      [
+        { id: "a", name: "Lawn", room_type: "artificial_grass", area_m2: 60 },
+        { id: "b", name: "Patio", room_type: "paving", area_m2: 30 },
+      ],
+      "porcelain",
+    );
+    expect(t.items).toEqual([]);
+    expect(t.summary.totalAreaM2).toBe(0);
+    expect(t.summary.landscapeAreaM2).toBe(90);
+  });
+
+  it("still produces a full interior take-off when one interior room exists", () => {
+    const t = computeTakeoff(
+      [
+        { id: "a", name: "Lawn", room_type: "artificial_grass", area_m2: 60 },
+        { id: "b", name: "Bed", room_type: "bedroom", area_m2: 16 },
+      ],
+      "porcelain",
+    );
+    expect(t.items.length).toBeGreaterThan(0);
+    expect(t.summary.totalAreaM2).toBe(16);
+    expect(t.summary.landscapeAreaM2).toBe(60);
+  });
+});
+
+describe("what-if leaves landscape lines alone", () => {
+  it("exposes no gradeable landscape line, so a scenario cannot regrade a garden", () => {
+    // What-if regrades interior lines by rule_id (P4/quantify/<key>) against a
+    // three-grade rate book. The landscape rate book has ONE grade — these are
+    // transacted rates, not an economy/standard/premium ladder — so garden
+    // lines are deliberately not gradeable. They still count toward the
+    // scenario total; they just cannot be swapped.
+    const sections = buildGardenSections(VILLA94).sections;
+    const lines = sections.flatMap((s) => s.lines);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) {
+      expect(String(l.rule_id).startsWith("GL-"), String(l.rule_id)).toBe(true);
+      expect(String(l.rule_id).startsWith("P4/quantify/")).toBe(false);
+    }
+  });
+
+  it("keeps landscape work in its own POMI sections", () => {
+    const names = buildGardenSections(VILLA94).sections.map((s) => s.work_section);
+    expect(names).toEqual([
+      "Demolition",
+      "Preliminaries",
+      "Hardscape & Structures",
+      "Soft Landscaping",
+      "Irrigation",
+      "Electrical & Lighting",
+    ]);
   });
 });

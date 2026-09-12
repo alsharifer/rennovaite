@@ -42,6 +42,21 @@ export interface TakeoffItem {
 
 const WET_ROOM_TYPES = new Set(["bathroom", "ensuite", "powder", "kitchen"]);
 
+/** Outdoor zone tokens — priced by the landscape take-off, never here. */
+const OUTDOOR_ZONE_TYPES = new Set([
+  "paving",
+  "artificial_grass",
+  "planting_bed",
+  "deck",
+  "path",
+  "structure",
+  "pool",
+]);
+
+function isOutdoorType(t: string | null): boolean {
+  return OUTDOOR_ZONE_TYPES.has(t ?? "");
+}
+
 function isWet(roomType: string | null): boolean {
   return WET_ROOM_TYPES.has(roomType ?? "");
 }
@@ -131,6 +146,12 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
 
   // --- Rooms: floor + ceiling (+ wet tiling) ---
   for (const room of graph.rooms) {
+    // G3: an outdoor zone has no interior floor to finish. Its surface is priced
+    // by the landscape take-off (PCC + paving install + tile supply, or grass),
+    // and emitting an interior floor_finish line here charged for the same
+    // ground twice. `terrace` and `balcony` are NOT outdoor zones and keep the
+    // interior treatment they have always had.
+    if (isOutdoorType(room.type)) continue;
     const wet = isWet(room.type);
     const h = ceilingByRoom.get(room.id) ?? globalCeiling;
     // Stairs are priced as a developed tile surface in the engine take-off (not
