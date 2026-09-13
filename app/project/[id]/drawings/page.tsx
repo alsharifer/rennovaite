@@ -32,6 +32,10 @@ const SHEET_BLURB: Record<string, string> = {
     "Every door, window and archway by mark — size, sill, and whether the dimensions were measured or defaulted.",
   electrical: "Electrical services plan — sockets, switches, lighting, AC & data points.",
   plumbing: "Plumbing / water services plan — WC, basin, shower, drains & heaters.",
+  site_plan: "Bird's-eye garden plan — every zone, overall dimensions, zone schedule and levels legend.",
+  zone_plan: "One zone at a readable scale — every straight edge dimensioned in millimetres.",
+  lighting_overlay: "Lighting as designed — points by fitting and an indicative cable route.",
+  irrigation_overlay: "Irrigated zones, drip runs, indicative routing and drainage points. No HVAC.",
 };
 
 export default async function DrawingsPage({
@@ -114,12 +118,16 @@ export default async function DrawingsPage({
     }
   }
 
+  const isGardenSet = !!set?.sheets.some((s) => s.kind === "site_plan");
+
   return (
     <AppShell pageName={PAGE_NAME}>
       <div className="mx-auto max-w-[1440px] pb-24">
         <header className="mb-xl">
           <JourneyProgress stepKey="downloads" projectId={projectId} />
-          <p className="label-caps mb-md text-brass-600">Drawing set · A3 · 1:100</p>
+          <p className="label-caps mb-md text-brass-600">
+            {isGardenSet ? "Drawing set · A3 · scaled to fit" : "Drawing set · A3 · 1:100"}
+          </p>
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Auto-generated drawings
           </h1>
@@ -127,6 +135,28 @@ export default async function DrawingsPage({
             Deterministic, dimensioned drawings derived from your plan geometry —
             no AI in this output. Download each sheet as a print-ready A3 PDF.
           </p>
+          {set && set.sheets.length > 0 && (
+            <div className="mt-lg flex flex-wrap gap-md">
+              <a
+                href={`/api/projects/${projectId}/drawings?format=pdf&sheet=all`}
+                className="focus-ring inline-flex h-10 items-center gap-sm rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  picture_as_pdf
+                </span>
+                Full drawing set (PDF)
+              </a>
+              <a
+                href={`/api/projects/${projectId}/render-pack`}
+                className="focus-ring inline-flex h-10 items-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  photo_library
+                </span>
+                Render pack (PDF)
+              </a>
+            </div>
+          )}
         </header>
 
         {error || !set ? (
@@ -163,7 +193,7 @@ export default async function DrawingsPage({
             <div className="grid grid-cols-1 gap-gutter lg:grid-cols-3">
               {set.sheets.map((sheet) => (
                 <article
-                  key={sheet.kind}
+                  key={sheet.sheetNumber}
                   className="flex flex-col rounded-xl border border-ink-100 bg-paper p-lg"
                 >
                   <div className="mb-md flex items-baseline justify-between">
@@ -183,7 +213,7 @@ export default async function DrawingsPage({
                     {SHEET_BLURB[sheet.kind]}
                   </p>
                   <a
-                    href={`/api/projects/${projectId}/drawings?format=pdf&sheet=${sheet.kind}`}
+                    href={`/api/projects/${projectId}/drawings?format=pdf&sheet=${sheet.sheetNumber}`}
                     className="focus-ring inline-flex h-10 items-center justify-center gap-sm self-start rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
                   >
                     <span className="material-symbols-outlined text-[18px]" aria-hidden="true">

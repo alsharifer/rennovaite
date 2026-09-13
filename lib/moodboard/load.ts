@@ -14,6 +14,7 @@ import { publicUrlForPath } from "@/lib/assets/load";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import {
+  isExteriorStyleRoom,
   isStyleRoom,
   sortItems,
   styleImagePath,
@@ -61,7 +62,13 @@ async function resolveUrls(
 
   return items.map((i) => {
     if (i.kind === "style" && i.style_key) {
-      const room = isStyleRoom(i.style_room) ? i.style_room : "living";
+      // A garden preset item keeps its exterior segment; anything else that is
+      // not an interior segment falls back to living, as before.
+      const room = isExteriorStyleRoom(i.style_room)
+        ? i.style_room
+        : isStyleRoom(i.style_room)
+          ? i.style_room
+          : "living";
       return { ...i, image_url: styleImagePath(i.style_key, room) };
     }
     if (i.kind === "asset" && i.asset_id) {

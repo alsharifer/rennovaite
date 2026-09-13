@@ -7,6 +7,8 @@ import { loadProjectPhotoAssets } from "@/lib/assets/load";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { resolveAnyStyle } from "@/lib/garden-styles";
+import { loadRenders } from "@/lib/render-batch/load";
+import { currentDayRender, planBatch, type BatchFixture } from "@/lib/render-batch/plan";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -183,7 +185,37 @@ export default async function RenderPage({
     .eq("project_id", projectId)
     .order("created_at", { ascending: true });
 
-  const initialChains = buildInitialChains(renderRows ?? []);
+  // G4: an evening view is an edit of a day render, not the next step in the
+  // zone's iteration chain — keep it out of the chain, or it would become the
+  // "latest" render and every tweak would edit the night scene.
+  const sbAny = supabase as unknown as SupabaseClient;
+  const viewRows = await loadRenders(sbAny, projectId);
+  const eveningIds = new Set(viewRows.filter((r) => r.view === "evening").map((r) => r.id));
+  const initialChains = buildInitialChains(
+    (renderRows ?? []).filter((r) => !eveningIds.has(r.id)),
+  );
+
+  // The evening view shown beside a zone is the one made from its CURRENT day.
+  const initialEvenings: Record<string, { id: string; imageUrl: string }> = {};
+  for (const room of roomList) {
+    const day = currentDayRender(viewRows, room.id);
+    if (!day) continue;
+    const evening = viewRows
+      .filter((r) => r.view === "evening" && r.parent_render_id === day.id && r.status === "succeeded" && r.image_url)
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0];
+    if (evening) initialEvenings[room.id] = { id: evening.id, imageUrl: evening.image_url! };
+  }
+
+  // G4 "Generate all": every zone and view still to render.
+  const { data: fixtureRows } = await sbAny
+    .from("plan_fixtures")
+    .select("type, room_id, position, spec")
+    .eq("project_id", projectId);
+  const batchJobs = planBatch({
+    rooms: roomList,
+    renders: viewRows,
+    fixtures: (fixtureRows ?? []) as BatchFixture[],
+  });
 
   // Rooms that already have an approved/locked design — these gate the
   // floating Cost-it CTA on the right.
@@ -273,6 +305,8 @@ export default async function RenderPage({
         roomBoqTotals={roomBoqTotals}
         stagingEnabled={stagingEnabled}
         initialFurnitureOptIns={initialFurnitureOptIns}
+        batchJobs={batchJobs}
+        initialEvenings={initialEvenings}
         journeySlot={<JourneyProgress stepKey="render" projectId={project.id} />}
       />
     </AppShell>

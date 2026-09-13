@@ -55,6 +55,14 @@ export interface Room {
    * every interior room behaves exactly as it did before the garden pilot.
    */
   unroofed: boolean;
+  /**
+   * G4: how much of `area_m2` was APPROXIMATED rather than read off the drawing
+   * (e.g. a curved edge traced as a quadrant), and why. null when nothing was.
+   * A drawing that prints the area has to be able to say this, so it lives on
+   * the zone rather than in a report that can be lost.
+   */
+  area_derived_m2: number | null;
+  derived_note: string | null;
   /** Names of fields on this room whose value is derived, not sourced. */
   derived_fields: string[];
 }
@@ -148,6 +156,12 @@ export interface PlanGraphMeta {
    *  Overlay fixtures are stored in this normalised space (like rooms.polygon);
    *  this lets the drawing sheets place them in metres. */
   norm_origin: [number, number];
+  /**
+   * G4: the measured plot (authored plans only), placed in the same metric frame
+   * as the rooms: its top-left corner is `origin_m` (normally slightly negative,
+   * because metres are measured from the rooms' bounding box, not the plot).
+   */
+  plot?: { width_m: number; depth_m: number; origin_m: Point } | null;
 }
 
 export interface DerivedRecord {
@@ -187,6 +201,9 @@ export interface RawRoom {
   polygon: unknown; // expected number[][] in normalised space
   /** G1: null/absent falls back to the type's default (outdoor ⇒ unroofed). */
   unroofed?: boolean | null;
+  /** G4: approximated share of the area and its reason (migration 035). */
+  area_derived_m2?: number | null;
+  derived_note?: string | null;
 }
 
 export interface BuildPlanGraphInput {
@@ -207,6 +224,8 @@ export interface BuildPlanGraphInput {
    * typed dimension is a measurement and must not read as a guess.
    */
   unit_to_m?: number | null;
+  /** G4: the measured plot of an authored plan, so drawings can show the site. */
+  plot?: { width_m: number; depth_m: number } | null;
   /** G1: how this plan's geometry came to exist. Defaults to "parsed". */
   source?: PlanSource | null;
 }
@@ -541,11 +560,17 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       // would believe it.
       ceiling_h_m: unroofed ? 0 : DEFAULT_CEILING_H_M,
       unroofed,
+      area_derived_m2:
+        typeof raw.area_derived_m2 === "number" && raw.area_derived_m2 > 0
+          ? Number(raw.area_derived_m2)
+          : null,
+      derived_note: raw.derived_note?.trim() || null,
       derived_fields: [
         // A measured scale makes the metric polygon a measurement too.
         ...(measuredScale ? [] : ["polygon"]),
         ...(unroofed ? [] : ["ceiling_h_m"]),
-        ...(raw.area_m2 == null ? ["area_m2"] : []),
+        // A stated area with an approximated share is still partly derived.
+        ...(raw.area_m2 == null || (Number(raw.area_derived_m2) || 0) > 0 ? ["area_m2"] : []),
       ],
     };
   });
@@ -687,6 +712,14 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       total_area_m2: totalAreaM2,
       unit_to_m: unitToM,
       norm_origin: [minX, minY],
+      plot:
+        input.plot && measuredScale
+          ? {
+              width_m: input.plot.width_m,
+              depth_m: input.plot.depth_m,
+              origin_m: [-minX * unitToM, -minY * unitToM] as Point,
+            }
+          : null,
     },
     derived: {
       walls: true,

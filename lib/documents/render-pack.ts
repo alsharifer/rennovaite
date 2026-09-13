@@ -1,0 +1,523 @@
+// =============================================================================
+// lib/documents/render-pack.ts — the garden render pack, as pages (G4, E1-lite).
+//
+// Pure: a PlanGraph, the fixtures, the renders and the direction in; a list of
+// A3 pages out. Each page is an SVG (the chrome — headings, facts, tables) plus
+// IMAGE SLOTS in millimetres where the server places the render photographs.
+// Photos are embedded as images in the PDF rather than rasterised into the SVG,
+// so a render keeps its own resolution.
+//
+// Assembled from the graph like every other document: a zone's name, area and
+// derived-area flag come from the same Room the drawing set dimensions, its
+// lighting from the same fixtures the electrical overlay draws, and its order
+// and Z-reference from gardenZones — so "Z05" is the pergola in the pack, on
+// the site plan and in the BoQ trace alike.
+//
+// What the pack never carries: a price, a rate, a rate source or a contractor.
+// It is a client-facing document about what the garden will look like.
+// =============================================================================
+
+import { LIGHTING_SOURCE_STATEMENT, gardenZones, toMetres, type GardenFixture } from "@/lib/drawings/garden-sheets";
+import {
+  BONE,
+  BRASS,
+  FONT_DISPLAY,
+  FONT_MONO,
+  FONT_UI,
+  INK_100,
+  INK_500,
+  INK_700,
+  INK_900,
+  PAPER,
+  TERRACOTTA,
+  esc,
+} from "@/lib/drawings/sheet";
+import type { GardenStyle } from "@/lib/garden-styles";
+import { LINEAR_ELEMENT_META } from "@/lib/plan/elements";
+import type { PlanGraph, Room } from "@/lib/plan/geometry";
+import { roomTypeLabel, zoneSurface } from "@/lib/plan/zones";
+import { lightingByZone, wantsEvening, type ZoneLight } from "@/lib/render-batch/plan";
+import type { Style } from "@/lib/styles";
+
+export const PAGE_W = 420; // mm, A3 landscape — same sheet as the drawing set
+export const PAGE_H = 297;
+const M = 18; // page margin
+
+export interface PackRender {
+  id: string;
+  image_url: string;
+}
+
+export interface PackZone {
+  ref: string;
+  room: Room;
+  typeLabel: string;
+  surface: string;
+  lights: ZoneLight[];
+  /** Does this zone get an evening view (lighting on the plan, or a structure)? */
+  eveningExpected: boolean;
+  day: PackRender | null;
+  evening: PackRender | null;
+  features: string[];
+}
+
+export interface ImageSlot {
+  /** Render id — the server resolves it to bytes. */
+  renderId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface PackPage {
+  kind: "cover" | "plan_overview" | "zone" | "materials";
+  title: string;
+  svg: string;
+  images: ImageSlot[];
+}
+
+export interface RenderPackInput {
+  graph: PlanGraph;
+  fixtures: readonly GardenFixture[];
+  /** roomId → current day render / its evening view. */
+  renders: Record<string, { day: PackRender | null; evening: PackRender | null }>;
+  /** plan_elements id → counter variant (bar | bbq | null). */
+  elementVariants?: Record<string, string | null>;
+  style: Style | GardenStyle | null;
+  projectName: string;
+  community: string;
+  dateISO: string;
+  /** The site plan sheet SVG (L-100) — the pack's plan overview IS the drawing. */
+  sitePlanSvg: string | null;
+  /** Renders that exist but whose image could not be fetched for this build. */
+  unavailableRenderIds?: ReadonlySet<string>;
+}
+
+// --- Model ------------------------------------------------------------------------
+
+function inside(pt: [number, number], poly: readonly [number, number][]): boolean {
+  let hit = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]!;
+    const [xj, yj] = poly[j]!;
+    if (yi > pt[1] !== yj > pt[1] && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+
+const UNIT_LABEL: Record<string, string> = {
+  planter_box: "Planter box",
+  wall_feature: "Wall feature",
+  bbq_grill: "BBQ grill (client-supplied)",
+};
+
+const VARIANT_LABEL: Record<string, string> = { bar: "bar counter", bbq: "BBQ counter" };
+
+function runLabel(kind: string, variant: string | null | undefined): string {
+  const meta = LINEAR_ELEMENT_META[kind as keyof typeof LINEAR_ELEMENT_META];
+  if (kind === "counter_run") {
+    return variant ? `Counter run — ${VARIANT_LABEL[variant] ?? variant}` : "Counter run — type not yet selected";
+  }
+  return meta?.label ?? kind;
+}
+
+export function buildPackZones(input: RenderPackInput): PackZone[] {
+  const { graph } = input;
+  const zones = gardenZones(graph);
+  const lights = lightingByZone(
+    graph.rooms.map((r) => ({
+      id: r.id,
+      name_en: r.name_en,
+      room_type: r.type,
+      // lightingByZone works in normalised space, like the fixtures.
+      polygon: r.polygon.map(([x, y]) => [
+        x / (graph.meta.unit_to_m || 1) + graph.meta.norm_origin[0],
+        y / (graph.meta.unit_to_m || 1) + graph.meta.norm_origin[1],
+      ]),
+    })),
+    input.fixtures,
+  );
+
+  return zones.map((room, i) => {
+    const zoneLights = lights.get(room.id) ?? [];
+    const features: string[] = [];
+    for (const el of graph.elements) {
+      if (el.kind === "boundary_wall") continue;
+      const a = el.polyline[0]!;
+      const b = el.polyline[el.polyline.length - 1]!;
+      const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (inside(mid, room.polygon)) {
+        features.push(`${runLabel(el.kind, input.elementVariants?.[el.id])} · ${el.length_m.toFixed(2)} m`);
+      }
+    }
+    for (const f of input.fixtures) {
+      if (f.layer !== "landscape") continue;
+      if (inside(toMetres(graph, f.position) as [number, number], room.polygon)) {
+        features.push(UNIT_LABEL[f.type] ?? f.type);
+      }
+    }
+    const r = input.renders[room.id] ?? { day: null, evening: null };
+    return {
+      ref: `Z${String(i + 1).padStart(2, "0")}`,
+      room,
+      typeLabel: roomTypeLabel(room.type),
+      surface: zoneSurface(room.type),
+      lights: zoneLights,
+      eveningExpected: wantsEvening({ id: room.id, name_en: room.name_en, room_type: room.type, polygon: [] }, zoneLights),
+      day: r.day,
+      evening: r.evening,
+      features,
+    };
+  });
+}
+
+// --- SVG helpers ----------------------------------------------------------------
+
+const f1 = (n: number) => (Math.round(n * 10) / 10).toString();
+
+function text(
+  x: number,
+  y: number,
+  s: string,
+  o: { size?: number; fill?: string; font?: string; anchor?: "start" | "middle" | "end"; weight?: number; spacing?: string } = {},
+): string {
+  return `<text x="${f1(x)}" y="${f1(y)}" font-size="${o.size ?? 3.2}" fill="${o.fill ?? INK_700}"${o.anchor ? ` text-anchor="${o.anchor}"` : ""} style="font-family:${o.font ?? FONT_UI}${o.weight ? `;font-weight:${o.weight}` : ""}${o.spacing ? `;letter-spacing:${o.spacing}` : ""}">${esc(s)}</text>`;
+}
+
+/** Greedy word wrap by an average glyph width — deterministic, no font metrics. */
+export function wrap(s: string, maxChars: number): string[] {
+  const words = s.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if (cur && (cur + " " + w).length > maxChars) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = cur ? `${cur} ${w}` : w;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+function paragraph(x: number, y: number, s: string, maxChars: number, lineH: number, o: Parameters<typeof text>[3] = {}) {
+  const lines = wrap(s, maxChars);
+  return { svg: lines.map((l, i) => text(x, y + i * lineH, l, o)).join(""), height: lines.length * lineH };
+}
+
+function page(body: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W}mm" height="${PAGE_H}mm" viewBox="0 0 ${PAGE_W} ${PAGE_H}"><rect width="${PAGE_W}" height="${PAGE_H}" fill="#F7F3EC"/>${body}</svg>`;
+}
+
+function chrome(input: RenderPackInput, title: string, n: number, total: number): string {
+  return (
+    text(M, 14, "RennovAIte", { size: 5, fill: BRASS, font: FONT_DISPLAY }) +
+    text(PAGE_W - M, 14, `${input.projectName} · Garden render pack`, { size: 3, fill: INK_500, anchor: "end" }) +
+    `<line x1="${M}" y1="18" x2="${PAGE_W - M}" y2="18" stroke="${BONE}" stroke-width="0.4"/>` +
+    `<line x1="${M}" y1="${PAGE_H - 14}" x2="${PAGE_W - M}" y2="${PAGE_H - 14}" stroke="${BONE}" stroke-width="0.4"/>` +
+    text(M, PAGE_H - 8, `${title} — concept visualisation, not a construction document. Dimensions are on the drawing set.`, {
+      size: 2.6,
+      fill: INK_500,
+    }) +
+    text(PAGE_W - M, PAGE_H - 8, `${n} / ${total}`, { size: 2.8, fill: INK_500, font: FONT_MONO, anchor: "end" })
+  );
+}
+
+/** A framed photo slot (matte-image: bone mat around the picture). The inner
+ *  ground is bone too, so a render whose aspect differs from the slot reads as
+ *  a wider mat rather than a white letterbox. */
+function frame(x: number, y: number, w: number, h: number): string {
+  return `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" rx="2" fill="${BONE}"/>`;
+}
+
+/** Renders come back landscape at about 3:2; slots are cut to match. */
+const PHOTO_ASPECT = 1.5;
+
+function placeholder(x: number, y: number, w: number, h: number, line1: string, line2: string): string {
+  return (
+    frame(x, y, w, h) +
+    `<rect x="${f1(x + 3)}" y="${f1(y + 3)}" width="${f1(w - 6)}" height="${f1(h - 6)}" fill="${PAPER}"/>` +
+    text(x + w / 2, y + h / 2 - 2, line1, { size: 5, fill: INK_500, font: FONT_DISPLAY, anchor: "middle" }) +
+    text(x + w / 2, y + h / 2 + 5, line2, { size: 2.8, fill: INK_500, anchor: "middle" })
+  );
+}
+
+const areaText = (r: Room) => `${r.area_m2.toFixed(2)} m²${r.area_derived_m2 ? " *" : ""}`;
+
+// --- Pages -------------------------------------------------------------------------
+
+function coverPage(input: RenderPackInput, zones: PackZone[], total: number): PackPage {
+  const rendered = zones.filter((z) => z.day).length;
+  const hero = [...zones].filter((z) => z.day).sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ?? null;
+  const images: ImageSlot[] = [];
+  const hx = 176;
+  const hw = PAGE_W - M - hx;
+  const hh = Math.round((hw - 6) / PHOTO_ASPECT + 6);
+  const hy = Math.max(34, (PAGE_H - hh) / 2 - 6);
+  let body = chrome(input, "Cover", 1, total);
+
+  body += text(M, 58, "Garden render pack", { size: 5, fill: INK_500, spacing: "0.06em" });
+  const titleLines = wrap(input.projectName, 22);
+  titleLines.forEach((l, i) => {
+    body += text(M, 80 + i * 15, l, { size: 14, fill: INK_900, font: FONT_DISPLAY });
+  });
+  let y = 80 + titleLines.length * 15;
+  body += text(M, y, input.community, { size: 4, fill: INK_700 });
+  y += 18;
+
+  if (input.style) {
+    body += text(M, y, "DIRECTION", { size: 2.8, fill: INK_500, spacing: "0.08em" });
+    body += text(M, y + 10, input.style.name_en, { size: 9, fill: INK_900, font: FONT_DISPLAY });
+    const p = paragraph(M, y + 18, input.style.one_line, 52, 5, { size: 3.4, fill: INK_700 });
+    body += p.svg;
+    const sy = y + 20 + p.height;
+    input.style.palette.forEach((hex, i) => {
+      body += `<rect x="${M + i * 16}" y="${f1(sy)}" width="13" height="13" rx="1.5" fill="${esc(hex)}" stroke="${INK_100}" stroke-width="0.3"/>`;
+      body += text(M + i * 16, sy + 17, hex.toUpperCase(), { size: 2.2, fill: INK_500, font: FONT_MONO });
+    });
+    y = sy + 30;
+  }
+
+  body += text(M, y, "CONTENTS", { size: 2.8, fill: INK_500, spacing: "0.08em" });
+  body += text(M, y + 7, `Plan overview · ${zones.length} zones · materials & finishes`, { size: 3.4, fill: INK_700 });
+  body += text(M, y + 13, `${rendered} of ${zones.length} zones rendered · dated ${input.dateISO}`, {
+    size: 3.4,
+    fill: rendered < zones.length ? TERRACOTTA : INK_700,
+    font: FONT_MONO,
+  });
+
+  if (hero?.day && input.unavailableRenderIds?.has(hero.day.id)) {
+    body += placeholder(hx, hy, hw, hh, "Image unavailable", "The render could not be fetched when this pack was built; rebuild the pack.");
+  } else if (hero?.day) {
+    body += frame(hx, hy, hw, hh);
+    images.push({ renderId: hero.day.id, x: hx + 3, y: hy + 3, w: hw - 6, h: hh - 6 });
+    body += text(hx, hy + hh + 7, `${hero.ref} · ${hero.room.name_en}`, { size: 3, fill: INK_500 });
+  } else {
+    body += placeholder(hx, hy, hw, hh, "No renders yet", "Generate the zone views from the render step, then rebuild the pack.");
+  }
+  return { kind: "cover", title: "Cover", svg: page(body), images };
+}
+
+function planOverviewPage(input: RenderPackInput, total: number): PackPage {
+  let body = chrome(input, "Plan overview", 2, total);
+  body += text(M, 30, "Plan overview", { size: 9, fill: INK_900, font: FONT_DISPLAY });
+  if (input.sitePlanSvg) {
+    // The drawing set's own site plan, nested at 85% — the same sheet, the same
+    // dimensions, so the pack cannot show a garden the drawings do not.
+    const s = 0.85;
+    const w = PAGE_W * s;
+    const h = PAGE_H * s;
+    const x = (PAGE_W - w) / 2;
+    const y = 36;
+    const inner = input.sitePlanSvg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+    body += `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" fill="${PAPER}" stroke="${INK_100}" stroke-width="0.3"/>`;
+    body += `<g transform="translate(${f1(x)} ${f1(y)}) scale(${s})">${inner}</g>`;
+  } else {
+    body += text(M, 50, "No outdoor zones on the plan.", { size: 4, fill: INK_500 });
+  }
+  return { kind: "plan_overview", title: "Plan overview", svg: page(body), images: [] };
+}
+
+function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number): PackPage {
+  const images: ImageSlot[] = [];
+  let body = chrome(input, `${z.ref} ${z.room.name_en}`, n, total);
+  body += text(M, 31, z.ref, { size: 5, fill: BRASS, font: FONT_MONO });
+  body += text(M + 18, 31, z.room.name_en, { size: 10, fill: INK_900, font: FONT_DISPLAY });
+  body += text(PAGE_W - M, 31, `${z.typeLabel} · ${areaText(z.room)}`, { size: 4, fill: INK_700, font: FONT_MONO, anchor: "end" });
+
+  const top = 40;
+  const gap = 8;
+  const colW = (PAGE_W - 2 * M - gap) / 2;
+  // Two-up: each slot is a 3:2 photo plus its mat. One-up: a larger 3:2 slot.
+  const photoH = z.eveningExpected ? Math.round((colW - 6) / PHOTO_ASPECT + 6) : 176;
+  const boxes = z.eveningExpected
+    ? [
+        { x: M, w: colW, view: "Day", r: z.day },
+        { x: M + colW + gap, w: colW, view: "Evening", r: z.evening },
+      ]
+    : [{ x: M, w: PAGE_W - 2 * M, view: "Day", r: z.day }];
+
+  for (const b of boxes) {
+    // A single day view keeps a photographic aspect instead of a letterbox.
+    const w = z.eveningExpected ? b.w : Math.min(b.w, (photoH - 6) * PHOTO_ASPECT + 6);
+    const x = z.eveningExpected ? b.x : (PAGE_W - w) / 2;
+    if (b.r && input.unavailableRenderIds?.has(b.r.id)) {
+      body += placeholder(x, top, w, photoH, "Image unavailable", "The render could not be fetched when this pack was built; rebuild the pack.");
+    } else if (b.r) {
+      body += frame(x, top, w, photoH);
+      images.push({ renderId: b.r.id, x: x + 3, y: top + 3, w: w - 6, h: photoH - 6 });
+    } else if (b.view === "Evening") {
+      body += placeholder(x, top, w, photoH, "Evening view not rendered", "This zone has lighting on the plan; generate its evening view.");
+    } else {
+      body += placeholder(x, top, w, photoH, "Not yet rendered", "Generate this zone's view from the render step.");
+    }
+    body += text(x, top + photoH + 6, b.view.toUpperCase(), { size: 2.8, fill: INK_500, spacing: "0.08em" });
+  }
+
+  // Facts band.
+  const fy = top + photoH + 16;
+  const col = (i: number) => M + i * ((PAGE_W - 2 * M) / 3);
+  body += text(col(0), fy, "SURFACE", { size: 2.6, fill: INK_500, spacing: "0.08em" });
+  body += text(col(0), fy + 6, z.surface, { size: 3.4, fill: INK_900 });
+  body += text(col(0), fy + 12, `Area ${areaText(z.room)}`, { size: 3.2, fill: INK_700, font: FONT_MONO });
+  if (z.room.area_derived_m2 && z.room.derived_note) {
+    body += paragraph(col(0), fy + 18, `* Derived area: ${z.room.derived_note}`, 62, 3.6, {
+      size: 2.5,
+      fill: TERRACOTTA,
+    }).svg;
+  }
+
+  body += text(col(1), fy, "BUILT FEATURES", { size: 2.6, fill: INK_500, spacing: "0.08em" });
+  (z.features.length ? z.features : ["None drawn in this zone"]).slice(0, 5).forEach((f, i) => {
+    body += text(col(1), fy + 6 + i * 5, f, { size: 3.2, fill: z.features.length ? INK_900 : INK_500 });
+  });
+
+  body += text(col(2), fy, "LIGHTING — AS DESIGNED", { size: 2.6, fill: INK_500, spacing: "0.08em" });
+  if (z.lights.length === 0) {
+    body += text(col(2), fy + 6, z.room.type === "structure" ? "Integral downlights (part of the structure)" : "No lighting on the plan", {
+      size: 3.2,
+      fill: INK_500,
+    });
+  } else {
+    z.lights.forEach((l, i) => {
+      body += text(col(2), fy + 6 + i * 5, `${l.count} × ${l.label}`, { size: 3.2, fill: INK_900 });
+    });
+  }
+  return { kind: "zone", title: `${z.ref} ${z.room.name_en}`, svg: page(body), images };
+}
+
+function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, total: number): PackPage {
+  let body = chrome(input, "Materials & finishes", n, total);
+  body += text(M, 31, "Materials & finishes", { size: 10, fill: INK_900, font: FONT_DISPLAY });
+
+  // Zone schedule (left).
+  const tx = M;
+  let y = 46;
+  const cols = [tx, tx + 14, tx + 70, tx + 110, tx + 190];
+  const head = ["REF", "ZONE", "TYPE", "FINISH", "AREA m²"];
+  head.forEach((h, i) =>
+    (body += text(i === 4 ? cols[4]! + 18 : cols[i]!, y, h, { size: 2.6, fill: INK_500, spacing: "0.08em", anchor: i === 4 ? "end" : "start" })),
+  );
+  body += `<line x1="${tx}" y1="${y + 2}" x2="${cols[4]! + 18}" y2="${y + 2}" stroke="${INK_100}" stroke-width="0.3"/>`;
+  y += 8;
+  for (const z of zones) {
+    body += text(cols[0]!, y, z.ref, { size: 3, fill: BRASS, font: FONT_MONO });
+    body += text(cols[1]!, y, z.room.name_en, { size: 3, fill: INK_900 });
+    body += text(cols[2]!, y, z.typeLabel, { size: 3, fill: INK_700 });
+    body += text(cols[3]!, y, z.surface, { size: 3, fill: INK_700 });
+    body += text(cols[4]! + 18, y, `${z.room.area_m2.toFixed(2)}${z.room.area_derived_m2 ? "*" : ""}`, {
+      size: 3,
+      fill: INK_900,
+      font: FONT_MONO,
+      anchor: "end",
+    });
+    y += 6;
+  }
+  const totalArea = zones.reduce((s, z) => s + z.room.area_m2, 0);
+  body += `<line x1="${tx}" y1="${y - 3}" x2="${cols[4]! + 18}" y2="${y - 3}" stroke="${INK_100}" stroke-width="0.3"/>`;
+  body += text(cols[1]!, y + 2, "Total drawn zones", { size: 3, fill: INK_900, weight: 600 });
+  body += text(cols[4]! + 18, y + 2, totalArea.toFixed(2), { size: 3, fill: INK_900, font: FONT_MONO, anchor: "end" });
+  y += 10;
+  const derived = zones.filter((z) => z.room.area_derived_m2 && z.room.derived_note);
+  for (const z of derived) {
+    const p = paragraph(tx, y, `* ${z.ref} derived area: ${z.room.derived_note}`, 105, 4, {
+      size: 2.6,
+      fill: TERRACOTTA,
+    });
+    body += p.svg;
+    y += p.height + 2;
+  }
+
+  // Built features.
+  y += 6;
+  body += text(tx, y, "BUILT FEATURES", { size: 2.6, fill: INK_500, spacing: "0.08em" });
+  y += 7;
+  for (const el of input.graph.elements.filter((e) => e.kind !== "boundary_wall")) {
+    body += text(tx, y, runLabel(el.kind, input.elementVariants?.[el.id]), {
+      size: 3,
+      fill: el.kind === "counter_run" && !input.elementVariants?.[el.id] ? TERRACOTTA : INK_900,
+    });
+    body += text(cols[4]! + 18, y, `${el.length_m.toFixed(2)} m`, { size: 3, fill: INK_900, font: FONT_MONO, anchor: "end" });
+    y += 5.5;
+  }
+  const units = input.fixtures.filter((f) => f.layer === "landscape");
+  const unitCounts = new Map<string, number>();
+  for (const u of units) unitCounts.set(u.type, (unitCounts.get(u.type) ?? 0) + 1);
+  for (const [type, count] of unitCounts) {
+    body += text(tx, y, UNIT_LABEL[type] ?? type, { size: 3, fill: INK_900 });
+    body += text(cols[4]! + 18, y, `${count} no.`, { size: 3, fill: INK_900, font: FONT_MONO, anchor: "end" });
+    y += 5.5;
+  }
+  for (const z of zones.filter((x) => x.room.type === "structure")) {
+    body += text(tx, y, `${z.room.name_en} (plan area)`, { size: 3, fill: INK_900 });
+    body += text(cols[4]! + 18, y, `${z.room.area_m2.toFixed(2)} m²`, { size: 3, fill: INK_900, font: FONT_MONO, anchor: "end" });
+    y += 5.5;
+  }
+
+  // Right column: direction + lighting.
+  const rx = 262;
+  let ry = 46;
+  if (input.style) {
+    body += text(rx, ry, "DIRECTION", { size: 2.6, fill: INK_500, spacing: "0.08em" });
+    body += text(rx, ry + 9, input.style.name_en, { size: 7, fill: INK_900, font: FONT_DISPLAY });
+    ry += 16;
+    input.style.palette.forEach((hex, i) => {
+      body += `<rect x="${rx + i * 14}" y="${ry}" width="11" height="11" rx="1.5" fill="${esc(hex)}" stroke="${INK_100}" stroke-width="0.3"/>`;
+    });
+    ry += 19;
+    for (const line of input.style.what_changes) {
+      const p = paragraph(rx + 4, ry, line, 58, 4.4, { size: 3, fill: INK_700 });
+      body += `<circle cx="${rx + 1}" cy="${f1(ry - 1)}" r="0.7" fill="${BRASS}"/>` + p.svg;
+      ry += p.height + 2;
+    }
+    ry += 6;
+  }
+
+  body += text(rx, ry, "LIGHTING — AS DESIGNED", { size: 2.6, fill: INK_500, spacing: "0.08em" });
+  ry += 7;
+  const totals = new Map<string, { label: string; count: number }>();
+  for (const z of zones) {
+    for (const l of z.lights) {
+      const t = totals.get(l.code) ?? { label: l.label, count: 0 };
+      t.count += l.count;
+      totals.set(l.code, t);
+    }
+  }
+  if (totals.size === 0) {
+    body += text(rx, ry, "No lighting points on the plan.", { size: 3, fill: INK_500 });
+    ry += 6;
+  } else {
+    for (const t of [...totals.values()].sort((a, b) => a.label.localeCompare(b.label))) {
+      body += text(rx, ry, t.label, { size: 3, fill: INK_900 });
+      body += text(PAGE_W - M, ry, String(t.count), { size: 3, fill: INK_900, font: FONT_MONO, anchor: "end" });
+      ry += 5.5;
+    }
+  }
+  const src = paragraph(rx, ry + 3, LIGHTING_SOURCE_STATEMENT, 66, 4, { size: 2.6, fill: TERRACOTTA });
+  body += src.svg;
+
+  return { kind: "materials", title: "Materials & finishes", svg: page(body), images: [] };
+}
+
+export function buildRenderPack(input: RenderPackInput): { pages: PackPage[]; zones: PackZone[] } {
+  const zones = buildPackZones(input);
+  const total = 3 + zones.length;
+  const pages: PackPage[] = [
+    coverPage(input, zones, total),
+    planOverviewPage(input, total),
+    ...zones.map((z, i) => zonePage(input, z, 3 + i, total)),
+    materialsPage(input, zones, total, total),
+  ];
+  return { pages, zones };
+}
+
+/** Contain-fit an image of (iw, ih) into a slot, centred. */
+export function containFit(iw: number, ih: number, slot: { x: number; y: number; w: number; h: number }) {
+  const s = Math.min(slot.w / iw, slot.h / ih);
+  const w = iw * s;
+  const h = ih * s;
+  return { x: slot.x + (slot.w - w) / 2, y: slot.y + (slot.h - h) / 2, w, h };
+}
+

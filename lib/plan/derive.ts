@@ -79,6 +79,7 @@ type ParsedJson = { scale?: string | null; units?: string | null } | null;
 interface AuthoredColumns {
   source: PlanSource | null;
   plot_width_m: number | null;
+  plot_depth_m?: number | null;
 }
 
 async function loadAuthoredColumns(
@@ -89,7 +90,7 @@ async function loadAuthoredColumns(
     const sb = supabase as unknown as SupabaseClient;
     const { data, error } = await sb
       .from("plans")
-      .select("source, plot_width_m")
+      .select("source, plot_width_m, plot_depth_m")
       .eq("id", planId)
       .maybeSingle<AuthoredColumns>();
     if (error || !data) return { source: null, plot_width_m: null };
@@ -124,21 +125,20 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
     });
   }
 
-  // `unroofed` (031) is selected best-effort for the same reason as the plan
-  // columns above: a pre-031 database must still derive a graph.
+  // Later columns are selected best-effort, newest first, for the same reason
+  // as the plan columns above: an older database must still derive a graph.
+  // 035 adds area_derived_m2/derived_note, 031 adds unroofed.
   const sb = supabase as unknown as SupabaseClient;
-  const withUnroofed = await sb
-    .from("rooms")
-    .select("id, name_en, name_ar, room_type, area_m2, polygon, unroofed")
-    .eq("plan_id", plan.id)
-    .order("name_en");
-  const roomsRes = withUnroofed.error
-    ? await supabase
-        .from("rooms")
-        .select("id, name_en, name_ar, room_type, area_m2, polygon")
-        .eq("plan_id", plan.id)
-        .order("name_en")
-    : withUnroofed;
+  const ROOM_SELECTS = [
+    "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note",
+    "id, name_en, name_ar, room_type, area_m2, polygon, unroofed",
+    "id, name_en, name_ar, room_type, area_m2, polygon",
+  ];
+  let roomsRes = await sb.from("rooms").select(ROOM_SELECTS[0]!).eq("plan_id", plan.id).order("name_en");
+  for (const cols of ROOM_SELECTS.slice(1)) {
+    if (!roomsRes.error) break;
+    roomsRes = await sb.from("rooms").select(cols).eq("plan_id", plan.id).order("name_en");
+  }
   if (roomsRes.error) {
     throw new Error(`derivePlanGraph: rooms load failed — ${roomsRes.error.message}`);
   }
@@ -153,12 +153,16 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
     planId: plan.id,
     scale: parsed?.scale ?? null,
     total_area_m2: plan.total_area_m2,
-    rooms: (roomsRes.data ?? []) as RawRoom[],
+    rooms: (roomsRes.data ?? []) as unknown as RawRoom[],
     openings,
     elements,
     // Only an authored plan carries a measured scale; a parsed one keeps the
     // area-derived factor it has always used.
     unit_to_m: authored.source === "user_drawn" ? authored.plot_width_m : null,
+    plot:
+      authored.source === "user_drawn" && authored.plot_width_m && authored.plot_depth_m
+        ? { width_m: Number(authored.plot_width_m), depth_m: Number(authored.plot_depth_m) }
+        : null,
     source: authored.source,
   });
 }

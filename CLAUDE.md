@@ -672,6 +672,88 @@ byte-identical to the pre-G3 commit. What-if works and deliberately does not
 regrade landscape lines: the landscape rate book has one grade, so garden lines
 count toward the scenario total but cannot be swapped.
 
+## Garden documents — drawings, overlays, batch render, render pack (garden pilot G4)
+
+Four deliverables, every one assembled from the same `PlanGraph`, built first
+against Villa 94 (the client garden follows once its measurements land).
+
+- **Villa 94 at its true geometry.** `lib/ground-truth/villa94-garden-geometry.ts`
+  holds the traced polygons (the lawn residual via `polygon-clipping`, the bench
+  court's curved edge as an elliptical quarter), runs, units and lighting points.
+  G3's zones were areas laid out as squares; since G4 every zone area is computed
+  from its polygon, so the BoQ, the dry-run and the drawings cannot disagree. That
+  refinement moved the platform total by **+AED 2.41** (148,202.60 → 148,205.01,
+  still −2.5%, still 10/14), and the curved cut came out at **1.8 m²** where G3's
+  arithmetic said 1.9.
+- **Derived area on the zone** (migration `035`): `rooms.area_derived_m2` +
+  `derived_note`. The lawn carries its 1.8 m² approximation as a flag, so every
+  document that prints the area prints the `*` and the reason. `buildPlanGraph`
+  adds `area_m2` to `derived_fields` when it is set.
+- **Dimension drawings** `lib/drawings/garden-sheets.ts`: L-100 site plan (zone
+  schedule, runs, plot extents, levels legend — "no levels are carried by this
+  plan" rather than an invented FFL), one L-1xx sheet per zone (every straight
+  edge dimensioned in mm between real vertices, overall extents, facts panel; a
+  curved edge is marked rather than dimensioned by its chords). A 26 m garden
+  does not fit A3 at 1:100, so each sheet picks the largest standard scale that
+  fits (`fitScale`) and prints it, with a true scale bar — the interior engine
+  and its fixed 1:100 are untouched. Every dimension carries `data-dim`/`data-mm`
+  so tests (and the live dry-run) check printed figures against the graph to
+  the millimetre.
+- **Overlays**: L-401 lighting & electrical (fitting codes, schedule, an
+  indicative cable route as the minimum spanning tree — labelled *derived, not
+  designed*) and L-402 irrigation & drainage (drip zones, planter runs, an
+  indicative line, drainage points or an explicit statement that none are
+  placed). **No HVAC.** Lighting is **as designed, never as surveyed**: point
+  positions come from the design session, `plan_fixtures.spec.source =
+  'as_designed'`, and the sheet states `LIGHTING_SOURCE_STATEMENT`.
+- **Set PDF**: a garden-only plan gets the garden set instead of the interior
+  sheets (mixed plans get both); `?format=pdf&sheet=all` returns the whole set as
+  one multi-page PDF; a sheet is addressable by its number.
+- **Batch render** ("Generate all", Newspace ask #2). `lib/render-batch/plan.ts`
+  is a pure planner: a day view per renderable zone, plus an **evening** view for
+  exterior zones with lighting on the plan (or a structure, whose downlights are
+  part of it). `POST /api/render/batch` plans and prepares; it holds no queue.
+  The client runner (`lib/render-batch/client.ts`) runs jobs through the existing
+  single-render routes, so the cache, the per-project in-flight cap of 3, the QA
+  gate and rehosting all apply; done jobs are skipped, so pressing twice costs
+  nothing. `POST /api/render/evening` is an **edit of the zone's current day
+  render** with a deterministic prompt naming only the designed fittings
+  (`renders.view = 'evening'`, migration 035); it is kept out of the iteration
+  chain and goes stale when the day view is tweaked.
+- **Exterior style preset.** With `TASTE_SEED_ENABLED`, the batch seeds a garden
+  project's EMPTY moodboard with its direction's garden + structure art
+  (`gardenPresetItems`, new `EXTERIOR_STYLE_ROOMS`, deterministic descriptors), so
+  every zone is conditioned on the same references. Never onto a board the user
+  built, never onto a project with interior rooms (the seed is project-wide).
+  The interior style-library catalogue is unchanged.
+- **Render pack** (E1-lite) `lib/documents/render-pack.ts` (pure pages) +
+  `render-pack-pdf.ts` + `GET /api/projects/[id]/render-pack` (gated with
+  `DRAWINGS_ENABLED`; `?format=json` for a manifest): cover (direction, palette,
+  hero render), plan overview (the L-100 sheet itself), a page per zone (day +
+  evening where lighting exists, a stated placeholder where a view is missing),
+  materials & finishes (zone schedule with the derived flag, built features with
+  counter variants, lighting as designed). Chrome is rasterised like a drawing
+  sheet; photographs are embedded at their own resolution. No price, rate, rate
+  source or contractor appears in it.
+- **Delta-log reasoning survives.** `lib/ground-truth/villa94-garden-dryrun.ts`
+  is the one comparison both the printed report and the stored record use;
+  `boq_outcomes.delta_lines` (035) stores every line's class and reason, and the
+  four over-measured lines (PCC, paving install, grass supply + install) carry the
+  client tile-purchase corroboration (`direct` for paving, `indirect` for grass).
+- **A save-route bug the live run caught.** `/api/update-plan` ran overlap repair
+  over every room, and clipping snaps vertices to 1 mm and inserts a vertex wherever
+  a neighbour's corner touches an edge — so an abutting garden was reshaped on
+  every save and the drawings dimensioned the extra vertices. `repairForSave`
+  (`lib/plan/save-repair.ts`) now reshapes only rooms that actually overlap.
+
+Interior output is unchanged: Mudon's graph (bar the additive null fields), as-built
+and demolition sheet SVGs, quantities and priced BoQ across styles are
+byte-identical to the pre-G4 commit.
+
+**DB step**: `supabase db push` for `035`, then
+`node --import ./scripts/_alias-hook.mjs scripts/garden-dry-run-live.ts [port]`
+against a dev server started with `GARDEN_PILOT_ENABLED=true DRAWINGS_ENABLED=true`.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

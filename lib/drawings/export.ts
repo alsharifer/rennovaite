@@ -15,6 +15,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { derivePlanGraph } from "@/lib/plan/derive";
 import type { PlanGraph, Room } from "@/lib/plan/geometry";
+import { zoneSurface } from "@/lib/plan/zones";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -26,6 +27,7 @@ import {
   renderOpeningSchedule,
   type ScheduleSourceOpening,
 } from "./opening-schedule";
+import { buildGardenSheets, type GardenFixture } from "./garden-sheets";
 import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
 import { renderPlumbingSheet } from "./plumbing-sheet";
@@ -38,12 +40,19 @@ export type SheetKind =
   | "finish_schedule"
   | "opening_schedule"
   | "electrical"
-  | "plumbing";
+  | "plumbing"
+  // G4 garden set.
+  | "site_plan"
+  | "zone_plan"
+  | "lighting_overlay"
+  | "irrigation_overlay";
 
 export interface DrawingSheet {
   kind: SheetKind;
   title: string;
   sheetNumber: string;
+  /** G4: zone sheets share a kind, so they are addressed by sheet number. */
+  zoneId?: string;
   svg: string;
 }
 
@@ -80,20 +89,6 @@ function perimeterM(room: Room): number {
   return p;
 }
 
-/** Surface description for an outdoor zone — its type IS its finish. */
-const ZONE_SURFACES: Record<string, string> = {
-  paving: "Paving to landscape spec",
-  artificial_grass: "Artificial grass on prepared base",
-  planting_bed: "Planting bed — topsoil and edging",
-  deck: "Timber / composite decking",
-  path: "Path finish to landscape spec",
-  structure: "Structure base slab",
-  pool: "Pool — out of scope",
-};
-
-function zoneSurface(type: string | null): string {
-  return (type && ZONE_SURFACES[type]) || "Open zone — surface to be specified";
-}
 
 function buildFinishRows(graph: PlanGraph, styleKey: string | null): FinishRow[] {
   const finishes = (styleKey && STYLE_FINISHES[styleKey]) || DEFAULT_FINISHES;
@@ -214,6 +209,25 @@ async function loadOverlayFixtures(projectId: string): Promise<OverlayFixtureFor
   }
 }
 
+/**
+ * G4: every fixture on the plan, all layers, for the garden sheets. Not gated by
+ * OVERLAYS_ENABLED: a planter box or a garden light on an authored garden is
+ * part of the design, not an MEP overlay. `[]` when the table is absent.
+ */
+async function loadGardenFixtures(projectId: string): Promise<GardenFixture[]> {
+  try {
+    const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
+    const { data, error } = await supabase
+      .from("plan_fixtures")
+      .select("id, layer, type, room_id, position, spec")
+      .eq("project_id", projectId);
+    if (error || !data) return [];
+    return data as GardenFixture[];
+  } catch {
+    return [];
+  }
+}
+
 export async function generateDrawingSet(projectId: string): Promise<DrawingSet> {
   // Read-only: derive the as-built graph live. The as-built plan_snapshot is
   // written at parse-confirm (update-plan), not here, so viewing drawings never
@@ -226,6 +240,34 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
   ]);
 
   const meta = sheetMeta(project, asBuilt, styleKey);
+
+  // G4: a plan made only of outdoor zones gets the garden set INSTEAD of the
+  // interior one. An as-built/demolition pair at a fixed 1:100 would run a 26 m
+  // garden off the sheet and diff two identical graphs; neither says anything a
+  // landscape contractor can build from. Mixed plans get both.
+  const outdoor = asBuilt.rooms.filter((r) => r.unroofed);
+  const interiorRooms = asBuilt.rooms.filter((r) => !r.unroofed);
+  if (outdoor.length > 0 && interiorRooms.length === 0) {
+    const fixturesAll = await loadGardenFixtures(projectId);
+    const garden = buildGardenSheets(asBuilt, fixturesAll, meta);
+    const finish: DrawingSheet = {
+      kind: "finish_schedule",
+      title: "Finish Schedule",
+      sheetNumber: "L-201",
+      svg: renderFinishSchedule(buildFinishRows(asBuilt, styleKey), meta, {
+        sheetNumber: "L-201",
+        title: "Finish Schedule",
+      }),
+    };
+    const zoneSheets = garden.filter((s) => s.kind === "site_plan" || s.kind === "zone_plan");
+    const overlays = garden.filter((s) => s.kind === "lighting_overlay" || s.kind === "irrigation_overlay");
+    return {
+      projectId,
+      planId: asBuilt.planId,
+      sheets: [...zoneSheets, finish, ...overlays],
+      derivedNotes: asBuilt.notes,
+    };
+  }
 
   const sheets: DrawingSheet[] = [
     {
@@ -307,7 +349,34 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
     });
   }
 
+  // G4: a mixed plan (villa rooms AND garden zones) keeps its interior sheets
+  // and gains the garden set after them.
+  if (outdoor.length > 0) {
+    const garden = buildGardenSheets(asBuilt, await loadGardenFixtures(projectId), meta);
+    sheets.push(...garden);
+  }
+
   return { projectId, planId: asBuilt.planId, sheets, derivedNotes: asBuilt.notes };
+}
+
+/**
+ * G4: a whole drawing set (or any subset) as ONE multi-page A3 PDF, in sheet
+ * order. Same rasterisation as a single sheet, so a page prints at its stated
+ * scale.
+ */
+export async function renderSetPdf(svgs: readonly string[]): Promise<Uint8Array> {
+  const { Resvg } = await import("@resvg/resvg-js");
+  const { PDFDocument } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  for (const svg of svgs) {
+    // 250 dpi keeps a 20-sheet set openable while text stays crisp.
+    const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4134 } });
+    const png = resvg.render().asPng();
+    const page = pdf.addPage([420 * MM_TO_PT, 297 * MM_TO_PT]);
+    const img = await pdf.embedPng(png);
+    page.drawImage(img, { x: 0, y: 0, width: 420 * MM_TO_PT, height: 297 * MM_TO_PT });
+  }
+  return pdf.save();
 }
 
 const MM_TO_PT = 72 / 25.4;

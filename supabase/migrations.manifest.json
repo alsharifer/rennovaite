@@ -206,6 +206,12 @@
       "version": "20260101003400",
       "name": "landscape_fixtures",
       "sha256": "ae5ab9907b4641bb24341ca0eb261d4d0bbbc3b3b81376bfc7aa2cf65062cc9c"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003500",
+      "name": "garden_documents",
+      "sha256": "8021b53a2d877254375d32abd4fa4c0a5c40db0b7fd37b2931238b1ce8314a21"
     }
   ]
 }

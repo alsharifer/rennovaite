@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { repairOverlaps } from "@/lib/parse/repair";
 import { findOverlaps } from "@/lib/plan/overlaps";
+import { repairForSave } from "@/lib/plan/save-repair";
 import { ensureAsBuiltSnapshot } from "@/lib/plan/snapshots";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -42,28 +42,12 @@ export async function POST(request: NextRequest) {
 
     // Re-run overlap repair on what the editor sent. The parse guarantees rooms
     // do not overlap; editing could quietly undo that and nothing downstream
-    // would ever put it back, leaving a plan permanently uncostable. Repair is
-    // a no-op for rooms that do not overlap — only the offending pair is
-    // carved, and the response names what changed so the editor can say so
-    // rather than silently reshaping someone's work.
-    const totalPosted = posted.reduce((sum, r) => sum + r.area_m2, 0);
-    const { rooms: repaired } = repairOverlaps(
-      posted.map((r) => ({
-        id: r.id,
-        polygon: r.polygon as [number, number][],
-        area_m2: r.area_m2,
-      })),
-      { totalAreaM2: totalPosted },
-    );
-    const repairedById = new Map(repaired.map((r) => [r.id, r]));
-    const trimmed = posted.filter((r) => {
-      const fixed = repairedById.get(r.id);
-      return fixed !== undefined && JSON.stringify(fixed.polygon) !== JSON.stringify(r.polygon);
-    });
-    const rooms = posted.map((r) => {
-      const fixed = repairedById.get(r.id);
-      return fixed ? { ...r, polygon: fixed.polygon as number[][], area_m2: fixed.area_m2 } : r;
-    });
+    // would ever put it back, leaving a plan permanently uncostable. Only rooms
+    // that actually overlap are reshaped (see lib/plan/save-repair) — and the
+    // response names what changed so the editor can say so rather than
+    // silently reshaping someone's work.
+    const { rooms, repairedIds } = repairForSave(posted);
+    const repairedSet = new Set(repairedIds);
 
     const supabase = getSupabaseAdmin();
 
@@ -168,15 +152,9 @@ export async function POST(request: NextRequest) {
       // Rooms whose geometry repair changed on the way in, with the shape that
       // was actually stored — so the editor shows what is in the database
       // rather than what the user last dragged.
-      repaired_rooms: trimmed.map((r) => {
-        const fixed = repairedById.get(r.id)!;
-        return {
-          id: r.id,
-          name_en: r.name_en,
-          polygon: fixed.polygon,
-          area_m2: fixed.area_m2,
-        };
-      }),
+      repaired_rooms: rooms
+        .filter((r) => repairedSet.has(r.id))
+        .map((r) => ({ id: r.id, name_en: r.name_en, polygon: r.polygon, area_m2: r.area_m2 })),
     });
   } catch (err) {
     console.error("[api/update-plan] error", err);

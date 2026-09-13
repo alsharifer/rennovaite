@@ -120,6 +120,24 @@ const LABELS: Record<string, string> = {
   pool: "Pool",
 };
 
+/**
+ * Surface description for an outdoor zone — its type IS its finish. Shared by
+ * the finish schedule and the render pack so the two documents say the same.
+ */
+const ZONE_SURFACES: Record<string, string> = {
+  paving: "Paving to landscape spec",
+  artificial_grass: "Artificial grass on prepared base",
+  planting_bed: "Planting bed — topsoil and edging",
+  deck: "Timber / composite decking",
+  path: "Path finish to landscape spec",
+  structure: "Structure base slab",
+  pool: "Pool — out of scope",
+};
+
+export function zoneSurface(type: string | null | undefined): string {
+  return (type && ZONE_SURFACES[type]) || "Open zone — surface to be specified";
+}
+
 export function roomTypeLabel(type: string | null | undefined): string {
   if (!type) return "Unclassified";
   return LABELS[type] ?? type;

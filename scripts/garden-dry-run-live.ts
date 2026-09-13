@@ -1,17 +1,27 @@
 // =============================================================================
-// scripts/garden-dry-run-live.ts — the dry-run, end to end (garden pilot G3).
+// scripts/garden-dry-run-live.ts — the dry-run, end to end (garden pilot G3/G4).
 //
 // Draws the traced Villa 94 garden into the ground-truth project through the
-// real routes (draw-plan → update-plan → plan-elements → plan-fixtures),
-// generates a BoQ through /api/generate-boq, and checks that what comes back
-// matches what the pure take-off computed. This is what proves the WIRING, not
-// just the rules: the same numbers have to survive the database round trip and
-// the BoQ assembly.
+// real routes (update-plan → plan-elements → plan-fixtures), generates a BoQ
+// through /api/generate-boq, and checks that what comes back matches what the
+// pure take-off computed. This is what proves the WIRING, not just the rules:
+// the same numbers have to survive the database round trip and the BoQ
+// assembly.
 //
 // Then it records the platform side of delta-log entry #2, which was left null
 // in G2 precisely because this BoQ did not exist yet.
 //
-// Run (dev server on the given port, GARDEN_PILOT_ENABLED=true):
+// G4: the garden is seeded at its TRUE traced geometry (villa94PlanRecords) —
+// real polygons, real run polylines, lighting points where they were placed —
+// instead of G3's area-preserving strip packing, because the drawing set and
+// the render pack are now built from this project, and a strip-packed garden
+// would dimension a garden that does not exist. The stored record now carries
+// delta_lines: every line's class, reason and, for the four over-measured
+// lines, the tile-purchase corroboration, so the reasoning survives outside the
+// console. It also checks that the live drawing set prints the same dimensions,
+// to the millimetre, as the pure sheets built from the same records.
+//
+// Run (dev server on the given port, GARDEN_PILOT_ENABLED=true DRAWINGS_ENABLED=true):
 //   node --import ./scripts/_alias-hook.mjs scripts/garden-dry-run-live.ts [port]
 // =============================================================================
 
@@ -19,8 +29,12 @@ import { readFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { computeGardenTakeoff, priceGardenTakeoff } from "../lib/boq/garden-takeoff.ts";
+import { buildGardenSheets } from "../lib/drawings/garden-sheets.ts";
+import { compareVilla94 } from "../lib/ground-truth/villa94-garden-dryrun.ts";
+import { villa94PlanRecords } from "../lib/ground-truth/villa94-garden-geometry.ts";
 import { VILLA94_GARDEN, PLOT } from "../lib/ground-truth/villa94-garden-plan.ts";
 import { TOTALS, PUBLIC_SOURCE_LABEL, INTERNAL_REF } from "../lib/ground-truth/villa94-garden.ts";
+import { buildPlanGraph } from "../lib/plan/geometry.ts";
 
 const ROOT = "C:/dev/rennovaite";
 const PORT = process.argv[2] ?? "3098";
@@ -34,6 +48,7 @@ const LANDSCAPE_SECTIONS = [
   "Irrigation",
   "Electrical & Lighting",
 ];
+const OVER_MEASURED = ["garden.pcc_base", "garden.paving_install", "garden.grass_supply", "garden.grass_install"];
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const money = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -61,49 +76,9 @@ const post = async (p: string, b: unknown) =>
     body: JSON.stringify(b),
   })).json();
 
-/**
- * Lay the traced zones out on the canvas so none of them overlap.
- *
- * The dry-run's numbers come from the traced AREAS, not from where the
- * rectangles sit, so a simple non-overlapping strip packing is honest here: it
- * preserves every area exactly and keeps the plan's overlap gate happy. The
- * real client garden gets drawn in the editor.
- */
-function layout(): { id: string; name_en: string; name_ar: null; room_type: string; area_m2: number; polygon: number[][]; unroofed: boolean }[] {
-  const rows: ReturnType<typeof layout> = [];
-  // Normalised space: x in [0,1] spans PLOT.width_m.
-  const unit = PLOT.width_m; // metres per normalised unit
-  let cursorY = 0.02;
-  let cursorX = 0.02;
-  let rowHeight = 0;
-  for (const z of VILLA94_GARDEN.zones) {
-    // Lay each zone as a square of the right area, wrapping into rows.
-    const side = Math.sqrt(z.area_m2) / unit; // normalised
-    if (cursorX + side > 0.98) {
-      cursorX = 0.02;
-      cursorY += rowHeight + 0.02;
-      rowHeight = 0;
-    }
-    const x0 = cursorX;
-    const y0 = cursorY;
-    rows.push({
-      id: crypto.randomUUID(),
-      name_en: z.name,
-      name_ar: null,
-      room_type: z.kind,
-      area_m2: z.area_m2,
-      polygon: [
-        [x0, y0],
-        [x0 + side, y0],
-        [x0 + side, y0 + side],
-        [x0, y0 + side],
-      ],
-      unroofed: true,
-    });
-    cursorX += side + 0.02;
-    rowHeight = Math.max(rowHeight, side);
-  }
-  return rows;
+/** Every printed dimension on a sheet, as "kind=mm", sorted — ids differ, figures must not. */
+function printedDims(svg: string): string[] {
+  return [...svg.matchAll(/data-dim="([^"]+)" data-mm="(\d+)"/g)].map((m) => `${m[1]}=${m[2]}`).sort();
 }
 
 async function main() {
@@ -152,16 +127,20 @@ async function main() {
   }
   const planId = plan!.id;
 
-  // --- 2. zones through the real save route ---------------------------------
+  // --- 2. zones at their traced polygons, through the real save route ---------
   // Clear first: /api/update-plan removes only the ids the editor explicitly
   // lists as deleted, which is right for the editor (it always posts the whole
   // set with stable ids) and wrong for a script that mints new ones each run.
+  // Renders hang off rooms; a re-seed starts the zone renders over.
+  await db.from("renders").delete().eq("project_id", projectId);
   await db.from("rooms").delete().eq("plan_id", planId);
-  const rooms = layout();
+  const records = villa94PlanRecords();
+  // Record ids are readable slugs; the tables key on uuids.
+  const roomUuid = new Map(records.rooms.map((r) => [r.id, crypto.randomUUID()]));
   const saved = await post("/api/update-plan", {
     plan_id: planId,
-    rooms: rooms.map((r) => ({
-      id: r.id,
+    rooms: records.rooms.map((r) => ({
+      id: roomUuid.get(r.id),
       name_en: r.name_en,
       name_ar: r.name_ar,
       room_type: r.room_type,
@@ -172,27 +151,40 @@ async function main() {
     deleted_ids: [],
   });
   check("zones save through /api/update-plan", saved.success === true, JSON.stringify(saved).slice(0, 160));
-  check("no overlaps in the laid-out plan", saved.has_overlaps === false, JSON.stringify(saved.overlap_pairs ?? []));
+  check("the true traced geometry has no overlaps", saved.has_overlaps === false, JSON.stringify(saved.overlap_pairs ?? []));
+
+  // The derived-area flag lives on the zone (migration 035). The editor does not
+  // author it, so it is written beside the save rather than through it.
+  for (const r of records.rooms.filter((x) => x.area_derived_m2 !== null)) {
+    const { error } = await db
+      .from("rooms")
+      .update({ area_derived_m2: r.area_derived_m2, derived_note: r.derived_note })
+      .eq("id", roomUuid.get(r.id)!);
+    check(`derived-area flag persists on ${r.name_en}`, !error, error?.message ?? `${r.area_derived_m2} m²`);
+  }
 
   const { data: storedRooms } = await db
     .from("rooms")
-    .select("id, name_en, room_type, area_m2")
+    .select("id, name_en, area_m2, polygon")
     .eq("plan_id", planId);
-  const areaById = new Map((storedRooms ?? []).map((r) => [r.name_en as string, Number(r.area_m2)]));
-  const areasExact = VILLA94_GARDEN.zones.every((z) => areaById.get(z.name) === z.area_m2);
-  check("every traced area round-trips exactly", areasExact);
+  const areaByName = new Map((storedRooms ?? []).map((r) => [r.name_en as string, Number(r.area_m2)]));
+  check(
+    "every traced area round-trips exactly",
+    VILLA94_GARDEN.zones.every((z) => areaByName.get(z.name) === z.area_m2),
+  );
+  const polyById = new Map((storedRooms ?? []).map((r) => [r.id as string, JSON.stringify(r.polygon)]));
+  check(
+    "every polygon round-trips unchanged (no overlap repair moved a vertex)",
+    records.rooms.every((r) => polyById.get(roomUuid.get(r.id)!) === JSON.stringify(r.polygon)),
+  );
 
-  const nameToId = new Map((storedRooms ?? []).map((r) => [r.name_en as string, r.id as string]));
-
-  // --- 3. runs, with the counter variants set -------------------------------
+  // --- 3. runs at their traced polylines, with the counter variants set -------
   await db.from("plan_elements").delete().eq("plan_id", planId);
-  const mPerUnit = PLOT.width_m;
-  for (const run of VILLA94_GARDEN.runs ?? []) {
-    const span = run.length_m / mPerUnit;
+  for (const run of records.elements) {
     const res = await post("/api/plan-elements", {
       plan_id: planId,
       kind: run.kind,
-      polyline: [[0.02, 0.5], [0.02 + span, 0.5]],
+      polyline: run.polyline,
       ...(run.variant ? { variant: run.variant } : {}),
     });
     if (res.error) check(`run ${run.id} persists`, false, res.error);
@@ -209,32 +201,37 @@ async function main() {
     JSON.stringify((storedRuns ?? []).map((r) => r.variant)),
   );
 
-  // --- 4. units + points -----------------------------------------------------
+  // --- 4. units + lighting points at their placed positions -------------------
+  // Lighting is AS DESIGNED: spec.source records it, and every document that
+  // shows a point says so.
   await db.from("plan_fixtures").delete().eq("project_id", projectId);
-  const fixtures: Record<string, unknown>[] = [];
-  for (const u of VILLA94_GARDEN.units ?? []) {
-    fixtures.push({
-      project_id: projectId,
-      layer: "landscape",
-      type: u.kind,
-      room_id: null,
-      position: [0.5, 0.5],
-      source: "user",
-    });
-  }
-  const lawnId = nameToId.get("Backyard lawn") ?? null;
-  for (const p of VILLA94_GARDEN.points ?? []) {
-    fixtures.push({
-      project_id: projectId,
-      layer: p.type === "boundary_light" ? "electrical" : "electrical",
-      type: p.type,
-      room_id: p.type === "garden_light" ? lawnId : null,
-      position: [0.5, 0.5],
-      source: "user",
-    });
-  }
+  const fixtures = records.fixtures.map((f) => ({
+    project_id: projectId,
+    layer: f.layer,
+    type: f.type,
+    room_id: f.room_id ? (roomUuid.get(f.room_id) ?? null) : null,
+    position: f.position,
+    spec: f.spec,
+    source: "user",
+  }));
+  check(
+    "every lighting point is marked as designed",
+    fixtures.filter((f) => f.layer === "electrical").every((f) => (f.spec as { source?: string } | null)?.source === "as_designed"),
+  );
   const ins = await db.from("plan_fixtures").insert(fixtures);
   check("units + points persist", !ins.error, ins.error?.message ?? `${fixtures.length} rows`);
+
+  // A direction to render in: Desert Modern, the pilot's default exterior style.
+  const { data: styleRows } = await db
+    .from("style_choices")
+    .select("style_key")
+    .eq("project_id", projectId)
+    .is("room_id", null)
+    .limit(1);
+  if (!styleRows || styleRows.length === 0) {
+    const sc = await post("/api/style-choice", { project_id: projectId, style_key: "desert-modern" });
+    check("a garden direction is locked", !sc.error, sc.error ?? "desert-modern");
+  }
 
   // --- 5. generate the BoQ through the real route ----------------------------
   const gen = await post("/api/generate-boq", { project_id: projectId });
@@ -260,9 +257,11 @@ async function main() {
     landscape.map((s) => s.work_section).join(" · "),
   );
 
-  // Cross-check the wired BoQ against the pure take-off.
+  // Cross-check the wired BoQ against the pure take-off and the dry-run.
   const pure = priceGardenTakeoff(computeGardenTakeoff(VILLA94_GARDEN).items);
   const pureTotal = r2(pure.reduce((s, l) => s + l.total_aed, 0));
+  const dry = compareVilla94();
+  check("the pure take-off is the dry-run's platform side", Math.abs(dry.platform_total - pureTotal) < 0.01, money(dry.platform_total));
   const wiredTotal = r2(landscape.reduce((s, x) => s + Number(x.section_total_aed), 0));
   check(
     "wired total equals the pure take-off",
@@ -313,26 +312,82 @@ async function main() {
     .maybeSingle<{ id: string; capture_gap_notes: string }>();
   if (outcome) {
     const notes = outcome.capture_gap_notes.replace(
-      /PLATFORM SIDE PENDING[^]*$/,
-      `PLATFORM SIDE RECORDED (G3 dry-run): plan traced from the setting-out drawing at 1:50. ` +
-        `Paved surface measures 64.27 m² against 87 m² of quoted paving install and a 66.24 m² tile order — ` +
-        `the platform lands within 3% of what was actually bought and 26% below what was quoted. ` +
-        `Lawn measures 62 m² against 71 m² quoted. Every other line matches to the fils. ` +
-        `Lighting point counts are the contract's: the drawing pack carries no lighting layout.`,
+      /(PLATFORM SIDE PENDING|PLATFORM SIDE RECORDED)[^]*$/,
+      `PLATFORM SIDE RECORDED (G3 dry-run, geometry-refined in G4): plan traced from the setting-out drawing at 1:50 and seeded at its true polygons. ` +
+        `Four lines are over-measured by the contract (PCC, paving install, grass supply, grass install) — delta_lines carries each one's class, ` +
+        `reason and the client tile-purchase corroboration (66.24 m² bought against 87 m² of paving quoted). The backyard lawn includes 1.8 m² ` +
+        `derived from an elliptical quarter, flagged on the zone. Lighting point counts are the contract's and positions are AS DESIGNED: ` +
+        `the drawing pack carries no lighting layout.`,
     );
-    await db
+    const { error: updErr } = await db
       .from("boq_outcomes")
       .update({
         platform_boq_total: wiredTotal,
         platform_by_section: byName,
         delta_pct: deltaPct,
         capture_gap_notes: notes,
+        delta_lines: dry.lines,
       })
       .eq("id", outcome.id);
-    check("delta-log entry #2 now carries the platform side", true, `${money(wiredTotal)} (${deltaPct}%)`);
+    check("delta-log entry #2 now carries the platform side", !updErr, updErr?.message ?? `${money(wiredTotal)} (${deltaPct}%)`);
+
+    const { data: stored } = await db
+      .from("boq_outcomes")
+      .select("delta_lines")
+      .eq("id", outcome.id)
+      .maybeSingle<{ delta_lines: { item_key: string; class: string; corroboration?: { source: string; strength: string } }[] | null }>();
+    const over = (stored?.delta_lines ?? []).filter((l) => OVER_MEASURED.includes(l.item_key));
+    check(
+      "the four over-measured lines are stored with the tile-purchase corroboration",
+      over.length === 4 && over.every((l) => l.class === "explained" && /tile invoice/.test(l.corroboration?.source ?? "")),
+      over.map((l) => `${l.item_key.replace("garden.", "")}:${l.corroboration?.strength}`).join(", "),
+    );
+    check("stored delta_lines cover every compared line", (stored?.delta_lines ?? []).length === dry.lines.length, String(stored?.delta_lines?.length));
+    check("delta_lines never name the contractor", !/KAME/i.test(JSON.stringify(stored?.delta_lines ?? [])));
   } else {
     check("delta-log entry #2 exists", false, "run record-garden-outcome first");
   }
+
+  // --- 7. the live drawing set prints the pure sheets' dimensions -------------
+  const liveRes = await fetch(`${BASE}/api/projects/${projectId}/drawings`);
+  const liveSet = (await liveRes.json().catch(() => ({}))) as {
+    sheets?: { sheetNumber: string; kind: string; svg: string }[];
+    error?: string;
+  };
+  const graph = buildPlanGraph({
+    projectId,
+    planId,
+    scale: null,
+    total_area_m2: records.rooms.reduce((s, r) => s + r.area_m2, 0),
+    rooms: records.rooms,
+    elements: records.elements,
+    unit_to_m: records.plot.width_m,
+    plot: records.plot,
+    source: "user_drawn",
+  });
+  const pureSheets = buildGardenSheets(graph, records.fixtures, {
+    projectNameEn: PROJECT_NAME,
+    projectNameAr: null,
+    community: "Dubai",
+    level: "ground",
+    scale: "1:100",
+    dateISO: "2026-09-13",
+  });
+  check("live drawing set generates", Array.isArray(liveSet.sheets), liveSet.error ?? `${liveSet.sheets?.length} sheets`);
+  let dimsCompared = 0;
+  const mismatched: string[] = [];
+  for (const ps of pureSheets) {
+    const live = liveSet.sheets?.find((s) => s.sheetNumber === ps.sheetNumber);
+    const a = printedDims(ps.svg);
+    const b = live ? printedDims(live.svg) : [];
+    dimsCompared += a.length;
+    if (JSON.stringify(a) !== JSON.stringify(b)) mismatched.push(`${ps.sheetNumber} (pure ${a.length} / live ${b.length})`);
+  }
+  check(
+    "every live sheet dimension equals the pure graph, to the mm",
+    dimsCompared > 0 && mismatched.length === 0,
+    mismatched.length ? mismatched.join(", ") : `${dimsCompared} dimensions on ${pureSheets.length} sheets`,
+  );
 
   const after = (await db.from("projects").select("id", { count: "exact", head: true })).count ?? 0;
   console.log(`[blast radius] projects after: ${after} (was ${before})\n`);
