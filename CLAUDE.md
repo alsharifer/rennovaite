@@ -879,6 +879,23 @@ mechanism, not a workaround.
   a pair gate (kept items stay, removed go, replaced stay in place, house and
   viewpoint unchanged, nothing major invented; deterministic judge). Fails twice →
   WITHHELD (no substitute). `renders.mode = "photo_pair"`, project-first cache key.
+- **Narrow-plot cameras** (`lib/scene/cameras.ts`, pipeline `g5-1`): a
+  standpoint with under `NARROW_M` (6 m) of clear width to a building, wall or
+  plot edge is cramped and gets no eye-level camera; zones in a corridor are seen
+  from ELEVATED three-quarter views (4.2/5.6 m up, FOV 70, aimed at eye height,
+  looking along the corridor axis — allowed up to 3 m beyond the plot line, kept
+  2.2 m off buildings), and a narrow garden's whole-garden views look along two
+  DIFFERENT corridors from 6.5 m. Every camera gets a clean-view verdict (zone ≥
+  10% of frame, no solid mass within 2.2 m of the lens, a horizon, walls ≤ 45%,
+  no structure > 40%); an unclean camera never spends a render attempt
+  (`shouldAttemptRender`) — the labelled 3D design view ships with
+  `design_view_reason: "no_clean_camera"` ("3D view · by choice" in Generate
+  all). Cameras are memoised per scene hash in `loadGardenSceneContext`.
+- **Pack backbone**: cover → plan → before/after pairs → whole-garden views →
+  zones → materials. 3D design views fill every slot no render passed (by-choice
+  views captioned as such); a passed day render carries its design view as an
+  inset; the cover and `summary.mix` state the mix (pairs, design views by choice
+  / after the gate, styled renders).
 - **Metrics** (037): `pilot_events` (plan_started, plan_saved, design_edit,
   boq_generated with `full`, pack_exported, friction) written best-effort by the
   routes for authored plans; `computePilotMetrics` (`GET /api/pilot-events`) —

@@ -19,7 +19,7 @@ import { graphDraftStatus } from "@/lib/plan/geometry";
 import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { PAGE_H, PAGE_W, buildRenderPack, containFit, type PackGardenView, type PackPhotoPair, type PackRender, type PackZone } from "./render-pack";
+import { PAGE_H, PAGE_W, buildRenderPack, containFit, packMix, type PackGardenView, type PackMix, type PackPhotoPair, type PackRender, type PackZone } from "./render-pack";
 
 const MM_TO_PT = 72 / 25.4;
 
@@ -36,6 +36,8 @@ export interface RenderPackSummary {
   pages: { kind: string; title: string; images: number }[];
   zones: { ref: string; name: string; area_m2: number; derived_m2: number | null; day: boolean; evening: boolean; evening_expected: boolean }[];
   missing_images: string[];
+  /** G5: before/after pairs + 3D design views (the backbone) and the styled renders that passed. */
+  mix: PackMix;
 }
 
 async function fetchBytes(url: string): Promise<Uint8Array | null> {
@@ -107,14 +109,19 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   const styleKey = (styleRes.data?.[0]?.style_key as string | undefined) ?? null;
   const style = styleKey ? getGardenStyle(isGardenStyleKey(styleKey) ? styleKey : gardenStyleFor(styleKey)) : null;
 
-  type SceneRow = { id: string; camera: string; view: string; image_url: string; project_id: string; gate: { outcome: "passed" | "substituted"; attempts: { attempt: number; passed: boolean; failures: string[] }[] } | null };
+  type SceneRow = { id: string; camera: string; view: string; image_url: string; project_id: string; gate: { outcome: "passed" | "substituted"; design_view_reason?: string | null; scene_url?: string; attempts: { attempt: number; passed: boolean; failures: string[] }[] } | null };
+  const designUrls = new Map<string, string>();
   const rows = ((sceneRes.data ?? []) as SceneRow[]).filter((r) => r.project_id === projectId && r.gate);
   const latest = (camera: string, view: "day" | "evening") => rows.find((r) => r.camera === camera && (r.view === "evening" ? "evening" : "day") === view) ?? null;
   const toPack = (r: SceneRow | null): PackRender | null => {
     if (!r) return null;
     const passed = r.gate!.outcome === "passed" && r.gate!.attempts.some((a) => a.passed);
     const lastFailure = r.gate!.attempts.at(-1)?.failures?.[0] ?? null;
-    return { id: r.id, image_url: r.image_url, kind: passed ? "render" : "design_view", gate_passed: passed, note: passed ? null : lastFailure };
+    const byChoice = !passed && r.gate!.design_view_reason === "no_clean_camera";
+    // A passed DAY render carries the day design model it was checked against.
+    const design = passed && r.view !== "evening" && r.gate!.scene_url ? { id: `design:${r.id}` } : null;
+    if (design) designUrls.set(design.id, r.gate!.scene_url!);
+    return { id: r.id, image_url: r.image_url, kind: passed ? "render" : "design_view", gate_passed: passed, note: passed || byChoice ? null : lastFailure, by_choice: byChoice, design };
   };
   const cameras = ctx?.cameras ?? [];
   const byRoom: Record<string, { day: PackRender | null; evening: PackRender | null }> = {};
@@ -170,6 +177,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   const wanted: { id: string; image_url: string }[] = [
     ...[...Object.values(byRoom), ...gardenViews].flatMap((r) => [r.day, r.evening]).filter((r): r is PackRender => !!r),
     ...photoPairs.flatMap((p) => [p.after, { id: p.beforeId, image_url: beforeUrls.get(p.beforeId)! }]),
+    ...[...designUrls.entries()].map(([id, image_url]) => ({ id, image_url })),
   ];
   for (let i = 0; i < wanted.length; i += 4) {
     await Promise.all(
@@ -247,6 +255,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
       evening_expected: z.eveningExpected,
     })),
     missing_images: [...unavailable],
+    mix: packMix({ renders: byRoom, gardenViews, photoPairs }),
   };
   // The page SVGs are what was printed (photographs aside): returned so a check
   // can assert on the exact text a client reads (G5 identity + draft assertions).

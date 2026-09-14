@@ -16,7 +16,7 @@ import type { BatchJob, RenderView, SceneOutcome } from "@/lib/render-batch/plan
 // that has not been rendered yet; each result lands in the zone's own chain, so
 // editing afterwards is the ordinary per-zone tweak flow.
 
-type Row = { room_id: string; room_name: string; view: RenderView; state: JobProgress; note: string | null; outcome: SceneOutcome | null };
+type Row = { room_id: string; room_name: string; view: RenderView; state: JobProgress; note: string | null; outcome: SceneOutcome | null; by_choice: boolean };
 
 const key = (roomId: string, view: RenderView) => `${roomId}:${view}`;
 
@@ -28,15 +28,17 @@ function rowsFrom(jobs: BatchJob[]): Row[] {
     state: j.status === "done" ? "done" : j.status === "blocked" ? "blocked" : j.status === "in_flight" ? "running" : "queued",
     note: j.reason,
     outcome: j.outcome ?? null,
+    by_choice: j.by_choice === true,
   }));
 }
 
 // G4b: a garden render that failed the faithfulness check is withheld and its 3D
 // design view ships instead — "Done" would hide that.
+const BY_CHOICE_NOTE = "No camera position on this plot gives a styled render a clean view, so the 3D design view ships and no render was attempted.";
 const SUBSTITUTED_NOTE = "Render withheld: it did not pass the faithfulness check, so the 3D design view ships in its place.";
 
 function stateLabel(r: Row): string {
-  if (r.state === "done" && r.outcome === "substituted") return "3D view";
+  if (r.state === "done" && r.outcome === "substituted") return r.by_choice ? "3D view · by choice" : "3D view";
   if (r.state === "done" && r.outcome === "passed") return "Checked";
   return STATE_LABEL[r.state];
 }
@@ -86,7 +88,7 @@ export function GenerateAllPanel({
           setRows((prev) =>
             prev.map((r) =>
               r.room_id === e.room_id && r.view === e.view
-                ? { ...r, state: e.state, note: e.error ?? (e.state === "done" ? null : r.note), outcome: e.result?.outcome ?? r.outcome }
+                ? { ...r, state: e.state, note: e.error ?? (e.state === "done" ? null : r.note), outcome: e.result?.outcome ?? r.outcome, by_choice: e.result?.by_choice ?? r.by_choice }
                 : r,
             ),
           );
@@ -139,7 +141,7 @@ export function GenerateAllPanel({
       {error && <p className="mt-xs font-body-sm text-[12px] text-error">{error}</p>}
       <ul className="mt-sm flex max-h-56 flex-col gap-[2px] overflow-y-auto">
         {rows.map((r) => (
-          <li key={key(r.room_id, r.view)} className="flex items-center justify-between gap-sm text-[12px]" title={r.note ?? (r.state === "done" && r.outcome === "substituted" ? SUBSTITUTED_NOTE : undefined)}>
+          <li key={key(r.room_id, r.view)} className="flex items-center justify-between gap-sm text-[12px]" title={r.note ?? (r.state === "done" && r.outcome === "substituted" ? (r.by_choice ? BY_CHOICE_NOTE : SUBSTITUTED_NOTE) : undefined)}>
             <span className="truncate text-ink-700">
               {r.room_name}
               <span className="text-ink-500"> · {r.view === "evening" ? "Evening" : "Day"}</span>

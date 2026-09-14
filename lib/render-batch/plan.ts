@@ -65,6 +65,8 @@ export interface BatchJob {
   camera_id?: string;
   /** G4b: a done scene job's gate outcome — "substituted" ships the 3D design view. */
   outcome?: SceneOutcome | null;
+  /** G5: a 3D design view shipped by choice — no clean camera, no render attempted. */
+  by_choice?: boolean;
 }
 
 export type SceneOutcome = "passed" | "substituted";
@@ -285,7 +287,7 @@ export interface SceneRenderRow {
   camera: string | null;
   view?: string | null;
   status: string | null;
-  gate?: { outcome?: string } | null;
+  gate?: { outcome?: string; design_view_reason?: string | null } | null;
 }
 
 const outcomeOf = (r: SceneRenderRow | undefined): SceneOutcome | null =>
@@ -302,7 +304,7 @@ export function planSceneBatch(cameras: readonly BatchCamera[], renders: readonl
   const jobs: BatchJob[] = [];
   for (const c of cameras) {
     const day = done(c.id, "day");
-    jobs.push({ room_id: c.zone_id ?? c.id, room_name: c.label, view: "day", status: day ? "done" : "queued", reason: null, parent_render_id: null, render_id: day?.id ?? null, camera_id: c.id, outcome: outcomeOf(day) });
+    jobs.push({ room_id: c.zone_id ?? c.id, room_name: c.label, view: "day", status: day ? "done" : "queued", reason: null, parent_render_id: null, render_id: day?.id ?? null, camera_id: c.id, outcome: outcomeOf(day), by_choice: day?.gate?.design_view_reason === "no_clean_camera" });
     if (!c.lit) continue;
     const eve = done(c.id, "evening");
     jobs.push({
@@ -315,6 +317,7 @@ export function planSceneBatch(cameras: readonly BatchCamera[], renders: readonl
       render_id: eve?.id ?? null,
       camera_id: c.id,
       outcome: outcomeOf(eve),
+      by_choice: eve?.gate?.design_view_reason === "no_clean_camera",
     });
   }
   return jobs;

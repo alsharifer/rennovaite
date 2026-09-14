@@ -153,7 +153,8 @@ describe("project isolation — the render cache key", () => {
     expect(key("villa-94", camA)).not.toBe(key("client-garden", camB));
     expect(key("villa-94", camA)).toBe(key("villa-94", camA));
     expect(() => key("", camA)).toThrow(/projectId is required/);
-  });
+    // Choosing a second full camera set renders a few hundred probe views.
+  }, 30_000);
 
   it("changes the key when the view, style or scene changes", () => {
     const cam = cameras[0]!;

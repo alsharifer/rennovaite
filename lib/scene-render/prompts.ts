@@ -15,7 +15,8 @@ import type { CameraManifest } from "@/lib/scene/cameras";
 import { gateChecks } from "./gate";
 
 /** Bump when the pipeline changes what a render is conditioned on. */
-export const SCENE_PIPELINE_VERSION = "g4b-2";
+// g5-1: narrow-plot cameras (elevated corridor views, clean-view check).
+export const SCENE_PIPELINE_VERSION = "g5-1";
 
 export type SceneView = "day" | "evening";
 
@@ -63,6 +64,15 @@ export function sceneCacheKey(parts: { projectId: string; cameraId: string; view
  */
 export function isInfrastructureFailure(attempts: readonly { image_url: string }[]): boolean {
   return attempts.length > 0 && attempts.every((a) => !a.image_url);
+}
+
+/**
+ * G5: may this camera/view spend a render attempt? Not from a camera with no
+ * clean view (the 3D design view ships by choice), and not for an evening with
+ * no passed day render to relight.
+ */
+export function shouldAttemptRender(cam: { clean?: boolean }, view: SceneView, hasPassedDay: boolean): boolean {
+  return cam.clean !== false && (view === "day" || hasPassedDay);
 }
 
 /**

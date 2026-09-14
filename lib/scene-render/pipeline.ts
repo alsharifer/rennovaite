@@ -41,6 +41,7 @@ import {
   SCENE_PIPELINE_VERSION,
   sceneCacheKey,
   sceneHash,
+  shouldAttemptRender,
   tightenedDayPrompt,
   type SceneView,
 } from "./prompts";
@@ -66,9 +67,20 @@ export interface AttemptRecord {
   gate_status: GateVerdict["status"];
 }
 
+/**
+ * G5: why a 3D design view shipped instead of a styled render.
+ *   no_clean_camera — decided from the geometry before any attempt (narrow plot);
+ *   no_passed_day   — an evening with no faithful day render to relight;
+ *   gate_failed     — every attempt failed the faithfulness gate.
+ */
+export type DesignViewReason = "no_clean_camera" | "no_passed_day" | "gate_failed";
+
 export interface SceneGateRecord {
   pipeline: string;
   outcome: "passed" | "substituted";
+  design_view_reason?: DesignViewReason | null;
+  /** The camera's clean-view verdict when it was not clean. */
+  camera_reasons?: string[];
   camera: GardenCamera;
   manifest: CameraManifest;
   scene_url: string;
@@ -83,9 +95,12 @@ export interface SceneRenderResult {
   view: SceneView;
   camera_id: string;
   outcome: "passed" | "substituted";
+  design_view_reason?: DesignViewReason | null;
   cached: boolean;
   attempts: AttemptRecord[];
 }
+
+const CAMERA_MEMO = new Map<string, GardenCamera[]>();
 
 function db(): SupabaseClient {
   return getSupabaseAdmin() as unknown as SupabaseClient;
@@ -112,8 +127,17 @@ export async function loadGardenSceneContext(projectId: string): Promise<GardenS
       fixtures,
     ).keys(),
   );
-  const cameras = chooseCameras(scene, graph, fixtures, lit);
-  return { projectId, graph, fixtures, variants, scene, cameras, style, sceneHash: sceneHash(scene) };
+  // Choosing cameras renders a few hundred probe views; the result is a pure
+  // function of the scene and the lit zones, so it is remembered per both.
+  const hash = sceneHash(scene);
+  const memoKey = `${projectId}|${hash}|${[...lit].sort().join(",")}`;
+  let cameras = CAMERA_MEMO.get(memoKey);
+  if (!cameras) {
+    cameras = chooseCameras(scene, graph, fixtures, lit);
+    CAMERA_MEMO.set(memoKey, cameras);
+    if (CAMERA_MEMO.size > 32) CAMERA_MEMO.delete(CAMERA_MEMO.keys().next().value!);
+  }
+  return { projectId, graph, fixtures, variants, scene, cameras, style, sceneHash: hash };
 }
 
 /** G5: shared with the photo-pair runner. */
@@ -208,7 +232,7 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
     staleEvening = isStaleEveningSubstitution(view, cached.gate.attempts, passedDay?.gate?.outcome === "passed");
   }
   if (cached?.image_url && cached.gate && !staleEvening) {
-    return { render_id: cached.id, image_url: cached.image_url, view, camera_id: cameraId, outcome: cached.gate.outcome, cached: true, attempts: cached.gate.attempts };
+    return { render_id: cached.id, image_url: cached.image_url, view, camera_id: cameraId, outcome: cached.gate.outcome, design_view_reason: cached.gate.design_view_reason ?? null, cached: true, attempts: cached.gate.attempts };
   }
 
   const base = `projects/${ctx.projectId}/scene/${cacheKey.slice(0, 24)}`;
@@ -256,7 +280,9 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
 
   let final: { url: string; outcome: "passed" | "substituted"; prompt: string; model: string } | null = null;
   // An evening needs a faithful day to relight; without one it ships the 3D night view.
-  const canAttempt = view === "day" || dayRenderBytes !== null;
+  // G5: a camera with no clean view never spends a render attempt — the labelled
+  // 3D design view is the honest image there, decided from the geometry.
+  const canAttempt = shouldAttemptRender(cam, view, dayRenderBytes !== null);
   for (let attempt = 1; canAttempt && attempt <= 2 && !final; attempt++) {
     const failures = attempts.at(-1)?.failures ?? [];
     let prompt: string;
@@ -305,7 +331,20 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
   }
   if (!final) final = { url: designUrl, outcome: "substituted", prompt: "(raw 3D design view)", model: "scene-raster" };
 
-  const gate: SceneGateRecord = { pipeline: SCENE_PIPELINE_VERSION, outcome: final.outcome, camera: cam, manifest, scene_url: dayUrl, depth_url: depthUrl, attempts, gate_model: "claude-opus-5" };
+  const designViewReason: DesignViewReason | null =
+    final.outcome === "passed" ? null : cam.clean === false ? "no_clean_camera" : view === "evening" && dayRenderBytes === null ? "no_passed_day" : "gate_failed";
+  const gate: SceneGateRecord = {
+    pipeline: SCENE_PIPELINE_VERSION,
+    outcome: final.outcome,
+    design_view_reason: designViewReason,
+    ...(cam.clean === false ? { camera_reasons: cam.cleanReasons } : {}),
+    camera: cam,
+    manifest,
+    scene_url: dayUrl,
+    depth_url: depthUrl,
+    attempts,
+    gate_model: "claude-opus-5",
+  };
   const { data: row, error } = await sb
     .from("renders")
     .insert({
@@ -325,5 +364,5 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
     .select("id")
     .single<{ id: string }>();
   if (error || !row) throw new Error(`could not save the render: ${error?.message}`);
-  return { render_id: row.id, image_url: final.url, view, camera_id: cameraId, outcome: final.outcome, cached: false, attempts };
+  return { render_id: row.id, image_url: final.url, view, camera_id: cameraId, outcome: final.outcome, design_view_reason: designViewReason, cached: false, attempts };
 }

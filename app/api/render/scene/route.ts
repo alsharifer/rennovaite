@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       if (!latest.has(k)) latest.set(k, { id: r.id, image_url: r.image_url, outcome: r.gate?.outcome ?? "unknown" });
     }
     return NextResponse.json({
-      cameras: ctx.cameras.map((c) => ({ id: c.id, label: c.label, zone_id: c.zoneId, lit: c.lit, day: latest.get(`${c.id}|day`) ?? null, evening: c.lit ? (latest.get(`${c.id}|evening`) ?? null) : null })),
+      cameras: ctx.cameras.map((c) => ({ id: c.id, label: c.label, zone_id: c.zoneId, lit: c.lit, clean: c.clean, mode: c.mode, clean_reasons: c.cleanReasons, day: latest.get(`${c.id}|day`) ?? null, evening: c.lit ? (latest.get(`${c.id}|evening`) ?? null) : null })),
     });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Could not load the garden scene." }, { status: 500 });

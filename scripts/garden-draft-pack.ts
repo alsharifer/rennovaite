@@ -166,7 +166,7 @@ async function main() {
   const set = await generateDrawingSet(PROJECT);
   // The pack page SVGs come from the route (pdf-lib does not load under the
   // script alias hook); the summary is the JSON manifest.
-  const packSummary = (await getJson<{ gate: { label: string; view: string; outcome: string; attempts: { attempt: number; passed: boolean; failures: string[] }[] }[]; pages: unknown[]; missing_images: string[] }>(`/api/projects/${PROJECT}/render-pack?format=json`)).body;
+  const packSummary = (await getJson<{ gate: { label: string; view: string; outcome: string; attempts: { attempt: number; passed: boolean; failures: string[] }[] }[]; pages: unknown[]; missing_images: string[]; mix: Record<string, number> }>(`/api/projects/${PROJECT}/render-pack?format=json`)).body;
   const pack = { pageSvgs: (await getJson<{ pages: string[] }>(`/api/projects/${PROJECT}/render-pack?format=pages`)).body.pages ?? [], summary: packSummary };
   const { data: proj } = await db.from("projects").select("name, city").eq("id", PROJECT).single<{ name: string; city: string }>();
   const boqPages = buildBoqPdfPages({ projectName: proj!.name, community: proj!.city, dateISO: "check", boq: boq as never });
@@ -202,6 +202,7 @@ async function main() {
   const scene = gate.filter((g) => g.view !== "photo_pair");
   console.log("\nFAITHFULNESS GATE");
   for (const g of gate) console.log(`  ${g.label.slice(0, 34).padEnd(34)} ${g.view.padEnd(10)} ${g.outcome.padEnd(12)} ${g.attempts.map((a) => `${a.attempt}:${a.passed ? "pass" : "fail"}`).join(" ")}`);
+  console.log(`\nPACK MIX  ${JSON.stringify(pack.summary.mix)}`);
   const metrics = (await getJson<{ metrics: unknown }>(`/api/pilot-events?project_id=${PROJECT}`)).body.metrics;
 
   const { snapshotOf } = await import("@/lib/pilot/change-report");
@@ -216,6 +217,9 @@ async function main() {
     drawings: set.sheets.map((s) => `${s.sheetNumber} ${s.title}`),
     pack: { pages: pack.summary.pages, missing_images: pack.summary.missing_images },
     gate,
+    // The pack's make-up: before/after pairs and 3D design views are the backbone;
+    // styled renders are in where the gate passed.
+    mix: pack.summary.mix,
     gate_summary: {
       scene_views: scene.length,
       passed: scene.filter((g) => g.outcome === "passed").length,

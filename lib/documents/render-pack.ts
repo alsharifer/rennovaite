@@ -54,6 +54,32 @@ export interface PackRender {
   gate_passed: boolean;
   /** Why a design view was shipped instead of a render. */
   note?: string | null;
+  /** G5: shown as the 3D design view by choice — no clean camera, no attempt made. */
+  by_choice?: boolean;
+  /** G5: a passed render carries its 3D design view as an inset (image-slot id). */
+  design?: { id: string } | null;
+}
+
+/** G5: what the pack is made of — the backbone and the extras. */
+export interface PackMix {
+  photo_pairs: number;
+  design_views_by_choice: number;
+  design_views_after_gate: number;
+  styled_renders: number;
+  missing: number;
+}
+
+export function packMix(input: Pick<RenderPackInput, "renders" | "gardenViews" | "photoPairs">): PackMix {
+  const all = [...Object.values(input.renders), ...(input.gardenViews ?? [])].flatMap((r) => [r.day, r.evening]);
+  const views = [...(input.gardenViews ?? [])];
+  const expectedMissing = views.filter((v) => !v.day).length + views.filter((v) => v.lit && !v.evening).length;
+  return {
+    photo_pairs: (input.photoPairs ?? []).length,
+    design_views_by_choice: all.filter((r) => r?.kind === "design_view" && r.by_choice).length,
+    design_views_after_gate: all.filter((r) => r?.kind === "design_view" && !r.by_choice).length,
+    styled_renders: all.filter((r) => r?.kind === "render").length,
+    missing: expectedMissing + Object.values(input.renders).filter((r) => !r.day).length,
+  };
 }
 
 /**
@@ -301,7 +327,13 @@ const areaText = (r: Room) => `${r.area_m2.toFixed(2)} m²${r.area_derived_m2 ? 
 /** What an image IS, printed under it: a gated render, or the design view shipped instead. */
 function caption(x: number, y: number, view: string, r: PackRender): string {
   if (r.kind === "render") {
-    return text(x, y, `${view.toUpperCase()} — RENDER · FAITHFULNESS CHECK PASSED`, { size: 2.6, fill: INK_500, spacing: "0.06em" });
+    return text(x, y, `${view.toUpperCase()} — RENDER · FAITHFULNESS CHECK PASSED${r.design ? " · INSET: 3D DESIGN VIEW" : ""}`, { size: 2.6, fill: INK_500, spacing: "0.06em" });
+  }
+  if (r.by_choice) {
+    return (
+      text(x, y, `${view.toUpperCase()} — 3D DESIGN VIEW`, { size: 2.6, fill: INK_700, spacing: "0.06em" }) +
+      text(x, y + 4, "The design model, shown by choice: no camera position on this plot gives a styled render a clean view.", { size: 2.2, fill: INK_500 })
+    );
   }
   const why = r.note ? `: ${r.note}` : "";
   return (
@@ -367,7 +399,9 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
   }
 
   body += text(M, y, "CONTENTS", { size: 2.8, fill: INK_500, spacing: "0.08em" });
-  body += text(M, y + 7, `Plan overview · ${zones.length} zones · materials & finishes`, { size: 3.4, fill: INK_700 });
+  const mix = packMix(input);
+  body += text(M, y + 7, `Plan overview · ${mix.photo_pairs} before/after · ${zones.length} zones · materials & finishes`, { size: 3.4, fill: INK_700 });
+  body += text(M, y + 19, `${mix.design_views_by_choice + mix.design_views_after_gate} 3D design views · ${mix.styled_renders} styled renders (faithfulness check passed)`, { size: 3, fill: INK_700, font: FONT_MONO });
   body += text(M, y + 13, `${rendered} of ${zones.length} zones rendered · dated ${input.dateISO}`, {
     size: 3.4,
     fill: rendered < zones.length ? TERRACOTTA : INK_700,
@@ -427,12 +461,21 @@ function gardenViewPage(input: RenderPackInput, v: PackGardenView, n: number, to
     } else if (b.r) {
       body += frame(b.x, top, b.w, photoH);
       images.push({ renderId: assertPackable(b.r).id, x: b.x + 3, y: top + 3, w: b.w - 6, h: photoH - 6 });
+      images.push(...designInset(b.r, b.x, top, b.w, photoH));
       body += caption(b.x, top + photoH + 6, b.view, b.r);
     } else {
       body += placeholder(b.x, top, b.w, photoH, "Not yet rendered", "Generate the whole-garden views from the render step.");
     }
   }
   return { kind: "garden_view", title: v.label, svg: page(body), images };
+}
+
+/** G5: the 3D design view a passed render was checked against, as a corner inset. */
+function designInset(r: PackRender, x: number, y: number, w: number, h: number): ImageSlot[] {
+  if (r.kind !== "render" || !r.design) return [];
+  const iw = (w - 6) * 0.3;
+  const ih = iw / PHOTO_ASPECT;
+  return [{ renderId: r.design.id, x: x + w - 3 - iw - 2, y: y + h - 3 - ih - 2, w: iw, h: ih }];
 }
 
 function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number): PackPage {
@@ -463,6 +506,7 @@ function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number)
     } else if (b.r) {
       body += frame(x, top, w, photoH);
       images.push({ renderId: assertPackable(b.r).id, x: x + 3, y: top + 3, w: w - 6, h: photoH - 6 });
+      images.push(...designInset(b.r, x, top, w, photoH));
     } else if (b.view === "Evening") {
       body += placeholder(x, top, w, photoH, "Evening view not rendered", "This zone has lighting on the plan; generate its evening view.");
     } else {
@@ -624,8 +668,10 @@ export function buildRenderPack(input: RenderPackInput): { pages: PackPage[]; zo
   const pages: PackPage[] = [
     coverPage(input, zones, total),
     planOverviewPage(input, total),
-    ...views.map((v, i) => gardenViewPage(input, v, 3 + i, total)),
-    ...pairs.map((p, i) => photoPairPage(input, p, 3 + views.length + i, total)),
+    // G5: the backbone first — the client's own garden before and after — then
+    // the whole-garden design views, then the zones.
+    ...pairs.map((p, i) => photoPairPage(input, p, 3 + i, total)),
+    ...views.map((v, i) => gardenViewPage(input, v, 3 + pairs.length + i, total)),
     ...zones.map((z, i) => zonePage(input, z, 3 + views.length + pairs.length + i, total)),
     materialsPage(input, zones, total, total),
   ];

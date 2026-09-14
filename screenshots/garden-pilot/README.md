@@ -135,9 +135,13 @@ Known limitations going in (candidates for the friction log if they bite):
   separate irrigation-zone element;
 - context (house, garage, walls) is editable through `/api/plan-context` only —
   the Step 5 amendment will need a UI for it;
-- on this narrow plot the scene cameras sit close (a rehearsal gazebo render was
-  honestly substituted by its 3D view: the model pulled back and invented a house
-  volume); expect a lower first-pass gate rate than Villa 94's.
+- ~~on this narrow plot the scene cameras sit close~~ — fixed before the pack run:
+  cramped standpoints (< 6 m clear) get no eye-level camera; zones are seen from
+  elevated three-quarter views along the corridor; the whole-garden views look
+  down the rear strip and the side garden. On the reference layout all 6 cameras
+  come out clean (4 zone views elevated, 2 whole-garden views from 6.5 m). An
+  unclean camera ships the 3D design view by choice with no render attempt —
+  verified live on Villa 94's side courtyard (0 attempts, 4 s).
 
 ## Rehearsal (scratch project, deleted afterwards)
 

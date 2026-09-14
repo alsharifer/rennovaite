@@ -21,6 +21,8 @@ export type GenerateResponse = {
   qaReason?: string | null;
   /** G4b scene renders: "substituted" = the render was withheld and the 3D design view ships. */
   outcome?: SceneOutcome;
+  /** G5: the 3D design view was chosen (no clean camera), not a gate failure. */
+  by_choice?: boolean;
 };
 
 // The render + iterate routes run async: they return a prediction_id and the
@@ -73,6 +75,7 @@ export async function resolveRender(
       image_url: body.image_url,
       prompt: typeof body.prompt === "string" ? body.prompt : "",
       ...(body.outcome === "passed" || body.outcome === "substituted" ? { outcome: body.outcome } : {}),
+      ...(body.design_view_reason === "no_clean_camera" ? { by_choice: true } : {}),
     };
   }
   if (typeof body.prediction_id === "string" && body.prediction_id) {
