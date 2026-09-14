@@ -50,7 +50,7 @@ export interface PackRender {
    * G4b: "render" = a plan-faithful render that PASSED the faithfulness gate;
    * "design_view" = the raw 3D design model shipped because no render passed.
    */
-  kind: "render" | "design_view";
+  kind: "render" | "design_view" | "photo_edit";
   gate_passed: boolean;
   /** Why a design view was shipped instead of a render. */
   note?: string | null;
@@ -61,7 +61,7 @@ export interface PackRender {
  * are built, so no caller can route around it.
  */
 export function assertPackable(r: PackRender): PackRender {
-  if (r.kind === "render" && !r.gate_passed) {
+  if ((r.kind === "render" || r.kind === "photo_edit") && !r.gate_passed) {
     throw new Error(`render ${r.id} has not passed the faithfulness gate and cannot enter a pack`);
   }
   return r;
@@ -99,7 +99,7 @@ export interface ImageSlot {
 }
 
 export interface PackPage {
-  kind: "cover" | "plan_overview" | "garden_view" | "zone" | "materials";
+  kind: "cover" | "plan_overview" | "garden_view" | "zone" | "materials" | "photo_pair";
   title: string;
   svg: string;
   images: ImageSlot[];
@@ -122,6 +122,27 @@ export interface RenderPackInput {
   unavailableRenderIds?: ReadonlySet<string>;
   /** G4b: whole-garden camera views, shown after the plan overview. */
   gardenViews?: PackGardenView[];
+  /** G5: the draft statement — printed on the cover and in every page header. */
+  draft?: string | null;
+  /** G5: where it came from (the derived-dimension source note). */
+  draftNote?: string | null;
+  /** G5: before/after pairs — a client photo and its gated photo restyle. */
+  photoPairs?: PackPhotoPair[];
+}
+
+/**
+ * G5: a client photo of a zone and the photo restyle made from it. The "after"
+ * passed its own faithfulness check (lib/scene-render/photo-pair.ts) or it is
+ * not here: a pair whose restyle failed is left out of the pack, and the gate
+ * table says so.
+ */
+export interface PackPhotoPair {
+  id: string;
+  zoneName: string;
+  /** Image-slot id for the client photo (resolved to bytes by the server). */
+  beforeId: string;
+  after: PackRender;
+  caption: string;
 }
 
 // --- Model ------------------------------------------------------------------------
@@ -140,6 +161,7 @@ const UNIT_LABEL: Record<string, string> = {
   planter_box: "Planter box",
   wall_feature: "Wall feature",
   bbq_grill: "BBQ grill (client-supplied)",
+  tree: "Tree",
 };
 
 const VARIANT_LABEL: Record<string, string> = { bar: "bar counter", bbq: "BBQ counter" };
@@ -244,7 +266,7 @@ function page(body: string): string {
 function chrome(input: RenderPackInput, title: string, n: number, total: number): string {
   return (
     text(M, 14, "RennovAIte", { size: 5, fill: BRASS, font: FONT_DISPLAY }) +
-    text(PAGE_W - M, 14, `${input.projectName} · Garden render pack`, { size: 3, fill: INK_500, anchor: "end" }) +
+    text(PAGE_W - M, 14, `${input.projectName} · Garden render pack${input.draft ? " · DRAFT FOR REVIEW" : ""}`, { size: 3, fill: input.draft ? TERRACOTTA : INK_500, anchor: "end" }) +
     `<line x1="${M}" y1="18" x2="${PAGE_W - M}" y2="18" stroke="${BONE}" stroke-width="0.4"/>` +
     `<line x1="${M}" y1="${PAGE_H - 14}" x2="${PAGE_W - M}" y2="${PAGE_H - 14}" stroke="${BONE}" stroke-width="0.4"/>` +
     text(M, PAGE_H - 8, `${title} — concept visualisation, not a construction document. Dimensions are on the drawing set.`, {
@@ -293,13 +315,14 @@ function caption(x: number, y: number, view: string, r: PackRender): string {
 function coverPage(input: RenderPackInput, zones: PackZone[], total: number): PackPage {
   const rendered = zones.filter((z) => z.day).length;
   const heroView = (input.gardenViews ?? []).find((v) => v.day?.kind === "render") ?? null;
-  const heroZone =
-    [...zones].filter((z) => z.day?.kind === "render").sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ??
-    [...zones].filter((z) => z.day).sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ??
-    null;
+  const passedZone = [...zones].filter((z) => z.day?.kind === "render").sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ?? null;
+  const anyZone = [...zones].filter((z) => z.day).sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ?? null;
+  // G5: a passed photo restyle beats a 3D design view on the cover. Both are
+  // honest, but the client's own garden redesigned is what a cover is for.
+  const pair = (input.photoPairs ?? [])[0] ?? null;
   const hero = heroView
     ? { ref: "", room: { name_en: heroView.label } as Room, day: heroView.day }
-    : heroZone;
+    : passedZone ?? (pair ? { ref: "", room: { name_en: pair.zoneName } as Room, day: pair.after } : anyZone);
   const images: ImageSlot[] = [];
   const hx = 176;
   const hw = PAGE_W - M - hx;
@@ -315,6 +338,20 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
   let y = 80 + titleLines.length * 15;
   body += text(M, y, input.community, { size: 4, fill: INK_700 });
   y += 18;
+  if (input.draft) {
+    // G5: the draft statement, verbatim, on the cover.
+    const [head, ...rest] = input.draft.split(" — ");
+    const r = paragraph(M + 4, y + 8.5, rest.join(" — "), 58, 4, { size: 3, fill: TERRACOTTA });
+    const noteY = y + 8.5 + r.height + 2;
+    const note = input.draftNote ? paragraph(M + 4, noteY, `Source: ${input.draftNote}`, 62, 3.6, { size: 2.6, fill: INK_700 }) : null;
+    const bottom = (note ? noteY + note.height : y + 8.5 + r.height) + 2;
+    const h = bottom - (y - 6);
+    body += `<rect x="${M}" y="${f1(y - 6)}" width="${hx - M - 8}" height="${f1(h)}" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.6" data-draft-cover="true" data-draft-statement="${esc(input.draft)}"/>`;
+    body += text(M + 4, y + 2, head ?? input.draft, { size: 5.2, fill: TERRACOTTA, weight: 700, spacing: "0.04em" });
+    body += r.svg;
+    if (note) body += note.svg;
+    y = bottom + 8;
+  }
 
   if (input.style) {
     body += text(M, y, "DIRECTION", { size: 2.8, fill: INK_500, spacing: "0.08em" });
@@ -343,7 +380,10 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
     body += frame(hx, hy, hw, hh);
     images.push({ renderId: assertPackable(hero.day).id, x: hx + 3, y: hy + 3, w: hw - 6, h: hh - 6 });
     body += text(hx, hy + hh + 7, `${hero.ref ? `${hero.ref} · ` : ""}${hero.room.name_en}`, { size: 3, fill: INK_500 });
-    body += caption(hx, hy + hh + 12, "Day", hero.day!);
+    body +=
+      hero.day!.kind === "photo_edit"
+        ? text(hx, hy + hh + 12, "AFTER — PHOTO RESTYLE · FAITHFULNESS CHECK PASSED", { size: 2.6, fill: INK_500, spacing: "0.06em" })
+        : caption(hx, hy + hh + 12, "Day", hero.day!);
   } else {
     body += placeholder(hx, hy, hw, hh, "No renders yet", "Generate the zone views from the render step, then rebuild the pack.");
   }
@@ -482,7 +522,7 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
     body += text(cols[1]!, y, z.room.name_en, { size: 3, fill: INK_900 });
     body += text(cols[2]!, y, z.typeLabel, { size: 3, fill: INK_700 });
     body += text(cols[3]!, y, z.surface, { size: 3, fill: INK_700 });
-    body += text(cols[4]! + 18, y, `${z.room.area_m2.toFixed(2)}${z.room.area_derived_m2 ? "*" : ""}`, {
+    body += text(cols[4]! + 18, y, `${z.room.dims_derived ? "≈ " : ""}${z.room.area_m2.toFixed(2)}${z.room.area_derived_m2 ? "*" : ""}`, {
       size: 3,
       fill: INK_900,
       font: FONT_MONO,
@@ -579,15 +619,37 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
 export function buildRenderPack(input: RenderPackInput): { pages: PackPage[]; zones: PackZone[] } {
   const zones = buildPackZones(input);
   const views = input.gardenViews ?? [];
-  const total = 3 + views.length + zones.length;
+  const pairs = input.photoPairs ?? [];
+  const total = 3 + views.length + pairs.length + zones.length;
   const pages: PackPage[] = [
     coverPage(input, zones, total),
     planOverviewPage(input, total),
     ...views.map((v, i) => gardenViewPage(input, v, 3 + i, total)),
-    ...zones.map((z, i) => zonePage(input, z, 3 + views.length + i, total)),
+    ...pairs.map((p, i) => photoPairPage(input, p, 3 + views.length + i, total)),
+    ...zones.map((z, i) => zonePage(input, z, 3 + views.length + pairs.length + i, total)),
     materialsPage(input, zones, total, total),
   ];
   return { pages, zones };
+}
+
+/** G5: before (client photo) and after (gated photo restyle), side by side. */
+function photoPairPage(input: RenderPackInput, pair: PackPhotoPair, n: number, total: number): PackPage {
+  const after = assertPackable(pair.after);
+  let body = chrome(input, `Before & after — ${pair.zoneName}`, n, total);
+  body += text(M, 31, `${pair.zoneName} — before & after`, { size: 10, fill: INK_900, font: FONT_DISPLAY });
+  const gap = 8;
+  const w = (PAGE_W - 2 * M - gap) / 2;
+  const h = Math.min(PAGE_H - 90, Math.round((w - 6) / 0.75 + 6));
+  const y = 42;
+  const images: ImageSlot[] = [];
+  body += frame(M, y, w, h);
+  images.push({ renderId: pair.beforeId, x: M + 3, y: y + 3, w: w - 6, h: h - 6 });
+  body += frame(M + w + gap, y, w, h);
+  images.push({ renderId: after.id, x: M + w + gap + 3, y: y + 3, w: w - 6, h: h - 6 });
+  body += text(M, y + h + 7, "BEFORE — CLIENT SITE PHOTO", { size: 2.8, fill: INK_500, spacing: "0.06em" });
+  body += text(M + w + gap, y + h + 7, "AFTER — PHOTO RESTYLE · FAITHFULNESS CHECK PASSED", { size: 2.8, fill: BRASS, spacing: "0.06em" });
+  body += paragraph(M, y + h + 13, pair.caption, 150, 4, { size: 2.8, fill: INK_700 }).svg;
+  return { kind: "photo_pair", title: `Before & after — ${pair.zoneName}`, svg: page(body), images };
 }
 
 /** Contain-fit an image of (iw, ih) into a slot, centred. */

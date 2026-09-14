@@ -16,9 +16,15 @@
 // Also asserted end-to-end: every render row, camera manifest, drawing sheet and
 // BoQ line resolves to its own project; no cache key is shared.
 //
+// G5: the client garden now exists, so the check can run against it directly
+// instead of the stand-in: pass --client <project-id>. The snapshot also covers
+// what a client project adds — its photo assets and room photos, the plan-uploads
+// storage prefix they live under, pilot events and review corrections.
+//
 // Run (dev server on the port with GARDEN_PILOT_ENABLED=true DRAWINGS_ENABLED=true):
 //   node --import ./scripts/_alias-hook.mjs scripts/garden-isolation-check.ts [port]
-// Writes screenshots/garden-pilot/g4b-isolation.json and prints the gate tables.
+//        [--client <project-id>] [--no-render-reference] [--no-render-client] [--out <name>]
+// Writes screenshots/garden-pilot/<name>.json (default g4b-isolation) and prints the gate tables.
 // =============================================================================
 
 import { createHash } from "node:crypto";
@@ -29,7 +35,16 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { seedVilla94Garden } from "./lib/garden-seed.ts";
 
 const ROOT = "C:/dev/rennovaite";
-const PORT = process.argv[2] ?? "3098";
+const ARGS = process.argv.slice(2);
+const argValue = (flag: string) => {
+  const i = ARGS.indexOf(flag);
+  return i >= 0 ? ARGS[i + 1] ?? null : null;
+};
+const PORT = ARGS.find((a) => /^\d+$/.test(a)) ?? "3098";
+const CLIENT_ID = argValue("--client");
+const RENDER_REFERENCE = !ARGS.includes("--no-render-reference");
+const RENDER_CLIENT = !ARGS.includes("--no-render-client");
+const OUT_NAME = argValue("--out") ?? "g4b-isolation";
 const BASE = `http://localhost:${PORT}`;
 const REFERENCE = "Villa 94 garden (ground truth)";
 const STAND_IN = "Client garden stand-in (isolation fixture)";
@@ -61,11 +76,11 @@ interface Snapshot {
   storage: { objects: number; fingerprint: string };
 }
 
-async function listStorage(db: SupabaseClient, prefix: string): Promise<{ name: string; size: number; updated: string }[]> {
+async function listStorage(db: SupabaseClient, prefix: string, bucket = "renders"): Promise<{ name: string; size: number; updated: string }[]> {
   const out: { name: string; size: number; updated: string }[] = [];
   const walk = async (dir: string) => {
     for (let offset = 0; ; offset += 1000) {
-      const { data } = await db.storage.from("renders").list(dir, { limit: 1000, offset, sortBy: { column: "name", order: "asc" } });
+      const { data } = await db.storage.from(bucket).list(dir, { limit: 1000, offset, sortBy: { column: "name", order: "asc" } });
       if (!data || data.length === 0) break;
       for (const o of data) {
         if (o.id === null) await walk(`${dir}/${o.name}`);
@@ -102,14 +117,27 @@ async function snapshot(db: SupabaseClient, projectId: string): Promise<Snapshot
     rooms: await byPlan("rooms"),
     plan_elements: await byPlan("plan_elements"),
     plan_context: await byPlan("plan_context"),
+    // G5: what a client project adds.
+    project_assets: await byProject("project_assets"),
+    pilot_events: await byProject("pilot_events"),
+    boq_corrections: await byProject("boq_corrections"),
   };
+  const roomIds = tables.rooms.map((r) => r.id as string);
+  if (roomIds.length > 0) {
+    const { data } = await db.from("room_photos").select("*").in("room_id", roomIds);
+    tables.room_photos = (data ?? []) as Record<string, unknown>[];
+  } else tables.room_photos = [];
   const counts: Record<string, number> = {};
   const fingerprints: Record<string, string> = {};
   for (const [t, rows] of Object.entries(tables)) {
     counts[t] = rows.length;
     fingerprints[t] = sha([...rows].sort((a, b) => String(a.id).localeCompare(String(b.id))));
   }
-  const objects = await listStorage(db, `projects/${projectId}`);
+  const objects = [
+    ...(await listStorage(db, `projects/${projectId}`)),
+    // Client photos and assets live in plan-uploads under the project id.
+    ...(await listStorage(db, projectId, "plan-uploads")).map((o) => ({ ...o, name: `plan-uploads/${o.name}` })),
+  ];
   return { counts, fingerprints, storage: { objects: objects.length, fingerprint: sha(objects) } };
 }
 
@@ -132,7 +160,16 @@ interface GateRow {
   attempts: { attempt: number; passed: boolean; failures: string[] }[];
 }
 
-async function regeneratePack(projectId: string, tag: string): Promise<{ gate: GateRow[]; packBytes: number; pages: number }> {
+async function regeneratePack(projectId: string, tag: string, render = true): Promise<{ gate: GateRow[]; packBytes: number; pages: number }> {
+  // The documents are regenerated whether or not the views are re-rendered: the
+  // BoQ (and its take-off rows) and the drawing set are part of the pack.
+  const gen = (await (await fetch(`${BASE}/api/generate-boq`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId }) })).json()) as { error?: string };
+  console.log(`  [${tag}] BoQ regenerated${gen.error ? ` — ERROR ${gen.error}` : ""}`);
+  await fetch(`${BASE}/api/projects/${projectId}/drawings`);
+  if (!render) {
+    const summary = (await (await fetch(`${BASE}/api/projects/${projectId}/render-pack?format=json`)).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
+    return { gate: summary.gate ?? [], packBytes: summary.bytes ?? 0, pages: summary.pages?.length ?? 0 };
+  }
   const cams = (await (await fetch(`${BASE}/api/render/scene?project_id=${projectId}`)).json()) as { cameras: { id: string; label: string; lit: boolean }[]; error?: string };
   if (!cams.cameras) throw new Error(`cameras: ${cams.error}`);
   const run = async (jobs: { id: string; view: "day" | "evening" }[]) => {
@@ -168,11 +205,20 @@ function printGate(title: string, gate: GateRow[]) {
 }
 
 async function endToEnd(db: SupabaseClient, projectId: string, otherId: string, tag: string) {
-  const { data: rows } = await db.from("renders").select("id, project_id, image_url, source_image_url, cache_key, gate").eq("project_id", projectId).eq("mode", "scene");
-  const scene = (rows ?? []) as { id: string; project_id: string; image_url: string; source_image_url: string; cache_key: string; gate: { manifest?: { projectId?: string }; scene_url?: string } | null }[];
-  check(`[${tag}] every scene render row carries this project`, scene.length > 0 && scene.every((r) => r.project_id === projectId), `${scene.length} rows`);
-  check(`[${tag}] every camera manifest carries this project`, scene.every((r) => r.gate?.manifest?.projectId === projectId));
-  check(`[${tag}] every image and scene model lives under this project's storage prefix`, scene.every((r) => [r.image_url, r.source_image_url, r.gate?.scene_url].every((u) => String(u).includes(`/projects/${projectId}/`) && !String(u).includes(otherId))));
+  const { data: rows } = await db.from("renders").select("id, project_id, image_url, source_image_url, cache_key, gate, mode").eq("project_id", projectId).in("mode", ["scene", "photo_pair"]);
+  const all = (rows ?? []) as { id: string; project_id: string; image_url: string; source_image_url: string; cache_key: string; mode: string; gate: { manifest?: { projectId?: string }; scene_url?: string } | null }[];
+  const scene = all.filter((r) => r.mode === "scene");
+  const pairs = all.filter((r) => r.mode === "photo_pair");
+  if (scene.length === 0) {
+    check(`[${tag}] scene render rows`, true, "none rendered on this run — row, manifest and storage assertions not applicable");
+  } else {
+    check(`[${tag}] every scene render row carries this project`, scene.every((r) => r.project_id === projectId), `${scene.length} rows`);
+    check(`[${tag}] every camera manifest carries this project`, scene.every((r) => r.gate?.manifest?.projectId === projectId));
+    check(`[${tag}] every image and scene model lives under this project's storage prefix`, scene.every((r) => [r.image_url, r.source_image_url, r.gate?.scene_url].every((u) => String(u).includes(`/projects/${projectId}/`) && !String(u).includes(otherId))));
+  }
+  if (pairs.length > 0) {
+    check(`[${tag}] every photo pair carries this project — manifest, restyle and source photo`, pairs.every((r) => r.gate?.manifest?.projectId === projectId && String(r.source_image_url).includes(`/${projectId}/`) && !String(r.image_url).includes(otherId)), `${pairs.length} pairs`);
+  }
 
   const drawings = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`)).json()) as { sheets?: { svg: string }[] };
   check(`[${tag}] every drawing sheet carries this project`, (drawings.sheets ?? []).length > 0 && (drawings.sheets ?? []).every((s) => s.svg.includes(`data-project-id="${projectId}"`) && !s.svg.includes(otherId)), `${drawings.sheets?.length} sheets`);
@@ -190,8 +236,10 @@ async function endToEnd(db: SupabaseClient, projectId: string, otherId: string, 
   check(`[${tag}] every BoQ line's element_refs resolve inside this project`, !!boq && boq.project_id === projectId && refs.length > 0 && refs.every((r) => own.has(r)), `${refs.length} refs`);
   const { count: ti } = await db.from("takeoff_items").select("id", { count: "exact", head: true }).eq("project_id", projectId);
   check(`[${tag}] take-off rows carry this project`, (ti ?? 0) > 0, `${ti} rows`);
-  return new Set(scene.map((r) => r.cache_key));
+  return new Set(all.map((r) => r.cache_key));
 }
+
+const RUN_STARTED = new Date().toISOString();
 
 async function main() {
   const env = await loadEnv();
@@ -200,7 +248,10 @@ async function main() {
 
   const { data: ref } = await db.from("projects").select("id").eq("name", REFERENCE).maybeSingle<{ id: string }>();
   if (!ref) throw new Error("Villa 94 ground-truth project not found.");
-  let { data: standIn } = await db.from("projects").select("id").eq("name", STAND_IN).maybeSingle<{ id: string }>();
+  let { data: standIn } = CLIENT_ID
+    ? await db.from("projects").select("id").eq("id", CLIENT_ID).maybeSingle<{ id: string }>()
+    : await db.from("projects").select("id").eq("name", STAND_IN).maybeSingle<{ id: string }>();
+  if (CLIENT_ID && !standIn) throw new Error(`client project ${CLIENT_ID} not found`);
   if (!standIn) {
     const { data, error } = await db.from("projects").insert({ name: STAND_IN, city: "Dubai" }).select("id").single<{ id: string }>();
     if (error || !data) throw error ?? new Error("could not create the stand-in");
@@ -212,36 +263,47 @@ async function main() {
   }
   const A = ref.id;
   const B = standIn.id;
-  console.log(`reference ${A}\nstand-in  ${B}\n`);
+  const otherTag = CLIENT_ID ? "client" : "stand-in";
+  console.log(`reference ${A}\n${otherTag.padEnd(9)} ${B}\n`);
 
   // Direction 1: regenerate Villa 94's pack; the stand-in must not change.
   const b0 = await snapshot(db, B);
-  const packA = await regeneratePack(A, "villa94");
+  const packA = await regeneratePack(A, "villa94", RENDER_REFERENCE);
   const b1 = await snapshot(db, B);
   const d1 = sameSnapshot(b0, b1);
-  check("regenerating Villa 94's pack touches zero rows, assets or cached images of the stand-in", d1.length === 0, d1.join("; ") || `${Object.values(b1.counts).reduce((s, n) => s + n, 0)} rows, ${b1.storage.objects} storage objects unchanged`);
+  check(`regenerating Villa 94's pack touches zero rows, assets or cached images of the ${otherTag}`, d1.length === 0, d1.join("; ") || `${Object.values(b1.counts).reduce((s, n) => s + n, 0)} rows, ${b1.storage.objects} storage objects unchanged`);
 
   // Direction 2: regenerate the stand-in's pack; Villa 94 must not change.
   const a0 = await snapshot(db, A);
-  const packB = await regeneratePack(B, "stand-in");
+  const packB = await regeneratePack(B, otherTag, RENDER_CLIENT);
   const a1 = await snapshot(db, A);
   const d2 = sameSnapshot(a0, a1);
-  check("regenerating the stand-in's pack touches zero rows, assets or cached images of Villa 94", d2.length === 0, d2.join("; ") || `${Object.values(a1.counts).reduce((s, n) => s + n, 0)} rows, ${a1.storage.objects} storage objects unchanged`);
+  check(`regenerating the ${otherTag}'s pack touches zero rows, assets or cached images of Villa 94`, d2.length === 0, d2.join("; ") || `${Object.values(a1.counts).reduce((s, n) => s + n, 0)} rows, ${a1.storage.objects} storage objects unchanged`);
 
   const keysA = await endToEnd(db, A, B, "villa94");
-  const keysB = await endToEnd(db, B, A, "stand-in");
+  const keysB = await endToEnd(db, B, A, otherTag);
   const shared = [...keysA].filter((k) => keysB.has(k));
   check("no render cache key is shared between the projects (same zones, same scene)", shared.length === 0, `${keysA.size} vs ${keysB.size} keys, ${shared.length} shared`);
+
+  // Events this run caused on either project are verification, not pilot data.
+  // Tagged only now, after every snapshot, so the tagging cannot read as a change.
+  for (const id of [A, B]) {
+    const { data: evs } = await db.from("pilot_events").select("id, detail, recorded_at").eq("project_id", id).gte("recorded_at", RUN_STARTED);
+    for (const e of evs ?? []) {
+      const d = (e.detail ?? {}) as Record<string, unknown>;
+      if (!d.stage) await db.from("pilot_events").update({ detail: { ...d, stage: "verification" } }).eq("id", e.id);
+    }
+  }
 
   const projectsAfter = (await db.from("projects").select("id", { count: "exact", head: true })).count ?? 0;
   console.log(`\n[blast radius] projects ${projectsBefore} → ${projectsAfter} (the stand-in is the only project this script may create)`);
 
   printGate("GATE — Villa 94 render pack", packA.gate);
-  printGate("GATE — stand-in render pack", packB.gate);
+  printGate(`GATE — ${otherTag} render pack`, packB.gate);
 
   mkdirSync(OUT, { recursive: true });
   writeFileSync(
-    `${OUT}/g4b-isolation.json`,
+    `${OUT}/${OUT_NAME}.json`,
     JSON.stringify({ reference: A, standIn: B, checks: results, snapshots: { standIn: { before: b0, after: b1 }, villa94: { before: a0, after: a1 } }, gate: { villa94: packA.gate, standIn: packB.gate }, packs: { villa94: { pages: packA.pages, bytes: packA.packBytes }, standIn: { pages: packB.pages, bytes: packB.packBytes } } }, null, 2),
   );
   const failed = results.filter((r) => r.startsWith("FAIL")).length;

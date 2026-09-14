@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -23,12 +24,22 @@ const BodySchema = z.object({
   plot_width_m: z.number().positive().min(2).max(500),
   plot_depth_m: z.number().positive().min(2).max(500),
   city: z.string().trim().min(1).max(120).optional(),
+  /**
+   * G5: the plot size was DERIVED (e.g. calibrated off a developer type plan)
+   * rather than measured, and from what. A derived plot keeps every document a
+   * draft until it is amended to measured.
+   */
+  dims_derived: z.boolean().optional(),
+  dims_note: z.string().trim().max(1000).nullable().optional(),
 });
 
 const ConvertSchema = z.object({
   plan_id: z.string().uuid(),
   plot_width_m: z.number().positive().min(2).max(500),
   plot_depth_m: z.number().positive().min(2).max(500),
+  /** G5: amend derived → measured (or back) together with the plot size. */
+  dims_derived: z.boolean().optional(),
+  dims_note: z.string().trim().max(1000).nullable().optional(),
 });
 
 /**
@@ -61,6 +72,8 @@ export async function PATCH(request: Request) {
         source: "user_drawn",
         plot_width_m: b.plot_width_m,
         plot_depth_m: b.plot_depth_m,
+        ...(b.dims_derived !== undefined ? { dims_derived: b.dims_derived } : {}),
+        ...(b.dims_note !== undefined ? { dims_note: b.dims_note } : {}),
       })
       .eq("id", b.plan_id);
     if (error) throw error;
@@ -114,12 +127,16 @@ export async function POST(request: Request) {
         plot_width_m: b.plot_width_m,
         plot_depth_m: b.plot_depth_m,
         total_area_m2: 0,
+        ...(b.dims_derived !== undefined ? { dims_derived: b.dims_derived } : {}),
+        ...(b.dims_note !== undefined ? { dims_note: b.dims_note } : {}),
       })
       .select("id")
       .single<{ id: string }>();
     if (planErr || !plan) {
       throw planErr ?? new Error("Failed to create plan row.");
     }
+
+    await recordPilotEvent(sb, project.id, "plan_started", { plot_width_m: b.plot_width_m, plot_depth_m: b.plot_depth_m, dims_derived: b.dims_derived === true });
 
     return NextResponse.json({
       project_id: project.id,

@@ -20,17 +20,26 @@
 // drew rather than a by-product of where two lawns happen to meet.
 // =============================================================================
 
+import { dispositionOf, type Disposition } from "./site-reference";
+
 export type LinearElementKind =
   | "boundary_wall"
   | "bench_run"
   | "planter_run"
-  | "counter_run";
+  | "counter_run"
+  // G5: site-reference runs. A stepping-stone path is slabs set in a lawn (not a
+  // surface of its own, so not a zone that would overlap the lawn), and a string
+  // light run is a catenary of lamps, not a counted point.
+  | "stepping_path"
+  | "string_light_run";
 
 export const LINEAR_ELEMENT_KINDS: readonly LinearElementKind[] = [
   "boundary_wall",
   "bench_run",
   "planter_run",
   "counter_run",
+  "stepping_path",
+  "string_light_run",
 ];
 
 export interface LinearElementMeta {
@@ -80,6 +89,22 @@ export const LINEAR_ELEMENT_META: Record<LinearElementKind, LinearElementMeta> =
     defaultWidthMm: 600,
     boqDescription: "Outdoor counter — substructure, worktop and finish",
   },
+  stepping_path: {
+    label: "Stepping-stone path",
+    code: "SP",
+    color: "#7A7F87",
+    defaultHeightMm: 40,
+    defaultWidthMm: 600,
+    boqDescription: "Stepping-stone path — slabs set in lawn",
+  },
+  string_light_run: {
+    label: "String lights",
+    code: "SL",
+    color: "#C08A2E",
+    defaultHeightMm: 2400,
+    defaultWidthMm: 20,
+    boqDescription: "Festoon string lights",
+  },
 };
 
 export type ElementSource = "parsed" | "user_drawn";
@@ -96,6 +121,11 @@ export interface RawLinearElement {
   derived?: boolean | null;
   /** G4b: build-up and provenance (migration 036). */
   spec?: Record<string, unknown> | null;
+  /** G5 (migration 037). */
+  dims_derived?: boolean | null;
+  derived_note?: string | null;
+  site_reference?: boolean | null;
+  disposition?: string | null;
 }
 
 /** A linear element in the PlanGraph — metric, with its length resolved. */
@@ -114,6 +144,12 @@ export interface LinearElement {
   derived: boolean;
   /** G4b: build-up (top slab, plinth, kerb) and where each number came from. */
   spec: Record<string, unknown> | null;
+  /** G5: position/length derived from a reference layout, and why. */
+  dims_derived: boolean;
+  derived_note: string | null;
+  /** G5: an existing feature from site photos, and the designer’s call on it. */
+  site_reference: boolean;
+  disposition: Disposition | null;
 }
 
 export function isLinearElementKind(v: unknown): v is LinearElementKind {
@@ -176,6 +212,10 @@ export function buildLinearElements(
       // A defaulted cross-section must never silently read as a measured one.
       derived: r.derived ?? dimsDefaulted,
       spec: r.spec && typeof r.spec === "object" ? r.spec : null,
+      dims_derived: r.dims_derived === true,
+      derived_note: r.derived_note?.trim() || null,
+      site_reference: r.site_reference === true,
+      disposition: dispositionOf(r),
     });
   }
   return out;
@@ -190,6 +230,8 @@ export function lengthByKind(
     bench_run: 0,
     planter_run: 0,
     counter_run: 0,
+    stepping_path: 0,
+    string_light_run: 0,
   } as Record<LinearElementKind, number>;
   for (const e of elements) out[e.kind] += e.length_m;
   for (const k of LINEAR_ELEMENT_KINDS) out[k] = Math.round(out[k] * 100) / 100;

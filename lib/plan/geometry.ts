@@ -29,6 +29,7 @@ import {
   type RawLinearElement,
 } from "./elements";
 import { pointToSegment } from "./polygon";
+import { dispositionOf, draftStatus, type Disposition, type DraftStatus } from "./site-reference";
 import { defaultUnroofed } from "./zones";
 
 export type Point = [number, number]; // metres. Origin = plan bbox top-left; +x right, +y DOWN (drawing convention).
@@ -72,6 +73,15 @@ export interface Room {
   height_mm: number | null;
   /** G4b: build-up (member sizes, post positions) and where each number came from. */
   spec: Record<string, unknown> | null;
+  /**
+   * G5: the zone's outline is DERIVED (calibrated from a reference layout), not
+   * measured. derived_note says from what. Boundary-critical: a plan with any
+   * such zone is a draft (lib/plan/site-reference.ts).
+   */
+  dims_derived: boolean;
+  /** G5: an existing feature placed from site photos, and the designer's call on it. */
+  site_reference: boolean;
+  disposition: Disposition | null;
   /** Names of fields on this room whose value is derived, not sourced. */
   derived_fields: string[];
 }
@@ -170,7 +180,14 @@ export interface PlanGraphMeta {
    * as the rooms: its top-left corner is `origin_m` (normally slightly negative,
    * because metres are measured from the rooms' bounding box, not the plot).
    */
-  plot?: { width_m: number; depth_m: number; origin_m: Point } | null;
+  plot?: {
+    width_m: number;
+    depth_m: number;
+    origin_m: Point;
+    /** G5: the plot size is derived from a reference layout, not measured. */
+    dims_derived?: boolean;
+    dims_note?: string | null;
+  } | null;
 }
 
 export interface DerivedRecord {
@@ -205,6 +222,10 @@ export interface ContextVolume {
   /** true = assumed or scaled from the drawing, not dimensioned. */
   derived: boolean;
   note: string | null;
+  /** G5: the FOOTPRINT is derived from a reference layout (boundary-critical). */
+  dims_derived: boolean;
+  site_reference: boolean;
+  disposition: Disposition | null;
 }
 
 export interface RawContext {
@@ -216,6 +237,9 @@ export interface RawContext {
   height_mm?: number | null;
   derived?: boolean | null;
   note?: string | null;
+  dims_derived?: boolean | null;
+  site_reference?: boolean | null;
+  disposition?: string | null;
 }
 
 export interface PlanGraph {
@@ -251,6 +275,10 @@ export interface RawRoom {
   level_mm?: number | null;
   height_mm?: number | null;
   spec?: Record<string, unknown> | null;
+  /** G5 (migration 037). */
+  dims_derived?: boolean | null;
+  site_reference?: boolean | null;
+  disposition?: string | null;
 }
 
 export interface BuildPlanGraphInput {
@@ -275,6 +303,9 @@ export interface BuildPlanGraphInput {
   unit_to_m?: number | null;
   /** G4: the measured plot of an authored plan, so drawings can show the site. */
   plot?: { width_m: number; depth_m: number } | null;
+  /** G5: the plot size is derived from a reference layout, and why. */
+  plot_dims_derived?: boolean | null;
+  dims_note?: string | null;
   /** G1: how this plan's geometry came to exist. Defaults to "parsed". */
   source?: PlanSource | null;
 }
@@ -617,7 +648,11 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       level_mm: raw.level_mm == null ? null : Number(raw.level_mm),
       height_mm: raw.height_mm == null ? null : Number(raw.height_mm),
       spec: raw.spec && typeof raw.spec === "object" ? raw.spec : null,
+      dims_derived: raw.dims_derived === true,
+      site_reference: raw.site_reference === true,
+      disposition: dispositionOf(raw),
       derived_fields: [
+        ...(raw.dims_derived === true ? ["dims"] : []),
         // A measured scale makes the metric polygon a measurement too.
         ...(measuredScale ? [] : ["polygon"]),
         ...(unroofed ? [] : ["ceiling_h_m"]),
@@ -708,6 +743,9 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
         height_mm: c.height_mm == null ? null : Number(c.height_mm),
         derived: c.derived === true || c.height_mm == null,
         note: c.note?.trim() || null,
+        dims_derived: c.dims_derived === true,
+        site_reference: c.site_reference === true,
+        disposition: dispositionOf(c),
       };
     })
     .filter((c): c is ContextVolume => c !== null);
@@ -793,6 +831,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
               width_m: input.plot.width_m,
               depth_m: input.plot.depth_m,
               origin_m: [-minX * unitToM, -minY * unitToM] as Point,
+              ...(input.plot_dims_derived ? { dims_derived: true, dims_note: input.dims_note?.trim() || null } : {}),
             }
           : null,
     },
@@ -828,4 +867,20 @@ export function derivedFieldSummary(graph: PlanGraph): string[] {
   if (d.north) out.push(`meta.north_deg — default ${DEFAULT_NORTH_DEG}°`);
   if (d.level) out.push(`meta.level — default "${DEFAULT_LEVEL}"`);
   return out;
+}
+
+/**
+ * G5: is this plan a DRAFT — does any boundary-critical dimension (the plot, a
+ * zone outline, a run, a context footprint) remain derived? Removed site-reference
+ * items do not count: they are not in the design.
+ */
+export function graphDraftStatus(graph: PlanGraph): DraftStatus {
+  const inDesign = <T extends { site_reference?: boolean; disposition?: Disposition | null }>(x: T) => !(x.site_reference && x.disposition === "remove");
+  return draftStatus({
+    plot_dims_derived: graph.meta.plot?.dims_derived === true,
+    dims_note: graph.meta.plot?.dims_note ?? null,
+    zones: graph.rooms.filter(inDesign).map((r) => ({ id: r.id, name: r.name_en, dims_derived: r.dims_derived })),
+    runs: graph.elements.filter(inDesign).map((e) => ({ id: e.id, name: e.spec && typeof e.spec.name === "string" ? e.spec.name : e.kind.replace(/_/g, " "), dims_derived: e.dims_derived })),
+    context: graph.context.filter(inDesign).map((c) => ({ id: c.id, name: c.name, dims_derived: c.dims_derived })),
+  });
 }

@@ -45,6 +45,8 @@ const DAY: Record<MaterialKey, [number, number, number]> = {
   steps: [225, 214, 196],
   grill: [46, 46, 46],
   trunk: [106, 79, 55],
+  glass: [62, 56, 50],
+  slab: [206, 204, 197],
 };
 
 type V = [number, number, number];

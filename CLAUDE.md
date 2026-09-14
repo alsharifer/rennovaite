@@ -829,6 +829,83 @@ information. Both are fixed at the root.
 
 **DB step**: `supabase db push` for `036`; the `renders` public bucket must exist.
 
+## Client garden on derived dimensions (garden pilot G5, draft stage)
+
+The first real client garden ("Arabella Garden — Draft for Review", corner plot)
+is drafted before anyone has measured it. The derived/measured distinction is the
+mechanism, not a workaround.
+
+- **Derived vs measured, per dimension** (migration `037`): `plans.dims_derived` +
+  `dims_note`, and `dims_derived` on `rooms`, `plan_elements` (+ `derived_note`),
+  `plan_fixtures` (+ `derived_note`) and `plan_context` (whose existing `derived`
+  still means "height assumed"). `graphDraftStatus` (`lib/plan/geometry.ts`, over
+  `lib/plan/site-reference.ts`) makes a plan a DRAFT while any boundary-critical
+  dimension — plot, zone outline, run, context footprint — is derived. Every
+  garden sheet then carries a terracotta stamp above the title block
+  (`SheetMeta.draft`, `data-draft-statement`), the set gains an **L-000 cover**,
+  the render-pack cover and header carry it, and the BoQ page header and every BoQ
+  PDF page carry `DRAFT_STATEMENT` verbatim. Interior sheets are unchanged.
+- **Site reference** (037): existing features photographed on site are placed as
+  what they are (a `structure` zone with `spec.form: "gazebo"`, `counter_run`,
+  `planter_run`, new run kinds `stepping_path` and `string_light_run`, landscape
+  fixture `tree`, context boundary walls) and tagged `site_reference` with a
+  `disposition` ∈ keep | remove | replace (null = undecided). One vocabulary
+  decides everything: keep → excluded from demolition AND new work; remove →
+  demolition only; replace → both; undecided → neither, and the pack refuses to
+  export. The take-off writes `garden.removal` take-off rows and the demolition
+  lump's `element_refs`; the 3D scene and drawings use `designGraph` (removed
+  items out; kept ones drawn as existing, dashed, never detailed in an elevation).
+- **Unpriced work is visible**: a deck, pool, stepping path, string lights or new
+  tree has no reference rate — it is a `needs_qs` line at rate 0 under
+  `UNPRICED_SOURCE_LABEL`, never silently dropped and never under the
+  market-reference label. Quantities off derived geometry carry `qty_derived` +
+  `DERIVED_QTY_NOTE`; the BoQ total prints `≈ AED 46,800*` with a footnote
+  (`lib/documents/boq-derived.ts`, shared by page, PDF and pack).
+- **Readiness gate** (`lib/documents/pack-readiness.ts`): `render-pack` and the new
+  `GET /api/projects/[id]/boq-pdf` return 409 `pack_not_ready` while a NEW-work
+  counter is untyped, an existing item is undecided, or the latest BoQ still has a
+  `needs_selection` line (`?format=json` stays available with the verdict).
+- **Editor (Step 2 support)**: the plan page's `GardenSitePanel` (draft banner,
+  keep/remove/replace for every existing item, levels/heights via
+  `PATCH /api/plan-zones`, pack readiness, friction log); context footprints drawn
+  under every layer (`POST/PATCH/DELETE /api/plan-context`); a **Landscape** layer
+  (planter box, wall feature, grill, tree — `/api/plan-fixtures` now accepts
+  them, and an authored garden is never rule-seeded with lights); every canvas
+  fits the PLOT, snaps to 5 cm; numeric X/Y/W/D, add/remove vertex; run and
+  fixture inspectors (cross-section, size, light fitting).
+- **Before/after photo pairs** (`lib/scene-render/photo-pair.ts` +
+  `photo-pair-run.ts`, `POST/GET /api/render/photo-pair`): a client photo
+  restyled with the design's decisions on the existing items in view, checked by
+  a pair gate (kept items stay, removed go, replaced stay in place, house and
+  viewpoint unchanged, nothing major invented; deterministic judge). Fails twice →
+  WITHHELD (no substitute). `renders.mode = "photo_pair"`, project-first cache key.
+- **Metrics** (037): `pilot_events` (plan_started, plan_saved, design_edit,
+  boq_generated with `full`, pack_exported, friction) written best-effort by the
+  routes for authored plans; `computePilotMetrics` (`GET /api/pilot-events`) —
+  time to draw (design session only; `stage: reference_layout|verification`
+  events excluded), active minutes, time to first FULL BoQ, gate pass rate,
+  friction list, corrections by type. `boq_corrections` (typed rate | quantity |
+  scope | design, `market_fair` provenance, never applied to the rate book) via
+  `ReviewCorrections` on the garden BoQ page.
+- **Scripts**: `scripts/arabella-draft-plan.ts` (Step 1 through the authored
+  routes; refuses to re-run; `--name` for a scratch rehearsal),
+  `scripts/garden-draft-pack.ts <project>` (Step 3/4: readiness, BoQ, renders,
+  photo pairs, three PDFs into `data/garden pilot/g5-draft-pack/` — gitignored,
+  they contain client photos — and assertions on what is printed: watermark,
+  derived total, needs_selection, elevations, overlays, zero contractor-identity
+  leakage; gate table; metrics; Step-5 baseline),
+  `scripts/garden-change-report.ts <project>` (Step 5 receipt: every quantity
+  that moved, BoQ delta, whether the watermark drops),
+  `scripts/garden-isolation-check.ts --client <id>` (now also snapshots photo
+  assets, room photos, plan-uploads storage, pilot events, corrections).
+- **Reference layout**: `lib/client-garden/arabella-reference.ts` — plot 26.7 ×
+  10.5, garage/drive 6.3 + house 14.8 + side garden 5.6 (deck 2.1 + lawn 3.5),
+  rear strip 4.3, the 0.1 m depth residual stated; existing features from the 14
+  client photos; `PHOTO_COVERAGE` maps photos to zones and visible items. No client
+  personal name anywhere.
+
+**DB step**: `supabase db push` for `037`.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { LINEAR_ELEMENT_META } from "@/lib/plan/elements";
+import { draftStatus, isDisposition, type DraftStatus } from "@/lib/plan/site-reference";
 import { isOutdoorType } from "@/lib/plan/zones";
 
 import {
@@ -22,6 +23,7 @@ import {
   findDoubleCounts,
   priceGardenTakeoff,
   type GardenPoint,
+  type GardenRemoval,
   type GardenRun,
   type GardenTakeoffElement,
   type GardenTakeoffInput,
@@ -51,6 +53,45 @@ interface BoqLike {
 /** The garden as the platform reads it off the plan. */
 export interface GardenCapture extends GardenTakeoffInput {
   planId: string | null;
+  /** G5: the plot size is derived from a reference layout. */
+  plotDimsDerived?: boolean;
+  dimsNote?: string | null;
+  contextDims?: { id: string; name: string; dims_derived: boolean }[];
+}
+
+/**
+ * G5: what a garden BoQ says about itself beyond its lines — whether it is a
+ * DRAFT on derived dimensions, how many lines carry derived quantities, and the
+ * site-reference decisions behind the demolition lump. Stored on the BoQ
+ * document so every surface that shows the BoQ (page, PDF, pack) reads the same
+ * verdict rather than re-deriving it.
+ */
+export interface GardenBoqMeta {
+  draft: DraftStatus;
+  derived_lines: number;
+  removals: GardenRemoval[];
+  kept: { element_id: string; name: string }[];
+  undecided: { element_id: string; name: string }[];
+  needs_selection: string[];
+}
+
+/** Supabase row flags → take-off site-reference fields. */
+const siteRef = (r: { site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null }) => ({
+  ...(r.site_reference ? { site_reference: true, disposition: isDisposition(r.disposition) ? r.disposition : null } : {}),
+  ...(r.dims_derived ? { dims_derived: true } : {}),
+});
+
+/** Select with the 037 columns first, falling back to the pre-037 shape. */
+async function selectWithFallback<T>(
+  run: (cols: string) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  cols: readonly string[],
+): Promise<{ data: T[] | null; error: unknown }> {
+  let last: { data: T[] | null; error: unknown } = { data: null, error: "no select" };
+  for (const c of cols) {
+    last = await run(c);
+    if (!last.error) return last;
+  }
+  return last;
 }
 
 /**
@@ -68,22 +109,31 @@ export async function captureGarden(
   // `plot_width_m` is metres per normalised unit — the measured scale an
   // authored plan carries (G1). Runs are stored in normalised space, so without
   // it there is no honest length and the runs are dropped rather than guessed.
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("id, plot_width_m")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<{ id: string; plot_width_m: number | null }>();
+  type PlanRow = { id: string; plot_width_m: number | null; dims_derived?: boolean | null; dims_note?: string | null };
+  let plan: PlanRow | null = null;
+  for (const cols of ["id, plot_width_m, dims_derived, dims_note", "id, plot_width_m"]) {
+    const { data, error } = await supabase
+      .from("plans")
+      .select(cols)
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<PlanRow>();
+    if (!error) {
+      plan = data;
+      break;
+    }
+  }
   if (!plan) return empty;
+  const planId = plan.id;
   const mPerUnit = Number(plan.plot_width_m ?? 0);
 
-  const { data: rooms, error: roomsErr } = await supabase
-    .from("rooms")
-    .select("id, name_en, room_type, area_m2")
-    .eq("plan_id", plan.id)
-    .returns<{ id: string; name_en: string | null; room_type: string | null; area_m2: number | null }[]>();
-  if (roomsErr) return { ...empty, planId: plan.id };
+  type RoomRow = { id: string; name_en: string | null; room_type: string | null; area_m2: number | null; site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null };
+  const { data: rooms, error: roomsErr } = await selectWithFallback<RoomRow>(
+    (cols) => supabase.from("rooms").select(cols).eq("plan_id", planId).returns<RoomRow[]>(),
+    ["id, name_en, room_type, area_m2, site_reference, disposition, dims_derived", "id, name_en, room_type, area_m2"],
+  );
+  if (roomsErr) return { ...empty, planId };
 
   const zones = (rooms ?? [])
     .filter((r) => isOutdoorType(r.room_type))
@@ -92,26 +142,31 @@ export async function captureGarden(
       name: r.name_en?.trim() || "Zone",
       kind: r.room_type as string,
       area_m2: Number(r.area_m2 ?? 0),
+      ...siteRef(r),
     }));
 
   // No drawn garden → nothing to price, and nothing else needs loading.
-  if (zones.length === 0) return { ...empty, planId: plan.id };
+  if (zones.length === 0) return { ...empty, planId };
 
   let runs: GardenRun[] = [];
   try {
-    const { data, error } = await supabase
-      .from("plan_elements")
-      .select("id, kind, polyline, variant")
-      .eq("plan_id", plan.id)
-      .returns<{ id: string; kind: string; polyline: unknown; variant: string | null }[]>();
+    type ElRow = { id: string; kind: string; polyline: unknown; variant: string | null; spec?: Record<string, unknown> | null; site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null };
+    const { data, error } = await selectWithFallback<ElRow>(
+      (cols) => supabase.from("plan_elements").select(cols).eq("plan_id", planId).returns<ElRow[]>(),
+      ["id, kind, polyline, variant, spec, site_reference, disposition, dims_derived", "id, kind, polyline, variant"],
+    );
     if (!error) {
       runs = (data ?? [])
-        .filter((e) => e.kind !== "boundary_wall")
+        // A boundary wall is priced by nobody — unless it is an existing one the
+        // design takes out, which the demolition lump has to name.
+        .filter((e) => e.kind !== "boundary_wall" || (e.site_reference && (e.disposition === "remove" || e.disposition === "replace")))
         .map((e): GardenRun => ({
           id: e.id,
           kind: e.kind as GardenRun["kind"],
           length_m: polylineLengthM(e.polyline, mPerUnit),
           variant: e.variant === "bbq" ? "bbq" : e.variant === "bar" ? "bar" : undefined,
+          ...(typeof e.spec?.name === "string" ? { name: e.spec.name } : {}),
+          ...siteRef(e),
         }))
         .filter((r) => r.length_m > 0 && r.kind in LINEAR_ELEMENT_META);
     }
@@ -122,21 +177,22 @@ export async function captureGarden(
   let units: GardenUnit[] = [];
   let points: GardenPoint[] = [];
   try {
-    const { data, error } = await supabase
-      .from("plan_fixtures")
-      .select("id, layer, type, room_id")
-      .eq("project_id", projectId)
-      .returns<{ id: string; layer: string; type: string; room_id: string | null }[]>();
+    type FxRow = { id: string; layer: string; type: string; room_id: string | null; spec?: Record<string, unknown> | null; site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null };
+    const { data, error } = await selectWithFallback<FxRow>(
+      (cols) => supabase.from("plan_fixtures").select(cols).eq("project_id", projectId).returns<FxRow[]>(),
+      ["id, layer, type, room_id, spec, site_reference, disposition, dims_derived", "id, layer, type, room_id"],
+    );
     if (!error) {
       for (const f of data ?? []) {
         if (f.layer === "landscape") {
-          units.push({ id: f.id, kind: f.type as GardenUnit["kind"] });
+          const name = typeof f.spec?.name === "string" ? f.spec.name : undefined;
+          units.push({ id: f.id, kind: f.type as GardenUnit["kind"], ...(name ? { name } : {}), ...siteRef(f) });
         } else {
-          points.push({ id: f.id, type: f.type, zone_id: f.room_id });
+          points.push({ id: f.id, type: f.type, zone_id: f.room_id, ...siteRef(f) });
         }
       }
       units = units.filter((u) =>
-        ["planter_box", "wall_feature", "bbq_grill"].includes(u.kind),
+        ["planter_box", "wall_feature", "bbq_grill", "tree"].includes(u.kind),
       );
       points = points.filter((p) => p.type === "garden_light" || p.type === "boundary_light");
     }
@@ -144,7 +200,50 @@ export async function captureGarden(
     /* plan_fixtures absent — no units or points */
   }
 
-  return { planId: plan.id, zones, runs, units, points };
+  // G5: site-reference context (e.g. an existing boundary wall) and derived context footprints.
+  let context: NonNullable<GardenTakeoffInput["context"]> = [];
+  let contextDims: { id: string; name: string; dims_derived: boolean }[] = [];
+  try {
+    type CtxRow = { id: string; kind: string; name: string | null; site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null };
+    const { data, error } = await supabase
+      .from("plan_context")
+      .select("id, kind, name, site_reference, disposition, dims_derived")
+      .eq("plan_id", planId)
+      .returns<CtxRow[]>();
+    if (!error) {
+      const rows = data ?? [];
+      context = rows
+        .filter((c) => c.site_reference)
+        .map((c) => ({ id: c.id, kind: c.kind, name: c.name ?? c.kind.replace(/_/g, " "), site_reference: true, disposition: isDisposition(c.disposition) ? c.disposition : null }));
+      contextDims = rows.map((c) => ({ id: c.id, name: c.name ?? c.kind, dims_derived: c.dims_derived === true }));
+    }
+  } catch {
+    /* plan_context absent or pre-037 */
+  }
+
+  return {
+    planId,
+    zones,
+    runs,
+    units,
+    points,
+    context,
+    plotDimsDerived: plan.dims_derived === true,
+    dimsNote: plan.dims_note ?? null,
+    contextDims,
+  };
+}
+
+/** G5: the draft verdict for a captured garden — derived plot, zones, runs or context. */
+export function gardenDraftStatus(capture: GardenCapture): DraftStatus {
+  const inDesign = (x: { site_reference?: boolean; disposition?: string | null }) => !(x.site_reference && x.disposition === "remove");
+  return draftStatus({
+    plot_dims_derived: capture.plotDimsDerived === true,
+    dims_note: capture.dimsNote ?? null,
+    zones: capture.zones.filter(inDesign).map((z) => ({ id: z.id, name: z.name, dims_derived: z.dims_derived })),
+    runs: (capture.runs ?? []).filter(inDesign).map((r) => ({ id: r.id, name: r.name ?? r.kind.replace(/_/g, " "), dims_derived: r.dims_derived })),
+    context: capture.contextDims ?? [],
+  });
 }
 
 /** A run's polyline is in normalised plan space; metres come from the plot
@@ -172,6 +271,9 @@ export interface GardenBoqResult {
   }[];
   items: ScopeItem[];
   elements: GardenTakeoffElement[];
+  removals: GardenRemoval[];
+  kept: { element_id: string; name: string }[];
+  undecided: { element_id: string; name: string }[];
   total_aed: number;
   violations: ReturnType<typeof findDoubleCounts>;
 }
@@ -188,6 +290,9 @@ export function buildGardenSections(capture: GardenTakeoffInput): GardenBoqResul
     arr.push(e.element_id);
     refsByKey.set(e.item_key, arr);
   }
+  // G5: the demolition lump traces to the existing items it takes out. A kept
+  // item is never among them.
+  if (takeoff.removals.length > 0) refsByKey.set("garden.demolition", takeoff.removals.map((r) => r.element_id));
 
   const bySection = new Map<PomiSection, Record<string, unknown>[]>();
   for (const l of priced) {
@@ -230,6 +335,9 @@ export function buildGardenSections(capture: GardenTakeoffInput): GardenBoqResul
     sections,
     items: takeoff.items,
     elements: takeoff.elements,
+    removals: takeoff.removals,
+    kept: takeoff.kept,
+    undecided: takeoff.undecided,
     total_aed: round2(sections.reduce((s, x) => s + x.section_total_aed, 0)),
     violations,
   };
@@ -276,7 +384,21 @@ export async function appendGardenSections<T extends BoqLike>(
 
     // Per-element take-off rows, so a zone can be asked what it costs. Same
     // table the interior P4 path writes; best-effort like everything else here.
-    await persistGardenTakeoff(projectId, built.elements, supabase);
+    // G5: removals persist beside them as garden.removal rows (a kept item has none).
+    await persistGardenTakeoff(projectId, [
+      ...built.elements,
+      ...built.removals.map((r) => ({ item_key: "garden.removal", element_id: r.element_id, qty: r.qty, unit: r.unit })),
+    ], supabase);
+
+    const meta: GardenBoqMeta = {
+      draft: gardenDraftStatus(capture),
+      derived_lines: built.sections.reduce((n, s) => n + s.lines.filter((l) => l.qty_derived === true).length, 0),
+      removals: built.removals,
+      kept: built.kept,
+      undecided: built.undecided,
+      needs_selection: built.sections.flatMap((s) => s.lines.filter((l) => l.rate_status === "needs_selection").map((l) => String(l.description))),
+    };
+    (boq as T & { garden?: GardenBoqMeta }).garden = meta;
 
     // Keep the canonical order after the merge.
     const rank = new Map(SECTION_ORDER.map((s, i) => [s as string, i] as const));

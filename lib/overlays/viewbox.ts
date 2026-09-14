@@ -56,7 +56,13 @@ function asPolygon(v: unknown): Pt[] | null {
   return pts.length >= 3 ? pts : null;
 }
 
-export function fitRooms(rooms: RawRoomInput[]): Fit {
+/**
+ * Fit rooms into the viewBox. With a PLOT (an authored plan), the canvas is the
+ * plot itself — exactly EditablePlanViewer's fitToPlot — so every layer lines up
+ * and a run or a light can be placed anywhere on the plot, not only inside the
+ * zones drawn so far (G5: before this the canvas fitted the zones' bounding box).
+ */
+export function fitRooms(rooms: RawRoomInput[], plot?: { width_m: number; depth_m: number } | null): Fit {
   const parsed = rooms
     .map((r) => ({ r, poly: asPolygon(r.polygon) }))
     .filter((x): x is { r: RawRoomInput; poly: Pt[] } => x.poly !== null);
@@ -78,6 +84,12 @@ export function fitRooms(rooms: RawRoomInput[]): Fit {
     minY = 0;
     maxX = 1;
     maxY = 1;
+  }
+  if (plot && plot.width_m > 0 && plot.depth_m > 0) {
+    minX = 0;
+    minY = 0;
+    maxX = 1;
+    maxY = plot.depth_m / plot.width_m;
   }
   const spanX = Math.max(maxX - minX, 1e-6);
   const spanY = Math.max(maxY - minY, 1e-6);

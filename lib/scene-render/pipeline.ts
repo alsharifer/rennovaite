@@ -116,6 +116,15 @@ export async function loadGardenSceneContext(projectId: string): Promise<GardenS
   return { projectId, graph, fixtures, variants, scene, cameras, style, sceneHash: sceneHash(scene) };
 }
 
+/** G5: shared with the photo-pair runner. */
+export async function runRenderModel(model: string, input: Record<string, unknown>): Promise<string> {
+  return runModel(model, input);
+}
+
+export async function fetchSceneBytes(url: string): Promise<Uint8Array> {
+  return fetchBytes(url);
+}
+
 async function runModel(model: string, input: Record<string, unknown>): Promise<string> {
   const apiKey = process.env.REPLICATE_API_TOKEN;
   if (!apiKey) throw new Error("REPLICATE_API_TOKEN is not configured.");

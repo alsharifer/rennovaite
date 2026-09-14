@@ -6,9 +6,11 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
+import { loadGardenSiteData, type GardenSiteData } from "@/lib/plan/garden-site-data";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+import { GardenSitePanel } from "./_components/garden-site-panel";
 import { PlanLayers } from "./_components/plan-layers";
 import { PlanNotAnalysed } from "./_components/plan-not-analysed";
 
@@ -192,6 +194,17 @@ export default async function PlanPage({
   const parsedComplete = planReady;
   const gardenPilot = process.env.GARDEN_PILOT_ENABLED === "true";
 
+  // G5: an authored garden's standing questions — draft status, what already
+  // stands on site and the call on each, levels, pack readiness.
+  let gardenSite: GardenSiteData | null = null;
+  if (authored && gardenPilot) {
+    try {
+      gardenSite = await loadGardenSiteData(sb, projectId, plan.id);
+    } catch (e) {
+      console.warn("[plan] garden site panel skipped:", e instanceof Error ? e.message : e);
+    }
+  }
+
   // Real parse-quality KPI: mean room confidence + this plan's correction count
   // (replaces the old hard-coded "99.2% confidence"). Both best-effort.
   const confVals = roomList
@@ -273,6 +286,8 @@ export default async function PlanPage({
                   overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
                   gardenPilot={gardenPilot}
                   plot={plot}
+                  context={gardenSite?.context ?? []}
+                  siteRefs={gardenSite?.siteRefs}
                   mode="edit"
                 />
                 <div className="mt-md flex items-center justify-end gap-md text-ink-500">
@@ -287,6 +302,16 @@ export default async function PlanPage({
                   <span className="font-mono text-[12px]">5 m</span>
                 </div>
               </div>
+              {gardenSite && (
+                <GardenSitePanel
+                  projectId={projectId}
+                  planId={plan.id}
+                  draft={gardenSite.draft}
+                  items={gardenSite.items}
+                  zones={gardenSite.zones}
+                  untypedCounters={gardenSite.untypedCounters}
+                />
+              )}
             </section>
 
             {/* Right: 3 stacked cards -------------------------------- */}
@@ -353,7 +378,9 @@ export default async function PlanPage({
                 </ul>
               </article>
 
-              {/* Verification */}
+              {/* Verification — placeholder copy about a parsed interior; an
+                  authored garden has nothing parsed to second-guess (G5). */}
+              {!authored && (
               <article className="rounded-xl border border-ink-100 bg-paper p-lg">
                 <p className="label-caps mb-md text-ink-500">
                   Worth a second look
@@ -376,6 +403,7 @@ export default async function PlanPage({
                   </button>
                 </div>
               </article>
+              )}
 
               {/* Drawings entry — gated by DRAWINGS_ENABLED so this page is
                   pixel-identical to today when the flag is off (P1). */}

@@ -29,14 +29,31 @@ import {
   getGardenRate,
 } from "@/lib/ground-truth/villa94-garden";
 
+import { DERIVED_QTY_NOTE, isDemolished, isNewWork, isUndecided, type Disposition } from "@/lib/plan/site-reference";
+
+export { DERIVED_QTY_NOTE };
+
 import type { PomiSection, ScopeItem } from "./schema";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // --- Input -------------------------------------------------------------------
 
+/**
+ * G5: every input may be an existing feature placed from site photos, with the
+ * designer's call on it (lib/plan/site-reference.ts), and may sit on DERIVED
+ * geometry. Absent fields mean a designed item on measured geometry — exactly
+ * what every garden before G5 was.
+ */
+export interface SiteRefFields {
+  site_reference?: boolean;
+  disposition?: Disposition | null;
+  /** The quantity this item contributes is derived from a reference layout. */
+  dims_derived?: boolean;
+}
+
 /** A drawn zone (a `rooms` row with an outdoor type — see lib/plan/zones.ts). */
-export interface GardenZone {
+export interface GardenZone extends SiteRefFields {
   id: string;
   name: string;
   /** Outdoor token: paving | artificial_grass | planting_bed | deck | path | structure | pool */
@@ -53,21 +70,24 @@ export interface GardenZone {
  * the conservative choice — a counter nobody has described as a BBQ should not
  * silently price as one.
  */
-export interface GardenRun {
+export interface GardenRun extends SiteRefFields {
   id: string;
-  kind: "boundary_wall" | "bench_run" | "planter_run" | "counter_run";
+  kind: "boundary_wall" | "bench_run" | "planter_run" | "counter_run" | "stepping_path" | "string_light_run";
+  /** For removal rows and notes. */
+  name?: string;
   length_m: number;
   variant?: "bbq" | "bar";
 }
 
 /** A discrete built item that is neither a zone nor a run. */
-export interface GardenUnit {
+export interface GardenUnit extends SiteRefFields {
   id: string;
-  kind: "planter_box" | "wall_feature" | "bbq_grill";
+  kind: "planter_box" | "wall_feature" | "bbq_grill" | "tree";
+  name?: string;
 }
 
 /** A placed point (a `plan_fixtures` row). `zone_id` is its room_id. */
-export interface GardenPoint {
+export interface GardenPoint extends SiteRefFields {
   id: string;
   type: string;
   zone_id: string | null;
@@ -78,6 +98,17 @@ export interface GardenTakeoffInput {
   runs?: GardenRun[];
   units?: GardenUnit[];
   points?: GardenPoint[];
+  /** G5: site-reference context (e.g. a boundary wall) — never new work, but removable. */
+  context?: (SiteRefFields & { id: string; name: string; kind: string })[];
+}
+
+/** G5: an existing item the design takes out (remove or replace). */
+export interface GardenRemoval {
+  element_id: string;
+  name: string;
+  qty: number;
+  unit: string;
+  disposition: "remove" | "replace";
 }
 
 /** One row per (zone or element) × work item — the per-element ground truth
@@ -94,6 +125,12 @@ export interface GardenTakeoff {
   items: ScopeItem[];
   /** Per-element breakdown; Σ qty per item_key equals that item's quantity. */
   elements: GardenTakeoffElement[];
+  /** G5: what the demolition lump takes out, per element. A kept item is never here. */
+  removals: GardenRemoval[];
+  /** G5: site-reference items kept — excluded from demolition and new work. */
+  kept: { element_id: string; name: string }[];
+  /** G5: site-reference items with no decision yet (the pack refuses to export). */
+  undecided: { element_id: string; name: string }[];
   summary: {
     pavedAreaM2: number;
     grassAreaM2: number;
@@ -130,7 +167,31 @@ const SECTION: Record<string, PomiSection> = {
   "garden.light_cabling": "Electrical & Lighting",
   "garden.light_fitting": "Electrical & Lighting",
   "garden.boundary_light": "Electrical & Lighting",
+  "garden.deck": "Hardscape & Structures",
+  "garden.pool": "Hardscape & Structures",
+  "garden.stepping_path": "Hardscape & Structures",
+  "garden.string_lights": "Electrical & Lighting",
+  "garden.tree": "Soft Landscaping",
 };
+
+/**
+ * G5: work the drawing supports but the landscape rate book has no rate for.
+ * Before G5 a deck or pool zone was simply not priced — a silent gap. It is now a
+ * visible line at rate 0, flagged needs_qs, so the gap reaches the QS instead of
+ * vanishing from the total.
+ */
+export const UNPRICED_GARDEN_ITEMS: Record<string, { label: string; unit: string }> = {
+  "garden.deck": { label: "Timber / composite deck (no reference rate — QS to price)", unit: "m2" },
+  "garden.pool": { label: "Pool or water feature (no reference rate — QS to price)", unit: "m2" },
+  "garden.stepping_path": { label: "Stepping-stone path, slabs set in lawn (no reference rate — QS to price)", unit: "lm" },
+  "garden.string_lights": { label: "Festoon string lights (no reference rate — QS to price)", unit: "lm" },
+  "garden.tree": { label: "Tree supply and planting (no reference rate — QS to price)", unit: "no" },
+};
+
+/** The source label on a line with no reference rate. Never the market-reference label. */
+export const UNPRICED_SOURCE_LABEL = "rate to be confirmed — not in the landscape rate book";
+
+
 
 /** Zone kinds that get a hard paved surface (PCC + install + tile supply). */
 const PAVED_KINDS = new Set(["paving", "path"]);
@@ -174,11 +235,11 @@ function rate(item_key: string): number {
 }
 
 function label(item_key: string): string {
-  return getGardenRate(item_key)?.label ?? item_key;
+  return getGardenRate(item_key)?.label ?? UNPRICED_GARDEN_ITEMS[item_key]?.label ?? item_key;
 }
 
 function unitOf(item_key: string): string {
-  return getGardenRate(item_key)?.unit ?? "no";
+  return getGardenRate(item_key)?.unit ?? UNPRICED_GARDEN_ITEMS[item_key]?.unit ?? "no";
 }
 
 function item(
@@ -209,10 +270,47 @@ function item(
  * inferred rather than measured (the irrigation lump), the line says so.
  */
 export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
-  const zones = input.zones ?? [];
-  const runs = input.runs ?? [];
-  const units = input.units ?? [];
-  const points = input.points ?? [];
+  const allZones = input.zones ?? [];
+  const allRuns = input.runs ?? [];
+  const allUnits = input.units ?? [];
+  const allPoints = input.points ?? [];
+  const allContext = input.context ?? [];
+
+  // G5: only NEW WORK is measured below. A kept site-reference item is excluded
+  // here, before any rule sees it; a removed one counts only toward demolition.
+  const zones = allZones.filter(isNewWork);
+  const runs = allRuns.filter(isNewWork);
+  const units = allUnits.filter((u) => isNewWork(u) && u.kind !== "tree");
+  const newTrees = allUnits.filter((u) => isNewWork(u) && u.kind === "tree");
+  const points = allPoints.filter(isNewWork);
+
+  const removals: GardenRemoval[] = [];
+  const kept: { element_id: string; name: string }[] = [];
+  const undecided: { element_id: string; name: string }[] = [];
+  const RUN_NAME: Record<GardenRun["kind"], string> = {
+    boundary_wall: "boundary wall", bench_run: "bench run", planter_run: "planter run", counter_run: "counter run",
+    stepping_path: "stepping-stone path", string_light_run: "string lights",
+  };
+  const siteItems: { id: string; name: string; qty: number; unit: string; t: SiteRefFields }[] = [
+    ...allZones.map((z) => ({ id: z.id, name: z.name, qty: z.area_m2 || 0, unit: "m2", t: z })),
+    ...allRuns.map((r) => ({ id: r.id, name: r.name ?? RUN_NAME[r.kind], qty: r.length_m || 0, unit: "lm", t: r })),
+    ...allUnits.map((u) => ({ id: u.id, name: u.name ?? u.kind.replace(/_/g, " "), qty: 1, unit: "no", t: u })),
+    ...allPoints.map((p) => ({ id: p.id, name: p.type.replace(/_/g, " "), qty: 1, unit: "no", t: p })),
+    ...allContext.map((c) => ({ id: c.id, name: c.name, qty: 1, unit: "no", t: c })),
+  ];
+  for (const s of siteItems) {
+    if (!s.t.site_reference) continue;
+    if (isDemolished(s.t)) removals.push({ element_id: s.id, name: s.name, qty: round2(s.qty), unit: s.unit, disposition: s.t.disposition as "remove" | "replace" });
+    else if (isUndecided(s.t)) undecided.push({ element_id: s.id, name: s.name });
+    else kept.push({ element_id: s.id, name: s.name });
+  }
+
+  // Derived geometry, per element: a line measured off any derived element says so.
+  const derivedIds = new Set([...zones, ...runs, ...newTrees].filter((x) => x.dims_derived).map((x) => x.id));
+  const derivedExtra = (ids: readonly string[]): Partial<ScopeItem> =>
+    ids.some((id) => derivedIds.has(id)) ? { qty_derived: true } : {};
+  const withDerivedNote = (measurement: string, ids: readonly string[]) =>
+    ids.some((id) => derivedIds.has(id)) ? `${measurement} — ${DERIVED_QTY_NOTE}` : measurement;
 
   const areaOf = (kinds: Set<string> | string) =>
     round2(
@@ -246,8 +344,13 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   // Emitted only when there is garden scope at all, so an interior project that
   // somehow reaches this function gets an empty take-off rather than three lumps.
   const hasScope =
-    zones.length > 0 || runs.length > 0 || units.length > 0 || points.length > 0;
+    zones.length > 0 || runs.length > 0 || units.length > 0 || points.length > 0 || newTrees.length > 0 || removals.length > 0;
   if (hasScope) {
+    const removalNote =
+      removals.length > 0
+        ? `; takes out ${removals.map((r) => `${r.name} (${r.qty} ${r.unit}, ${r.disposition})`).join(", ")}`
+        : "";
+    const keptNote = kept.length > 0 ? `; retained and excluded: ${kept.map((k) => k.name).join(", ")}` : "";
     items.push(
       item("GL-01", "garden.preliminaries", 1, "per project — approvals, admin, shop drawings"),
       item("GL-02", "garden.mobilization", 1, "per project — debris removal, setting out, protection, supervision"),
@@ -255,7 +358,7 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
         "GL-03",
         "garden.demolition",
         1,
-        `per project — strip-out of ${round2(pavedAreaM2 + grassAreaM2)} m² existing hardscape and grass (lump for a garden this size, not scaled)`,
+        `per project — strip-out of ${round2(pavedAreaM2 + grassAreaM2)} m² existing hardscape and grass (lump for a garden this size, not scaled)${removalNote}${keptNote}`,
       ),
     );
   }
@@ -272,16 +375,18 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
     structurePlanAreaM2 > 0
       ? `${pavedAreaM2} m² paved zones + ${structurePlanAreaM2} m² under structures`
       : `paved zone area = ${pavedAreaM2} m²`;
+  const pavedIds = zones.filter((z) => PAVED_KINDS.has(z.kind) || z.kind === "structure").map((z) => z.id);
   if (pavedSurfaceM2 > 0) {
     items.push(
-      item("GL-04", "garden.pcc_base", pavedSurfaceM2, `${surfaceNote} (${VILLA94_PCC_VS_PAVING_NOTE})`),
-      item("GL-05", "garden.paving_install", pavedSurfaceM2, surfaceNote),
+      item("GL-04", "garden.pcc_base", pavedSurfaceM2, withDerivedNote(`${surfaceNote} (${VILLA94_PCC_VS_PAVING_NOTE})`, pavedIds), derivedExtra(pavedIds)),
+      item("GL-05", "garden.paving_install", pavedSurfaceM2, withDerivedNote(surfaceNote, pavedIds), derivedExtra(pavedIds)),
       // The supply rate is per m² PURCHASED, and the reference order covered all
       // paving AND cladding from 66.24 m² against 87 m² of quoted paving. Drawn
       // area is therefore an upper bound on what gets bought, and the line goes
       // to the QS flagged rather than priced as though it were measured.
-      item("GL-06", "garden.tile_supply", pavedSurfaceM2, `${surfaceNote}; tile is bought per m² PURCHASED, which site setting-out usually reduces`, {
+      item("GL-06", "garden.tile_supply", pavedSurfaceM2, withDerivedNote(`${surfaceNote}; tile is bought per m² PURCHASED, which site setting-out usually reduces`, pavedIds), {
         rate_status: "site_assessment",
+        ...derivedExtra(pavedIds),
       }),
     );
     const pavedRows = [...zonesOf(PAVED_KINDS), ...zonesOf("structure")];
@@ -292,12 +397,13 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
 
   // --- Softscape (GL-07..08) -------------------------------------------------
   if (grassAreaM2 > 0) {
-    items.push(
-      item("GL-07", "garden.grass_supply", grassAreaM2, `artificial grass zone area = ${grassAreaM2} m²`),
-      // Inclusive of base prep, black sand and PCC borders — see INCLUSIVE_SCOPE.
-      item("GL-08", "garden.grass_install", grassAreaM2, `artificial grass zone area = ${grassAreaM2} m² (incl. base prep, sand bed and borders)`),
-    );
     const grassRows = zonesOf("artificial_grass");
+    const ids = grassRows.map((r) => r.id);
+    items.push(
+      item("GL-07", "garden.grass_supply", grassAreaM2, withDerivedNote(`artificial grass zone area = ${grassAreaM2} m²`, ids), derivedExtra(ids)),
+      // Inclusive of base prep, black sand and PCC borders — see INCLUSIVE_SCOPE.
+      item("GL-08", "garden.grass_install", grassAreaM2, withDerivedNote(`artificial grass zone area = ${grassAreaM2} m² (incl. base prep, sand bed and borders)`, ids), derivedExtra(ids)),
+    );
     per("garden.grass_supply", grassRows);
     per("garden.grass_install", grassRows);
   }
@@ -319,18 +425,21 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
 
   const benchLm = runTotal("bench_run");
   if (benchLm > 0) {
-    items.push(item("GL-09", "garden.bench_run", benchLm, `Σ bench run length = ${benchLm} lm`));
+    const ids = runRows("bench_run").map((r) => r.id);
+    items.push(item("GL-09", "garden.bench_run", benchLm, withDerivedNote(`Σ bench run length = ${benchLm} lm`, ids), derivedExtra(ids)));
     per("garden.bench_run", runRows("bench_run"));
   }
   const planterLm = runTotal("planter_run");
   if (planterLm > 0) {
-    items.push(item("GL-10", "garden.planter_bench_run", planterLm, `Σ planter run length = ${planterLm} lm`));
+    const ids = runRows("planter_run").map((r) => r.id);
+    items.push(item("GL-10", "garden.planter_bench_run", planterLm, withDerivedNote(`Σ planter run length = ${planterLm} lm`, ids), derivedExtra(ids)));
     per("garden.planter_bench_run", runRows("planter_run"));
   }
   const bbqLm = runTotal("counter_run", "bbq");
   if (bbqLm > 0) {
     // Inclusive of its own water, drainage and sockets — see INCLUSIVE_SCOPE.
-    items.push(item("GL-11a", "garden.counter_bbq", bbqLm, `Σ BBQ counter length = ${bbqLm} lm (incl. sink, water, drainage and sockets)`));
+    const ids = runRows("counter_run", "bbq").map((r) => r.id);
+    items.push(item("GL-11a", "garden.counter_bbq", bbqLm, withDerivedNote(`Σ BBQ counter length = ${bbqLm} lm (incl. sink, water, drainage and sockets)`, ids), derivedExtra(ids)));
     per("garden.counter_bbq", runRows("counter_run", "bbq"));
   }
   // A counter nobody has typed is priced as a bar counter — the cheaper of the
@@ -344,9 +453,10 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   );
   if (barChosenLm > 0 || barUntypedLm > 0) {
     const total = round2(barChosenLm + barUntypedLm);
+    const ids = runs.filter((r) => r.kind === "counter_run" && r.variant !== "bbq").map((r) => r.id);
     items.push(
-      item("GL-11b", "garden.counter_bar", total, `Σ bar counter length = ${total} lm${barUntypedLm > 0 ? ` (${barUntypedLm} lm not yet typed — priced as a bar counter, the cheaper of the two)` : ""}`,
-        barUntypedLm > 0 ? { rate_status: "needs_selection" } : {}),
+      item("GL-11b", "garden.counter_bar", total, withDerivedNote(`Σ bar counter length = ${total} lm${barUntypedLm > 0 ? ` (${barUntypedLm} lm not yet typed — priced as a bar counter, the cheaper of the two)` : ""}`, ids),
+        { ...(barUntypedLm > 0 ? { rate_status: "needs_selection" as const } : {}), ...derivedExtra(ids) }),
     );
     per("garden.counter_bar", [
       ...runRows("counter_run", "bar"),
@@ -373,8 +483,9 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   // --- Pergola (GL-14) -------------------------------------------------------
   if (structurePlanAreaM2 > 0) {
     // Inclusive of its 8 recessed downlights and the wood-effect coating.
+    const ids = structureZones.map((z) => z.id);
     items.push(
-      item("GL-14", "garden.pergola", structurePlanAreaM2, `Σ structure zone plan area = ${structurePlanAreaM2} m² (all-in rate: structure, coating and its ${PERGOLA_INCLUDED_DOWNLIGHTS} recessed downlights)`),
+      item("GL-14", "garden.pergola", structurePlanAreaM2, withDerivedNote(`Σ structure zone plan area = ${structurePlanAreaM2} m² (all-in rate: structure, coating and its ${PERGOLA_INCLUDED_DOWNLIGHTS} recessed downlights)`, ids), derivedExtra(ids)),
     );
     per("garden.pergola", zonesOf("structure"));
   }
@@ -429,6 +540,20 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
     items.push(item("GL-18", "garden.boundary_light", boundaryLightPoints, `${boundaryLightPoints} boundary wall light point(s)`));
   }
 
+  // --- Work with no reference rate (GL-20..24, G5) ---------------------------
+  const unpriced = (rule: string, key: string, rows: { id: string; qty: number }[], measurement: string) => {
+    const qty = round2(rows.reduce((s, r) => s + r.qty, 0));
+    if (qty <= 0) return;
+    const ids = rows.map((r) => r.id);
+    items.push(item(rule, key, qty, withDerivedNote(measurement.replace("{q}", String(qty)), ids), { rate_status: "needs_qs", ...derivedExtra(ids) }));
+    per(key, rows);
+  };
+  unpriced("GL-20", "garden.deck", zonesOf("deck"), "deck zone area = {q} m²");
+  unpriced("GL-21", "garden.pool", zonesOf("pool"), "pool zone area = {q} m²");
+  unpriced("GL-22", "garden.stepping_path", runRows("stepping_path"), "Σ stepping-stone path length = {q} lm");
+  unpriced("GL-23", "garden.string_lights", runRows("string_light_run"), "Σ string light run length = {q} lm");
+  unpriced("GL-24", "garden.tree", newTrees.map((t) => ({ id: t.id, qty: 1 })), "{q} tree(s) to supply and plant");
+
   // --- Client-supplied equipment (GL-19) -------------------------------------
   const grills = unitCount("bbq_grill");
   if (grills > 0) {
@@ -439,6 +564,9 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   return {
     items,
     elements,
+    removals,
+    kept,
+    undecided,
     summary: {
       pavedAreaM2,
       grassAreaM2,
@@ -462,6 +590,11 @@ export interface GardenPricedLine extends ScopeItem {
 /** Price a take-off at the Villa 94 net rates. Deterministic. */
 export function priceGardenTakeoff(items: readonly ScopeItem[]): GardenPricedLine[] {
   return items.map((i) => {
+    // G5: a line with no reference rate goes to the QS at 0 — never at an
+    // invented rate, and never under the market-reference label.
+    if (UNPRICED_GARDEN_ITEMS[i.item_key]) {
+      return { ...i, rate_aed: 0, total_aed: 0, vendor_or_source: UNPRICED_SOURCE_LABEL };
+    }
     const r = rate(i.item_key);
     return {
       ...i,

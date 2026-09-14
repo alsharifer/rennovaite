@@ -49,6 +49,9 @@ export const LANDSCAPE_TYPES = [
   "planter_box",
   "wall_feature",
   "bbq_grill",
+  // G5: a tree. Existing ones are placed from site photos as site reference
+  // (keep / remove / replace); a NEW tree is design scope with no reference rate.
+  "tree",
 ] as const;
 
 export type ElectricalType = (typeof ELECTRICAL_TYPES)[number];

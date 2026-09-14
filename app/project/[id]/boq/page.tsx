@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
+import { DRAFT_STATEMENT } from "@/lib/plan/site-reference";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   hasTakeoffProvenance,
@@ -29,6 +30,7 @@ import {
   type VendorOption,
 } from "./_components/boq-view";
 import { GenerateBoqButton } from "./_components/generate-boq-button";
+import { ReviewCorrections } from "./_components/review-corrections";
 
 export const dynamic = "force-dynamic";
 
@@ -255,6 +257,25 @@ export default async function BoqPage({
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Your bill of quantities.
           </h1>
+          {/* G5: the BoQ header of a draft carries the statement, verbatim. */}
+          {boqPayload?.garden?.draft.draft && (
+            <div className="mb-md max-w-[900px] rounded-md border border-[#9d3e1d] bg-[#FDF3EE] px-md py-sm" data-boq-draft="true">
+              <p className="font-body text-body-sm font-semibold uppercase tracking-wide text-[#9d3e1d]">
+                {boqPayload.garden.draft.statement ?? DRAFT_STATEMENT}
+              </p>
+              {boqPayload.garden.draft.note && (
+                <p className="mt-1 font-body text-[12px] text-ink-700">Source: {boqPayload.garden.draft.note}</p>
+              )}
+            </div>
+          )}
+          {boqPayload?.garden && (boqPayload.garden.kept.length > 0 || boqPayload.garden.removals.length > 0 || boqPayload.garden.undecided.length > 0) && (
+            <p className="mb-md max-w-[900px] font-body text-[13px] text-ink-700">
+              Existing on site — kept and excluded: {boqPayload.garden.kept.length} · removed or replaced (in demolition): {boqPayload.garden.removals.length}
+              {boqPayload.garden.undecided.length > 0 && (
+                <span className="text-[#9A3412]"> · {boqPayload.garden.undecided.length} undecided (not in any quantity — decide on the plan)</span>
+              )}
+            </p>
+          )}
           {boqPayload ? (
             <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
               {lineCount} line items across {sectionCount} work sections,
@@ -286,6 +307,23 @@ export default async function BoqPage({
             fired={permitCheck.fired}
             community={permitCheck.community}
             className="mb-xl"
+          />
+        )}
+
+        {boqPayload?.garden && process.env.GARDEN_PILOT_ENABLED === "true" && (
+          <ReviewCorrections
+            projectId={id}
+            boqId={latestBoq?.id ?? null}
+            lines={boqPayload.sections.flatMap((s, si) =>
+              s.lines.map((l, li) => ({
+                key: `${si}:${li}`,
+                item_key: (l as { item_key?: string }).item_key ?? l.rule_id ?? null,
+                description: `${s.work_section} — ${l.description}`,
+                quantity: l.quantity,
+                rate_aed: l.rate_aed,
+                element_refs: l.element_refs ?? null,
+              })),
+            )}
           />
         )}
 

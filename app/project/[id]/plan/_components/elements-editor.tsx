@@ -30,6 +30,14 @@ const INK_900 = "#0F1B2D";
 const INK_500 = "#64748b";
 const BRASS = "#A4793A";
 
+/** G5: an existing footprint drawn under the plan (house, garage, boundary wall). */
+export interface ContextOutline {
+  id: string;
+  name: string;
+  kind: string;
+  polygon: number[][];
+}
+
 interface Element {
   id: string;
   kind: LinearElementKind;
@@ -40,7 +48,16 @@ interface Element {
   /** Counter runs only. null = nobody has chosen yet. */
   variant: "bar" | "bbq" | null;
   derived: boolean;
+  /** G5 */
+  spec?: Record<string, unknown> | null;
+  dims_derived?: boolean;
+  site_reference?: boolean;
+  disposition?: string | null;
 }
+
+/** A counter that still needs a type is one that is NEW work (G5: a kept or removed existing counter is not). */
+const needsVariant = (el: Element) =>
+  el.kind === "counter_run" && el.variant == null && (!el.site_reference || el.disposition === "replace");
 
 const COUNTER_VARIANTS = [
   { value: "bar" as const, label: "Bar counter", hint: "Blockwork and cladding only." },
@@ -62,15 +79,23 @@ export function ElementsEditor({
   planId,
   rooms,
   plot,
+  context = [],
   readOnly = false,
 }: {
   planId: string;
   rooms: RawRoomInput[];
   /** Authored plan's measured plot — lets the layer report true lengths. */
   plot?: { width_m: number; depth_m: number } | null;
+  /** G5: existing footprints to draw under the plan. */
+  context?: ContextOutline[];
   readOnly?: boolean;
 }) {
-  const fit = useMemo(() => fitRooms(rooms), [rooms]);
+  const fit = useMemo(() => fitRooms(rooms, plot), [rooms, plot]);
+  // G5: on a plot, points snap to a 5 cm grid — a run is set out, not sketched.
+  const snap = useCallback(
+    (raw: Pt): Pt => (plot ? [Math.round(raw[0] * plot.width_m * 20) / 20 / plot.width_m, Math.round(raw[1] * plot.width_m * 20) / 20 / plot.width_m] : raw),
+    [plot],
+  );
 
   const [elements, setElements] = useState<Element[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,13 +179,13 @@ export function ElementsEditor({
       if (e.target === e.currentTarget) setSelectedId(null);
       return;
     }
-    const raw = fit.toRaw(clientToViewBox(e.clientX, e.clientY));
+    const raw = snap(fit.toRaw(clientToViewBox(e.clientX, e.clientY)));
     setDraft((cur) => [...cur, raw]);
   };
 
   const onSvgPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
     if (readOnly || !kind || draft.length === 0) return;
-    setCursor(fit.toRaw(clientToViewBox(e.clientX, e.clientY)));
+    setCursor(snap(fit.toRaw(clientToViewBox(e.clientX, e.clientY))));
   };
 
   const finish = useCallback(() => {
@@ -207,6 +232,23 @@ export function ElementsEditor({
     }
   };
 
+  /** G5: give a run a measured cross-section (both values → no longer derived). */
+  const setSection = async (id: string, height_mm: number, width_mm: number) => {
+    if (!(height_mm > 0) || !(width_mm > 0)) return;
+    setElements((cur) => cur.map((el) => (el.id === id ? { ...el, height_mm, width_mm, derived: false } : el)));
+    try {
+      const res = await fetch("/api/plan-elements", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, height_mm, width_mm }),
+      });
+      const body = await res.json();
+      if (body.error) setError(body.error);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const deleteSelected = async () => {
     if (!selectedId) return;
     const id = selectedId;
@@ -230,9 +272,7 @@ export function ElementsEditor({
 
   const drawPts = cursor && draft.length > 0 ? [...draft, cursor] : draft;
   const selected = elements.find((el) => el.id === selectedId) ?? null;
-  const untypedCounters = elements.filter(
-    (el) => el.kind === "counter_run" && el.variant == null,
-  ).length;
+  const untypedCounters = elements.filter(needsVariant).length;
 
   return (
     <div className="space-y-3">
@@ -284,6 +324,18 @@ export function ElementsEditor({
         </div>
       )}
 
+      {/* G5: what the selected run is — its name, cross-section, and whether it
+          is an existing feature or sits on derived geometry. */}
+      {selected && (
+        <RunInspector
+          key={`${selected.id}:${selected.height_mm}:${selected.width_mm}`}
+          el={selected}
+          length={lengthLabel(selected.polyline)}
+          readOnly={readOnly}
+          onSection={(h, w) => setSection(selected.id, h, w)}
+        />
+      )}
+
       {/* Properties for the selected run. Today the only property that changes
           a price is the counter variant, so that is what this holds. */}
       {!readOnly && selected?.kind === "counter_run" && (
@@ -309,7 +361,7 @@ export function ElementsEditor({
               </button>
             );
           })}
-          {selected.variant == null && (
+          {needsVariant(selected) && (
             <span className="flex items-center gap-1 text-[12px] text-[#9A3412]">
               <span className="inline-block h-2 w-2 rounded-full bg-[#C2410C]" aria-hidden="true" />
               Not chosen — priced as a bar counter and flagged on the BoQ.
@@ -329,6 +381,22 @@ export function ElementsEditor({
           onPointerMove={onSvgPointerMove}
           onDoubleClick={readOnly ? undefined : finish}
         >
+          {/* G5: existing footprints, then the plot outline. */}
+          {context.map((c) => {
+            const pts = c.polygon.map((p) => fit.toViewBox([p[0]!, p[1]!]));
+            return (
+              <polygon
+                key={`ctx-${c.id}`}
+                pointerEvents="none"
+                points={pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
+                fill={c.kind === "existing_building" ? "#D9D6CF" : "#8A8F98"}
+                fillOpacity={c.kind === "existing_building" ? 0.7 : 0.9}
+                stroke="#6B7280"
+                strokeWidth={1}
+              />
+            );
+          })}
+
           {/* Zones as read-only context. Open zones keep their dashed edge so
               this layer reads the same as the plan layer underneath it. */}
           {fit.rooms.map((r) => {
@@ -384,7 +452,8 @@ export function ElementsEditor({
                   fill="none"
                   stroke={selected ? BRASS : meta.color}
                   strokeWidth={el.kind === "boundary_wall" ? 6 : 4}
-                  strokeOpacity={selected ? 1 : 0.85}
+                  strokeOpacity={el.site_reference && el.disposition === "remove" ? 0.3 : selected ? 1 : 0.85}
+                  strokeDasharray={el.site_reference ? "5 4" : undefined}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -398,7 +467,7 @@ export function ElementsEditor({
                   pointerEvents="none"
                   style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}
                 >
-                  {meta.code} {lengthLabel(el.polyline)}
+                  {meta.code} {el.dims_derived ? "≈ " : ""}{lengthLabel(el.polyline)}{el.site_reference ? " · existing" : ""}
                 </text>
               </g>
             );
@@ -453,6 +522,57 @@ export function ElementsEditor({
           ? ` · ${untypedCounters} counter run${untypedCounters === 1 ? "" : "s"} still need a type — select one to choose.`
           : ""}
       </p>
+    </div>
+  );
+}
+
+/** G5: the selected run — name, cross-section (editable), existing / derived badges. */
+function RunInspector({
+  el,
+  length,
+  readOnly,
+  onSection,
+}: {
+  el: Element;
+  length: string;
+  readOnly: boolean;
+  onSection: (height_mm: number, width_mm: number) => void;
+}) {
+  const meta = LINEAR_ELEMENT_META[el.kind];
+  const name = typeof el.spec?.name === "string" ? el.spec.name : meta.label;
+  const [h, setH] = useState(el.height_mm ?? meta.defaultHeightMm);
+  const [w, setW] = useState(el.width_mm ?? meta.defaultWidthMm);
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-ink-100 bg-canvas px-md py-sm text-[12px] text-ink-700">
+      <span className="font-semibold text-ink-900">{name}</span>
+      <span className="font-mono tabular-nums">{length}</span>
+      {readOnly ? (
+        <span className="font-mono tabular-nums">
+          H {el.height_mm ?? "—"} · W {el.width_mm ?? "—"} mm
+        </span>
+      ) : (
+        <>
+          <label className="flex items-center gap-1">
+            <span className="text-ink-500">H</span>
+            <input type="number" step={10} value={h} onChange={(e) => setH(Number(e.target.value))} className="focus-ring w-[70px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums" />
+          </label>
+          <label className="flex items-center gap-1">
+            <span className="text-ink-500">W</span>
+            <input type="number" step={10} value={w} onChange={(e) => setW(Number(e.target.value))} className="focus-ring w-[70px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums" />
+          </label>
+          <span className="text-ink-500">mm</span>
+          <button type="button" onClick={() => onSection(h, w)} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
+            Set section
+          </button>
+        </>
+      )}
+      {el.derived && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Section assumed</span>}
+      {el.dims_derived && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Position derived</span>}
+      {el.site_reference && (
+        <span className="rounded-full border border-brass-600 px-2 py-0.5 font-medium text-brass-600">
+          Existing · {el.disposition ?? "undecided"}
+        </span>
+      )}
     </div>
   );
 }

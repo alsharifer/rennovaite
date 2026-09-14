@@ -39,6 +39,7 @@ const INK_900 = "#0F1B2D";
 const INK_700 = "#4F4539";
 // G1: open zones read as ground, not as floor — a muted sage against the bone.
 const OPEN_ZONE_FILL = "#DCE3D2";
+const BRASS_600 = "#A4793A";
 
 type Point = [number, number];
 
@@ -53,7 +54,14 @@ type RoomInput = {
   confidence?: number | null;
   /** G1: open to the sky. Absent → the type's default. */
   unroofed?: boolean | null;
+  /** G5: existing feature from site photos, the designer's call on it, derived outline. */
+  site_reference?: boolean | null;
+  disposition?: string | null;
+  dims_derived?: boolean | null;
 };
+
+/** G5: an existing, out-of-scope footprint drawn under the zones (the house, a wall). */
+export type ContextOutline = { id: string; name: string; kind: string; polygon: number[][] };
 
 /** G1: an authored plan's measured plot. Its presence changes the canvas from
  *  fit-to-content to fit-to-plot, which is what makes a drawn area exact. */
@@ -70,6 +78,9 @@ type Room = {
   confidence: number | null;
   /** G1: open to the sky — no ceiling, and its edges emit no wall. */
   unroofed: boolean;
+  site_reference: boolean;
+  disposition: string | null;
+  dims_derived: boolean;
   isNew?: boolean;
   isDeleted?: boolean;
 };
@@ -192,6 +203,9 @@ function toRoom(r: RoomInput, pts: Point[]): Room {
     polygon: pts,
     confidence: typeof r.confidence === "number" ? r.confidence : null,
     unroofed: r.unroofed == null ? defaultUnroofed(r.room_type) : r.unroofed === true,
+    site_reference: r.site_reference === true,
+    disposition: r.disposition ?? null,
+    dims_derived: r.dims_derived === true,
   };
 }
 
@@ -314,6 +328,12 @@ type Props = {
   plot?: PlotSize | null;
   /** G1: offer outdoor zone types in the picker (garden pilot flag). */
   outdoorEnabled?: boolean;
+  /** G5: existing footprints (house, garage, boundary walls), normalised plot space. */
+  context?: ContextOutline[];
+  /** G5: zone id → site-reference state from the latest server render. Wins over
+   *  the state this editor was mounted with, so a keep/remove decision taken in
+   *  the garden panel shows on the canvas without discarding unsaved edits. */
+  siteRefs?: Record<string, { site_reference: boolean; disposition: string | null; dims_derived: boolean }>;
 };
 
 export function EditablePlanViewer({
@@ -324,6 +344,8 @@ export function EditablePlanViewer({
   areaDisputes,
   plot,
   outdoorEnabled = false,
+  context = [],
+  siteRefs,
 }: Props) {
   const router = useRouter();
   const editing = editingEnabled(mode);
@@ -360,11 +382,16 @@ export function EditablePlanViewer({
       new Set(
         findOverlaps(
           rooms
-            .filter((r) => !r.isDeleted)
+            // G5: a removed site-reference zone is not in the design; a zone
+            // drawn over its footprint is not an overlap.
+            .filter((r) => {
+              const s = siteRefs?.[r.id] ?? r;
+              return !r.isDeleted && !(s.site_reference && s.disposition === "remove");
+            })
             .map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
         ).room_ids,
       ),
-    [rooms],
+    [rooms, siteRefs],
   );
   // Rooms the parser flagged low-confidence — surfaced for review in the editor.
   const lowConfidenceIds = useMemo(() => {
@@ -478,6 +505,74 @@ export function EditablePlanViewer({
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
   };
 
+  // G5: metres ↔ viewBox on a plot-anchored canvas. Identity off a plot.
+  const toPlotM = useCallback(
+    (p: Point): Point => {
+      if (!plot) return p;
+      const s = fitted.toStored(p);
+      return [s[0] * plot.width_m, s[1] * plot.width_m];
+    },
+    [plot, fitted],
+  );
+  const fromPlotM = useCallback(
+    (m: Point): Point => (plot ? fitted.toViewBox([m[0] / plot.width_m, m[1] / plot.width_m]) : m),
+    [plot, fitted],
+  );
+  const snapToPlot = useCallback(
+    (p: Point): Point => {
+      if (!plot) return p;
+      const [mx, my] = toPlotM(p);
+      return fromPlotM([Math.round(mx * 20) / 20, Math.round(my * 20) / 20]);
+    },
+    [plot, toPlotM, fromPlotM],
+  );
+
+  /** G5: set a zone to an exact rectangle, in metres from the plot's rear-left corner. */
+  const setRoomRect = (roomId: string, x: number, y: number, w: number, d: number) => {
+    if (!plot || !(w > 0) || !(d > 0)) return;
+    snapshot();
+    correctionCounts.current.vertex += 1;
+    const poly = rectFromBbox(...fromPlotM([x, y]), ...fromPlotM([x + w, y + d])) as Point[];
+    setRooms((current) => current.map((r) => (r.id === roomId ? { ...r, polygon: poly, area_m2: recomputeArea(poly) } : r)));
+  };
+
+  /** G5: split a zone's longest edge, so an outline can become an L or a notch. */
+  const addVertex = (roomId: string) => {
+    snapshot();
+    setRooms((current) =>
+      current.map((r) => {
+        if (r.id !== roomId) return r;
+        let best = 0;
+        let bestLen = -1;
+        r.polygon.forEach((p, i) => {
+          const q = r.polygon[(i + 1) % r.polygon.length]!;
+          const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
+          if (len > bestLen) {
+            bestLen = len;
+            best = i;
+          }
+        });
+        const a = r.polygon[best]!;
+        const b = r.polygon[(best + 1) % r.polygon.length]!;
+        const mid = snapToPlot([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+        const poly = [...r.polygon.slice(0, best + 1), mid, ...r.polygon.slice(best + 1)];
+        return { ...r, polygon: poly, area_m2: recomputeArea(poly) };
+      }),
+    );
+  };
+
+  const removeVertex = (roomId: string, vertexIndex: number) => {
+    snapshot();
+    correctionCounts.current.vertex += 1;
+    setRooms((current) =>
+      current.map((r) => {
+        if (r.id !== roomId || r.polygon.length <= 3) return r;
+        const poly = r.polygon.filter((_, i) => i !== vertexIndex);
+        return { ...r, polygon: poly, area_m2: recomputeArea(poly) };
+      }),
+    );
+  };
+
   // Begin a single-vertex drag.
   const onVertexPointerDown = (
     e: ReactPointerEvent<SVGCircleElement>,
@@ -486,6 +581,10 @@ export function EditablePlanViewer({
   ) => {
     e.stopPropagation();
     setSelectedId(room.id);
+    if (e.shiftKey && room.polygon.length > 3) {
+      removeVertex(room.id, vertexIndex);
+      return;
+    }
     const [px, py] = toViewBox(e.clientX, e.clientY);
     dragRef.current = {
       kind: "vertex",
@@ -516,6 +615,7 @@ export function EditablePlanViewer({
       current.map((r) => {
         if (r.id !== drag.roomId) return r;
         let nextPoly: Point[];
+        const snap = snapToPlot;
         if (drag.kind === "move") {
           // Shift the whole polygon; clamp so its bbox stays inside the viewBox
           // (preserves shape — every vertex moves by the same delta).
@@ -526,13 +626,17 @@ export function EditablePlanViewer({
           if (bb.yT + ddy < 0) ddy = -bb.yT;
           if (bb.xR + ddx > VIEW_W) ddx = VIEW_W - bb.xR;
           if (bb.yB + ddy > VIEW_H) ddy = VIEW_H - bb.yB;
+          // G5: on a plot, the top-left corner snaps to a 5 cm grid.
+          const corner = snap([bb.xL + ddx, bb.yT + ddy]);
+          ddx = corner[0] - bb.xL;
+          ddy = corner[1] - bb.yT;
           nextPoly = drag.startPolygon.map(([x, y]) => [x + ddx, y + ddy] as Point);
         } else {
           // Move only the grabbed vertex (clamped into the viewBox).
           const vi = drag.vertexIndex ?? 0;
           nextPoly = drag.startPolygon.map((p, i) =>
             i === vi
-              ? ([clampToView(p[0] + dx, VIEW_W), clampToView(p[1] + dy, VIEW_H)] as Point)
+              ? snap([clampToView(p[0] + dx, VIEW_W), clampToView(p[1] + dy, VIEW_H)] as Point)
               : ([p[0], p[1]] as Point),
           );
         }
@@ -592,6 +696,9 @@ export function EditablePlanViewer({
       polygon,
       confidence: null,
       unroofed: defaultUnroofed(room_type),
+      site_reference: false,
+      disposition: null,
+      dims_derived: false,
       isNew: true,
     };
     setRooms((current) => [...current, next]);
@@ -1065,6 +1172,18 @@ export function EditablePlanViewer({
       </div>
       )}
 
+      {/* G5: exact geometry for the selected zone, in metres on the plot. A
+          garden is set out from dimensions, not dragged into place. */}
+      {editing && plot && selectedRoom && (
+        <ZoneGeometryBar
+          key={`${selectedRoom.id}:${selectedRoom.polygon.map((p) => p.join(",")).join(";")}`}
+          room={selectedRoom}
+          toPlotM={toPlotM}
+          onRect={(x, y, w, d) => setRoomRect(selectedRoom.id, x, y, w, d)}
+          onAddVertex={() => addVertex(selectedRoom.id)}
+        />
+      )}
+
       {/* Area disputes. The drawing prints a dimension for this room and the
           outline works out to something materially different; both cannot be
           right, and only a person can say which. The parse kept the printed
@@ -1148,6 +1267,30 @@ export function EditablePlanViewer({
             .room-group:hover .room-poly { fill: ${PRIMARY_FIXED}; fill-opacity: 0.7; }
             .room-group:hover .room-label { transform: translateY(-2px); }
           `}</style>
+          {/* G5: existing footprints under the zones — the house is where the
+              garden is not, and designing without it is designing blind. */}
+          {plot &&
+            context.map((c) => {
+              const pts = c.polygon.map(([x, y]) => fitted.toViewBox([x, y]));
+              const bb = bboxOf(pts);
+              const building = c.kind === "existing_building";
+              return (
+                <g key={`ctx-${c.id}`} pointerEvents="none">
+                  <polygon
+                    points={pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
+                    fill={building ? "#D9D6CF" : "#8A8F98"}
+                    fillOpacity={building ? 0.7 : 0.9}
+                    stroke="#6B7280"
+                    strokeWidth={1}
+                  />
+                  {building && (
+                    <text x={(bb.xL + bb.xR) / 2} y={(bb.yT + bb.yB) / 2} textAnchor="middle" dominantBaseline="middle" fontSize="12" fill="#4B5563" style={{ fontFamily: "var(--font-inter), sans-serif", letterSpacing: "0.05em" }}>
+                      {c.name.toUpperCase()}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
           {visibleRooms.length === 0 ? (
             <text
               x={VIEW_W / 2}
@@ -1162,7 +1305,8 @@ export function EditablePlanViewer({
                 : "No rooms yet — click “Add room” to start."}
             </text>
           ) : (
-            visibleRooms.map((room, index) => {
+            visibleRooms.map((stored, index) => {
+              const room = siteRefs?.[stored.id] ? { ...stored, ...siteRefs[stored.id] } : stored;
               const selected = selectedId === room.id;
               const renaming = renamingId === room.id;
               const overlapping = overlappingIds.has(room.id);
@@ -1180,7 +1324,9 @@ export function EditablePlanViewer({
               const widthM = pixelToM(rectWPx, unitToM2Factor);
               const heightM = pixelToM(rectHPx, unitToM2Factor);
               const areaInt = Math.round(room.area_m2);
-              const dimsLine = `${widthM} × ${heightM} m`;
+              // G5: a derived outline says so on the canvas, not only in a report.
+              const dimsLine = `${room.dims_derived ? "≈ " : ""}${widthM} × ${heightM} m`;
+              const removed = room.site_reference && room.disposition === "remove";
               const areaLabel = `${areaInt} m²`;
               const inlineLine = `${dimsLine} · ${areaLabel}`;
               return (
@@ -1206,11 +1352,11 @@ export function EditablePlanViewer({
                       .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                       .join(" ")}
                     fill={room.unroofed ? OPEN_ZONE_FILL : BONE_FILL}
-                    fillOpacity={room.unroofed ? 0.45 : 0.5}
-                    stroke={room.unroofed ? INK_700 : INK_900}
+                    fillOpacity={removed ? 0.12 : room.unroofed ? 0.45 : 0.5}
+                    stroke={room.site_reference ? BRASS_600 : room.unroofed ? INK_700 : INK_900}
                     strokeOpacity={room.unroofed ? 0.7 : 1}
-                    strokeDasharray={room.unroofed ? "6 4" : undefined}
-                    strokeWidth={editing && selected ? 2.5 : 1.5}
+                    strokeDasharray={room.site_reference ? "3 3" : room.unroofed ? "6 4" : undefined}
+                    strokeWidth={editing && selected ? 2.5 : room.site_reference ? 2 : 1.5}
                     style={{ cursor: roomMode === "drag" ? "grab" : "pointer" }}
                     onPointerDown={
                       roomMode === "drag"
@@ -1223,6 +1369,19 @@ export function EditablePlanViewer({
                         : undefined
                     }
                   />
+
+                  {room.site_reference && (
+                    <text
+                      x={bb.xL + 6}
+                      y={bb.yT + 14}
+                      fontSize="10"
+                      fill={BRASS_600}
+                      pointerEvents="none"
+                      style={{ fontFamily: "var(--font-inter), sans-serif", letterSpacing: "0.06em", fontWeight: 600 }}
+                    >
+                      {room.disposition === "remove" ? "EXISTING · TO REMOVE" : room.disposition === "replace" ? "EXISTING · REPLACE" : room.disposition === "keep" ? "EXISTING · KEEP" : "EXISTING · UNDECIDED"}
+                    </text>
+                  )}
 
                   {overlapping && (
                     <polygon
@@ -1384,7 +1543,9 @@ export function EditablePlanViewer({
                           strokeWidth={2}
                           style={{ cursor: "move" }}
                           onPointerDown={(e) => onVertexPointerDown(e, room, vertexIndex)}
-                        />
+                        >
+                          <title>{`Drag to reshape${plot ? " (snaps to 5 cm)" : ""}; shift-click to remove this vertex`}</title>
+                        </circle>
                       ))}
 
                       {/* Delete X above the top-right corner. */}
@@ -1455,3 +1616,74 @@ export function EditablePlanViewer({
   );
 }
 
+
+/**
+ * G5: the selected zone's exact geometry. A rectangle is edited as X / Y / W / D
+ * in metres from the plot's rear-left corner; any other outline shows its vertex
+ * count and can still gain a vertex (the longest edge splits) or lose one
+ * (shift-click its handle).
+ */
+function ZoneGeometryBar({
+  room,
+  toPlotM,
+  onRect,
+  onAddVertex,
+}: {
+  room: Room;
+  toPlotM: (p: Point) => Point;
+  onRect: (x: number, y: number, w: number, d: number) => void;
+  onAddVertex: () => void;
+}) {
+  const m = room.polygon.map(toPlotM);
+  const xs = m.map((p) => p[0]);
+  const ys = m.map((p) => p[1]);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const isRect =
+    m.length === 4 &&
+    m.every((p, i) => {
+      const q = m[(i + 1) % 4]!;
+      return Math.abs(p[0] - q[0]) < 0.011 || Math.abs(p[1] - q[1]) < 0.011;
+    });
+  const init = { x: r2(Math.min(...xs)), y: r2(Math.min(...ys)), w: r2(Math.max(...xs) - Math.min(...xs)), d: r2(Math.max(...ys) - Math.min(...ys)) };
+  const [v, setV] = useState(init);
+  const apply = () => onRect(v.x, v.y, v.w, v.d);
+  const field = (k: keyof typeof v, label: string) => (
+    <label className="flex items-center gap-1">
+      <span className="text-ink-500">{label}</span>
+      <input
+        type="number"
+        step={0.05}
+        value={v[k]}
+        onChange={(e) => setV({ ...v, [k]: Number(e.target.value) })}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") apply();
+        }}
+        className="focus-ring w-[72px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono text-xs tabular-nums text-ink-900"
+      />
+    </label>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-ink-100 bg-canvas px-3 py-2 text-xs text-ink-700">
+      <span className="font-semibold text-ink-900">{room.name_en}</span>
+      {isRect ? (
+        <>
+          {field("x", "X")}
+          {field("y", "Y")}
+          {field("w", "W")}
+          {field("d", "D")}
+          <span className="text-ink-500">m</span>
+          <button type="button" onClick={apply} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
+            Apply
+          </button>
+        </>
+      ) : (
+        <span className="font-mono tabular-nums">{m.length} vertices · {init.w} × {init.d} m extents</span>
+      )}
+      <button type="button" onClick={onAddVertex} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
+        + Vertex
+      </button>
+      <span className="text-ink-500">Shift-click a vertex to remove it. X/Y from the plot&apos;s top-left corner.</span>
+      {room.dims_derived && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Derived outline</span>}
+    </div>
+  );
+}

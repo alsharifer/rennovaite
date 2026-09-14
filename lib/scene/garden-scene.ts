@@ -14,6 +14,7 @@
 import { runBand, runSegments } from "@/lib/drawings/garden-elevations";
 import { bboxOf, gardenZones, toMetres, type GardenFixture } from "@/lib/drawings/garden-sheets";
 import type { PlanGraph, Point } from "@/lib/plan/geometry";
+import { isInDesign } from "@/lib/plan/site-reference";
 
 import { SceneBuilder, type MaterialKey, type Scene } from "./mesh";
 
@@ -58,8 +59,17 @@ export interface GardenSceneInput {
   variants?: Record<string, string | null>;
 }
 
-export function buildGardenScene({ graph, fixtures, variants = {} }: GardenSceneInput): Scene {
+export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, variants = {} }: GardenSceneInput): Scene {
   const sb = new SceneBuilder();
+  // G5: the scene is the DESIGN. An existing item the design removes is not in
+  // it; a kept or undecided one stands where it stands, as what it is.
+  const graph: PlanGraph = {
+    ...fullGraph,
+    rooms: fullGraph.rooms.filter(isInDesign),
+    elements: fullGraph.elements.filter(isInDesign),
+    context: fullGraph.context.filter(isInDesign),
+  };
+  const fixtures = allFixtures.filter((f) => isInDesign({ site_reference: f.site_reference ?? false, disposition: f.disposition ?? null }));
   const zones = gardenZones(graph);
   const levelAt = (p: Point): number => {
     const z = zones.find((r) => r.type !== "structure" && pointInPolygon(p, r.polygon)) ?? zones.find((r) => pointInPolygon(p, r.polygon));
@@ -85,12 +95,16 @@ export function buildGardenScene({ graph, fixtures, variants = {} }: GardenScene
     if (z.type === "planting_bed") plantMasses(sb, z.polygon, top, `plants:${z.id}`, z.id);
   }
 
-  // Structure zones (a pergola).
+  // Structure zones (a pergola; G5: or an existing gazebo, drawn as one).
   for (const z of zones.filter((r) => r.type === "structure" && r.height_mm != null)) {
     const spec = (z.spec ?? {}) as Record<string, unknown>;
     const b = bboxOf(z.polygon);
     const lv = (z.level_mm ?? 0) / 1000;
     const H = z.height_mm! / 1000;
+    if (spec.form === "gazebo") {
+      gazebo(sb, b, lv, H, sb.object({ key: `structure:${z.id}`, label: z.name_en, category: "structure", noun: "gazebo", zoneId: z.id }));
+      continue;
+    }
     const m = (num(spec.member_mm) ?? 150) / 1000;
     const beam = (num(spec.beam_depth_mm) ?? 150) / 1000;
     const id = sb.object({ key: `structure:${z.id}`, label: z.name_en, category: "structure", noun: "pergola", zoneId: z.id });
@@ -120,13 +134,32 @@ export function buildGardenScene({ graph, fixtures, variants = {} }: GardenScene
   for (const el of graph.elements) {
     if (el.kind === "boundary_wall") continue;
     const spec = (el.spec ?? {}) as Record<string, unknown>;
+    if (el.kind === "stepping_path") {
+      steppingPath(sb, graph, el, levelAt, zoneIdAt);
+      continue;
+    }
+    if (el.kind === "string_light_run") {
+      // Festoon lamps along the run: light for the evening view, no geometry a
+      // gate could mistake for a structure.
+      const segs = runSegments(el);
+      const H = el.height_mm / 1000;
+      const pitch = 1.0;
+      for (const seg of segs) {
+        for (let t = pitch / 2; t < seg.len; t += pitch) {
+          const p: Point = [seg.a[0] + seg.dir[0] * t, seg.a[1] + seg.dir[1] * t];
+          sb.lights.push({ pos: [p[0], levelAt(p) + H - 0.15 * Math.sin((Math.PI * t) / seg.len), p[1]], radius: 0.45, kind: "strip" });
+        }
+      }
+      continue;
+    }
     const [o0, o1] = runBand(el);
     const segs = runSegments(el);
     const mid = segs[0] ? ([(segs[0].a[0] + segs[0].b[0]) / 2, (segs[0].a[1] + segs[0].b[1]) / 2] as Point) : ([0, 0] as Point);
     const lv = levelAt(mid);
     const H = el.height_mm / 1000;
     const variant = variants[el.id] ?? null;
-    const noun = el.kind === "counter_run" ? (variant === "bbq" ? "BBQ counter" : variant === "bar" ? "bar counter" : "counter") : el.kind === "bench_run" ? "built-in bench" : "raised planter";
+    const form = typeof spec.form === "string" ? spec.form : null;
+    const noun = el.kind === "counter_run" ? (variant === "bbq" ? "BBQ counter" : variant === "bar" ? "bar counter" : form === "sink counter" ? "outdoor sink counter" : "counter") : el.kind === "bench_run" ? "built-in bench" : form === "planter border" ? "planter border" : "raised planter";
     const id = sb.object({ key: `run:${el.id}`, label: noun, category: "structure", noun, zoneId: zoneIdAt(mid) });
     segs.forEach((seg, i) => {
       const ext = 0;
@@ -219,6 +252,15 @@ export function buildGardenScene({ graph, fixtures, variants = {} }: GardenScene
       const tree = sb.object({ key: `plants:${u.id}`, label: "tree in planter", category: "planting", noun: "tree", zoneId });
       sb.box(p[0] - 0.07, lv + H - 0.06, p[1] - 0.07, p[0] + 0.07, lv + H + 1.1, p[1] + 0.07, "trunk", tree);
       canopy(sb, [p[0], lv + H + 1.6, p[1]], 0.75, 0.6, tree);
+    } else if (u.type === "tree") {
+      const H = (num(s.height_mm) ?? 4000) / 1000;
+      const R = (num(s.canopy_mm) ?? 3000) / 2000;
+      const palm = String(s.species ?? "").toLowerCase().includes("palm");
+      const tree = sb.object({ key: `plants:${u.id}`, label: palm ? "palm tree" : "tree", category: "planting", noun: palm ? "palm tree" : "tree", zoneId });
+      const trunk = palm ? 0.14 : 0.1;
+      sb.box(p[0] - trunk, lv, p[1] - trunk, p[0] + trunk, lv + H * (palm ? 0.92 : 0.55), p[1] + trunk, "trunk", tree);
+      if (palm) canopy(sb, [p[0], lv + H * 0.93, p[1]], R, 0.45, tree);
+      else canopy(sb, [p[0], lv + H * 0.7, p[1]], R, H * 0.28, tree);
     } else if (u.type === "bbq_grill") {
       const W = (num(s.width_mm) ?? 700) / 1000;
       const D = (num(s.depth_mm) ?? 500) / 1000;
@@ -323,5 +365,56 @@ function canopy(sb: SceneBuilder, c: [number, number, number], rxz: number, ry: 
     const p = ring[i]!, q = ring[(i + 1) % 6]!;
     sb.tri(top, p, q, mat, obj);
     sb.tri(bot, q, p, mat, obj);
+  }
+}
+
+/**
+ * G5: an existing hardtop gazebo — four corner posts, dark glazed panels on three
+ * sides with the widest side open, a hipped roof. Read off the client photos; its
+ * height is assumed and flagged on the zone, never invented here.
+ */
+function gazebo(sb: SceneBuilder, b: { minX: number; minY: number; maxX: number; maxY: number }, lv: number, H: number, id: number): void {
+  const post = 0.1;
+  const eave = lv + H * 0.78;
+  const [x0, z0, x1, z1] = [b.minX + 0.1, b.minY + 0.1, b.maxX - 0.1, b.maxY - 0.1];
+  for (const [px, pz] of [[x0, z0], [x1 - post, z0], [x0, z1 - post], [x1 - post, z1 - post]] as [number, number][]) {
+    sb.box(px, lv, pz, px + post, eave, pz + post, "metal", id);
+  }
+  // Glazed panels: back (min z) and both ends; the front (max z) stays open.
+  sb.box(x0 + post, lv + 0.05, z0, x1 - post, eave - 0.1, z0 + 0.04, "glass", id);
+  sb.box(x0, lv + 0.05, z0 + post, x0 + 0.04, eave - 0.1, z1 - post, "glass", id);
+  sb.box(x1 - 0.04, lv + 0.05, z0 + post, x1, eave - 0.1, z1 - post, "glass", id);
+  // Eave frame and hipped roof.
+  sb.box(x0 - 0.15, eave - 0.12, z0 - 0.15, x1 + 0.15, eave, z1 + 0.15, "metal", id);
+  const apex: [number, number, number] = [(x0 + x1) / 2, lv + H, (z0 + z1) / 2];
+  const e: [number, number, number][] = [[x0 - 0.15, eave, z0 - 0.15], [x1 + 0.15, eave, z0 - 0.15], [x1 + 0.15, eave, z1 + 0.15], [x0 - 0.15, eave, z1 + 0.15]];
+  for (let i = 0; i < 4; i++) sb.tri(e[i]!, apex, e[(i + 1) % 4]!, "metal", id);
+}
+
+/** G5: concrete slabs set flush in the lawn along a run's centreline. */
+function steppingPath(
+  sb: SceneBuilder,
+  graph: PlanGraph,
+  el: PlanGraph["elements"][number],
+  levelAt: (p: Point) => number,
+  zoneIdAt: (p: Point) => string | null,
+): void {
+  const spec = (el.spec ?? {}) as Record<string, unknown>;
+  const slab = Array.isArray(spec.slab_mm) ? (spec.slab_mm as number[]).map((v) => v / 1000) : [el.width_mm / 1000, 0.5];
+  const across = slab[0] ?? 0.6;
+  const along = slab[1] ?? 0.5;
+  const gap = (num(spec.gap_mm) ?? 150) / 1000;
+  const segs = runSegments(el);
+  const first = segs[0];
+  const mid: Point = first ? [(first.a[0] + first.b[0]) / 2, (first.a[1] + first.b[1]) / 2] : [0, 0];
+  const id = sb.object({ key: `run:${el.id}`, label: "stepping-stone path", category: "surface", noun: "stepping-stone path", zoneId: zoneIdAt(mid) });
+  void graph;
+  for (const seg of segs) {
+    for (let t = 0; t + along <= seg.len + 1e-6; t += along + gap) {
+      const a: Point = [seg.a[0] + seg.dir[0] * t, seg.a[1] + seg.dir[1] * t];
+      const b2: Point = [seg.a[0] + seg.dir[0] * (t + along), seg.a[1] + seg.dir[1] * (t + along)];
+      const lv = levelAt(a);
+      sb.bandBox(a, b2, -across / 2, across / 2, lv + 0.02, lv + 0.045, "slab", id);
+    }
   }
 }

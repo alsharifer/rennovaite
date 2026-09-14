@@ -1,0 +1,401 @@
+{
+  "reference": "8d460645-9450-4072-af41-b37adf8512a0",
+  "standIn": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
+  "checks": [
+    "PASS  regenerating Villa 94's pack touches zero rows, assets or cached images of the client — 60 rows, 14 storage objects unchanged",
+    "PASS  regenerating the client's pack touches zero rows, assets or cached images of Villa 94 — 119 rows, 180 storage objects unchanged",
+    "PASS  [villa94] scene render rows — none rendered on this run — row, manifest and storage assertions not applicable",
+    "PASS  [villa94] every drawing sheet carries this project — 25 sheets",
+    "PASS  [villa94] every BoQ line's element_refs resolve inside this project — 35 refs",
+    "PASS  [villa94] take-off rows carry this project — 35 rows",
+    "PASS  [client] scene render rows — none rendered on this run — row, manifest and storage assertions not applicable",
+    "PASS  [client] every drawing sheet carries this project — 10 sheets",
+    "PASS  [client] every BoQ line's element_refs resolve inside this project — 5 refs",
+    "PASS  [client] take-off rows carry this project — 5 rows",
+    "PASS  no render cache key is shared between the projects (same zones, same scene) — 0 vs 0 keys, 0 shared"
+  ],
+  "snapshots": {
+    "standIn": {
+      "before": {
+        "counts": {
+          "renders": 0,
+          "boqs": 0,
+          "takeoff_items": 0,
+          "plan_fixtures": 6,
+          "moodboard_items": 0,
+          "style_choices": 0,
+          "boq_outcomes": 0,
+          "plans": 1,
+          "rooms": 4,
+          "plan_elements": 6,
+          "plan_context": 6,
+          "project_assets": 14,
+          "pilot_events": 23,
+          "boq_corrections": 0,
+          "room_photos": 0
+        },
+        "fingerprints": {
+          "renders": "4f53cda18c2baa0c",
+          "boqs": "4f53cda18c2baa0c",
+          "takeoff_items": "4f53cda18c2baa0c",
+          "plan_fixtures": "2d066ff1f7f03f49",
+          "moodboard_items": "4f53cda18c2baa0c",
+          "style_choices": "4f53cda18c2baa0c",
+          "boq_outcomes": "4f53cda18c2baa0c",
+          "plans": "c848a621d0e34421",
+          "rooms": "792048c48287aa5d",
+          "plan_elements": "b62fcee7db288276",
+          "plan_context": "dcb45fbc137b7862",
+          "project_assets": "d0262cf8c0b1c940",
+          "pilot_events": "e6368a371a9e7e91",
+          "boq_corrections": "4f53cda18c2baa0c",
+          "room_photos": "4f53cda18c2baa0c"
+        },
+        "storage": {
+          "objects": 14,
+          "fingerprint": "067a4a086e586203"
+        }
+      },
+      "after": {
+        "counts": {
+          "renders": 0,
+          "boqs": 0,
+          "takeoff_items": 0,
+          "plan_fixtures": 6,
+          "moodboard_items": 0,
+          "style_choices": 0,
+          "boq_outcomes": 0,
+          "plans": 1,
+          "rooms": 4,
+          "plan_elements": 6,
+          "plan_context": 6,
+          "project_assets": 14,
+          "pilot_events": 23,
+          "boq_corrections": 0,
+          "room_photos": 0
+        },
+        "fingerprints": {
+          "renders": "4f53cda18c2baa0c",
+          "boqs": "4f53cda18c2baa0c",
+          "takeoff_items": "4f53cda18c2baa0c",
+          "plan_fixtures": "2d066ff1f7f03f49",
+          "moodboard_items": "4f53cda18c2baa0c",
+          "style_choices": "4f53cda18c2baa0c",
+          "boq_outcomes": "4f53cda18c2baa0c",
+          "plans": "c848a621d0e34421",
+          "rooms": "792048c48287aa5d",
+          "plan_elements": "b62fcee7db288276",
+          "plan_context": "dcb45fbc137b7862",
+          "project_assets": "d0262cf8c0b1c940",
+          "pilot_events": "e6368a371a9e7e91",
+          "boq_corrections": "4f53cda18c2baa0c",
+          "room_photos": "4f53cda18c2baa0c"
+        },
+        "storage": {
+          "objects": 14,
+          "fingerprint": "067a4a086e586203"
+        }
+      }
+    },
+    "villa94": {
+      "before": {
+        "counts": {
+          "renders": 0,
+          "boqs": 9,
+          "takeoff_items": 35,
+          "plan_fixtures": 40,
+          "moodboard_items": 2,
+          "style_choices": 1,
+          "boq_outcomes": 1,
+          "plans": 1,
+          "rooms": 12,
+          "plan_elements": 4,
+          "plan_context": 13,
+          "project_assets": 0,
+          "pilot_events": 1,
+          "boq_corrections": 0,
+          "room_photos": 0
+        },
+        "fingerprints": {
+          "renders": "4f53cda18c2baa0c",
+          "boqs": "5f629ff92b89e6c7",
+          "takeoff_items": "34e32ed2737f125b",
+          "plan_fixtures": "66564b237f1a3a68",
+          "moodboard_items": "6c85059c829de63c",
+          "style_choices": "7fcc3402266fc67c",
+          "boq_outcomes": "5cc2bc6543afbdd8",
+          "plans": "ecbe17050c992125",
+          "rooms": "2b3d8445f9433c2c",
+          "plan_elements": "996acdc5675d5164",
+          "plan_context": "cc8ccedb4a3bad08",
+          "project_assets": "4f53cda18c2baa0c",
+          "pilot_events": "8c7f62b7fa215ad2",
+          "boq_corrections": "4f53cda18c2baa0c",
+          "room_photos": "4f53cda18c2baa0c"
+        },
+        "storage": {
+          "objects": 180,
+          "fingerprint": "2fc663a90062ddc6"
+        }
+      },
+      "after": {
+        "counts": {
+          "renders": 0,
+          "boqs": 9,
+          "takeoff_items": 35,
+          "plan_fixtures": 40,
+          "moodboard_items": 2,
+          "style_choices": 1,
+          "boq_outcomes": 1,
+          "plans": 1,
+          "rooms": 12,
+          "plan_elements": 4,
+          "plan_context": 13,
+          "project_assets": 0,
+          "pilot_events": 1,
+          "boq_corrections": 0,
+          "room_photos": 0
+        },
+        "fingerprints": {
+          "renders": "4f53cda18c2baa0c",
+          "boqs": "5f629ff92b89e6c7",
+          "takeoff_items": "34e32ed2737f125b",
+          "plan_fixtures": "66564b237f1a3a68",
+          "moodboard_items": "6c85059c829de63c",
+          "style_choices": "7fcc3402266fc67c",
+          "boq_outcomes": "5cc2bc6543afbdd8",
+          "plans": "ecbe17050c992125",
+          "rooms": "2b3d8445f9433c2c",
+          "plan_elements": "996acdc5675d5164",
+          "plan_context": "cc8ccedb4a3bad08",
+          "project_assets": "4f53cda18c2baa0c",
+          "pilot_events": "8c7f62b7fa215ad2",
+          "boq_corrections": "4f53cda18c2baa0c",
+          "room_photos": "4f53cda18c2baa0c"
+        },
+        "storage": {
+          "objects": 180,
+          "fingerprint": "2fc663a90062ddc6"
+        }
+      }
+    }
+  },
+  "gate": {
+    "villa94": [
+      {
+        "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
+        "label": "North planting strip",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
+        "label": "North planting strip",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
+        "label": "Pergola court paving",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
+        "label": "Pergola court paving",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
+        "label": "Wall-feature terrace",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
+        "label": "Wall-feature terrace",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+        "label": "Seating-bench court",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+        "label": "Seating-bench court",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
+        "label": "Aluminium pergola",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
+        "label": "Aluminium pergola",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+        "label": "Backyard lawn",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+        "label": "Backyard lawn",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
+        "label": "West planting strip",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
+        "label": "West planting strip",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+        "label": "Side courtyard",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+        "label": "Side courtyard",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
+        "label": "Front lawn — north",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
+        "label": "Front lawn — north",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
+        "label": "Front approach — upper",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
+        "label": "Front approach — upper",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:e15d5e11-f020-477c-930e-ebd1d633535e",
+        "label": "Front approach — lower",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
+        "label": "Front lawn — south",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
+        "label": "Front lawn — south",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "garden:garden-1",
+        "label": "Whole garden — view 1",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "garden:garden-1",
+        "label": "Whole garden — view 1",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "garden:garden-2",
+        "label": "Whole garden — view 2",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "garden:garden-2",
+        "label": "Whole garden — view 2",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "garden:front-1",
+        "label": "Front garden",
+        "view": "day",
+        "outcome": "missing",
+        "attempts": []
+      },
+      {
+        "camera": "garden:front-1",
+        "label": "Front garden",
+        "view": "evening",
+        "outcome": "missing",
+        "attempts": []
+      }
+    ],
+    "standIn": []
+  },
+  "packs": {
+    "villa94": {
+      "pages": 18,
+      "bytes": 2071799
+    },
+    "standIn": {
+      "pages": 7,
+      "bytes": 898488
+    }
+  }
+}

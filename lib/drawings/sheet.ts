@@ -48,6 +48,12 @@ export interface SheetMeta {
    * the root). Absent on interior sheets, which therefore render unchanged.
    */
   projectId?: string;
+  /**
+   * G5: the draft statement. Present → every sheet carries it in a stamp above
+   * the title block and data-draft="true" on its root. Absent on every sheet
+   * built before G5, which therefore renders unchanged.
+   */
+  draft?: string | null;
 }
 
 /** Region available for drawing content (inside margins, above the title block). */
@@ -109,6 +115,20 @@ function titleBlock(meta: SheetMeta, sheetNumber: string, sheetTitle: string): s
   </g>`;
 }
 
+/** G5: the draft stamp — terracotta, directly above the title block, on every sheet. */
+export const DRAFT_STAMP_BOX = { h: 13, gap: 2 };
+function draftStamp(statement: string): string {
+  const x = SHEET_W - SHEET_MARGIN - TITLE_W;
+  const y = SHEET_H - SHEET_MARGIN - TITLE_H - DRAFT_STAMP_BOX.gap - DRAFT_STAMP_BOX.h;
+  const [head, ...rest] = statement.split(" — ");
+  return `
+  <g data-draft-stamp="true" data-draft-statement="${esc(statement)}">
+    <rect x="${x}" y="${y}" width="${TITLE_W}" height="${DRAFT_STAMP_BOX.h}" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.6"/>
+    <text x="${x + 3}" y="${y + 5.4}" font-size="4.2" fill="${TERRACOTTA}" style="font-family:${FONT_UI};font-weight:700;letter-spacing:0.06em">${esc(head ?? statement)}</text>
+    <text x="${x + 3}" y="${y + 10.2}" font-size="2.55" fill="${TERRACOTTA}" style="font-family:${FONT_UI}">${esc(rest.join(" — "))}</text>
+  </g>`;
+}
+
 function northArrow(cx: number, cy: number, northDeg: number): string {
   // Arrow points "up" then rotates by north_deg (0 = up).
   return `
@@ -158,11 +178,11 @@ export function renderSheet(o: RenderSheetOptions): string {
         ? scaleBar(SHEET_MARGIN + 2, SHEET_H - SHEET_MARGIN - 5, o.scaleBar.mmPerM, o.scaleBar.cells, o.scaleBar.stepM)
         : scaleBar(SHEET_MARGIN + 2, SHEET_H - SHEET_MARGIN - 5))
     : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}mm" height="${SHEET_H}mm" viewBox="0 0 ${SHEET_W} ${SHEET_H}" role="img" aria-label="${esc(o.title)}"${o.meta.projectId ? ` data-project-id="${esc(o.meta.projectId)}"` : ""}>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}mm" height="${SHEET_H}mm" viewBox="0 0 ${SHEET_W} ${SHEET_H}" role="img" aria-label="${esc(o.title)}"${o.meta.projectId ? ` data-project-id="${esc(o.meta.projectId)}"` : ""}${o.meta.draft ? ` data-draft="true"` : ""}>
   <rect x="0" y="0" width="${SHEET_W}" height="${SHEET_H}" fill="${PAPER}"/>
   <rect x="${SHEET_MARGIN / 2}" y="${SHEET_MARGIN / 2}" width="${SHEET_W - SHEET_MARGIN}" height="${SHEET_H - SHEET_MARGIN}" fill="none" stroke="${INK_900}" stroke-width="0.5"/>
   ${o.body}
   ${ns}
-  ${titleBlock(o.meta, o.sheetNumber, o.title)}
+  ${titleBlock(o.meta, o.sheetNumber, o.title)}${o.meta.draft ? `\n  ${draftStamp(o.meta.draft)}` : ""}
 </svg>`;
 }

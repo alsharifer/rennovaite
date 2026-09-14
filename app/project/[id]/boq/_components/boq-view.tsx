@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { boqDerivedInfo, derivedLineNote, derivedTotal } from "@/lib/documents/boq-derived";
 import { cn } from "@/lib/utils";
 import {
   recalc,
@@ -61,6 +62,15 @@ export type BoqPayload = {
   vat_pct: number;
   vat_aed: number;
   grand_total_aed: number;
+  /** G5: a garden BoQ's verdict on itself (draft, derived lines, site-reference decisions). */
+  garden?: {
+    draft: { draft: boolean; derived: string[]; note: string | null; statement: string | null };
+    derived_lines: number;
+    removals: { element_id: string; name: string; qty: number; unit: string; disposition: string }[];
+    kept: { element_id: string; name: string }[];
+    undecided: { element_id: string; name: string }[];
+    needs_selection: string[];
+  };
 };
 
 export type VendorOption = {
@@ -329,6 +339,9 @@ export function BoqView({
   const scopeTotal = whatifOn && scenario ? scenario.total : adjustedTotal;
   const furnitureIncluded = furnitureOn ? furnitureTotal : 0;
   const displayTotal = scopeTotal + furnitureIncluded;
+  // G5: a total resting on derived quantities never prints as a bare number.
+  const derivedInfo = boqDerivedInfo(boq);
+  const totalFootnote = derivedTotal(displayTotal, derivedInfo).footnote;
   const headroom = budgetAed - displayTotal;
 
   // Top 5 sections by total for the stacked bar, with everything else
@@ -454,8 +467,13 @@ export function BoqView({
             transition={{ duration: 0.24, ease: "easeOut" }}
             className="font-display text-headline-lg tabular-nums text-ink-900"
           >
-            {formatAed(displayTotal)}
+            {derivedTotal(displayTotal, derivedInfo).text}
           </motion.h2>
+          {totalFootnote && (
+            <p className="font-body-sm text-[12px] leading-4 text-[#9A3412]" data-derived-total="true">
+              {totalFootnote}
+            </p>
+          )}
           <p className="font-body-sm text-body-sm text-on-surface-variant">
             against your {formatAed(budgetAed)} budget —{" "}
             <span
@@ -521,6 +539,21 @@ export function BoqView({
               vendors" both with text was 390px in a 336px column. The
               icon is universally read; title attribute carries the
               label for screen readers and tooltips. */}
+          {/* G5: a garden BoQ exports as a PDF (draft header, derived total). */}
+          {boq.garden ? (
+            <a
+              href={`/api/projects/${projectId}/boq-pdf`}
+              target="_blank"
+              rel="noopener"
+              title="Export PDF"
+              aria-label="Export PDF"
+              className="focus-ring flex size-12 items-center justify-center rounded-lg border border-ink-100 text-ink-900 transition-colors hover:bg-surface-container-low"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                picture_as_pdf
+              </span>
+            </a>
+          ) : (
           <button
             type="button"
             title="Export PDF"
@@ -531,6 +564,7 @@ export function BoqView({
               picture_as_pdf
             </span>
           </button>
+          )}
           <Link
             href={`/project/${projectId}/vendors`}
             className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
@@ -638,7 +672,7 @@ export function BoqView({
                       fontFamily: "var(--font-jetbrains-mono), monospace",
                     }}
                   >
-                    {formatAed(displayTotal)}
+                    {derivedTotal(displayTotal, derivedInfo).text}
                   </motion.span>
                 </td>
                 <td colSpan={2} />
@@ -1144,8 +1178,8 @@ function LineRow({
             {line.description}
           </p>
           {line.qty_derived && (
-            <p className="mt-1 font-body-sm text-[12px] text-error">
-              Quantity inferred, not measured — confirm on site.
+            <p className="mt-1 font-body-sm text-[12px] text-error" data-derived-line="true">
+              {derivedLineNote(line)}
             </p>
           )}
           {line.notes && (

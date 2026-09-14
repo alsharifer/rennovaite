@@ -27,6 +27,7 @@
 // Deterministic SVG. No LLM, no DOM.
 // =============================================================================
 
+import { isInDesign, isNewWork } from "@/lib/plan/site-reference";
 import { LINEAR_ELEMENT_META, type LinearElement } from "@/lib/plan/elements";
 import type { ContextVolume, PlanGraph, Point, Room } from "@/lib/plan/geometry";
 import { roomTypeLabel } from "@/lib/plan/zones";
@@ -66,6 +67,11 @@ export interface GardenFixture {
   /** Normalised plan space, like rooms.polygon. */
   position: [number, number];
   spec?: Record<string, unknown> | null;
+  /** G5 (migration 037): an existing feature placed from photos, and the call on it. */
+  site_reference?: boolean | null;
+  disposition?: string | null;
+  dims_derived?: boolean | null;
+  derived_note?: string | null;
 }
 
 export interface GardenSheet {
@@ -353,18 +359,42 @@ function runSvg(el: LinearElement, f: Frame, withLabel = true): string {
   if (el.kind === "boundary_wall") return "";
   const meta = LINEAR_ELEMENT_META[el.kind];
   const w = Math.max(0.6, (el.width_mm / 1000) * f.k * 0.6);
+  // G5: an existing run is dashed; one the design removes is faint.
+  const dash = el.site_reference ? ` stroke-dasharray="${f2(Math.max(1.2, w * 1.6))} ${f2(Math.max(0.8, w))}"` : "";
+  const removed = el.site_reference && el.disposition === "remove";
   const pts = el.polyline.map(([x, y]) => `${f2(f.px(x))},${f2(f.py(y))}`).join(" ");
   const mid = el.polyline[Math.floor(el.polyline.length / 2)] ?? el.polyline[0]!;
   const label = withLabel
     ? `<text x="${f2(f.px(mid[0]) + 1.2)}" y="${f2(f.py(mid[1]) - 1.2)}" font-size="2.4" fill="${meta.color}" style="font-family:${FONT_MONO}" data-dim="run" data-mm="${Math.round(el.length_m * 1000)}">${meta.code} ${Math.round(el.length_m * 1000)}</text>`
     : "";
-  return `<polyline points="${pts}" fill="none" stroke="${meta.color}" stroke-width="${f2(w)}" stroke-opacity="0.85" stroke-linecap="butt" stroke-linejoin="miter"/>${label}`;
+  return `<polyline points="${pts}" fill="none" stroke="${meta.color}" stroke-width="${f2(w)}" stroke-opacity="${removed ? 0.3 : 0.85}"${dash} stroke-linecap="butt" stroke-linejoin="miter"/>${label}`;
+}
+
+/**
+ * G5: the plan the DESIGN is made of — an existing item the design removes is
+ * taken out. Zone sheets, overlays, elevations and the 3D scene read this; the
+ * site plan draws the removed items faintly on top so the demolition is visible.
+ */
+export function designGraph(graph: PlanGraph): PlanGraph {
+  return { ...graph, rooms: graph.rooms.filter(isInDesign), elements: graph.elements.filter(isInDesign), context: graph.context.filter(isInDesign) };
+}
+
+export function designFixtures(fixtures: readonly GardenFixture[]): GardenFixture[] {
+  return fixtures.filter((f) => isInDesign({ site_reference: f.site_reference ?? false, disposition: f.disposition ?? null }));
+}
+
+const DISPOSITION_WORD: Record<string, string> = { keep: "keep", remove: "to remove", replace: "replace" };
+
+/** "existing · keep" — how a site-reference item is named on a sheet. */
+export function existingTag(t: { site_reference?: boolean | null; disposition?: string | null }): string {
+  return t.site_reference ? `existing · ${t.disposition ? DISPOSITION_WORD[t.disposition] ?? t.disposition : "undecided"}` : "";
 }
 
 const UNIT_META: Record<string, { code: string; label: string }> = {
   planter_box: { code: "PB", label: "Planter box" },
   wall_feature: { code: "WF", label: "Wall feature with bench" },
   bbq_grill: { code: "BQ", label: "Built-in BBQ grill" },
+  tree: { code: "TR", label: "Tree" },
 };
 
 function unitSymbol(x: number, y: number, code: string, color = INK_900): string {
@@ -463,14 +493,16 @@ function stepLevelTags(graph: PlanGraph, f: Frame): string {
 /** Top-of-structure tags for runs, units and structure zones inside a predicate. */
 function structureTopTags(graph: PlanGraph, fixtures: readonly GardenFixture[], f: Frame, include: (p: Point) => boolean): string {
   let s = "";
-  for (const z of gardenZones(graph).filter((r) => r.type === "structure" && r.height_mm != null)) {
+  // G5: tops are tagged for what gets BUILT — an existing item with an assumed
+  // height, a tree, a stepping path or a string light run carries no top level.
+  for (const z of gardenZones(graph).filter((r) => r.type === "structure" && r.height_mm != null && isNewWork(r))) {
     const b = bboxOf(z.polygon);
     const p: Point = [(b.minX + b.maxX) / 2, b.minY];
     if (!include(p)) continue;
     s += planLevelTag(f.px(b.minX) + 1.5, f.py(b.minY) + 2.4, (z.level_mm ?? 0) + z.height_mm!, "TRL", `room:${z.id}:level_mm + room:${z.id}:height_mm`, BRASS);
   }
   const code: Record<string, string> = { counter_run: "CTL", bench_run: "TOS", planter_run: "TOC" };
-  for (const el of graph.elements.filter((e) => e.kind !== "boundary_wall")) {
+  for (const el of graph.elements.filter((e) => (e.kind === "counter_run" || e.kind === "bench_run" || e.kind === "planter_run") && isNewWork(e))) {
     const a = el.polyline[0]!;
     const b = el.polyline[1] ?? a;
     const mid: Point = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
@@ -480,7 +512,7 @@ function structureTopTags(graph: PlanGraph, fixtures: readonly GardenFixture[], 
     const dy = el.kind === "planter_run" ? -2.2 : 2.6;
     s += planLevelTag(f.px(mid[0]) + (vertical ? 1.6 : -4), f.py(mid[1]) + (vertical ? (el.kind === "planter_run" ? -6 : 6) : dy), lv.mm + el.height_mm, code[el.kind] ?? "TOC", `${lv.src} + el:${el.id}:height_mm`, LINEAR_ELEMENT_META[el.kind].color);
   }
-  for (const u of fixtures.filter((x) => x.layer === "landscape" && typeof x.spec?.height_mm === "number")) {
+  for (const u of fixtures.filter((x) => x.layer === "landscape" && x.type !== "tree" && typeof x.spec?.height_mm === "number" && isNewWork({ site_reference: x.site_reference ?? false, disposition: x.disposition ?? null }))) {
     const m = toMetres(graph, u.position);
     if (!include(m)) continue;
     const lv = levelUnder(graph, m);
@@ -638,19 +670,22 @@ function siteBbox(graph: PlanGraph) {
 }
 
 export function renderSitePlan(
-  graph: PlanGraph,
-  fixtures: readonly GardenFixture[],
+  fullGraph: PlanGraph,
+  allFixtures: readonly GardenFixture[],
   meta: SheetMeta,
   sheet: { sheetNumber: string; title: string },
 ): string {
-  const b = siteBbox(graph);
+  const graph = designGraph(fullGraph);
+  const fixtures = designFixtures(allFixtures);
+  const b = siteBbox(fullGraph);
   const area = drawingArea();
   const f = frameFor(b, area);
   const zones = gardenZones(graph);
+  const removedZones = fullGraph.rooms.filter((r) => r.site_reference && r.disposition === "remove");
 
   let body = defs();
   body += contextSvg(graph, f, true);
-  body += graph.rooms.map((r) => zoneShape(r, f)).join("");
+  body += graph.rooms.map((r) => zoneShape(r, f, r.site_reference ? { highlight: BRASS } : {})).join("");
   body += wallsSvg(graph, f);
 
   // Plot outline + overall site extents.
@@ -661,10 +696,22 @@ export function renderSitePlan(
     body += extentDims({ minX: ox, minY: oy, maxX: ox + plot.width_m, maxY: oy + plot.depth_m }, f, 9, "plot");
   }
 
-  body += graph.elements.map((el) => runSvg(el, f)).join("");
-  for (const u of fixtures.filter((x) => x.layer === "landscape")) {
+  body += fullGraph.elements.map((el) => runSvg(el, f)).join("");
+  for (const u of allFixtures.filter((x) => x.layer === "landscape")) {
     const m = toMetres(graph, u.position);
-    body += unitSymbol(f.px(m[0]), f.py(m[1]), UNIT_META[u.type]?.code ?? "?");
+    const removed = u.site_reference && u.disposition === "remove";
+    if (u.type === "tree") {
+      const s = (u.spec ?? {}) as Record<string, unknown>;
+      const r = ((typeof s.canopy_mm === "number" ? s.canopy_mm : 3000) / 2000) * f.k;
+      body += `<circle cx="${f2(f.px(m[0]))}" cy="${f2(f.py(m[1]))}" r="${f2(r)}" fill="#4F7A52" fill-opacity="${removed ? 0.04 : 0.12}" stroke="#4F7A52" stroke-width="0.25"${u.site_reference ? ' stroke-dasharray="1 0.6"' : ""}/>`;
+    }
+    body += unitSymbol(f.px(m[0]), f.py(m[1]), `${removed ? "×" : ""}${UNIT_META[u.type]?.code ?? "?"}`, u.site_reference ? BRASS : INK_900);
+  }
+  // Existing zones the design removes: faint, crossed, named.
+  for (const r of removedZones) {
+    const p = labelPoint(r.polygon);
+    body += `<polygon points="${polyPts(r.polygon, f)}" fill="none" stroke="${TERRACOTTA}" stroke-width="0.35" stroke-dasharray="1.4 0.9"/>`;
+    body += `<text x="${f2(f.px(p[0]))}" y="${f2(f.py(p[1]))}" text-anchor="middle" font-size="2.2" fill="${TERRACOTTA}" style="font-family:${FONT_UI};font-weight:600">${esc(r.name_en)} — TO REMOVE</text>`;
   }
 
   // Zone tags, with the zone's level where the plan has more than one.
@@ -687,7 +734,8 @@ export function renderSitePlan(
   y += 3.8;
   zones.forEach((r, i) => {
     const flag = r.area_derived_m2 ? "*" : "";
-    body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${BRASS}" style="font-family:${FONT_MONO}">${zoneRef(i)}</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(r.name_en.slice(0, 32))}</text><text x="${panelX() + 70}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(zoneStyle(r.type).label)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO}" data-area="${r.area_m2}">${r.area_m2.toFixed(2)}${flag}</text>`;
+    const approx = r.dims_derived ? "≈ " : "";
+    body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${BRASS}" style="font-family:${FONT_MONO}">${zoneRef(i)}</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(r.name_en.slice(0, 32))}</text><text x="${panelX() + 70}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(zoneStyle(r.type).label)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO}" data-area="${r.area_m2}">${approx}${r.area_m2.toFixed(2)}${flag}</text>`;
     y += 3.5;
   });
   const total = r2(zones.reduce((s, r) => s + r.area_m2, 0));
@@ -713,6 +761,34 @@ export function renderSitePlan(
   const lv = levelsLegend(y, graph);
   body += lv.svg;
   y = lv.y + 2;
+
+  // G5: what already stands on site, and the design's call on each item.
+  const existing: string[] = [
+    ...fullGraph.rooms.filter((r) => r.site_reference).map((r) => `${r.name_en} — ${existingTag(r)}`),
+    ...fullGraph.elements.filter((e) => e.site_reference).map((e) => `${typeof e.spec?.name === "string" ? e.spec.name : LINEAR_ELEMENT_META[e.kind].label} — ${existingTag(e)}`),
+    ...allFixtures.filter((u) => u.site_reference).map((u) => `${typeof u.spec?.name === "string" ? u.spec.name : UNIT_META[u.type]?.label ?? u.type} — ${existingTag(u)}`),
+  ];
+  if (existing.length > 0) {
+    body += panelHeading(y, "Existing on site (dashed)");
+    y += 5;
+    for (const line of existing.slice(0, 18)) {
+      const t = panelText(y, line, { size: 2.1, color: INK_700 });
+      body += t.svg;
+      y = t.y + 0.4;
+    }
+    if (existing.length > 18) {
+      body += panelText(y, `… and ${existing.length - 18} more — see the drawing set cover.`, { size: 2.1, color: INK_500 }).svg;
+      y += 3.5;
+    }
+    y += 2;
+  }
+  if (fullGraph.meta.plot?.dims_derived || zones.some((r) => r.dims_derived)) {
+    body += panelHeading(y, "Derived dimensions (≈)");
+    y += 5;
+    const t = panelText(y, `Boundary and zone dimensions are DERIVED, not measured: ${fullGraph.meta.plot?.dims_note ?? zones.find((r) => r.dims_derived)?.derived_note ?? "reference layout"}.`, { size: 2.2, color: TERRACOTTA });
+    body += t.svg;
+    y = t.y + 2;
+  }
 
   const derived = zones.filter((r) => r.area_derived_m2 && r.derived_note);
   if (derived.length > 0) {
@@ -923,13 +999,17 @@ export const FITTING_LABEL: Record<string, string> = {
 };
 
 export function renderLightingOverlay(
-  graph: PlanGraph,
-  fixtures: readonly GardenFixture[],
+  fullGraph: PlanGraph,
+  allFixtures: readonly GardenFixture[],
   meta: SheetMeta,
   sheet: { sheetNumber: string; title: string },
 ): string {
+  const graph = designGraph(fullGraph);
+  const fixtures = designFixtures(allFixtures);
   const f = frameFor(siteBbox(graph), drawingArea());
   const lights = fixtures.filter((p) => p.type === "garden_light" || p.type === "boundary_light");
+  // G5: string light runs in the design (kept existing ones, or new) are lighting too.
+  const stringRuns = graph.elements.filter((e) => e.kind === "string_light_run");
   const pts = lights.map((p) => toMetres(graph, p.position));
   const tree = minimumSpanningTree(pts);
 
@@ -940,6 +1020,12 @@ export function renderLightingOverlay(
   lights.forEach((p, i) => {
     body += ringSymbol(f.px(pts[i]![0]), f.py(pts[i]![1]), fittingCode(p.spec, p.type), LIGHT_AMBER, 1.6);
   });
+  for (const el of stringRuns) {
+    const pl = el.polyline.map(([x, yy]) => `${f2(f.px(x))},${f2(f.py(yy))}`).join(" ");
+    const mid = el.polyline[Math.floor(el.polyline.length / 2)] ?? el.polyline[0]!;
+    body += `<polyline points="${pl}" fill="none" stroke="${LIGHT_AMBER}" stroke-width="0.5" stroke-dasharray="0.3 1"/>`;
+    body += `<text x="${f2(f.px(mid[0]) + 1.2)}" y="${f2(f.py(mid[1]) - 1.2)}" font-size="2.2" fill="${LIGHT_AMBER}" style="font-family:${FONT_MONO}">SL ${Math.round(el.length_m * 1000)}${el.site_reference ? " existing" : ""}</text>`;
+  }
 
   let y = SHEET_MARGIN + 8;
   body += `<rect x="${panelX() - 2}" y="${f2(y - 4)}" width="${PANEL_W + 4}" height="15" fill="#FFF7E8" stroke="${LIGHT_AMBER}" stroke-width="0.35"/>`;
@@ -956,6 +1042,12 @@ export function renderLightingOverlay(
     body += `<text x="${panelX() + 7}" y="${f2(y)}" font-size="2.5" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(FITTING_LABEL[code] ?? code)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.5" fill="${INK_900}" style="font-family:${FONT_MONO}" data-count="${code}">${n}</text>`;
     y += 4.2;
   }
+  if (stringRuns.length > 0) {
+    const lm = r2(stringRuns.reduce((s, e) => s + e.length_m, 0));
+    const existingRuns = stringRuns.filter((e) => e.site_reference).length;
+    body += `<text x="${panelX() + 7}" y="${f2(y)}" font-size="2.5" fill="${INK_700}" style="font-family:${FONT_UI}">String lights${existingRuns ? ` (${existingRuns} existing run${existingRuns === 1 ? "" : "s"})` : ""}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.5" fill="${INK_900}" style="font-family:${FONT_MONO}" data-count="SL">${lm.toFixed(1)} m</text>`;
+    y += 4.2;
+  }
   body += `<text x="${panelX() + 7}" y="${f2(y)}" font-size="2.5" fill="${INK_500}" style="font-family:${FONT_UI};font-weight:600">Total points</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.5" fill="${INK_900}" style="font-family:${FONT_MONO};font-weight:700">${lights.length}</text>`;
   y += 7;
 
@@ -966,7 +1058,7 @@ export function renderLightingOverlay(
   const t = panelText(y, "Route is the shortest network reaching every point — derived, not designed. Feed point, conduit and circuit layout to be confirmed by the electrical contractor.", { size: 2.3 });
   body += t.svg;
   y = t.y + 3;
-  const structures = graph.rooms.filter((r) => r.type === "structure");
+  const structures = graph.rooms.filter((r) => r.type === "structure" && isNewWork(r));
   if (structures.length > 0) {
     const s = panelText(y, `${structures.map((r) => r.name_en).join(", ")}: integral downlights are part of the structure and are not shown as points.`, { size: 2.3 });
     body += s.svg;
@@ -1070,10 +1162,12 @@ export function renderIrrigationOverlay(
 
 /** Assemble every garden sheet for a graph that has outdoor zones. */
 export function buildGardenSheets(
-  graph: PlanGraph,
-  fixtures: readonly GardenFixture[],
+  fullGraph: PlanGraph,
+  allFixtures: readonly GardenFixture[],
   meta: SheetMeta,
 ): GardenSheet[] {
+  const graph = designGraph(fullGraph);
+  const fixtures = designFixtures(allFixtures);
   const zones = gardenZones(graph);
   if (zones.length === 0) return [];
   const sheets: GardenSheet[] = [
@@ -1081,7 +1175,7 @@ export function buildGardenSheets(
       kind: "site_plan",
       title: "Site Plan — Garden",
       sheetNumber: "L-100",
-      svg: renderSitePlan(graph, fixtures, meta, { sheetNumber: "L-100", title: "Site Plan — Garden" }),
+      svg: renderSitePlan(fullGraph, allFixtures, meta, { sheetNumber: "L-100", title: "Site Plan — Garden" }),
     },
   ];
   zones.forEach((z, i) => {
@@ -1094,7 +1188,7 @@ export function buildGardenSheets(
       svg: renderZoneSheet(graph, z, zoneRef(i), fixtures, meta, { sheetNumber: num, title: `${zoneRef(i)} ${z.name_en}` }),
     });
   });
-  const hasLights = fixtures.some((p) => p.type === "garden_light" || p.type === "boundary_light");
+  const hasLights = fixtures.some((p) => p.type === "garden_light" || p.type === "boundary_light") || graph.elements.some((e) => e.kind === "string_light_run");
   if (hasLights) {
     sheets.push({
       kind: "lighting_overlay",
@@ -1119,3 +1213,91 @@ export const TITLE_BLOCK_BOX = {
   w: TITLE_W,
   h: TITLE_H,
 };
+
+// --- L-000 Cover & sheet index (G5) -------------------------------------------------
+
+/**
+ * The first page of a garden drawing set: what the set contains, whether it is a
+ * DRAFT and why, and what already stands on site with the design's call on each
+ * item. A reader who sees only this page knows how far to trust the rest.
+ */
+export function renderCoverSheet(
+  fullGraph: PlanGraph,
+  allFixtures: readonly GardenFixture[],
+  meta: SheetMeta,
+  index: readonly { sheetNumber: string; title: string }[],
+  draft: { derived: string[]; note: string | null } | null,
+): string {
+  const x0 = SHEET_MARGIN + 6;
+  let y = SHEET_MARGIN + 18;
+  let body = `<text x="${x0}" y="${y}" font-size="12" fill="${INK_900}" style="font-family:${FONT_DISPLAY}">${esc(meta.projectNameEn)}</text>`;
+  y += 8;
+  body += `<text x="${x0}" y="${y}" font-size="4" fill="${INK_500}" style="font-family:${FONT_UI};letter-spacing:0.08em">GARDEN DRAWING SET · ${esc(meta.community.toUpperCase())} · ${esc(meta.dateISO)}</text>`;
+  y += 12;
+
+  if (meta.draft) {
+    const h = 30 + Math.min(draft?.derived.length ?? 0, 6) * 0;
+    body += `<rect x="${x0}" y="${y}" width="232" height="${h}" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.7" data-draft-cover="true" data-draft-statement="${esc(meta.draft)}"/>`;
+    const [head, ...rest] = meta.draft.split(" — ");
+    body += `<text x="${x0 + 5}" y="${y + 10}" font-size="7" fill="${TERRACOTTA}" style="font-family:${FONT_UI};font-weight:700;letter-spacing:0.05em">${esc(head ?? meta.draft)}</text>`;
+    body += `<text x="${x0 + 5}" y="${y + 17}" font-size="3.6" fill="${TERRACOTTA}" style="font-family:${FONT_UI}">${esc(rest.join(" — "))}</text>`;
+    if (draft?.note) {
+      wrap(`Source: ${draft.note}`, 120).forEach((line, i) => {
+        body += `<text x="${x0 + 5}" y="${y + 23 + i * 3.6}" font-size="2.8" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(line)}</text>`;
+      });
+    }
+    y += h + 8;
+  }
+
+  // Sheet index.
+  body += `<text x="${x0}" y="${y}" font-size="3.4" fill="${INK_500}" style="font-family:${FONT_UI};font-weight:600;letter-spacing:0.08em">SHEET INDEX</text>`;
+  y += 3;
+  body += `<line x1="${x0}" y1="${y}" x2="${x0 + 232}" y2="${y}" stroke="${INK_100}" stroke-width="0.3"/>`;
+  y += 5;
+  const col = Math.ceil(index.length / 2);
+  index.forEach((s, i) => {
+    const cx = x0 + (i < col ? 0 : 118);
+    const cy = y + (i < col ? i : i - col) * 5;
+    body += `<text x="${cx}" y="${cy}" font-size="3" fill="${BRASS}" style="font-family:${FONT_MONO}" data-index="${esc(s.sheetNumber)}">${esc(s.sheetNumber)}</text><text x="${cx + 16}" y="${cy}" font-size="3" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(s.title.slice(0, 48))}</text>`;
+  });
+  y += col * 5 + 6;
+
+  // Notes.
+  const notes = [
+    "All dimensions in millimetres; levels against ±000.",
+    LIGHTING_SOURCE_STATEMENT,
+    ...(meta.draft ? ["Dimensions marked ≈ are derived from the reference layout, not measured. Quantities and drawings firm up after site verification."] : []),
+    ...(allFixtures.some((u) => u.site_reference) || fullGraph.rooms.some((r) => r.site_reference) || fullGraph.elements.some((e) => e.site_reference)
+      ? ["Existing features are placed approximately from site photos and shown dashed; each carries the design's decision (keep / remove / replace)."]
+      : []),
+  ];
+  body += `<text x="${x0}" y="${y}" font-size="3.4" fill="${INK_500}" style="font-family:${FONT_UI};font-weight:600;letter-spacing:0.08em">NOTES</text>`;
+  y += 6;
+  for (const n of notes) {
+    for (const line of wrap(n, 125)) {
+      body += `<text x="${x0}" y="${y}" font-size="2.8" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(line)}</text>`;
+      y += 3.8;
+    }
+    y += 1;
+  }
+
+  // Existing on site — right panel.
+  const existing: { name: string; tag: string }[] = [
+    ...fullGraph.rooms.filter((r) => r.site_reference).map((r) => ({ name: r.name_en, tag: existingTag(r) })),
+    ...fullGraph.elements.filter((e) => e.site_reference).map((e) => ({ name: typeof e.spec?.name === "string" ? e.spec.name : LINEAR_ELEMENT_META[e.kind].label, tag: existingTag(e) })),
+    ...allFixtures.filter((u) => u.site_reference).map((u) => ({ name: typeof u.spec?.name === "string" ? u.spec.name : UNIT_META[u.type]?.label ?? u.type, tag: existingTag(u) })),
+    ...fullGraph.context.filter((c) => c.site_reference).map((c) => ({ name: c.name, tag: existingTag(c) })),
+  ];
+  if (existing.length > 0) {
+    let py = SHEET_MARGIN + 18;
+    const px = panelX();
+    body += panelHeading(py, "Existing on site");
+    py += 5.5;
+    for (const e of existing.slice(0, 40)) {
+      body += `<text x="${px}" y="${f2(py)}" font-size="2.35" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(e.name.slice(0, 54))}</text><text x="${px + PANEL_W}" y="${f2(py)}" text-anchor="end" font-size="2.35" fill="${e.tag.endsWith("undecided") ? TERRACOTTA : BRASS}" style="font-family:${FONT_MONO}">${esc(e.tag.replace("existing · ", ""))}</text>`;
+      py += 3.6;
+    }
+  }
+
+  return renderSheet({ meta: { ...meta, scale: "NTS", level: "Ground (external works)" }, sheetNumber: "L-000", title: "Cover & Sheet Index", body, showNorthScale: false });
+}

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
 import { LINEAR_ELEMENT_META, LINEAR_ELEMENT_KINDS } from "@/lib/plan/elements";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -17,9 +18,26 @@ function db(): SupabaseClient {
   return getSupabaseAdmin() as unknown as SupabaseClient;
 }
 
-/** Columns the editor reads back — keep in sync with migration 031. */
+/** Columns the editor reads back — migrations 031/033, plus 036 spec and 037 site reference. */
 const SELECT_COLS =
+  "id, plan_id, room_id, kind, polyline, height_mm, width_mm, variant, source, derived, created_at, spec, dims_derived, derived_note, site_reference, disposition";
+const SELECT_COLS_PRE037 =
   "id, plan_id, room_id, kind, polyline, height_mm, width_mm, variant, source, derived, created_at";
+
+/** G5 fields a create or update may carry. */
+const SiteRefFields = {
+  spec: z.record(z.string(), z.unknown()).nullish(),
+  dims_derived: z.boolean().optional(),
+  derived_note: z.string().max(1000).nullish(),
+  site_reference: z.boolean().optional(),
+  disposition: z.enum(["keep", "remove", "replace"]).nullish(),
+};
+
+async function logEdit(planId: string | null, detail: Record<string, unknown>) {
+  if (!planId) return;
+  const projectId = await projectOfPlan(db(), planId);
+  if (projectId) await recordPilotEvent(db(), projectId, "design_edit", { layer: "elements", ...detail });
+}
 
 /** Counter runs only. `null` is the unanswered state and must stay reachable. */
 const VariantSchema = z.enum(["bar", "bbq"]);
@@ -44,11 +62,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "plan_id (uuid) required." }, { status: 400 });
   }
   try {
-    const { data, error } = await db()
+    let { data, error } = await db()
       .from("plan_elements")
       .select(SELECT_COLS)
       .eq("plan_id", planId)
       .order("created_at", { ascending: true });
+    if (error) {
+      const pre = await db().from("plan_elements").select(SELECT_COLS_PRE037).eq("plan_id", planId).order("created_at", { ascending: true });
+      data = pre.data as typeof data;
+      error = pre.error;
+    }
     if (error) {
       console.warn("[api/plan-elements] GET degraded:", error.message);
       return NextResponse.json({ elements: [], degraded: true });
@@ -68,6 +91,9 @@ const CreateSchema = z.object({
   height_mm: z.number().positive().nullish(),
   width_mm: z.number().positive().nullish(),
   variant: VariantSchema.nullish(),
+  /** A client may mark a cross-section derived (an estimate from a photo) — never measured. */
+  derived: z.literal(true).optional(),
+  ...SiteRefFields,
 });
 
 export async function POST(request: NextRequest) {
@@ -78,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
     const b = parsed.data;
     const meta = LINEAR_ELEMENT_META[b.kind as keyof typeof LINEAR_ELEMENT_META];
-    const dimsDefaulted = b.height_mm == null || b.width_mm == null;
+    const dimsDefaulted = b.height_mm == null || b.width_mm == null || b.derived === true;
 
     const { data, error } = await db()
       .from("plan_elements")
@@ -94,10 +120,16 @@ export async function POST(request: NextRequest) {
         variant: b.kind === "counter_run" ? (b.variant ?? null) : null,
         source: "user_drawn",
         derived: dimsDefaulted,
+        ...(b.spec !== undefined ? { spec: b.spec } : {}),
+        ...(b.dims_derived !== undefined ? { dims_derived: b.dims_derived } : {}),
+        ...(b.derived_note !== undefined ? { derived_note: b.derived_note } : {}),
+        ...(b.site_reference !== undefined ? { site_reference: b.site_reference } : {}),
+        ...(b.disposition !== undefined ? { disposition: b.disposition } : {}),
       })
       .select(SELECT_COLS)
       .single();
     if (error || !data) throw error ?? new Error("Failed to create element.");
+    await logEdit(b.plan_id, { action: "create", kind: b.kind });
     return NextResponse.json({ element: data, derived: dimsDefaulted });
   } catch (err) {
     console.error("[api/plan-elements] POST error", err);
@@ -114,6 +146,7 @@ const UpdateSchema = z.object({
   width_mm: z.number().positive().nullish(),
   /** `null` clears the choice back to unanswered; omitted leaves it alone. */
   variant: VariantSchema.nullable().optional(),
+  ...SiteRefFields,
 });
 
 /**
@@ -148,6 +181,7 @@ export async function PATCH(request: NextRequest) {
       .select(SELECT_COLS)
       .single();
     if (error || !data) throw error ?? new Error("Failed to update element.");
+    await logEdit((data as { plan_id?: string }).plan_id ?? null, { action: "update", fields: Object.keys(patch) });
     return NextResponse.json({ element: data });
   } catch (err) {
     console.error("[api/plan-elements] PATCH error", err);

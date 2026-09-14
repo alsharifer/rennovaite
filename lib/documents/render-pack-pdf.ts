@@ -15,17 +15,18 @@ import { generateDrawingSet } from "@/lib/drawings/export";
 import type { GardenFixture } from "@/lib/drawings/garden-sheets";
 import { gardenStyleFor, getGardenStyle, isGardenStyleKey } from "@/lib/garden-styles";
 import { derivePlanGraph } from "@/lib/plan/derive";
+import { graphDraftStatus } from "@/lib/plan/geometry";
 import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { PAGE_H, PAGE_W, buildRenderPack, containFit, type PackGardenView, type PackRender, type PackZone } from "./render-pack";
+import { PAGE_H, PAGE_W, buildRenderPack, containFit, type PackGardenView, type PackPhotoPair, type PackRender, type PackZone } from "./render-pack";
 
 const MM_TO_PT = 72 / 25.4;
 
 export interface GateRow {
   camera: string;
   label: string;
-  view: "day" | "evening";
+  view: "day" | "evening" | "photo_pair";
   outcome: "passed" | "substituted" | "missing";
   attempts: { attempt: number; passed: boolean; failures: string[] }[];
 }
@@ -67,7 +68,7 @@ async function toEmbeddable(bytes: Uint8Array): Promise<{ kind: "png" | "jpg"; b
   }
 }
 
-export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint8Array; summary: RenderPackSummary }> {
+export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint8Array; summary: RenderPackSummary; pageSvgs: string[] }> {
   const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
 
   const [graph, set, projectRes, styleRes, fixturesRes, sceneRes, ctx] = await Promise.all([
@@ -81,7 +82,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
       .is("room_id", null)
       .order("created_at", { ascending: false })
       .limit(1),
-    supabase.from("plan_fixtures").select("id, layer, type, room_id, position, spec").eq("project_id", projectId),
+    supabase.from("plan_fixtures").select("id, layer, type, room_id, position, spec, site_reference, disposition, dims_derived").eq("project_id", projectId),
     // G4b: ONLY plan-faithful scene renders, and only this project's. A photo-
     // mode or legacy off-plan render has not been gated and never enters a pack.
     supabase
@@ -94,6 +95,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
     loadGardenSceneContext(projectId).catch(() => null),
   ]);
 
+  const draftStatus = graphDraftStatus(graph);
   const variants: Record<string, string | null> = {};
   if (graph.planId) {
     const { data } = await supabase.from("plan_elements").select("id, variant").eq("plan_id", graph.planId);
@@ -123,17 +125,52 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   const gardenViews: PackGardenView[] = cameras
     .filter((c) => c.zoneId === null)
     .map((c) => ({ id: c.id, label: c.label, lit: c.lit, day: toPack(latest(c.id, "day")), evening: c.lit ? toPack(latest(c.id, "evening")) : null }));
-  const gate: GateRow[] = cameras.flatMap((c) =>
+  // G5: before/after photo pairs — only a restyle that passed its own check.
+  type PairRow = { id: string; room_id: string | null; camera: string; image_url: string; source_image_url: string; gate: { outcome: "passed" | "withheld"; attempts: { attempt: number; passed: boolean; failures: string[] }[]; caption?: string; zone_name?: string } | null };
+  const { data: pairData } = await supabase
+    .from("renders")
+    .select("id, room_id, camera, image_url, source_image_url, gate, created_at, project_id")
+    .eq("project_id", projectId)
+    .eq("mode", "photo_pair")
+    .eq("status", "succeeded")
+    .order("created_at", { ascending: false });
+  const pairRows = ((pairData ?? []) as (PairRow & { project_id: string })[]).filter((r) => r.project_id === projectId && r.gate);
+  const latestPair = new Map<string, PairRow>();
+  for (const r of pairRows) if (!latestPair.has(r.camera)) latestPair.set(r.camera, r);
+  const photoPairs: PackPhotoPair[] = [...latestPair.values()]
+    .filter((r) => r.gate!.outcome === "passed" && r.gate!.attempts.some((a) => a.passed))
+    .map((r) => ({
+      id: r.id,
+      zoneName: r.gate!.zone_name ?? graph.rooms.find((z) => z.id === r.room_id)?.name_en ?? "Garden",
+      beforeId: `before:${r.id}`,
+      after: { id: r.id, image_url: r.image_url, kind: "photo_edit", gate_passed: true, note: null },
+      caption: r.gate!.caption ?? "Client photo restyled in the design direction; layout and dimensions are on the drawing set.",
+    }));
+  const beforeUrls = new Map([...latestPair.values()].map((r) => [`before:${r.id}`, r.source_image_url]));
+
+  const gate: GateRow[] = [
+    ...[...latestPair.values()].map((r) => ({
+      camera: r.camera,
+      label: r.gate!.zone_name ?? "photo pair",
+      view: "photo_pair" as const,
+      outcome: (r.gate!.outcome === "passed" ? "passed" : "substituted") as GateRow["outcome"],
+      attempts: r.gate!.attempts.map((a) => ({ attempt: a.attempt, passed: a.passed, failures: a.failures })),
+    })),
+  ];
+  gate.push(...cameras.flatMap((c) =>
     (c.lit ? (["day", "evening"] as const) : (["day"] as const)).map((view) => {
       const r = latest(c.id, view);
-      return { camera: c.id, label: c.label, view, outcome: r ? r.gate!.outcome : "missing", attempts: r ? r.gate!.attempts.map((a) => ({ attempt: a.attempt, passed: a.passed, failures: a.failures })) : [] };
+      return { camera: c.id, label: c.label, view, outcome: (r ? r.gate!.outcome : "missing") as GateRow["outcome"], attempts: r ? r.gate!.attempts.map((a) => ({ attempt: a.attempt, passed: a.passed, failures: a.failures })) : [] };
     }),
-  );
+  ));
 
   // Fetch every photograph BEFORE composing, so a render whose image cannot be
   // fetched gets a page that says so instead of an empty frame.
   const bytesById = new Map<string, { kind: "png" | "jpg"; bytes: Uint8Array }>();
-  const wanted = [...Object.values(byRoom), ...gardenViews].flatMap((r) => [r.day, r.evening]).filter((r): r is PackRender => !!r);
+  const wanted: { id: string; image_url: string }[] = [
+    ...[...Object.values(byRoom), ...gardenViews].flatMap((r) => [r.day, r.evening]).filter((r): r is PackRender => !!r),
+    ...photoPairs.flatMap((p) => [p.after, { id: p.beforeId, image_url: beforeUrls.get(p.beforeId)! }]),
+  ];
   for (let i = 0; i < wanted.length; i += 4) {
     await Promise.all(
       wanted.slice(i, i + 4).map(async (r) => {
@@ -157,6 +194,9 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
     sitePlanSvg: set.sheets.find((s) => s.kind === "site_plan")?.svg ?? null,
     unavailableRenderIds: unavailable,
     gardenViews,
+    draft: draftStatus.statement,
+    draftNote: draftStatus.note,
+    photoPairs: photoPairs.filter((p) => !unavailable.has(p.after.id) && !unavailable.has(p.beforeId)),
   });
 
   const { Resvg } = await import("@resvg/resvg-js");
@@ -208,5 +248,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
     })),
     missing_images: [...unavailable],
   };
-  return { pdf: await pdf.save(), summary };
+  // The page SVGs are what was printed (photographs aside): returned so a check
+  // can assert on the exact text a client reads (G5 identity + draft assertions).
+  return { pdf: await pdf.save(), summary, pageSvgs: pages.map((p) => p.svg) };
 }

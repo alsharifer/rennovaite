@@ -55,6 +55,7 @@ export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
   planter_box: { label: "Planter box", code: "PB", glyph: "potted_plant", boqDescription: "Standalone planter box — blockwork, waterproofed and clad", unitRateAed: null },
   wall_feature: { label: "Wall feature", code: "WF", glyph: "water_drop", boqDescription: "Wall feature with seating bench — blockwork, waterproofed and clad", unitRateAed: null },
   bbq_grill: { label: "BBQ grill", code: "BQ", glyph: "outdoor_grill", boqDescription: "Built-in BBQ grill (client-supplied equipment)", unitRateAed: null },
+  tree: { label: "Tree", code: "TR", glyph: "park", boqDescription: "Tree supply and planting", unitRateAed: null },
 };
 
 export function pomiSectionFor(type: FixtureType): string {

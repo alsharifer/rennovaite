@@ -28,7 +28,8 @@ import {
   type ScheduleSourceOpening,
 } from "./opening-schedule";
 import { buildElevationSheets } from "./garden-elevations";
-import { buildGardenSheets, type GardenFixture } from "./garden-sheets";
+import { buildGardenSheets, designFixtures, designGraph, renderCoverSheet, type GardenFixture } from "./garden-sheets";
+import { graphDraftStatus } from "@/lib/plan/geometry";
 import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
 import { renderPlumbingSheet } from "./plumbing-sheet";
@@ -49,7 +50,9 @@ export type SheetKind =
   | "irrigation_overlay"
   // G4b eye-level drawings.
   | "structure_elevation"
-  | "garden_elevation";
+  | "garden_elevation"
+  // G5: the garden set's first page.
+  | "cover";
 
 export interface DrawingSheet {
   kind: SheetKind;
@@ -234,12 +237,11 @@ async function loadElementVariants(planId: string | null): Promise<Record<string
 async function loadGardenFixtures(projectId: string): Promise<GardenFixture[]> {
   try {
     const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
-    const { data, error } = await supabase
-      .from("plan_fixtures")
-      .select("id, layer, type, room_id, position, spec")
-      .eq("project_id", projectId);
-    if (error || !data) return [];
-    return data as GardenFixture[];
+    for (const cols of ["id, layer, type, room_id, position, spec, site_reference, disposition, dims_derived, derived_note", "id, layer, type, room_id, position, spec"]) {
+      const { data, error } = await supabase.from("plan_fixtures").select(cols).eq("project_id", projectId);
+      if (!error && data) return data as unknown as GardenFixture[];
+    }
+    return [];
   } catch {
     return [];
   }
@@ -266,7 +268,9 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
   const interiorRooms = asBuilt.rooms.filter((r) => !r.unroofed);
   if (outdoor.length > 0 && interiorRooms.length === 0) {
     const fixturesAll = await loadGardenFixtures(projectId);
-    const gardenMeta = { ...meta, projectId };
+    // G5: a plan on derived dimensions stamps EVERY sheet as a draft.
+    const draft = graphDraftStatus(asBuilt);
+    const gardenMeta = { ...meta, projectId, ...(draft.statement ? { draft: draft.statement } : {}) };
     const garden = buildGardenSheets(asBuilt, fixturesAll, gardenMeta);
     const finish: DrawingSheet = {
       kind: "finish_schedule",
@@ -281,13 +285,20 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
     const overlays = garden.filter((s) => s.kind === "lighting_overlay" || s.kind === "irrigation_overlay");
     // G4b: sectional elevations (L-3nn) after the finish schedule, the garden
     // elevation strips (L-501) last — sheet-number order.
-    const elevations = buildElevationSheets(asBuilt, fixturesAll, gardenMeta, await loadElementVariants(asBuilt.planId));
+    const elevations = buildElevationSheets(designGraph(asBuilt), designFixtures(fixturesAll), gardenMeta, await loadElementVariants(asBuilt.planId));
     const structures = elevations.filter((s) => s.kind === "structure_elevation");
     const strips = elevations.filter((s) => s.kind === "garden_elevation");
+    const ordered: DrawingSheet[] = [...zoneSheets, finish, ...structures, ...overlays, ...strips];
+    const cover: DrawingSheet = {
+      kind: "cover",
+      title: "Cover & Sheet Index",
+      sheetNumber: "L-000",
+      svg: renderCoverSheet(asBuilt, fixturesAll, gardenMeta, [{ sheetNumber: "L-000", title: "Cover & Sheet Index" }, ...ordered], draft.draft ? draft : null),
+    };
     return {
       projectId,
       planId: asBuilt.planId,
-      sheets: [...zoneSheets, finish, ...structures, ...overlays, ...strips],
+      sheets: [cover, ...ordered],
       derivedNotes: asBuilt.notes,
     };
   }

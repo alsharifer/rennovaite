@@ -32,6 +32,7 @@ const SHEET_BLURB: Record<string, string> = {
     "Every door, window and archway by mark — size, sill, and whether the dimensions were measured or defaulted.",
   electrical: "Electrical services plan — sockets, switches, lighting, AC & data points.",
   plumbing: "Plumbing / water services plan — WC, basin, shower, drains & heaters.",
+  cover: "What the set contains, whether it is a draft and why, and what already stands on site.",
   site_plan: "Bird's-eye garden plan — every zone, overall dimensions, zone schedule and levels legend.",
   zone_plan: "One zone at a readable scale — every straight edge dimensioned in millimetres.",
   lighting_overlay: "Lighting as designed — points by fitting and an indicative cable route.",

@@ -92,3 +92,78 @@ Fixes after the 402:
 - Interior identity re-checked against `99cdd55`: Mudon graph (bar additive
   null fields), as-built + demolition sheets, quantities and the priced BoQ across
   four styles are byte-identical (BoQ minus `generated_at`).
+
+---
+
+# G5 — client garden draft stage (2026-09-14, in progress)
+
+Project **Arabella Garden — Draft for Review** (`ec4497c7-…`, dev DB). No client
+personal name appears anywhere. The client photos stay under `data/` (gitignored);
+no image in this folder contains them.
+
+## Step 1 — done
+
+`scripts/arabella-draft-plan.ts` drew the reference layout through the authored
+routes in 20.8 s, 11/11 checks (`g5-step1.json`): plot 26.7 × 10.5 m and every zone,
+run and context footprint flagged `dims_derived` with the type-plan source note;
+4 zones (rear lawn 90.73, deck strip 22.05, side lawn 24.50, existing gazebo 12.25);
+villa + garage/drive block as context; 17 existing items from the photos tagged
+site reference, **none decided** (gazebo, stepping path, sink counter, 2 planter
+borders, 2 string-light runs, 6 trees, 4 boundary walls); all 14 photos in the
+asset library, unassigned. The plan is a draft on 17 derived boundary-critical
+items.
+
+- `g5-L-000-cover-draft.png` — the new drawing-set cover: draft statement, source
+  note, sheet index, existing-on-site schedule (all undecided).
+- `g5-L-100-site-plan-existing.png` — existing items dashed, trees with canopies,
+  zone areas `≈`, "Derived dimensions" note, the draft stamp over the title block.
+- `g5-L-501-boundary-elevations.png` — boundary strips with the house and walls.
+
+## Step 2 — the design session (Abdallah)
+
+Blocked on the design pass. Editor fixes landed first so it is not blocked by the
+tool: Landscape layer, keep/remove/replace for every existing item, levels and
+structure heights, plot-fitted canvases with 5 cm snapping, numeric zone
+geometry, add/remove vertex, run and fixture inspectors, context drawn under every
+layer, draft banner, pack readiness, friction log (plan page, under the plan).
+
+Known limitations going in (candidates for the friction log if they bite):
+- a run cannot be reshaped after drawing — delete and redraw;
+- a zone outline is edited as a rectangle (X/Y/W/D) or by vertices — no
+  click-to-draw polygon tool;
+- irrigation zones are derived from planting beds and planter runs — there is no
+  separate irrigation-zone element;
+- context (house, garage, walls) is editable through `/api/plan-context` only —
+  the Step 5 amendment will need a UI for it;
+- on this narrow plot the scene cameras sit close (a rehearsal gazebo render was
+  honestly substituted by its 3D view: the model pulled back and invented a house
+  volume); expect a lower first-pass gate rate than Villa 94's.
+
+## Rehearsal (scratch project, deleted afterwards)
+
+A scratch copy of the reference layout with a simulated design pass ran the whole
+Step 3 pipeline: `garden-draft-pack.ts --no-render` → **18/18** (readiness,
+needs_selection empty, draft BoQ, 5 derived lines, source labels, three PDFs,
+cover/L-3nn/L-401/L-402, watermark on 12/12 sheets + both covers + every BoQ page,
+`≈ AED 46,800*`, BoQ page and plan page flags, zero identity leakage across 25
+documents). Live: one scene render (substituted, stated) and one photo pair
+(passed on attempt 2 — attempt 1 lost to an unparseable gate reply, since fixed:
+nullable fields, a re-check of the same image before another render). The pack
+carried the pair page and the design view. `g5-rehearsal-boq-pdf-p1.png` is that
+rehearsal's BoQ PDF page 1 (rehearsal quantities, not the client design). The
+scratch project was then deleted: 5 → 4 projects, its 20 storage objects removed,
+client and Villa 94 row counts identical before and after.
+
+## Isolation — Villa 94 ↔ client, documents only
+
+`garden-isolation-check.ts --client ec4497c7-… --no-render-reference
+--no-render-client` → **11/11** both directions (`g5-isolation.json`): BoQ, take-off
+and drawings regenerated on each side; the other side's rows (incl. photo assets,
+room photos, pilot events, corrections) and storage (incl. `plan-uploads`)
+unchanged. Rerun with renders once the design is in.
+
+## Still to do for the draft stage
+
+After the design session: `garden-draft-pack.ts ec4497c7-…` (renders, 2–3 photo
+pairs, gate table, metrics, Step-5 baseline), the isolation check with renders,
+then the draft-stage commit.

@@ -22,7 +22,10 @@ export type MaterialKey =
   | "garage"
   | "steps"
   | "grill"
-  | "trunk";
+  | "trunk"
+  // G5: an existing gazebo's glazed panels, and concrete stepping slabs.
+  | "glass"
+  | "slab";
 
 export type ObjectCategory = "surface" | "structure" | "context" | "planting";
 

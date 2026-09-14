@@ -19,6 +19,7 @@
 // Deterministic SVG. No LLM, no DOM.
 // =============================================================================
 
+import { isNewWork } from "@/lib/plan/site-reference";
 import { LINEAR_ELEMENT_META, type LinearElement } from "@/lib/plan/elements";
 import type { ContextVolume, PlanGraph, Point, Room } from "@/lib/plan/geometry";
 
@@ -282,10 +283,13 @@ export function runBand(el: LinearElement): [number, number] {
 
 /** Structures that get an elevation sheet, in sheet order. */
 export function elevationSubjects(graph: PlanGraph, fixtures: readonly GardenFixture[], variants: Record<string, string | null> = {}) {
-  const structures = gardenZones(graph).filter((z) => z.type === "structure" && z.height_mm != null);
+  // G5: an elevation details what gets BUILT. An existing item that is kept (or
+  // not yet decided) is surveyed context, not a construction detail — and a
+  // stepping-stone path or a string light run has no section worth drawing.
+  const structures = gardenZones(graph).filter((z) => z.type === "structure" && z.height_mm != null && isNewWork(z));
   const order: Record<string, number> = { counter_run: 0, bench_run: 1, planter_run: 2 };
   const runs = graph.elements
-    .filter((e) => e.kind !== "boundary_wall")
+    .filter((e) => e.kind !== "boundary_wall" && e.kind !== "stepping_path" && e.kind !== "string_light_run" && isNewWork(e))
     .slice()
     // Sheet numbers must not depend on database ids: kind, then BBQ before bar,
     // then position on the plan (north to south, west to east).
@@ -296,7 +300,7 @@ export function elevationSubjects(graph: PlanGraph, fixtures: readonly GardenFix
     });
   const unitOrder: Record<string, number> = { wall_feature: 0, planter_box: 1 };
   const units = fixtures
-    .filter((u) => u.layer === "landscape" && (u.type === "wall_feature" || u.type === "planter_box") && num(spec(u).height_mm) != null)
+    .filter((u) => u.layer === "landscape" && (u.type === "wall_feature" || u.type === "planter_box") && num(spec(u).height_mm) != null && isNewWork({ site_reference: u.site_reference ?? false, disposition: u.disposition ?? null }))
     .slice()
     .sort((a, b) => (unitOrder[a.type] ?? 9) - (unitOrder[b.type] ?? 9) || a.position[1] - b.position[1] || a.position[0] - b.position[0]);
   return { structures, runs, units };

@@ -59,8 +59,10 @@ async function loadElements(
 ): Promise<RawLinearElement[]> {
   try {
     const sb = supabase as unknown as SupabaseClient;
-    // 036 adds spec; an older database still derives a graph without it.
+    // 036 adds spec, 037 site reference + derived dims; an older database still
+    // derives a graph without them.
     for (const cols of [
+      "id, room_id, kind, polyline, height_mm, width_mm, source, derived, spec, dims_derived, derived_note, site_reference, disposition",
       "id, room_id, kind, polyline, height_mm, width_mm, source, derived, spec",
       "id, room_id, kind, polyline, height_mm, width_mm, source, derived",
     ]) {
@@ -85,14 +87,19 @@ async function loadContext(
 ): Promise<RawContext[]> {
   try {
     const sb = supabase as unknown as SupabaseClient;
-    const { data, error } = await sb
-      .from("plan_context")
-      .select("id, kind, name, polygon, base_mm, height_mm, derived, note")
-      .eq("plan_id", planId)
-      .order("created_at")
-      .returns<RawContext[]>();
-    if (error) return [];
-    return data ?? [];
+    for (const cols of [
+      "id, kind, name, polygon, base_mm, height_mm, derived, note, dims_derived, site_reference, disposition",
+      "id, kind, name, polygon, base_mm, height_mm, derived, note",
+    ]) {
+      const { data, error } = await sb
+        .from("plan_context")
+        .select(cols)
+        .eq("plan_id", planId)
+        .order("created_at")
+        .returns<RawContext[]>();
+      if (!error) return data ?? [];
+    }
+    return [];
   } catch {
     return [];
   }
@@ -106,6 +113,9 @@ interface AuthoredColumns {
   source: PlanSource | null;
   plot_width_m: number | null;
   plot_depth_m?: number | null;
+  /** 037 */
+  dims_derived?: boolean | null;
+  dims_note?: string | null;
 }
 
 async function loadAuthoredColumns(
@@ -114,13 +124,11 @@ async function loadAuthoredColumns(
 ): Promise<AuthoredColumns> {
   try {
     const sb = supabase as unknown as SupabaseClient;
-    const { data, error } = await sb
-      .from("plans")
-      .select("source, plot_width_m, plot_depth_m")
-      .eq("id", planId)
-      .maybeSingle<AuthoredColumns>();
-    if (error || !data) return { source: null, plot_width_m: null };
-    return data;
+    for (const cols of ["source, plot_width_m, plot_depth_m, dims_derived, dims_note", "source, plot_width_m, plot_depth_m"]) {
+      const { data, error } = await sb.from("plans").select(cols).eq("id", planId).maybeSingle<AuthoredColumns>();
+      if (!error) return data ?? { source: null, plot_width_m: null };
+    }
+    return { source: null, plot_width_m: null };
   } catch {
     return { source: null, plot_width_m: null };
   }
@@ -153,9 +161,11 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
 
   // Later columns are selected best-effort, newest first, for the same reason
   // as the plan columns above: an older database must still derive a graph.
-  // 036 adds level_mm/height_mm/spec, 035 area_derived_m2/derived_note, 031 unroofed.
+  // 037 adds dims_derived/site_reference/disposition, 036 level_mm/height_mm/spec,
+  // 035 area_derived_m2/derived_note, 031 unroofed.
   const sb = supabase as unknown as SupabaseClient;
   const ROOM_SELECTS = [
+    "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec, dims_derived, site_reference, disposition",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed",
@@ -192,6 +202,8 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
       authored.source === "user_drawn" && authored.plot_width_m && authored.plot_depth_m
         ? { width_m: Number(authored.plot_width_m), depth_m: Number(authored.plot_depth_m) }
         : null,
+    plot_dims_derived: authored.dims_derived === true,
+    dims_note: authored.dims_note ?? null,
     source: authored.source,
   });
 }
