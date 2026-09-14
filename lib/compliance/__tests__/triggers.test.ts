@@ -16,7 +16,7 @@ function wall(is_structural: boolean | null): Wall {
   return { id: "w1", polyline: [[0, 0], [3, 0]], thickness_mm: 200, is_structural, room_ids: ["r1"], derived: true, source: "derived" };
 }
 function room(type: string, id = "r1"): Room {
-  return { id, name_en: type, name_ar: null, type, polygon: [[0, 0], [3, 0], [3, 3], [0, 3]], area_m2: 9, ceiling_h_m: 2.9, unroofed: false, area_derived_m2: null, derived_note: null, derived_fields: [] };
+  return { id, name_en: type, name_ar: null, type, polygon: [[0, 0], [3, 0], [3, 3], [0, 3]], area_m2: 9, ceiling_h_m: 2.9, unroofed: false, area_derived_m2: null, derived_note: null, level_mm: null, height_mm: null, spec: null, derived_fields: [] };
 }
 function opening(type: "door" | "window"): Opening {
   return {

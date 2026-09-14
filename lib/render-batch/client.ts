@@ -11,7 +11,7 @@
 // the day render that actually came back.
 // =============================================================================
 
-import type { BatchJob, RenderView } from "./plan";
+import type { BatchJob, RenderView, SceneOutcome } from "./plan";
 
 export type GenerateResponse = {
   render_id: string;
@@ -19,6 +19,8 @@ export type GenerateResponse = {
   prompt: string;
   qa?: "passed" | "failed" | null;
   qaReason?: string | null;
+  /** G4b scene renders: "substituted" = the render was withheld and the 3D design view ships. */
+  outcome?: SceneOutcome;
 };
 
 // The render + iterate routes run async: they return a prediction_id and the
@@ -70,6 +72,7 @@ export async function resolveRender(
       render_id: String(body.render_id),
       image_url: body.image_url,
       prompt: typeof body.prompt === "string" ? body.prompt : "",
+      ...(body.outcome === "passed" || body.outcome === "substituted" ? { outcome: body.outcome } : {}),
     };
   }
   if (typeof body.prediction_id === "string" && body.prediction_id) {
@@ -114,14 +117,14 @@ export async function fetchBatchPlan(projectId: string): Promise<BatchPlanRespon
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function runJob(projectId: string, job: BatchJob): Promise<GenerateResponse> {
-  const url = job.view === "evening" ? "/api/render/evening" : "/api/render";
+  const url = job.camera_id ? "/api/render/scene" : job.view === "evening" ? "/api/render/evening" : "/api/render";
   // A 429 means the project is at its in-flight cap (possibly from another tab):
   // wait and try again rather than failing the job.
   for (let attempt = 0; attempt < 40; attempt++) {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_id: projectId, room_id: job.room_id }),
+      body: JSON.stringify(job.camera_id ? { project_id: projectId, camera_id: job.camera_id, view: job.view } : { project_id: projectId, room_id: job.room_id }),
     });
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
     if (res.status === 429) {

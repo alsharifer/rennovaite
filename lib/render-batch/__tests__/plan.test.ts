@@ -62,7 +62,7 @@ describe("planBatch", () => {
     const jobs = planBatch({ rooms, renders: [], fixtures: rec.fixtures, now: NOW });
     const days = jobs.filter((j) => j.view === "day");
     const evenings = jobs.filter((j) => j.view === "evening");
-    expect(days).toHaveLength(11);
+    expect(days).toHaveLength(12);
     expect(days.every((j) => j.status === "queued")).toBe(true);
     // Lit zones + the pergola (structure). The unlit pergola court paving has none.
     const lit = new Set(evenings.map((j) => j.room_id));

@@ -28,7 +28,7 @@
 // =============================================================================
 
 import { LINEAR_ELEMENT_META, type LinearElement } from "@/lib/plan/elements";
-import type { PlanGraph, Point, Room } from "@/lib/plan/geometry";
+import type { ContextVolume, PlanGraph, Point, Room } from "@/lib/plan/geometry";
 import { roomTypeLabel } from "@/lib/plan/zones";
 
 import {
@@ -381,6 +381,114 @@ function ringSymbol(x: number, y: number, code: string, color: string, r = 1.9):
   );
 }
 
+// --- Levels (G4b) -----------------------------------------------------------------
+
+/** "±000", "+150", "+2800", "-150" — the KAME level convention. */
+export function fmtLevel(mm: number): string {
+  const r = Math.round(mm);
+  if (r === 0) return "±000";
+  const s = String(Math.abs(r)).padStart(3, "0");
+  return `${r > 0 ? "+" : "-"}${s}`;
+}
+
+/** The zone a point stands in (structure zones last, so the paving under a pergola wins). */
+export function zoneAtPoint(graph: PlanGraph, p: Point): Room | null {
+  const zones = gardenZones(graph);
+  return zones.find((z) => z.type !== "structure" && pointInPolygon(p, z.polygon)) ?? zones.find((z) => pointInPolygon(p, z.polygon)) ?? null;
+}
+
+/** Level (mm) under a point and the data-src term that states it. */
+export function levelUnder(graph: PlanGraph, p: Point): { mm: number; src: string; stated: boolean } {
+  const z = zoneAtPoint(graph, p);
+  if (z && z.level_mm != null) return { mm: z.level_mm, src: `room:${z.id}:level_mm`, stated: true };
+  return { mm: 0, src: "k:0", stated: false };
+}
+
+/** Distinct stated levels on the plan: zones and step treads. */
+function statedLevels(graph: PlanGraph): number[] {
+  const set = new Set<number>();
+  for (const r of graph.rooms) if (r.unroofed && r.level_mm != null) set.add(Math.round(r.level_mm));
+  for (const c of graph.context) if (c.kind === "steps" && c.height_mm != null) set.add(Math.round(c.base_mm + c.height_mm));
+  return [...set].sort((a, b) => a - b);
+}
+
+/** A plan level tag: quartered datum symbol + "+300 FFL". */
+function planLevelTag(x: number, y: number, mm: number, code: string, src: string, color = INK_900): string {
+  const r = 0.9;
+  return (
+    `<circle cx="${f2(x)}" cy="${f2(y)}" r="${r}" fill="${PAPER}" stroke="${color}" stroke-width="0.2"/>` +
+    `<path d="M${f2(x)},${f2(y)} L${f2(x + r)},${f2(y)} A${r},${r} 0 0 0 ${f2(x)},${f2(y - r)} Z M${f2(x)},${f2(y)} L${f2(x - r)},${f2(y)} A${r},${r} 0 0 0 ${f2(x)},${f2(y + r)} Z" fill="${color}"/>` +
+    `<text x="${f2(x + 1.4)}" y="${f2(y + 0.7)}" font-size="1.9" fill="${color}" style="font-family:${FONT_MONO}" data-level="${Math.round(mm)}" data-src="${esc(src)}">${fmtLevel(mm)} ${code}</text>`
+  );
+}
+
+/** Existing context on a plan: buildings, boundary walls, steps, existing structures. */
+function contextSvg(graph: PlanGraph, f: Frame, withLabels: boolean): string {
+  let s = "";
+  const order: Record<ContextVolume["kind"], number> = { existing_building: 0, boundary_wall: 1, steps: 2, existing_structure: 3 };
+  for (const c of [...graph.context].sort((a, b) => order[a.kind] - order[b.kind])) {
+    const pts = polyPts(c.polygon, f);
+    if (c.kind === "existing_building") {
+      s += `<polygon points="${pts}" fill="#E4E4E4" stroke="${INK_500}" stroke-width="0.35" data-context="${esc(c.id)}"/>`;
+      if (withLabels) {
+        const p = labelPoint(c.polygon);
+        s += `<text x="${f2(f.px(p[0]))}" y="${f2(f.py(p[1]))}" text-anchor="middle" font-size="2.6" fill="${INK_500}" style="font-family:${FONT_UI};letter-spacing:0.04em">${esc(c.name.toUpperCase())}</text>`;
+      }
+    } else if (c.kind === "boundary_wall") {
+      s += `<polygon points="${pts}" fill="${INK_700}" stroke="${INK_900}" stroke-width="0.15" data-context="${esc(c.id)}"/>`;
+    } else if (c.kind === "steps") {
+      s += `<polygon points="${pts}" fill="${PAPER}" stroke="${INK_500}" stroke-width="0.25" data-context="${esc(c.id)}"/>`;
+    } else {
+      s += `<polygon points="${pts}" fill="none" stroke="${INK_500}" stroke-width="0.3" stroke-dasharray="1.2 0.8" data-context="${esc(c.id)}"/>`;
+      if (withLabels) {
+        const p = labelPoint(c.polygon);
+        s += `<text x="${f2(f.px(p[0]))}" y="${f2(f.py(p[1]))}" text-anchor="middle" font-size="2" fill="${INK_500}" style="font-family:${FONT_UI}">${esc(c.name)}</text>`;
+      }
+    }
+  }
+  return s;
+}
+
+/** Tags for step treads (only the top tread of each footprint is readable, so all are tagged). */
+function stepLevelTags(graph: PlanGraph, f: Frame): string {
+  return graph.context
+    .filter((c) => c.kind === "steps" && c.height_mm != null)
+    .map((c) => {
+      const b = bboxOf(c.polygon);
+      return planLevelTag(f.px(b.maxX) + 0.8, f.py((b.minY + b.maxY) / 2), c.base_mm + c.height_mm!, "FFL", `ctx:${c.id}:height_mm`, INK_700);
+    })
+    .join("");
+}
+
+/** Top-of-structure tags for runs, units and structure zones inside a predicate. */
+function structureTopTags(graph: PlanGraph, fixtures: readonly GardenFixture[], f: Frame, include: (p: Point) => boolean): string {
+  let s = "";
+  for (const z of gardenZones(graph).filter((r) => r.type === "structure" && r.height_mm != null)) {
+    const b = bboxOf(z.polygon);
+    const p: Point = [(b.minX + b.maxX) / 2, b.minY];
+    if (!include(p)) continue;
+    s += planLevelTag(f.px(b.minX) + 1.5, f.py(b.minY) + 2.4, (z.level_mm ?? 0) + z.height_mm!, "TRL", `room:${z.id}:level_mm + room:${z.id}:height_mm`, BRASS);
+  }
+  const code: Record<string, string> = { counter_run: "CTL", bench_run: "TOS", planter_run: "TOC" };
+  for (const el of graph.elements.filter((e) => e.kind !== "boundary_wall")) {
+    const a = el.polyline[0]!;
+    const b = el.polyline[1] ?? a;
+    const mid: Point = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    if (!include(mid)) continue;
+    const lv = levelUnder(graph, mid);
+    const vertical = Math.abs(b[0] - a[0]) < Math.abs(b[1] - a[1]);
+    const dy = el.kind === "planter_run" ? -2.2 : 2.6;
+    s += planLevelTag(f.px(mid[0]) + (vertical ? 1.6 : -4), f.py(mid[1]) + (vertical ? (el.kind === "planter_run" ? -6 : 6) : dy), lv.mm + el.height_mm, code[el.kind] ?? "TOC", `${lv.src} + el:${el.id}:height_mm`, LINEAR_ELEMENT_META[el.kind].color);
+  }
+  for (const u of fixtures.filter((x) => x.layer === "landscape" && typeof x.spec?.height_mm === "number")) {
+    const m = toMetres(graph, u.position);
+    if (!include(m)) continue;
+    const lv = levelUnder(graph, m);
+    s += planLevelTag(f.px(m[0]) + 3, f.py(m[1]) + 3.4, lv.mm + (u.spec!.height_mm as number), "TOC", `${lv.src} + unit:${u.id}:spec.height_mm`);
+  }
+  return s;
+}
+
 // --- Dimensions ------------------------------------------------------------------
 
 const TICK = 1.1;
@@ -483,8 +591,8 @@ function panelText(y: number, text: string, opts: { size?: number; color?: strin
   return { svg, y: y + lines.length * size * 1.35 };
 }
 
-/** The levels legend. The graph carries no levels today, so it says that too. */
-function levelsLegend(y: number): { svg: string; y: number } {
+/** The levels legend — what the plan states, and what it does not. */
+function levelsLegend(y: number, graph?: PlanGraph): { svg: string; y: number } {
   let svg = panelHeading(y, "Levels");
   let cy = y + 5;
   for (const [code, label] of [
@@ -495,8 +603,17 @@ function levelsLegend(y: number): { svg: string; y: number } {
     svg += `<text x="${panelX()}" y="${f2(cy)}" font-size="2.5" fill="${INK_900}" style="font-family:${FONT_MONO}">${code}</text><text x="${panelX() + 12}" y="${f2(cy)}" font-size="2.5" fill="${INK_700}" style="font-family:${FONT_UI}">${label}</text>`;
     cy += 3.6;
   }
-  const t = panelText(cy, "No levels are carried by this plan. Confirm FFL / GL / TS on site before setting out falls or steps.", { size: 2.3, color: TERRACOTTA });
-  return { svg: svg + t.svg, y: t.y + 2 };
+  const levels = graph ? statedLevels(graph) : [];
+  if (levels.length === 0) {
+    const t = panelText(cy, "No levels are carried by this plan. Confirm FFL / GL / TS on site before setting out falls or steps.", { size: 2.3, color: TERRACOTTA });
+    return { svg: svg + t.svg, y: t.y + 2 };
+  }
+  const t1 = panelText(cy, `Datum ±000 FFL. Levels stated on the plan: ${levels.map(fmtLevel).join(", ")}. Structure tops tagged TRL / CTL / TOS / TOC.`, { size: 2.3 });
+  svg += t1.svg;
+  const unstated = graph!.rooms.filter((r) => r.unroofed && r.level_mm == null);
+  if (unstated.length === 0) return { svg, y: t1.y + 2 };
+  const t2 = panelText(t1.y + 0.8, `No level stated for: ${unstated.map((r) => r.name_en).join(", ")} (top of soil). Confirm on site.`, { size: 2.3, color: TERRACOTTA });
+  return { svg: svg + t2.svg, y: t2.y + 2 };
 }
 
 function zoneRef(i: number): string {
@@ -532,6 +649,7 @@ export function renderSitePlan(
   const zones = gardenZones(graph);
 
   let body = defs();
+  body += contextSvg(graph, f, true);
   body += graph.rooms.map((r) => zoneShape(r, f)).join("");
   body += wallsSvg(graph, f);
 
@@ -549,13 +667,17 @@ export function renderSitePlan(
     body += unitSymbol(f.px(m[0]), f.py(m[1]), UNIT_META[u.type]?.code ?? "?");
   }
 
-  // Zone tags.
+  // Zone tags, with the zone's level where the plan has more than one.
+  const levelsDiffer = statedLevels(graph).length > 1;
   zones.forEach((r, i) => {
     const p = labelPoint(r.polygon);
     const x = f.px(p[0]);
     const y = f.py(p[1]);
     body += `<circle cx="${f2(x)}" cy="${f2(y)}" r="2.3" fill="${PAPER}" stroke="${BRASS}" stroke-width="0.35"/><text x="${f2(x)}" y="${f2(y + 0.8)}" text-anchor="middle" font-size="2" fill="${BRASS}" style="font-family:${FONT_MONO};font-weight:600">${zoneRef(i)}</text>`;
+    if (levelsDiffer && r.level_mm != null) body += planLevelTag(x - 3.5, y + 4.4, r.level_mm, "FFL", `room:${r.id}:level_mm`);
   });
+  if (levelsDiffer) body += stepLevelTags(graph, f);
+  body += structureTopTags(graph, fixtures, f, () => true);
 
   // Side panel: zone schedule, legend, levels, notes.
   let y = SHEET_MARGIN + 8;
@@ -588,7 +710,7 @@ export function renderSitePlan(
   body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">All dimensions in millimetres. Plot boundary dashed.</text>`;
   y += 6;
 
-  const lv = levelsLegend(y);
+  const lv = levelsLegend(y, graph);
   body += lv.svg;
   y = lv.y + 2;
 
@@ -662,6 +784,7 @@ export function renderZoneSheet(
   const clipId = `clip-${zone.id.replace(/[^a-z0-9]/gi, "")}`;
   body += `<clipPath id="${clipId}"><rect x="${f2(area.x)}" y="${f2(area.y)}" width="${f2(area.w)}" height="${f2(area.h)}"/></clipPath>`;
   body += `<g clip-path="url(#${clipId})">`;
+  body += contextSvg(graph, f, false);
   body += graph.rooms.filter((r) => r.id !== zone.id).map((r) => zoneShape(r, f, { faint: true })).join("");
   body += zoneShape(zone, f, { highlight: BRASS });
   body += wallsSvg(graph, f);
@@ -681,6 +804,7 @@ export function renderZoneSheet(
     const m = toMetres(graph, p.position);
     body += ringSymbol(f.px(m[0]), f.py(m[1]), p.type === "boundary_light" ? "BL" : "GL", LIGHT_AMBER, 1.5);
   }
+  body += structureTopTags(graph, fixtures, f, inZone);
   body += `</g>`;
 
   // Every straight edge, then the overall extents one step further out.
@@ -690,6 +814,9 @@ export function renderZoneSheet(
 
   const p = labelPoint(zone.polygon);
   body += `<text x="${f2(f.px(p[0]))}" y="${f2(f.py(p[1]) - 1)}" text-anchor="middle" font-size="3.4" fill="${INK_900}" style="font-family:${FONT_DISPLAY}">${esc(zone.name_en)}</text><text x="${f2(f.px(p[0]))}" y="${f2(f.py(p[1]) + 3)}" text-anchor="middle" font-size="2.6" fill="${INK_700}" style="font-family:${FONT_MONO}">${zone.area_m2.toFixed(2)} m²${zone.area_derived_m2 ? " *" : ""}</text>`;
+  if (zone.level_mm != null && statedLevels(graph).length > 1) {
+    body += planLevelTag(f.px(p[0]) - 5, f.py(p[1]) + 7, zone.level_mm, "FFL", `room:${zone.id}:level_mm`);
+  }
 
   // Side panel.
   let y = SHEET_MARGIN + 8;
@@ -706,6 +833,7 @@ export function renderZoneSheet(
     ["Perimeter", `${perimeter.toFixed(2)} m`],
     ["Extents", `${Math.round((zb.maxX - zb.minX) * 1000)} × ${Math.round((zb.maxY - zb.minY) * 1000)} mm`],
     ["Open to sky", zone.unroofed ? "Yes — no wall or ceiling finish" : "No"],
+    ["Level", zone.level_mm != null ? `${fmtLevel(zone.level_mm)} FFL` : "Not stated on the plan"],
   ];
   body += panelHeading(y, "Zone");
   y += 5;
@@ -754,8 +882,8 @@ export function renderZoneSheet(
     body += t.svg;
     y = t.y + 3;
   }
-  if (zone.type === "paving" || zone.type === "structure" || zone.type === "deck") {
-    body += levelsLegend(y).svg;
+  if (zone.type === "paving" || zone.type === "structure" || zone.type === "deck" || zone.level_mm != null) {
+    body += levelsLegend(y, graph).svg;
   }
 
   return renderSheet({

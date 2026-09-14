@@ -45,8 +45,8 @@ function fullRenders() {
     empty.zones.map((z) => [
       z.room.id,
       {
-        day: { id: `d-${z.room.id}`, image_url: `https://img/d-${z.room.id}.png` },
-        evening: z.eveningExpected ? { id: `e-${z.room.id}`, image_url: `https://img/e-${z.room.id}.png` } : null,
+        day: { id: `d-${z.room.id}`, image_url: `https://img/d-${z.room.id}.png`, kind: "render" as const, gate_passed: true },
+        evening: z.eveningExpected ? { id: `e-${z.room.id}`, image_url: `https://img/e-${z.room.id}.png`, kind: "render" as const, gate_passed: true } : null,
       },
     ]),
   );
@@ -57,7 +57,7 @@ describe("render pack — Villa 94", () => {
 
   it("is a cover, a plan overview, one page per zone and a materials summary", () => {
     expect(pages.map((p) => p.kind)).toEqual(["cover", "plan_overview", ...zones.map(() => "zone"), "materials"]);
-    expect(zones).toHaveLength(11);
+    expect(zones).toHaveLength(12);
   });
 
   it("uses the drawing set's own zone references and site plan", () => {
@@ -99,10 +99,42 @@ describe("render pack — Villa 94", () => {
   it("says what is missing instead of leaving a blank frame", () => {
     const partial = buildRenderPack({ ...base, renders: {} });
     expect(partial.pages.every((p) => p.images.length === 0)).toBe(true);
-    expect(partial.pages[0]!.svg).toContain("0 of 11 zones rendered");
+    expect(partial.pages[0]!.svg).toContain("0 of 12 zones rendered");
     expect(partial.pages[2]!.svg).toContain("Not yet rendered");
     const lit = partial.zones.findIndex((z) => z.eveningExpected);
     expect(partial.pages[2 + lit]!.svg).toContain("Evening view not rendered");
+  });
+});
+
+describe("render pack — the faithfulness gate", () => {
+  const renders = fullRenders();
+  const lawn = "z-lawn-back";
+
+  it("refuses a render that has not passed the gate", () => {
+    const bad = { ...renders, [lawn]: { day: { id: "x", image_url: "https://img/x.png", kind: "render" as const, gate_passed: false }, evening: null } };
+    expect(() => buildRenderPack({ ...base, renders: bad })).toThrow(/has not passed the faithfulness gate/);
+  });
+
+  it("labels a substituted design view as what it is", () => {
+    const sub = {
+      ...renders,
+      [lawn]: { day: { id: "dv", image_url: "https://img/dv.png", kind: "design_view" as const, gate_passed: false, note: "F1 lawn: missing" }, evening: null },
+    };
+    const { pages, zones } = buildRenderPack({ ...base, renders: sub });
+    const svg = pages[2 + zones.findIndex((z) => z.room.id === lawn)]!.svg;
+    expect(svg).toContain("DAY — 3D DESIGN VIEW");
+    expect(svg).toContain("No render passed the faithfulness check");
+    const passed = pages[2 + zones.findIndex((z) => z.room.id === "z-pergola")]!.svg;
+    expect(passed).toContain("DAY — RENDER · FAITHFULNESS CHECK PASSED");
+  });
+
+  it("adds a page per whole-garden view, after the plan overview", () => {
+    const view = { id: "garden:garden-1", label: "Whole garden — view 1", lit: true, day: { id: "g1", image_url: "https://img/g1.png", kind: "render" as const, gate_passed: true }, evening: null };
+    const { pages } = buildRenderPack({ ...base, renders, gardenViews: [view] });
+    expect(pages[2]!.kind).toBe("garden_view");
+    expect(pages[2]!.images.map((i) => i.renderId)).toEqual(["g1"]);
+    // The cover leads with the passed whole-garden render.
+    expect(pages[0]!.images[0]!.renderId).toBe("g1");
   });
 });
 

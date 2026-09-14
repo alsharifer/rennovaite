@@ -11,7 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import type { RawLinearElement } from "./elements";
-import { buildPlanGraph, type PlanGraph, type PlanSource, type RawOpening, type RawRoom } from "./geometry";
+import { buildPlanGraph, type PlanGraph, type PlanSource, type RawContext, type RawOpening, type RawRoom } from "./geometry";
 
 /** Read persisted openings for a plan (migration 026). `[]` if the table is
  *  absent, so derivePlanGraph works before 026 is applied. */
@@ -59,12 +59,38 @@ async function loadElements(
 ): Promise<RawLinearElement[]> {
   try {
     const sb = supabase as unknown as SupabaseClient;
+    // 036 adds spec; an older database still derives a graph without it.
+    for (const cols of [
+      "id, room_id, kind, polyline, height_mm, width_mm, source, derived, spec",
+      "id, room_id, kind, polyline, height_mm, width_mm, source, derived",
+    ]) {
+      const { data, error } = await sb
+        .from("plan_elements")
+        .select(cols)
+        .eq("plan_id", planId)
+        .order("created_at")
+        .returns<RawLinearElement[]>();
+      if (!error) return data ?? [];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/** G4b: existing context volumes (migration 036). `[]` before it is applied. */
+async function loadContext(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  planId: string,
+): Promise<RawContext[]> {
+  try {
+    const sb = supabase as unknown as SupabaseClient;
     const { data, error } = await sb
-      .from("plan_elements")
-      .select("id, room_id, kind, polyline, height_mm, width_mm, source, derived")
+      .from("plan_context")
+      .select("id, kind, name, polygon, base_mm, height_mm, derived, note")
       .eq("plan_id", planId)
       .order("created_at")
-      .returns<RawLinearElement[]>();
+      .returns<RawContext[]>();
     if (error) return [];
     return data ?? [];
   } catch {
@@ -127,9 +153,10 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
 
   // Later columns are selected best-effort, newest first, for the same reason
   // as the plan columns above: an older database must still derive a graph.
-  // 035 adds area_derived_m2/derived_note, 031 adds unroofed.
+  // 036 adds level_mm/height_mm/spec, 035 area_derived_m2/derived_note, 031 unroofed.
   const sb = supabase as unknown as SupabaseClient;
   const ROOM_SELECTS = [
+    "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed",
     "id, name_en, name_ar, room_type, area_m2, polygon",
@@ -146,6 +173,7 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
   const parsed = plan.parsed_json as ParsedJson;
   const openings = await loadOpenings(supabase, plan.id);
   const elements = await loadElements(supabase, plan.id);
+  const context = await loadContext(supabase, plan.id);
   const authored = await loadAuthoredColumns(supabase, plan.id);
 
   return buildPlanGraph({
@@ -156,6 +184,7 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
     rooms: (roomsRes.data ?? []) as unknown as RawRoom[],
     openings,
     elements,
+    context,
     // Only an authored plan carries a measured scale; a parsed one keeps the
     // area-derived factor it has always used.
     unit_to_m: authored.source === "user_drawn" ? authored.plot_width_m : null,

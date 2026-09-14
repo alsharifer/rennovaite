@@ -754,6 +754,81 @@ byte-identical to the pre-G4 commit.
 `node --import ./scripts/_alias-hook.mjs scripts/garden-dry-run-live.ts [port]`
 against a dev server started with `GARDEN_PILOT_ENABLED=true DRAWINGS_ENABLED=true`.
 
+## Plan-faithful renders, elevations + levels, project isolation (garden pilot G4b)
+
+G4 was not client-ready: text-prompted off-plan renders invented layouts (a
+pergola render with no pergola in it) and the drawings had no eye-level
+information. Both are fixed at the root.
+
+- **Levels, heights and context on the graph** (migration `036`):
+  `rooms.level_mm` (finished level vs ±000 FFL; null = not stated, never read
+  as ±000), `rooms.height_mm` + `rooms.spec` (a structure's top and member
+  sizes), `plan_elements.spec` (a run's build-up and `band_mm` — where its width
+  sits across the traced reference line), `plan_fixtures.spec` (unit sizes),
+  and **`plan_context`** — existing villa, garage, pergola, steps and boundary
+  walls: never a zone, never priced. `PlanGraph.context` carries them. Every
+  value records its source; assumed or scaled ones are `derived` and say so.
+- **Villa 94 heights and levels are read from the KAME sections** (A-A-001,
+  B-A-001/002, C-A-001, GL-PS-001): pergola TRL +2800 (150 mm members, posts at
+  1000/3350), BBQ counter +900 × 900, bar +1000 × 450, bench +350 with a +600
+  kerb, wall feature 2500 × 300 × 1800 with its arch, planter box +450, courtyard
+  +300, front approach +150/±000, steps +150/+300. The boundary wall (~2000,
+  scaled) and the villa/garage heights are not dimensioned and are flagged.
+  Tracing the villa outline exposed three G4 zone-trace errors, corrected
+  (courtyard L +1.26 m², front approach −2.76 m² and split into two levels,
+  courtyard-mouth step −0.72 m² of lawn): the dry-run is now **AED 147,679.18,
+  −2.9%, still 10/14**.
+- **Sectional elevations** `lib/drawings/garden-elevations.ts`: L-301…L-307, one
+  per structure (pergola, BBQ counter, bar counter, bench, planter run, wall
+  feature, planter box), each view at a fitted KAME scale (main views 1:20) with
+  heights, build-up and FFL/TRL/CTL/TOS/TOC level tags; L-501 whole-garden
+  boundary elevation strips. **Level tags** on the site plan and zone sheets
+  wherever the plan's levels differ, plus structure tops; existing context is
+  drawn on the plans. Every dimension and level carries `data-src` — an
+  expression over graph fields — and a test resolves it independently against
+  the traced records. The live dry-run compares every printed figure (h, v and
+  level) on the live set against the pure sheets. Elevation sheet numbers are
+  ordered by content, never by database id.
+- **The 3D scene** `lib/scene/*`: `buildGardenScene` turns the graph into
+  triangles (zones at their levels, structures at their heights, context);
+  `renderScene` is a deterministic software rasteriser (z-buffer, id buffer,
+  outlines, evening glows at the designed light points); `chooseCameras` picks
+  one camera per zone and up to three whole-garden views by scoring id-buffer
+  probes; `buildManifest` lists what each camera actually sees.
+- **The pipeline** `lib/scene-render/pipeline.ts` (+ `POST/GET
+  /api/render/scene`): scene image → `google/nano-banana-pro` restyle (the style
+  only paints) → **faithfulness gate** (`lib/scene-render/gate.ts`,
+  `claude-opus-5` observes both images against the manifest; the pass rule is
+  deterministic code) → one tightened retry (the gate's findings, surface
+  regions, exact framing) → otherwise the **raw 3D design view** ships, labelled
+  as such. The gate fails closed. Evening views relight a passed day render and
+  are gated again; without one, the 3D night view ships. Calibration: the raw
+  view passes, G4's pergola render fails with exact reasons; `nano-banana`
+  reframed, `flux-depth-pro` invented buildings, `flux-canny-pro` paved lawns.
+  **Text-prompted off-plan generation is retired for gardens**: `/api/render`
+  delegates an exterior zone with no photo to the scene pipeline. An evening
+  is also checked against the **night design model**: a lit fitting or wall
+  where no light was designed fails it (lighting is as designed). A run whose
+  every attempt died before producing an image (no credit, an outage) is an
+  infrastructure fault — never saved or cached as a substitution. "Generate
+  all" shows each garden view as *Checked* or *3D view* (render withheld).
+- **The pack uses gated scene renders only**: `assertPackable` refuses an
+  ungated render; every image is captioned "render · faithfulness check passed"
+  or "3D design view"; whole-garden pages follow the plan overview; the JSON
+  summary carries the gate table. "Generate all" plans a garden by camera
+  (`planSceneBatch`).
+- **Project isolation**: the scene cache key starts with the project id
+  (`sceneCacheKey`, regression-tested with two projects seeded from identical
+  records); render rows, camera manifests, storage paths
+  (`projects/<id>/scene/…`), garden drawing sheets (`data-project-id`) and BoQ
+  `element_refs` all resolve to their own project.
+  `scripts/garden-isolation-check.ts` regenerates each project's full pack and
+  asserts the other's rows, assets and cached images are untouched, both
+  directions, against a stand-in seeded from the same records
+  (`scripts/lib/garden-seed.ts`).
+
+**DB step**: `supabase db push` for `036`; the `renders` public bucket must exist.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

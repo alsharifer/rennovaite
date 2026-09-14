@@ -10,13 +10,13 @@ import {
   type GenerateResponse,
   type JobProgress,
 } from "@/lib/render-batch/client";
-import type { BatchJob, RenderView } from "@/lib/render-batch/plan";
+import type { BatchJob, RenderView, SceneOutcome } from "@/lib/render-batch/plan";
 
 // G4 "Generate all" (Newspace ask #2). One action queues every zone and view
 // that has not been rendered yet; each result lands in the zone's own chain, so
 // editing afterwards is the ordinary per-zone tweak flow.
 
-type Row = { room_id: string; room_name: string; view: RenderView; state: JobProgress; note: string | null };
+type Row = { room_id: string; room_name: string; view: RenderView; state: JobProgress; note: string | null; outcome: SceneOutcome | null };
 
 const key = (roomId: string, view: RenderView) => `${roomId}:${view}`;
 
@@ -27,7 +27,18 @@ function rowsFrom(jobs: BatchJob[]): Row[] {
     view: j.view,
     state: j.status === "done" ? "done" : j.status === "blocked" ? "blocked" : j.status === "in_flight" ? "running" : "queued",
     note: j.reason,
+    outcome: j.outcome ?? null,
   }));
+}
+
+// G4b: a garden render that failed the faithfulness check is withheld and its 3D
+// design view ships instead — "Done" would hide that.
+const SUBSTITUTED_NOTE = "Render withheld: it did not pass the faithfulness check, so the 3D design view ships in its place.";
+
+function stateLabel(r: Row): string {
+  if (r.state === "done" && r.outcome === "substituted") return "3D view";
+  if (r.state === "done" && r.outcome === "passed") return "Checked";
+  return STATE_LABEL[r.state];
 }
 
 const STATE_LABEL: Record<JobProgress, string> = {
@@ -54,6 +65,8 @@ export function GenerateAllPanel({
 
   const outstanding = rows.filter((r) => r.state !== "done").length;
   const done = rows.length - outstanding;
+  const substituted = rows.filter((r) => r.state === "done" && r.outcome === "substituted").length;
+  const scene = rows.some((r) => r.outcome != null);
 
   async function handleGenerateAll() {
     setRunning(true);
@@ -73,7 +86,7 @@ export function GenerateAllPanel({
           setRows((prev) =>
             prev.map((r) =>
               r.room_id === e.room_id && r.view === e.view
-                ? { ...r, state: e.state, note: e.error ?? (e.state === "done" ? null : r.note) }
+                ? { ...r, state: e.state, note: e.error ?? (e.state === "done" ? null : r.note), outcome: e.result?.outcome ?? r.outcome }
                 : r,
             ),
           );
@@ -112,6 +125,12 @@ export function GenerateAllPanel({
         Day view for every zone, then an evening view wherever lighting is on the plan. Up to three render at once; edit any
         of them afterwards from its zone.
       </p>
+      {scene && (
+        <p className="mt-xs font-body-sm text-[12px] leading-4 text-ink-700">
+          Every garden render is checked against the 3D design model before it is kept.
+          {substituted > 0 && ` ${substituted} withheld — ${substituted === 1 ? "its" : "their"} 3D design view ships instead.`}
+        </p>
+      )}
       {preset?.seeded && (
         <p className="mt-xs font-body-sm text-[12px] leading-4 text-ink-700">
           Moodboard seeded with the direction&apos;s garden and structure references.
@@ -120,7 +139,7 @@ export function GenerateAllPanel({
       {error && <p className="mt-xs font-body-sm text-[12px] text-error">{error}</p>}
       <ul className="mt-sm flex max-h-56 flex-col gap-[2px] overflow-y-auto">
         {rows.map((r) => (
-          <li key={key(r.room_id, r.view)} className="flex items-center justify-between gap-sm text-[12px]" title={r.note ?? undefined}>
+          <li key={key(r.room_id, r.view)} className="flex items-center justify-between gap-sm text-[12px]" title={r.note ?? (r.state === "done" && r.outcome === "substituted" ? SUBSTITUTED_NOTE : undefined)}>
             <span className="truncate text-ink-700">
               {r.room_name}
               <span className="text-ink-500"> · {r.view === "evening" ? "Evening" : "Day"}</span>
@@ -128,13 +147,14 @@ export function GenerateAllPanel({
             <span
               className={cn(
                 "shrink-0 font-mono tabular-nums",
-                r.state === "done" && "text-ink-500",
+                r.state === "done" && r.outcome !== "substituted" && "text-ink-500",
+                r.state === "done" && r.outcome === "substituted" && "text-tertiary",
                 r.state === "running" && "text-brass-600",
                 r.state === "failed" && "text-error",
                 (r.state === "queued" || r.state === "blocked") && "text-ink-500",
               )}
             >
-              {STATE_LABEL[r.state]}
+              {stateLabel(r)}
             </span>
           </li>
         ))}

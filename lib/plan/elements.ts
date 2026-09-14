@@ -94,6 +94,8 @@ export interface RawLinearElement {
   width_mm?: number | null;
   source?: string | null;
   derived?: boolean | null;
+  /** G4b: build-up and provenance (migration 036). */
+  spec?: Record<string, unknown> | null;
 }
 
 /** A linear element in the PlanGraph — metric, with its length resolved. */
@@ -110,6 +112,8 @@ export interface LinearElement {
   source: ElementSource;
   /** true = cross-section dimensions were DEFAULTED, not measured. */
   derived: boolean;
+  /** G4b: build-up (top slab, plinth, kerb) and where each number came from. */
+  spec: Record<string, unknown> | null;
 }
 
 export function isLinearElementKind(v: unknown): v is LinearElementKind {
@@ -171,6 +175,7 @@ export function buildLinearElements(
       source: r.source === "parsed" ? "parsed" : "user_drawn",
       // A defaulted cross-section must never silently read as a measured one.
       derived: r.derived ?? dimsDefaulted,
+      spec: r.spec && typeof r.spec === "object" ? r.spec : null,
     });
   }
   return out;

@@ -43,6 +43,11 @@ export interface SheetMeta {
   level: string;
   scale: string; // "1:100"
   dateISO: string; // YYYY-MM-DD
+  /**
+   * G4b: stamps the sheet with the project it belongs to (data-project-id on
+   * the root). Absent on interior sheets, which therefore render unchanged.
+   */
+  projectId?: string;
 }
 
 /** Region available for drawing content (inside margins, above the title block). */
@@ -153,7 +158,7 @@ export function renderSheet(o: RenderSheetOptions): string {
         ? scaleBar(SHEET_MARGIN + 2, SHEET_H - SHEET_MARGIN - 5, o.scaleBar.mmPerM, o.scaleBar.cells, o.scaleBar.stepM)
         : scaleBar(SHEET_MARGIN + 2, SHEET_H - SHEET_MARGIN - 5))
     : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}mm" height="${SHEET_H}mm" viewBox="0 0 ${SHEET_W} ${SHEET_H}" role="img" aria-label="${esc(o.title)}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}mm" height="${SHEET_H}mm" viewBox="0 0 ${SHEET_W} ${SHEET_H}" role="img" aria-label="${esc(o.title)}"${o.meta.projectId ? ` data-project-id="${esc(o.meta.projectId)}"` : ""}>
   <rect x="0" y="0" width="${SHEET_W}" height="${SHEET_H}" fill="${PAPER}"/>
   <rect x="${SHEET_MARGIN / 2}" y="${SHEET_MARGIN / 2}" width="${SHEET_W - SHEET_MARGIN}" height="${SHEET_H - SHEET_MARGIN}" fill="none" stroke="${INK_900}" stroke-width="0.5"/>
   ${o.body}

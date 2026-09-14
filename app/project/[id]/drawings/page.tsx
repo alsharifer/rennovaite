@@ -36,6 +36,8 @@ const SHEET_BLURB: Record<string, string> = {
   zone_plan: "One zone at a readable scale — every straight edge dimensioned in millimetres.",
   lighting_overlay: "Lighting as designed — points by fitting and an indicative cable route.",
   irrigation_overlay: "Irrigated zones, drip runs, indicative routing and drainage points. No HVAC.",
+  structure_elevation: "Sectional elevation — heights, build-up and FFL levels, every figure from the plan.",
+  garden_elevation: "The boundary lines in elevation, with every structure in profile at its height.",
 };
 
 export default async function DrawingsPage({

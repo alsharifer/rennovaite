@@ -60,3 +60,35 @@ timeout per render and does not touch garden prompts). `.env.local` unchanged.
   `lib/plan/save-repair.ts`; the live run now round-trips every polygon exactly.
 - One render's image failed to fetch on one build (transient); the pack now
   retries and, if an image is still unavailable, says so on the page.
+
+---
+
+# G4b — plan-faithful renders, elevations, isolation (2026-09-14, in progress)
+
+`g4b-*.png` are pages of the live drawing-set PDF (24 A3 pages), opened with
+mupdf: the site plan with level tags and existing context, a zone sheet with its
++300 level, the seven sectional elevations (L-301…L-307) and the boundary
+elevation strips (L-501). `g4b-isolation.json` is the isolation check's record.
+
+**Status: committed without regenerating the render pack.** The Replicate
+account ran out of credit (HTTP 402) mid-verification; after the top-up the
+regeneration was deferred and G4b closed on fixes only. Drawings, levels, the
+live dry-run (30/30, 244 printed figures incl. 28 vertical dimensions equal to
+the graph) and the isolation check (15/15, both directions) are verified. The
+gate table for the Villa 94 pack comes from a rerun of
+`scripts/garden-isolation-check.ts`.
+
+Fixes after the 402:
+
+- **Evening light positions are gated.** The evening check now sees the night
+  design model as a third image; a light where none was designed is a failure.
+  Calibrated on the saved live pergola evening: it failed on the surface-mounted
+  downlight on the rear boundary wall (major) and classed soft spill beside
+  designed points as minor.
+- **Infrastructure faults are not verdicts.** Attempts that never produced an
+  image are thrown, not saved as a 3D-view substitution; an evening that shipped
+  as the night view only because no day had passed is re-rendered once one has.
+- **The render page says what shipped**: *Checked* or *3D view* per garden view.
+- Interior identity re-checked against `99cdd55`: Mudon graph (bar additive
+  null fields), as-built + demolition sheets, quantities and the priced BoQ across
+  four styles are byte-identical (BoQ minus `generated_at`).

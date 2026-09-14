@@ -56,9 +56,9 @@ function dims(svg: string) {
 describe("garden drawing set — Villa 94", () => {
   it("builds a site plan, one sheet per zone, both overlays", () => {
     const zones = gardenZones(graph);
-    expect(zones).toHaveLength(11);
+    expect(zones).toHaveLength(12);
     expect(sheets.filter((s) => s.kind === "site_plan")).toHaveLength(1);
-    expect(sheets.filter((s) => s.kind === "zone_plan")).toHaveLength(11);
+    expect(sheets.filter((s) => s.kind === "zone_plan")).toHaveLength(12);
     expect(sheets.some((s) => s.kind === "lighting_overlay")).toBe(true);
     expect(sheets.some((s) => s.kind === "irrigation_overlay")).toBe(true);
     // Sheet numbers are unique — zone sheets share a kind and are addressed by number.

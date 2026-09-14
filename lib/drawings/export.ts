@@ -27,6 +27,7 @@ import {
   renderOpeningSchedule,
   type ScheduleSourceOpening,
 } from "./opening-schedule";
+import { buildElevationSheets } from "./garden-elevations";
 import { buildGardenSheets, type GardenFixture } from "./garden-sheets";
 import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
@@ -45,7 +46,10 @@ export type SheetKind =
   | "site_plan"
   | "zone_plan"
   | "lighting_overlay"
-  | "irrigation_overlay";
+  | "irrigation_overlay"
+  // G4b eye-level drawings.
+  | "structure_elevation"
+  | "garden_elevation";
 
 export interface DrawingSheet {
   kind: SheetKind;
@@ -209,6 +213,19 @@ async function loadOverlayFixtures(projectId: string): Promise<OverlayFixtureFor
   }
 }
 
+/** G4b: counter variants by element id, so an elevation can say "BBQ counter". */
+async function loadElementVariants(planId: string | null): Promise<Record<string, string | null>> {
+  if (!planId) return {};
+  try {
+    const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
+    const { data, error } = await supabase.from("plan_elements").select("id, variant").eq("plan_id", planId);
+    if (error || !data) return {};
+    return Object.fromEntries((data as { id: string; variant: string | null }[]).map((r) => [r.id, r.variant]));
+  } catch {
+    return {};
+  }
+}
+
 /**
  * G4: every fixture on the plan, all layers, for the garden sheets. Not gated by
  * OVERLAYS_ENABLED: a planter box or a garden light on an authored garden is
@@ -249,22 +266,28 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
   const interiorRooms = asBuilt.rooms.filter((r) => !r.unroofed);
   if (outdoor.length > 0 && interiorRooms.length === 0) {
     const fixturesAll = await loadGardenFixtures(projectId);
-    const garden = buildGardenSheets(asBuilt, fixturesAll, meta);
+    const gardenMeta = { ...meta, projectId };
+    const garden = buildGardenSheets(asBuilt, fixturesAll, gardenMeta);
     const finish: DrawingSheet = {
       kind: "finish_schedule",
       title: "Finish Schedule",
       sheetNumber: "L-201",
-      svg: renderFinishSchedule(buildFinishRows(asBuilt, styleKey), meta, {
+      svg: renderFinishSchedule(buildFinishRows(asBuilt, styleKey), gardenMeta, {
         sheetNumber: "L-201",
         title: "Finish Schedule",
       }),
     };
     const zoneSheets = garden.filter((s) => s.kind === "site_plan" || s.kind === "zone_plan");
     const overlays = garden.filter((s) => s.kind === "lighting_overlay" || s.kind === "irrigation_overlay");
+    // G4b: sectional elevations (L-3nn) after the finish schedule, the garden
+    // elevation strips (L-501) last — sheet-number order.
+    const elevations = buildElevationSheets(asBuilt, fixturesAll, gardenMeta, await loadElementVariants(asBuilt.planId));
+    const structures = elevations.filter((s) => s.kind === "structure_elevation");
+    const strips = elevations.filter((s) => s.kind === "garden_elevation");
     return {
       projectId,
       planId: asBuilt.planId,
-      sheets: [...zoneSheets, finish, ...overlays],
+      sheets: [...zoneSheets, finish, ...structures, ...overlays, ...strips],
       derivedNotes: asBuilt.notes,
     };
   }
@@ -352,8 +375,11 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
   // G4: a mixed plan (villa rooms AND garden zones) keeps its interior sheets
   // and gains the garden set after them.
   if (outdoor.length > 0) {
-    const garden = buildGardenSheets(asBuilt, await loadGardenFixtures(projectId), meta);
+    const gardenFixtures = await loadGardenFixtures(projectId);
+    const gardenMeta = { ...meta, projectId };
+    const garden = buildGardenSheets(asBuilt, gardenFixtures, gardenMeta);
     sheets.push(...garden);
+    sheets.push(...buildElevationSheets(asBuilt, gardenFixtures, gardenMeta, await loadElementVariants(asBuilt.planId)));
   }
 
   return { projectId, planId: asBuilt.planId, sheets, derivedNotes: asBuilt.notes };

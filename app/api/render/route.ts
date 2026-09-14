@@ -39,11 +39,12 @@ import {
 import { buildStagingBlock } from "@/lib/staging/prompt";
 import { stagingRoomTypeFromDb, type StagingSet } from "@/lib/staging/sets";
 import { roomDimensions } from "@/lib/room-geometry";
+import { loadGardenSceneContext, renderGardenCamera } from "@/lib/scene-render/pipeline";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const BodySchema = z.object({
   project_id: z.string().uuid(),
@@ -145,6 +146,33 @@ export async function POST(request: NextRequest) {
     // room on a garden-led project in the companion interior one). The response
     // says which style actually ran, so a substitution is never silent.
     const exterior = isExteriorRoomType(promptRoomType);
+
+    // G4b: text-prompted off-plan generation is retired for gardens — it
+    // invents layouts. An exterior zone with no client photo is rendered from
+    // its 3D scene through the plan-faithful pipeline (gated; a render that
+    // fails the gate is replaced by the honest 3D design view). A zone WITH a
+    // photo keeps the photo path below.
+    if (exterior) {
+      const { data: zonePhoto } = await supabase
+        .from("room_photos")
+        .select("public_url")
+        .eq("room_id", room_id)
+        .limit(1)
+        .maybeSingle();
+      if (!zonePhoto?.public_url) {
+        const ctx = await loadGardenSceneContext(project_id);
+        const result = await renderGardenCamera(ctx, `zone:${room_id}`, "day");
+        return NextResponse.json({
+          render_id: result.render_id,
+          image_url: result.image_url,
+          prompt: result.outcome === "passed" ? "Plan-faithful render (faithfulness check passed)" : "3D design view — the render did not pass the faithfulness check",
+          mode: "scene",
+          outcome: result.outcome,
+          cached: result.cached,
+          attempts: result.attempts.map((a) => ({ attempt: a.attempt, passed: a.passed, failures: a.failures })),
+        });
+      }
+    }
     const resolvedStyleKey = exterior
       ? gardenStyleFor(styleKey)
       : (interiorStyleFor(styleKey) ?? styleKey);

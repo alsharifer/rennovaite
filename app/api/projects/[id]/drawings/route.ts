@@ -19,6 +19,8 @@ const KINDS: SheetKind[] = [
   "zone_plan",
   "lighting_overlay",
   "irrigation_overlay",
+  "structure_elevation",
+  "garden_elevation",
 ];
 
 function flagOn(): boolean {

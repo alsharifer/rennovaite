@@ -15,15 +15,23 @@ import { generateDrawingSet } from "@/lib/drawings/export";
 import type { GardenFixture } from "@/lib/drawings/garden-sheets";
 import { gardenStyleFor, getGardenStyle, isGardenStyleKey } from "@/lib/garden-styles";
 import { derivePlanGraph } from "@/lib/plan/derive";
-import { loadRenders } from "@/lib/render-batch/load";
-import { currentDayRender } from "@/lib/render-batch/plan";
+import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { PAGE_H, PAGE_W, buildRenderPack, containFit, type PackRender, type PackZone } from "./render-pack";
+import { PAGE_H, PAGE_W, buildRenderPack, containFit, type PackGardenView, type PackRender, type PackZone } from "./render-pack";
 
 const MM_TO_PT = 72 / 25.4;
 
+export interface GateRow {
+  camera: string;
+  label: string;
+  view: "day" | "evening";
+  outcome: "passed" | "substituted" | "missing";
+  attempts: { attempt: number; passed: boolean; failures: string[] }[];
+}
+
 export interface RenderPackSummary {
+  gate: GateRow[];
   pages: { kind: string; title: string; images: number }[];
   zones: { ref: string; name: string; area_m2: number; derived_m2: number | null; day: boolean; evening: boolean; evening_expected: boolean }[];
   missing_images: string[];
@@ -62,7 +70,7 @@ async function toEmbeddable(bytes: Uint8Array): Promise<{ kind: "png" | "jpg"; b
 export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint8Array; summary: RenderPackSummary }> {
   const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
 
-  const [graph, set, projectRes, styleRes, fixturesRes, renders] = await Promise.all([
+  const [graph, set, projectRes, styleRes, fixturesRes, sceneRes, ctx] = await Promise.all([
     derivePlanGraph(projectId),
     generateDrawingSet(projectId),
     supabase.from("projects").select("name, city").eq("id", projectId).maybeSingle<{ name: string | null; city: string | null }>(),
@@ -74,7 +82,16 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
       .order("created_at", { ascending: false })
       .limit(1),
     supabase.from("plan_fixtures").select("id, layer, type, room_id, position, spec").eq("project_id", projectId),
-    loadRenders(supabase, projectId),
+    // G4b: ONLY plan-faithful scene renders, and only this project's. A photo-
+    // mode or legacy off-plan render has not been gated and never enters a pack.
+    supabase
+      .from("renders")
+      .select("id, camera, view, image_url, gate, created_at, project_id")
+      .eq("project_id", projectId)
+      .eq("mode", "scene")
+      .eq("status", "succeeded")
+      .order("created_at", { ascending: false }),
+    loadGardenSceneContext(projectId).catch(() => null),
   ]);
 
   const variants: Record<string, string | null> = {};
@@ -88,24 +105,35 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   const styleKey = (styleRes.data?.[0]?.style_key as string | undefined) ?? null;
   const style = styleKey ? getGardenStyle(isGardenStyleKey(styleKey) ? styleKey : gardenStyleFor(styleKey)) : null;
 
+  type SceneRow = { id: string; camera: string; view: string; image_url: string; project_id: string; gate: { outcome: "passed" | "substituted"; attempts: { attempt: number; passed: boolean; failures: string[] }[] } | null };
+  const rows = ((sceneRes.data ?? []) as SceneRow[]).filter((r) => r.project_id === projectId && r.gate);
+  const latest = (camera: string, view: "day" | "evening") => rows.find((r) => r.camera === camera && (r.view === "evening" ? "evening" : "day") === view) ?? null;
+  const toPack = (r: SceneRow | null): PackRender | null => {
+    if (!r) return null;
+    const passed = r.gate!.outcome === "passed" && r.gate!.attempts.some((a) => a.passed);
+    const lastFailure = r.gate!.attempts.at(-1)?.failures?.[0] ?? null;
+    return { id: r.id, image_url: r.image_url, kind: passed ? "render" : "design_view", gate_passed: passed, note: passed ? null : lastFailure };
+  };
+  const cameras = ctx?.cameras ?? [];
   const byRoom: Record<string, { day: PackRender | null; evening: PackRender | null }> = {};
   for (const room of graph.rooms) {
-    const day = currentDayRender(renders, room.id);
-    const evening = day
-      ? renders
-          .filter((r) => r.view === "evening" && r.parent_render_id === day.id && r.status === "succeeded" && r.image_url)
-          .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0]
-      : undefined;
-    byRoom[room.id] = {
-      day: day?.image_url ? { id: day.id, image_url: day.image_url } : null,
-      evening: evening?.image_url ? { id: evening.id, image_url: evening.image_url } : null,
-    };
+    const cam = cameras.find((c) => c.zoneId === room.id);
+    byRoom[room.id] = { day: cam ? toPack(latest(cam.id, "day")) : null, evening: cam ? toPack(latest(cam.id, "evening")) : null };
   }
+  const gardenViews: PackGardenView[] = cameras
+    .filter((c) => c.zoneId === null)
+    .map((c) => ({ id: c.id, label: c.label, lit: c.lit, day: toPack(latest(c.id, "day")), evening: c.lit ? toPack(latest(c.id, "evening")) : null }));
+  const gate: GateRow[] = cameras.flatMap((c) =>
+    (c.lit ? (["day", "evening"] as const) : (["day"] as const)).map((view) => {
+      const r = latest(c.id, view);
+      return { camera: c.id, label: c.label, view, outcome: r ? r.gate!.outcome : "missing", attempts: r ? r.gate!.attempts.map((a) => ({ attempt: a.attempt, passed: a.passed, failures: a.failures })) : [] };
+    }),
+  );
 
   // Fetch every photograph BEFORE composing, so a render whose image cannot be
   // fetched gets a page that says so instead of an empty frame.
   const bytesById = new Map<string, { kind: "png" | "jpg"; bytes: Uint8Array }>();
-  const wanted = Object.values(byRoom).flatMap((r) => [r.day, r.evening]).filter((r): r is PackRender => !!r);
+  const wanted = [...Object.values(byRoom), ...gardenViews].flatMap((r) => [r.day, r.evening]).filter((r): r is PackRender => !!r);
   for (let i = 0; i < wanted.length; i += 4) {
     await Promise.all(
       wanted.slice(i, i + 4).map(async (r) => {
@@ -128,6 +156,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
     dateISO: new Date().toISOString().slice(0, 10),
     sitePlanSvg: set.sheets.find((s) => s.kind === "site_plan")?.svg ?? null,
     unavailableRenderIds: unavailable,
+    gardenViews,
   });
 
   const { Resvg } = await import("@resvg/resvg-js");
@@ -166,6 +195,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   }
 
   const summary: RenderPackSummary = {
+    gate,
     pages: pages.map((p) => ({ kind: p.kind, title: p.title, images: p.images.length })),
     zones: zones.map((z: PackZone) => ({
       ref: z.ref,

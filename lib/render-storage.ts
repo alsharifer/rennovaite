@@ -85,3 +85,20 @@ export async function rehostImage(
     return sourceUrl;
   }
 }
+
+/**
+ * G4b: upload bytes we produced ourselves (a 3D scene render) to the `renders`
+ * bucket and return the public URL. Unlike rehostImage this is NOT best-effort:
+ * a scene image is the geometry authority a render is checked against, so a
+ * failed upload is an error the caller must see.
+ */
+export async function uploadRenderBytes(path: string, bytes: Uint8Array, contentType: "image/png" | "image/jpeg"): Promise<string> {
+  const storage = getSupabaseAdmin().storage.from(BUCKET);
+  const { error } = await storage.upload(path, new Blob([bytes as BlobPart], { type: contentType }), {
+    upsert: true,
+    contentType,
+    cacheControl: "31536000",
+  });
+  if (error) throw new Error(`render upload failed (${path}): ${error.message}`);
+  return storage.getPublicUrl(path).data.publicUrl;
+}

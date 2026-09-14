@@ -61,7 +61,13 @@ export interface BatchJob {
   /** Evening jobs: the day render the evening view edits. */
   parent_render_id: string | null;
   render_id: string | null;
+  /** G4b: set for plan-faithful scene jobs, which run through /api/render/scene. */
+  camera_id?: string;
+  /** G4b: a done scene job's gate outcome — "substituted" ships the 3D design view. */
+  outcome?: SceneOutcome | null;
 }
+
+export type SceneOutcome = "passed" | "substituted";
 
 export interface ZoneLight {
   code: string;
@@ -261,6 +267,54 @@ export function planBatch(input: {
       reason: stale ? "day view changed since the last evening view" : null,
       parent_render_id: day.id,
       render_id: current?.id ?? pending?.id ?? null,
+    });
+  }
+  return jobs;
+}
+
+/** A camera as the batch sees it (G4b). */
+export interface BatchCamera {
+  id: string;
+  label: string;
+  zone_id: string | null;
+  lit: boolean;
+}
+
+export interface SceneRenderRow {
+  id: string;
+  camera: string | null;
+  view?: string | null;
+  status: string | null;
+  gate?: { outcome?: string } | null;
+}
+
+const outcomeOf = (r: SceneRenderRow | undefined): SceneOutcome | null =>
+  r?.gate?.outcome === "passed" || r?.gate?.outcome === "substituted" ? r.gate.outcome : null;
+
+/**
+ * G4b: the batch for a garden — one day view per camera (every zone plus the
+ * whole-garden views) and an evening view per lit camera. An evening waits for
+ * its day: it relights a render that passed, or ships the 3D night view.
+ */
+export function planSceneBatch(cameras: readonly BatchCamera[], renders: readonly SceneRenderRow[]): BatchJob[] {
+  const done = (id: string, view: RenderView) =>
+    renders.find((r) => r.camera === id && (r.view === "evening" ? "evening" : "day") === view && r.status === "succeeded");
+  const jobs: BatchJob[] = [];
+  for (const c of cameras) {
+    const day = done(c.id, "day");
+    jobs.push({ room_id: c.zone_id ?? c.id, room_name: c.label, view: "day", status: day ? "done" : "queued", reason: null, parent_render_id: null, render_id: day?.id ?? null, camera_id: c.id, outcome: outcomeOf(day) });
+    if (!c.lit) continue;
+    const eve = done(c.id, "evening");
+    jobs.push({
+      room_id: c.zone_id ?? c.id,
+      room_name: c.label,
+      view: "evening",
+      status: eve ? "done" : day ? "queued" : "blocked",
+      reason: eve || day ? null : "waits for the day view",
+      parent_render_id: day?.id ?? null,
+      render_id: eve?.id ?? null,
+      camera_id: c.id,
+      outcome: outcomeOf(eve),
     });
   }
   return jobs;

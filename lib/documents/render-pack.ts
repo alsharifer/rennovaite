@@ -46,6 +46,34 @@ const M = 18; // page margin
 export interface PackRender {
   id: string;
   image_url: string;
+  /**
+   * G4b: "render" = a plan-faithful render that PASSED the faithfulness gate;
+   * "design_view" = the raw 3D design model shipped because no render passed.
+   */
+  kind: "render" | "design_view";
+  gate_passed: boolean;
+  /** Why a design view was shipped instead of a render. */
+  note?: string | null;
+}
+
+/**
+ * No render enters a pack without passing the gate. Enforced here, where pages
+ * are built, so no caller can route around it.
+ */
+export function assertPackable(r: PackRender): PackRender {
+  if (r.kind === "render" && !r.gate_passed) {
+    throw new Error(`render ${r.id} has not passed the faithfulness gate and cannot enter a pack`);
+  }
+  return r;
+}
+
+/** A whole-garden camera view for the pack. */
+export interface PackGardenView {
+  id: string;
+  label: string;
+  lit: boolean;
+  day: PackRender | null;
+  evening: PackRender | null;
 }
 
 export interface PackZone {
@@ -71,7 +99,7 @@ export interface ImageSlot {
 }
 
 export interface PackPage {
-  kind: "cover" | "plan_overview" | "zone" | "materials";
+  kind: "cover" | "plan_overview" | "garden_view" | "zone" | "materials";
   title: string;
   svg: string;
   images: ImageSlot[];
@@ -92,6 +120,8 @@ export interface RenderPackInput {
   sitePlanSvg: string | null;
   /** Renders that exist but whose image could not be fetched for this build. */
   unavailableRenderIds?: ReadonlySet<string>;
+  /** G4b: whole-garden camera views, shown after the plan overview. */
+  gardenViews?: PackGardenView[];
 }
 
 // --- Model ------------------------------------------------------------------------
@@ -246,11 +276,30 @@ function placeholder(x: number, y: number, w: number, h: number, line1: string, 
 
 const areaText = (r: Room) => `${r.area_m2.toFixed(2)} m²${r.area_derived_m2 ? " *" : ""}`;
 
+/** What an image IS, printed under it: a gated render, or the design view shipped instead. */
+function caption(x: number, y: number, view: string, r: PackRender): string {
+  if (r.kind === "render") {
+    return text(x, y, `${view.toUpperCase()} — RENDER · FAITHFULNESS CHECK PASSED`, { size: 2.6, fill: INK_500, spacing: "0.06em" });
+  }
+  const why = r.note ? `: ${r.note}` : "";
+  return (
+    text(x, y, `${view.toUpperCase()} — 3D DESIGN VIEW`, { size: 2.6, fill: TERRACOTTA, spacing: "0.06em" }) +
+    text(x, y + 4, `No render passed the faithfulness check, so the design model is shown${why}`.slice(0, 150), { size: 2.2, fill: TERRACOTTA })
+  );
+}
+
 // --- Pages -------------------------------------------------------------------------
 
 function coverPage(input: RenderPackInput, zones: PackZone[], total: number): PackPage {
   const rendered = zones.filter((z) => z.day).length;
-  const hero = [...zones].filter((z) => z.day).sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ?? null;
+  const heroView = (input.gardenViews ?? []).find((v) => v.day?.kind === "render") ?? null;
+  const heroZone =
+    [...zones].filter((z) => z.day?.kind === "render").sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ??
+    [...zones].filter((z) => z.day).sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ??
+    null;
+  const hero = heroView
+    ? { ref: "", room: { name_en: heroView.label } as Room, day: heroView.day }
+    : heroZone;
   const images: ImageSlot[] = [];
   const hx = 176;
   const hw = PAGE_W - M - hx;
@@ -292,8 +341,9 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
     body += placeholder(hx, hy, hw, hh, "Image unavailable", "The render could not be fetched when this pack was built; rebuild the pack.");
   } else if (hero?.day) {
     body += frame(hx, hy, hw, hh);
-    images.push({ renderId: hero.day.id, x: hx + 3, y: hy + 3, w: hw - 6, h: hh - 6 });
-    body += text(hx, hy + hh + 7, `${hero.ref} · ${hero.room.name_en}`, { size: 3, fill: INK_500 });
+    images.push({ renderId: assertPackable(hero.day).id, x: hx + 3, y: hy + 3, w: hw - 6, h: hh - 6 });
+    body += text(hx, hy + hh + 7, `${hero.ref ? `${hero.ref} · ` : ""}${hero.room.name_en}`, { size: 3, fill: INK_500 });
+    body += caption(hx, hy + hh + 12, "Day", hero.day!);
   } else {
     body += placeholder(hx, hy, hw, hh, "No renders yet", "Generate the zone views from the render step, then rebuild the pack.");
   }
@@ -318,6 +368,31 @@ function planOverviewPage(input: RenderPackInput, total: number): PackPage {
     body += text(M, 50, "No outdoor zones on the plan.", { size: 4, fill: INK_500 });
   }
   return { kind: "plan_overview", title: "Plan overview", svg: page(body), images: [] };
+}
+
+function gardenViewPage(input: RenderPackInput, v: PackGardenView, n: number, total: number): PackPage {
+  const images: ImageSlot[] = [];
+  let body = chrome(input, v.label, n, total);
+  body += text(M, 31, v.label, { size: 10, fill: INK_900, font: FONT_DISPLAY });
+  const top = 40;
+  const gap = 8;
+  const colW = (PAGE_W - 2 * M - gap) / 2;
+  const photoH = v.lit ? Math.round((colW - 6) / PHOTO_ASPECT + 6) : 200;
+  const boxes = v.lit
+    ? [{ x: M, w: colW, view: "Day", r: v.day }, { x: M + colW + gap, w: colW, view: "Evening", r: v.evening }]
+    : [{ x: (PAGE_W - (photoH - 6) * PHOTO_ASPECT - 6) / 2, w: (photoH - 6) * PHOTO_ASPECT + 6, view: "Day", r: v.day }];
+  for (const b of boxes) {
+    if (b.r && input.unavailableRenderIds?.has(b.r.id)) {
+      body += placeholder(b.x, top, b.w, photoH, "Image unavailable", "The render could not be fetched when this pack was built; rebuild the pack.");
+    } else if (b.r) {
+      body += frame(b.x, top, b.w, photoH);
+      images.push({ renderId: assertPackable(b.r).id, x: b.x + 3, y: top + 3, w: b.w - 6, h: photoH - 6 });
+      body += caption(b.x, top + photoH + 6, b.view, b.r);
+    } else {
+      body += placeholder(b.x, top, b.w, photoH, "Not yet rendered", "Generate the whole-garden views from the render step.");
+    }
+  }
+  return { kind: "garden_view", title: v.label, svg: page(body), images };
 }
 
 function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number): PackPage {
@@ -347,13 +422,13 @@ function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number)
       body += placeholder(x, top, w, photoH, "Image unavailable", "The render could not be fetched when this pack was built; rebuild the pack.");
     } else if (b.r) {
       body += frame(x, top, w, photoH);
-      images.push({ renderId: b.r.id, x: x + 3, y: top + 3, w: w - 6, h: photoH - 6 });
+      images.push({ renderId: assertPackable(b.r).id, x: x + 3, y: top + 3, w: w - 6, h: photoH - 6 });
     } else if (b.view === "Evening") {
       body += placeholder(x, top, w, photoH, "Evening view not rendered", "This zone has lighting on the plan; generate its evening view.");
     } else {
       body += placeholder(x, top, w, photoH, "Not yet rendered", "Generate this zone's view from the render step.");
     }
-    body += text(x, top + photoH + 6, b.view.toUpperCase(), { size: 2.8, fill: INK_500, spacing: "0.08em" });
+    body += b.r ? caption(x, top + photoH + 6, b.view, b.r) : text(x, top + photoH + 6, b.view.toUpperCase(), { size: 2.8, fill: INK_500, spacing: "0.08em" });
   }
 
   // Facts band.
@@ -503,11 +578,13 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
 
 export function buildRenderPack(input: RenderPackInput): { pages: PackPage[]; zones: PackZone[] } {
   const zones = buildPackZones(input);
-  const total = 3 + zones.length;
+  const views = input.gardenViews ?? [];
+  const total = 3 + views.length + zones.length;
   const pages: PackPage[] = [
     coverPage(input, zones, total),
     planOverviewPage(input, total),
-    ...zones.map((z, i) => zonePage(input, z, 3 + i, total)),
+    ...views.map((v, i) => gardenViewPage(input, v, 3 + i, total)),
+    ...zones.map((z, i) => zonePage(input, z, 3 + views.length + i, total)),
     materialsPage(input, zones, total, total),
   ];
   return { pages, zones };

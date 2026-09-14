@@ -63,6 +63,15 @@ export interface Room {
    */
   area_derived_m2: number | null;
   derived_note: string | null;
+  /**
+   * G4b: finished level relative to the plan datum (±0 FFL), in mm. null = the
+   * drawing states no level for this zone — never read as ±0.
+   */
+  level_mm: number | null;
+  /** G4b: top of a structure zone above its level, in mm (a pergola's TRL). */
+  height_mm: number | null;
+  /** G4b: build-up (member sizes, post positions) and where each number came from. */
+  spec: Record<string, unknown> | null;
   /** Names of fields on this room whose value is derived, not sourced. */
   derived_fields: string[];
 }
@@ -177,6 +186,38 @@ export interface DerivedRecord {
   metric_scale: boolean; // metres derived from total_area_m2, not a real scale bar
 }
 
+/**
+ * G4b: something on the plot that is not in scope — the existing villa and
+ * garage, an existing pergola, steps, a boundary wall. Never a zone and never
+ * priced; it exists so a 3D scene, a camera and an elevation know what stands
+ * there.
+ */
+export type ContextKind = "existing_building" | "existing_structure" | "steps" | "boundary_wall";
+
+export interface ContextVolume {
+  id: string;
+  kind: ContextKind;
+  name: string;
+  /** Metric footprint, same frame as rooms. */
+  polygon: Point[];
+  base_mm: number;
+  height_mm: number | null;
+  /** true = assumed or scaled from the drawing, not dimensioned. */
+  derived: boolean;
+  note: string | null;
+}
+
+export interface RawContext {
+  id: string;
+  kind: string;
+  name?: string | null;
+  polygon: unknown;
+  base_mm?: number | null;
+  height_mm?: number | null;
+  derived?: boolean | null;
+  note?: string | null;
+}
+
 export interface PlanGraph {
   projectId: string;
   planId: string | null;
@@ -185,6 +226,8 @@ export interface PlanGraph {
   openings: Opening[];
   /** G1: boundary walls, bench/planter/counter runs — priced per linear metre. */
   elements: LinearElement[];
+  /** G4b: existing, out-of-scope volumes on the plot (migration 036). */
+  context: ContextVolume[];
   meta: PlanGraphMeta;
   derived: DerivedRecord;
   notes: string[];
@@ -204,6 +247,10 @@ export interface RawRoom {
   /** G4: approximated share of the area and its reason (migration 035). */
   area_derived_m2?: number | null;
   derived_note?: string | null;
+  /** G4b (migration 036). */
+  level_mm?: number | null;
+  height_mm?: number | null;
+  spec?: Record<string, unknown> | null;
 }
 
 export interface BuildPlanGraphInput {
@@ -216,6 +263,8 @@ export interface BuildPlanGraphInput {
   openings?: RawOpening[];
   /** G1: persisted linear elements (boundary walls, bench/planter/counter runs). */
   elements?: RawLinearElement[];
+  /** G4b: existing context volumes (villa, garage, steps, boundary walls). */
+  context?: RawContext[];
   /**
    * G1: metres per normalised unit, when the plan's scale was MEASURED rather
    * than inferred. An authored plan has one (the plot width the user typed);
@@ -565,6 +614,9 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
           ? Number(raw.area_derived_m2)
           : null,
       derived_note: raw.derived_note?.trim() || null,
+      level_mm: raw.level_mm == null ? null : Number(raw.level_mm),
+      height_mm: raw.height_mm == null ? null : Number(raw.height_mm),
+      spec: raw.spec && typeof raw.spec === "object" ? raw.spec : null,
       derived_fields: [
         // A measured scale makes the metric polygon a measurement too.
         ...(measuredScale ? [] : ["polygon"]),
@@ -641,6 +693,28 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
     );
   }
 
+  // --- Context (G4b) ---------------------------------------------------------
+  const CONTEXT_KINDS: readonly ContextKind[] = ["existing_building", "existing_structure", "steps", "boundary_wall"];
+  const context: ContextVolume[] = (input.context ?? [])
+    .map((c): ContextVolume | null => {
+      const poly = toNormalisedPolygon(c.polygon);
+      if (!poly || !(CONTEXT_KINDS as readonly string[]).includes(c.kind)) return null;
+      return {
+        id: c.id,
+        kind: c.kind as ContextKind,
+        name: c.name?.trim() || c.kind.replace(/_/g, " "),
+        polygon: poly.map(toM),
+        base_mm: Number(c.base_mm ?? 0),
+        height_mm: c.height_mm == null ? null : Number(c.height_mm),
+        derived: c.derived === true || c.height_mm == null,
+        note: c.note?.trim() || null,
+      };
+    })
+    .filter((c): c is ContextVolume => c !== null);
+  if (context.length > 0) {
+    notes.push(`${context.length} context volume(s) on the plot (existing, not in scope; ${context.filter((c) => c.derived).length} with an assumed or scaled dimension).`);
+  }
+
   // --- Openings (A3/A5) — assign each to its nearest derived wall -------------
   const openings: Opening[] = (input.openings ?? [])
     .map((ro): Opening | null => {
@@ -702,6 +776,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
     walls,
     openings,
     elements,
+    context,
     meta: {
       scale,
       source: input.source === "user_drawn" ? "user_drawn" : "parsed",

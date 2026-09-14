@@ -212,6 +212,12 @@
       "version": "20260101003500",
       "name": "garden_documents",
       "sha256": "8021b53a2d877254375d32abd4fa4c0a5c40db0b7fd37b2931238b1ce8314a21"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003600",
+      "name": "garden_scene",
+      "sha256": "f64c2907ce25bef0e5177f790bcf3a4efd9c1384b837c6f1c277fac5bb9efc99"
     }
   ]
 }

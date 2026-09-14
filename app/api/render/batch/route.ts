@@ -5,7 +5,8 @@ import { z } from "zod";
 import { gardenStyleFor, isGardenStyleKey } from "@/lib/garden-styles";
 import { gardenPresetItems } from "@/lib/moodboard/types";
 import { loadRenders } from "@/lib/render-batch/load";
-import { planBatch, type BatchFixture, type BatchRoom } from "@/lib/render-batch/plan";
+import { planBatch, planSceneBatch, type BatchFixture, type BatchRoom, type SceneRenderRow } from "@/lib/render-batch/plan";
+import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 import { tasteSeedEnabled } from "@/lib/render-grounding";
 import { IN_FLIGHT_CAP } from "@/lib/render-image";
 import { isExteriorRoomType, roomTypeFromDb } from "@/lib/render-prompts";
@@ -13,6 +14,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 // G4 "Generate all" — Newspace ask #2.
 //
@@ -78,11 +80,29 @@ export async function POST(request: NextRequest) {
 
     const preset = await prepareGardenPreset(supabase, project_id, styleKey, rooms);
 
-    const jobs = planBatch({
-      rooms,
-      renders: rendersRes,
-      fixtures: (fixturesRes.data ?? []) as BatchFixture[],
-    });
+    // G4b: a garden is rendered by camera through the plan-faithful pipeline —
+    // every zone's camera plus the whole-garden views.
+    const renderable = rooms.map((r) => roomTypeFromDb(r.room_type)).filter((t) => t !== null);
+    const gardenOnly = renderable.length > 0 && renderable.every((t) => isExteriorRoomType(t));
+    let jobs;
+    if (gardenOnly) {
+      const ctx = await loadGardenSceneContext(project_id);
+      const { data: sceneRows } = await supabase
+        .from("renders")
+        .select("id, camera, view, status")
+        .eq("project_id", project_id)
+        .eq("mode", "scene");
+      jobs = planSceneBatch(
+        ctx.cameras.map((c) => ({ id: c.id, label: c.label, zone_id: c.zoneId, lit: c.lit })),
+        (sceneRows ?? []) as SceneRenderRow[],
+      );
+    } else {
+      jobs = planBatch({
+        rooms,
+        renders: rendersRes,
+        fixtures: (fixturesRes.data ?? []) as BatchFixture[],
+      });
+    }
 
     return NextResponse.json({ jobs, preset, cap: IN_FLIGHT_CAP });
   } catch (err) {
