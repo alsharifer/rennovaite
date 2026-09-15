@@ -920,8 +920,48 @@ mechanism, not a workaround.
   rear strip 4.3, the 0.1 m depth residual stated; existing features from the 14
   client photos; `PHOTO_COVERAGE` maps photos to zones and visible items. No client
   personal name anywhere.
+- **Replaced by a different element** (`spec.replaced_by`, G5 design seed):
+  replace used to mean like-for-like. When the replacement is ANOTHER design
+  element (stepping path → porcelain paving zones, sink counter → a BBQ counter
+  under the pergola, string lights → designed lighting) the old item counts toward
+  demolition only, is out of the design (`isInDesign`), and the replacing element
+  carries the new work — never both priced. `replaced_in_place` tells a photo pair
+  whether the replacement stands where the old item did (otherwise it is simply
+  gone from that camera). API only (no editor control yet).
+- **Design assumptions page** (`lib/documents/design-assumptions.ts`): after the
+  plan overview, a draft pack lists every existing item's proposal (REPLACE →
+  what it becomes, REMOVE, KEEP), built from the same dispositions the take-off
+  priced, plus layout assumptions (`spec.assumption`, context notes) and "Design
+  direction … proposed, to confirm with the client". Absent when nothing is
+  proposed (a completed garden).
+- **Document names** (migration `038`): `projects.display_name`, set via
+  `PATCH /api/projects/[id]`; every client-facing document (drawing set, render
+  pack, BoQ PDF) reads the project through `loadDocumentProject`, so a working
+  name like "…(ground truth)" never reaches a cover.
+- **The gate checks what the client was promised, not just "a structure"**: a
+  louvred pergola is named `louvred pergola` in the scene manifest and the gate is
+  told shade sails / fabric / timber rafters are a different structure (a
+  shade-sail render had passed as "a pergola" and become the cover); an existing
+  tree the design KEEPS is `existing tree (kept)`, on the gate's list once ≥ 1% of
+  the frame and in the render prompt's keep line (a render that dropped all six
+  kept trees had passed). Both apply only where such items exist — other prompts
+  are byte-identical.
+- **Pair gate robustness**: the reply schema takes whatever the model names the
+  extra-structure text field and treats an unsure `null` as "no" (a reply with
+  `"what"` instead of `"description"` had made the gate "unavailable"); a withheld
+  pair with no verdict (`isVerdictless`: every attempt a render error or an
+  unavailable gate) is neither cached nor trusted from cache. The draft-pack
+  script tries a zone's second photo when its first pair is withheld.
+- **Seeding and reference packs are not the pilot**:
+  `scripts/arabella-design-seed.ts` applies a design proposal through the authored
+  routes and tags its events `stage: design_seed` (excluded from design-session
+  minutes); `scripts/garden-reference-pack.ts` sets the reference project's
+  display name, renders every camera, exports the render pack + drawing set (no
+  BoQ — negotiated prices) and asserts no "ground truth", no house number, no
+  contractor identity, no price and no draft watermark; its events are
+  `stage: reference_pack` (excluded from metrics like `verification`).
 
-**DB step**: `supabase db push` for `037`.
+**DB step**: `supabase db push` for `037` and `038`.
 
 ## The journey — nine steps, one definition (B1/B2/B3)
 

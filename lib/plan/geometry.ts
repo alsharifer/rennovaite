@@ -29,7 +29,7 @@ import {
   type RawLinearElement,
 } from "./elements";
 import { pointToSegment } from "./polygon";
-import { dispositionOf, draftStatus, type Disposition, type DraftStatus } from "./site-reference";
+import { dispositionOf, draftStatus, isInDesign, type Disposition, type DraftStatus } from "./site-reference";
 import { defaultUnroofed } from "./zones";
 
 export type Point = [number, number]; // metres. Origin = plan bbox top-left; +x right, +y DOWN (drawing convention).
@@ -875,7 +875,7 @@ export function derivedFieldSummary(graph: PlanGraph): string[] {
  * items do not count: they are not in the design.
  */
 export function graphDraftStatus(graph: PlanGraph): DraftStatus {
-  const inDesign = <T extends { site_reference?: boolean; disposition?: Disposition | null }>(x: T) => !(x.site_reference && x.disposition === "remove");
+  const inDesign = <T extends { site_reference?: boolean; disposition?: Disposition | null; spec?: Record<string, unknown> | null }>(x: T) => isInDesign(x);
   return draftStatus({
     plot_dims_derived: graph.meta.plot?.dims_derived === true,
     dims_note: graph.meta.plot?.dims_note ?? null,

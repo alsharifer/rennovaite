@@ -95,7 +95,7 @@ Fixes after the 402:
 
 ---
 
-# G5 — client garden draft stage (2026-09-14, in progress)
+# G5 — client garden draft stage (2026-09-14 → 16, draft packs ready for the review session)
 
 Project **Arabella Garden — Draft for Review** (`ec4497c7-…`, dev DB). No client
 personal name appears anywhere. The client photos stay under `data/` (gitignored);
@@ -119,55 +119,107 @@ items.
   zone areas `≈`, "Derived dimensions" note, the draft stamp over the title block.
 - `g5-L-501-boundary-elevations.png` — boundary strips with the house and walls.
 
-## Step 2 — the design session (Abdallah)
+## Step 2 — the baseline design, seeded as a PROPOSAL
 
-Blocked on the design pass. Editor fixes landed first so it is not blocked by the
-tool: Landscape layer, keep/remove/replace for every existing item, levels and
-structure heights, plot-fitted canvases with 5 cm snapping, numeric zone
-geometry, add/remove vertex, run and fixture inspectors, context drawn under every
-layer, draft banner, pack readiness, friction log (plan page, under the plan).
+`scripts/arabella-design-seed.ts` applied the design brief through the authored
+routes (7/7, `g5-design-seed.json`): 4 → 10 zones, 6 → 8 runs, 6 → 26 fixtures.
+Every zone, run and context footprint is still `dims_derived`; all 11 existing
+zones/runs/walls keep their `site_reference` tag; the plan is still a draft; the
+export gate passes legitimately (no untyped counter, nothing undecided, no
+`needs_selection`). Every pilot event the seeding caused is `stage: design_seed`.
 
-Known limitations going in (candidates for the friction log if they bite):
-- a run cannot be reshaped after drawing — delete and redraw;
-- a zone outline is edited as a rectangle (X/Y/W/D) or by vertices — no
-  click-to-draw polygon tool;
-- irrigation zones are derived from planting beds and planter runs — there is no
-  separate irrigation-zone element;
-- context (house, garage, walls) is editable through `/api/plan-context` only —
-  the Step 5 amendment will need a UI for it;
-- ~~on this narrow plot the scene cameras sit close~~ — fixed before the pack run:
-  cramped standpoints (< 6 m clear) get no eye-level camera; zones are seen from
-  elevated three-quarter views along the corridor; the whole-garden views look
-  down the rear strip and the side garden. On the reference layout all 6 cameras
-  come out clean (4 zone views elevated, 2 whole-garden views from 6.5 m). An
-  unclean camera ships the 3D design view by choice with no render attempt —
-  verified live on Villa 94's side courtyard (0 attempts, 4 s).
+| Zone | Type | m² |
+| --- | --- | --- |
+| Rear planting bed | planting bed | 12.36 |
+| Rear garden — lawn | artificial grass | 55.62 |
+| Porcelain path — garden gate to side garden | path | 20.60 |
+| Pergola court — porcelain paving | paving | 13.98 |
+| Louvred pergola (replaces existing gazebo) | structure, 2.8 m | 12.25 |
+| Side garden — porcelain paving terrace | paving | 16.12 |
+| Side garden — lawn | artificial grass | 14.88 |
+| Side garden — planting bed | planting bed | 3.72 |
+| Front garden — lawn | artificial grass (assumed) | 6.40 |
+| Front garden — planting bed | planting bed (assumed) | 2.40 |
+
+Runs: BBQ counter 3.0 lm (bbq, 900 × 900) under the pergola, L-bench 4.0 lm.
+Points: 6 spike + 6 inground garden lights, 6 boundary-wall lights, 2 drainage
+points. Style direction: Desert Modern, proposed.
+
+**Decisions** (the pack's Design assumptions page, `g5-design-assumptions-page.png`):
+REPLACE gazebo → louvred pergola; sink counter → BBQ counter under the pergola;
+stepping-stone path → porcelain paving (the side terrace and the rear path); both
+string-light runs → designed lighting. REMOVE both planter borders. KEEP 6 trees
+and 4 boundary walls.
+
+**Friction log** (9 entries, pilot data): no style locked (renders need one);
+no front-garden footprint in the dimension set (assumed, garage block reshaped via
+API — no context editor); no gate element on a boundary wall; no pergola variant
+field; replace-by-a-different-element had no representation (added
+`spec.replaced_by`, API only); PATCH replaces spec wholesale; counter default
+section is not a BBQ counter's; irrigation has no drawn zones; one run replaced by
+two elements has one `replaced_by` text.
 
 ## Rehearsal (scratch project, deleted afterwards)
 
-A scratch copy of the reference layout with a simulated design pass ran the whole
-Step 3 pipeline: `garden-draft-pack.ts --no-render` → **18/18** (readiness,
-needs_selection empty, draft BoQ, 5 derived lines, source labels, three PDFs,
-cover/L-3nn/L-401/L-402, watermark on 12/12 sheets + both covers + every BoQ page,
-`≈ AED 46,800*`, BoQ page and plan page flags, zero identity leakage across 25
-documents). Live: one scene render (substituted, stated) and one photo pair
-(passed on attempt 2 — attempt 1 lost to an unparseable gate reply, since fixed:
-nullable fields, a re-check of the same image before another render). The pack
-carried the pair page and the design view. `g5-rehearsal-boq-pdf-p1.png` is that
-rehearsal's BoQ PDF page 1 (rehearsal quantities, not the client design). The
-scratch project was then deleted: 5 → 4 projects, its 20 storage objects removed,
-client and Villa 94 row counts identical before and after.
+Before the design, a scratch copy of the reference layout ran the whole pack
+pipeline (18/18 with `--no-render`, one live render, one photo pair).
+`g5-rehearsal-boq-pdf-p1.png` is that rehearsal's BoQ PDF page 1 (rehearsal
+quantities, not the client design). The scratch project was deleted; client and
+reference row counts were identical before and after.
 
-## Isolation — Villa 94 ↔ client, documents only
+## The client draft pack (paid run) — 20/20
 
-`garden-isolation-check.ts --client ec4497c7-… --no-render-reference
---no-render-client` → **11/11** both directions (`g5-isolation.json`): BoQ, take-off
-and drawings regenerated on each side; the other side's rows (incl. photo assets,
-room photos, pilot events, corrections) and storage (incl. `plan-uploads`)
-unchanged. Rerun with renders once the design is in.
+`garden-draft-pack.ts ec4497c7-…` → drawing set (19 sheets), render pack (19
+pages), BoQ PDF (2 pages) in `data/garden pilot/g5-draft-pack/` (gitignored).
+Watermark on all 19 sheets, both covers and every BoQ page; `≈ AED 116,900*`;
+zero contractor-identity leakage across 42 documents; no internal sales language.
 
-## Still to do for the draft stage
+**Mix**: 3 before/after photo pairs (one per zone photographed — the side-garden
+zones on their second photo), 1 styled render (rear lawn), 15 3D design views by
+choice (no clean camera: 0.6 m beds, the 1.0 m path, the side garden against the
+house, the front garden), 5 3D design views after a failed gate. The cover leads
+with the side-terrace pair.
 
-After the design session: `garden-draft-pack.ts ec4497c7-…` (renders, 2–3 photo
-pairs, gate table, metrics, Step-5 baseline), the isolation check with renders,
-then the draft-stage commit.
+What the run found and fixed (each cost a re-render, none tuned away):
+- the pair gate went "unavailable" because a reply named the extra-structure
+  field `what`; lenient schema + a withheld pair with no verdict is never cached;
+- the stepping path's replacement named only the 1.0 m path, so the gate rightly
+  rejected the side terrace in a side-garden photo;
+- a shade-sail pergola passed as "a pergola" and became the cover — the gate now
+  checks a *louvred* pergola;
+- a render that dropped all six kept trees passed — kept trees are on the gate's
+  list (species named), which needed the scene loader to read the fixtures'
+  site-reference columns at all (a removed tree would otherwise have been drawn);
+- the seeded pergola note said "the upsell conversation" on a client page —
+  reworded, and asserted against.
+
+The stricter gate is why the final mix has 1 styled render where an earlier,
+laxer run had 4; the pergola and court now ship as design views.
+
+**BoQ**: AED 116,942.01 (printed `≈ AED 116,900*`), 15 lines, 9 derived. Top 5:
+irrigation allowance 1.6 lump × 11,000 = 17,600 · louvred pergola 12.25 m² ×
+1,366.69 = 16,742 · BBQ counter 3 lm × 5,280 = 15,840 · porcelain tile supply
+62.95 m² × 128.10 = 8,064 · PCC base 62.95 m² × 105.60 = 6,648. Planting beds carry
+no supply line (no reference rate) — they only size the irrigation band.
+
+## The reference pack — 9/9
+
+`garden-reference-pack.ts` → the completed reference garden as
+**Contemporary Villa Garden — Completed Renovation** (display name, migration
+038): render pack (18 pages) and drawing set; no BoQ (negotiated prices). No
+"ground truth", no house number, no contractor identity, no price, no draft
+watermark, no assumptions page. Mix: 8 styled renders, 17 design views by
+choice, 4 after a failed gate. Cover: `g5-reference-pack-cover.png`.
+
+## Isolation — with renders, both directions — 16/16
+
+`garden-isolation-check.ts --client ec4497c7-… --out g5-isolation`: regenerating
+the reference pack leaves the client's 312 rows and 228 storage objects unchanged;
+regenerating the client's leaves the reference's 155 rows and 254 objects
+unchanged; every render row, manifest, photo pair, sheet and BoQ ref resolves to
+its own project; 30 vs 91 cache keys, 0 shared.
+
+## Next
+
+The review session with the client (Step 5 amendment to measured dimensions, then
+`garden-change-report.ts`).

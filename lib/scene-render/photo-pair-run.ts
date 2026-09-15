@@ -17,7 +17,7 @@ import { uploadRenderBytes } from "@/lib/render-storage";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { isInfrastructureFailure, PRIMARY_MODEL } from "./prompts";
-import { pairCacheKey, pairManifest, pairPrompt, PHOTO_PAIR_VERSION, runPairGate, type PairManifest } from "./photo-pair";
+import { isVerdictless, pairCacheKey, pairManifest, pairPrompt, PHOTO_PAIR_VERSION, runPairGate, type PairManifest } from "./photo-pair";
 import { fetchSceneBytes, loadGardenSceneContext, runRenderModel } from "./pipeline";
 
 const SURFACE_NOUN: Record<string, string> = {
@@ -59,19 +59,30 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
     .select("id, type, spec, site_reference, disposition")
     .eq("project_id", input.projectId)
     .in("id", input.itemIds.length ? input.itemIds : ["00000000-0000-0000-0000-000000000000"]);
-  const items: { noun: string; disposition: "keep" | "remove" | "replace" | null }[] = [];
+  const items: { noun: string; disposition: "keep" | "remove" | "replace" | null; replacement?: string | null }[] = [];
   const clean = (s: string) => s.replace(/\s*\(existing\)\s*/i, " ").replace(/\s+—\s+/g, " — ").trim().toLowerCase();
   for (const id of input.itemIds) {
     const r = ctx.graph.rooms.find((x) => x.id === id);
     if (r) {
       const form = typeof r.spec?.form === "string" ? r.spec.form : null;
-      items.push({ noun: form === "gazebo" ? "the hardtop gazebo with dark glazed panels" : clean(r.name_en), disposition: r.disposition });
+      const was = typeof r.spec?.replaces_existing === "string" ? r.spec.replaces_existing : null;
+      if (r.disposition === "replace" && was) {
+        // Replaced in place by something else (gazebo → louvred pergola).
+        items.push({ noun: `the ${was}`, disposition: "replace", replacement: `a ${String(r.spec?.system ?? r.name_en).toLowerCase()}` });
+      } else {
+        items.push({ noun: form === "gazebo" ? "the hardtop gazebo with dark glazed panels" : clean(r.name_en), disposition: r.disposition });
+      }
       continue;
     }
     const e = ctx.graph.elements.find((x) => x.id === id);
     if (e) {
       const name = typeof e.spec?.name === "string" ? e.spec.name : LINEAR_ELEMENT_META[e.kind].label;
-      items.push({ noun: `the ${clean(name.split(" — ")[0]!)}`, disposition: e.disposition });
+      const noun = `the ${clean(name.split(" — ")[0]!)}`;
+      const by = typeof e.spec?.replaced_by === "string" && e.disposition === "replace" ? e.spec.replaced_by : null;
+      if (by && e.spec?.replaced_in_place === true) items.push({ noun, disposition: "replace", replacement: by });
+      // Replaced by something placed elsewhere: from this camera it is simply gone.
+      else if (by) items.push({ noun, disposition: "remove" });
+      else items.push({ noun, disposition: e.disposition });
       continue;
     }
     const f = (fx ?? []).find((x: { id: string }) => x.id === id) as { type: string; spec: Record<string, unknown> | null; site_reference: boolean; disposition: string | null } | undefined;
@@ -92,8 +103,8 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
     .eq("mode", "photo_pair")
     .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle<{ id: string; image_url: string; gate: { outcome: "passed" | "withheld"; attempts: PhotoPairResult["attempts"] } }>();
-  if (cached?.gate) return { render_id: cached.id, image_url: cached.image_url, outcome: cached.gate.outcome, cached: true, attempts: cached.gate.attempts };
+    .maybeSingle<{ id: string; image_url: string; gate: { outcome: "passed" | "withheld"; attempts: (PhotoPairResult["attempts"][number] & { image_url?: string })[] } }>();
+  if (cached?.gate && !(cached.gate.outcome === "withheld" && isVerdictless(cached.gate.attempts))) return { render_id: cached.id, image_url: cached.image_url, outcome: cached.gate.outcome, cached: true, attempts: cached.gate.attempts };
 
   const before = await fetchSceneBytes(photoUrl);
   const beforeMime = before[0] === 0x89 ? "image/png" : "image/jpeg";
@@ -132,6 +143,9 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
   }
   if (!passedUrl && isInfrastructureFailure(attempts)) {
     throw new Error(`render model unavailable: ${attempts.at(-1)!.failures[0] ?? "unknown error"}`);
+  }
+  if (!passedUrl && isVerdictless(attempts)) {
+    throw new Error(`pair gate unavailable — not withheld on a verdict, retry later: ${attempts.at(-1)!.failures[0] ?? "unknown error"}`);
   }
 
   const outcome: "passed" | "withheld" = passedUrl ? "passed" : "withheld";

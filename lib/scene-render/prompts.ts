@@ -94,7 +94,9 @@ function keepLine(m: CameraManifest): string {
   const checks = gateChecks(m);
   const structures = checks.filter((c) => c.category === "structure");
   const context = checks.filter((c) => c.category === "context");
+  const kept = checks.filter((c) => c.category === "planting");
   const parts: string[] = [];
+  if (kept.length) parts.push(`the existing trees the client is keeping — ${kept.map((c) => `${c.noun.replace(/^existing | \(kept\)$/g, "")} (${region(c.box)})`).join("; ")}`);
   if (structures.length) parts.push(`built elements — ${structures.map((c) => `the ${c.noun} (${region(c.box)})`).join("; ")}`);
   if (context.length) parts.push(`${[...new Set(context.map((c) => c.noun))].join(", ")}`);
   return parts.length ? `Keep exactly as modelled, same position, shape, size and height: ${parts.join("; ")}; plus every step and level.` : "Keep every wall, step and level exactly as modelled.";

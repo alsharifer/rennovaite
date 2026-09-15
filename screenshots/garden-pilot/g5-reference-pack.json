@@ -1,0 +1,451 @@
+{
+  "project_id": "8d460645-9450-4072-af41-b37adf8512a0",
+  "display_name": "Contemporary Villa Garden — Completed Renovation",
+  "generated_at": "2026-09-15T20:01:18.645Z",
+  "drawings": [
+    "L-000 Cover & Sheet Index",
+    "L-100 Site Plan — Garden",
+    "L-101 Z01 North planting strip",
+    "L-102 Z02 Pergola court paving",
+    "L-103 Z03 Wall-feature terrace",
+    "L-104 Z04 Seating-bench court",
+    "L-105 Z05 Aluminium pergola",
+    "L-106 Z06 Backyard lawn",
+    "L-107 Z07 West planting strip",
+    "L-108 Z08 Side courtyard",
+    "L-109 Z09 Front lawn — north",
+    "L-110 Z10 Front approach — upper",
+    "L-111 Z11 Front approach — lower",
+    "L-112 Z12 Front lawn — south",
+    "L-201 Finish Schedule",
+    "L-301 Sectional Elevation — Aluminium pergola",
+    "L-302 Sectional Elevation — BBQ counter",
+    "L-303 Sectional Elevation — Bar counter",
+    "L-304 Sectional Elevation — Bench run",
+    "L-305 Sectional Elevation — Planter run",
+    "L-306 Sectional Elevation — Wall feature with bench",
+    "L-307 Sectional Elevation — Planter box",
+    "L-401 Lighting & Electrical Overlay",
+    "L-402 Irrigation & Drainage Overlay",
+    "L-501 Garden Elevations — Boundary Lines"
+  ],
+  "pack": {
+    "pages": [
+      {
+        "kind": "cover",
+        "title": "Cover",
+        "images": 1
+      },
+      {
+        "kind": "plan_overview",
+        "title": "Plan overview",
+        "images": 0
+      },
+      {
+        "kind": "garden_view",
+        "title": "Whole garden — view 1",
+        "images": 3
+      },
+      {
+        "kind": "garden_view",
+        "title": "Whole garden — view 2",
+        "images": 2
+      },
+      {
+        "kind": "garden_view",
+        "title": "Front garden",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z01 North planting strip",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z02 Pergola court paving",
+        "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z03 Wall-feature terrace",
+        "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z04 Seating-bench court",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z05 Aluminium pergola",
+        "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z06 Backyard lawn",
+        "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z07 West planting strip",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z08 Side courtyard",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z09 Front lawn — north",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z10 Front approach — upper",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z11 Front approach — lower",
+        "images": 1
+      },
+      {
+        "kind": "zone",
+        "title": "Z12 Front lawn — south",
+        "images": 2
+      },
+      {
+        "kind": "materials",
+        "title": "Materials & finishes",
+        "images": 0
+      }
+    ],
+    "missing_images": []
+  },
+  "gate": [
+    {
+      "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
+      "label": "North planting strip",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
+      "label": "North planting strip",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
+      "label": "Pergola court paving",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
+      "label": "Pergola court paving",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: Two wall-mounted downlights with bright wash pools on the rear boundary wall above the BBQ counter, where the night model shows no glow"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "undesigned light: Three vertical wall-mounted light fittings on the rear boundary wall (and one on the left wall) where the night model shows no glow"
+          ]
+        }
+      ]
+    },
+    {
+      "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
+      "label": "Wall-feature terrace",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
+      "label": "Wall-feature terrace",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: In-ground uplight at the right-hand return of the arched wall feature, washing the wall and paving, where the night model shows no glow"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "undesigned light: In-ground uplight fitting and bright wall wash on the right-hand return wall beside the raised planter, where the night model shows no glow",
+            "undesigned light: In-ground uplight and wall wash on the boundary wall immediately left of the arched feature, no corresponding designed light point"
+          ]
+        }
+      ]
+    },
+    {
+      "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+      "label": "Seating-bench court",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "invented structure: Lit stone steps descending to a lawn at the bottom right, not present in the design model"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "invented structure: Flight of steps with adjoining low wall at far left, not present in the model"
+          ]
+        }
+      ]
+    },
+    {
+      "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+      "label": "Seating-bench court",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
+      "label": "Aluminium pergola",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
+      "label": "Aluminium pergola",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+      "label": "Backyard lawn",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+      "label": "Backyard lawn",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
+      "label": "West planting strip",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
+      "label": "West planting strip",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+      "label": "Side courtyard",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+      "label": "Side courtyard",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
+      "label": "Front lawn — north",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
+      "label": "Front lawn — north",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
+      "label": "Front approach — upper",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
+      "label": "Front approach — upper",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:e15d5e11-f020-477c-930e-ebd1d633535e",
+      "label": "Front approach — lower",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
+      "label": "Front lawn — south",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
+      "label": "Front lawn — south",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "garden:garden-1",
+      "label": "Whole garden — view 1",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "garden:garden-1",
+      "label": "Whole garden — view 1",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "garden:garden-2",
+      "label": "Whole garden — view 2",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "garden:garden-2",
+      "label": "Whole garden — view 2",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "garden:front-1",
+      "label": "Front garden",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": []
+    },
+    {
+      "camera": "garden:front-1",
+      "label": "Front garden",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": []
+    }
+  ],
+  "mix": {
+    "photo_pairs": 0,
+    "design_views_by_choice": 17,
+    "design_views_after_gate": 4,
+    "styled_renders": 8,
+    "missing": 0
+  },
+  "gate_summary": {
+    "scene_views": 29,
+    "passed": 8,
+    "substituted_by_3d_view": 21,
+    "missing": 0
+  },
+  "pilot_events_tagged": 1,
+  "results": [
+    "PASS  display name set through the project route — Contemporary Villa Garden — Completed Renovation",
+    "PASS  render pack and drawing set export as PDFs — {\"pack\":5867556,\"drawings\":4580103}",
+    "PASS  the display name is what the documents print",
+    "PASS  no \"ground truth\" on any page or in the PDF metadata — 45 documents",
+    "PASS  no house number on any page",
+    "PASS  zero contractor-identity leakage across drawings and pack — 2 identity tokens × 45 documents",
+    "PASS  no draft watermark — a built garden, not a proposal",
+    "PASS  no price or rate in the render pack",
+    "PASS  no design-assumptions page (nothing proposed on a completed garden)"
+  ]
+}

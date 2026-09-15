@@ -76,8 +76,9 @@ export interface GardenBoqMeta {
 }
 
 /** Supabase row flags → take-off site-reference fields. */
-const siteRef = (r: { site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null }) => ({
+const siteRef = (r: { site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null; spec?: Record<string, unknown> | null }) => ({
   ...(r.site_reference ? { site_reference: true, disposition: isDisposition(r.disposition) ? r.disposition : null } : {}),
+  ...(r.site_reference && r.disposition === "replace" && typeof r.spec?.replaced_by === "string" && r.spec.replaced_by.trim() ? { replaced_by: r.spec.replaced_by.trim() } : {}),
   ...(r.dims_derived ? { dims_derived: true } : {}),
 });
 
@@ -128,10 +129,10 @@ export async function captureGarden(
   const planId = plan.id;
   const mPerUnit = Number(plan.plot_width_m ?? 0);
 
-  type RoomRow = { id: string; name_en: string | null; room_type: string | null; area_m2: number | null; site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null };
+  type RoomRow = { id: string; name_en: string | null; room_type: string | null; area_m2: number | null; spec?: Record<string, unknown> | null; site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null };
   const { data: rooms, error: roomsErr } = await selectWithFallback<RoomRow>(
     (cols) => supabase.from("rooms").select(cols).eq("plan_id", planId).returns<RoomRow[]>(),
-    ["id, name_en, room_type, area_m2, site_reference, disposition, dims_derived", "id, name_en, room_type, area_m2"],
+    ["id, name_en, room_type, area_m2, spec, site_reference, disposition, dims_derived", "id, name_en, room_type, area_m2"],
   );
   if (roomsErr) return { ...empty, planId };
 
@@ -236,7 +237,7 @@ export async function captureGarden(
 
 /** G5: the draft verdict for a captured garden — derived plot, zones, runs or context. */
 export function gardenDraftStatus(capture: GardenCapture): DraftStatus {
-  const inDesign = (x: { site_reference?: boolean; disposition?: string | null }) => !(x.site_reference && x.disposition === "remove");
+  const inDesign = (x: { site_reference?: boolean; disposition?: string | null; replaced_by?: string | null }) => !(x.site_reference && (x.disposition === "remove" || !!x.replaced_by));
   return draftStatus({
     plot_dims_derived: capture.plotDimsDerived === true,
     dims_note: capture.dimsNote ?? null,

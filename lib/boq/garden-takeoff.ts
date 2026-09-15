@@ -50,6 +50,8 @@ export interface SiteRefFields {
   disposition?: Disposition | null;
   /** The quantity this item contributes is derived from a reference layout. */
   dims_derived?: boolean;
+  /** Replaced by a different design element — demolition only here. */
+  replaced_by?: string | null;
 }
 
 /** A drawn zone (a `rooms` row with an outdoor type — see lib/plan/zones.ts). */
@@ -109,6 +111,7 @@ export interface GardenRemoval {
   qty: number;
   unit: string;
   disposition: "remove" | "replace";
+  replaced_by?: string;
 }
 
 /** One row per (zone or element) × work item — the per-element ground truth
@@ -300,7 +303,7 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   ];
   for (const s of siteItems) {
     if (!s.t.site_reference) continue;
-    if (isDemolished(s.t)) removals.push({ element_id: s.id, name: s.name, qty: round2(s.qty), unit: s.unit, disposition: s.t.disposition as "remove" | "replace" });
+    if (isDemolished(s.t)) removals.push({ element_id: s.id, name: s.name, qty: round2(s.qty), unit: s.unit, disposition: s.t.disposition as "remove" | "replace", ...(s.t.replaced_by ? { replaced_by: s.t.replaced_by } : {}) });
     else if (isUndecided(s.t)) undecided.push({ element_id: s.id, name: s.name });
     else kept.push({ element_id: s.id, name: s.name });
   }
@@ -348,7 +351,7 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   if (hasScope) {
     const removalNote =
       removals.length > 0
-        ? `; takes out ${removals.map((r) => `${r.name} (${r.qty} ${r.unit}, ${r.disposition})`).join(", ")}`
+        ? `; takes out ${removals.map((r) => `${r.name} (${r.qty} ${r.unit}, ${r.replaced_by ? `replaced by ${r.replaced_by}` : r.disposition})`).join(", ")}`
         : "";
     const keptNote = kept.length > 0 ? `; retained and excluded: ${kept.map((k) => k.name).join(", ")}` : "";
     items.push(

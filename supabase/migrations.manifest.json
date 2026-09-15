@@ -224,6 +224,12 @@
       "version": "20260101003700",
       "name": "client_garden_draft",
       "sha256": "ba69dc3fde92f515d156a7a90a8ee5816a971eb0305be79e6b7f6c6592ae7654"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003800",
+      "name": "project_display_name",
+      "sha256": "92ceefef9147a4885311c65d967aef350684e9ad2c31497ebc824e857b5c82c6"
     }
   ]
 }

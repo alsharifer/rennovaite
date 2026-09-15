@@ -107,7 +107,10 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
     }
     const m = (num(spec.member_mm) ?? 150) / 1000;
     const beam = (num(spec.beam_depth_mm) ?? 150) / 1000;
-    const id = sb.object({ key: `structure:${z.id}`, label: z.name_en, category: "structure", noun: "pergola", zoneId: z.id });
+    // G5: the KIND of pergola is part of the design — a render of shade sails passed
+    // a gate that only asked for "a pergola". A louvred one is named as such.
+    const louvred = spec.variant === "louvered" || [spec.form, spec.system].some((v) => typeof v === "string" && /louv/i.test(v));
+    const id = sb.object({ key: `structure:${z.id}`, label: z.name_en, category: "structure", noun: louvred ? "louvred pergola" : "pergola", zoneId: z.id });
     const posts = (Array.isArray(spec.posts_mm) ? spec.posts_mm : [[0, 0], [(b.maxX - b.minX) * 1000 - 150, 0], [0, (b.maxY - b.minY) * 1000 - 150], [(b.maxX - b.minX) * 1000 - 150, (b.maxY - b.minY) * 1000 - 150]]) as [number, number][];
     for (const [px, pz] of posts) sb.box(b.minX + px / 1000, lv, b.minY + pz / 1000, b.minX + px / 1000 + m, lv + H, b.minY + pz / 1000 + m, "metal", id);
     const bx = (Array.isArray(spec.beams_x_mm) ? spec.beams_x_mm : [0, (b.maxX - b.minX) * 1000 - 150]) as number[];
@@ -256,7 +259,13 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
       const H = (num(s.height_mm) ?? 4000) / 1000;
       const R = (num(s.canopy_mm) ?? 3000) / 2000;
       const palm = String(s.species ?? "").toLowerCase().includes("palm");
-      const tree = sb.object({ key: `plants:${u.id}`, label: palm ? "palm tree" : "tree", category: "planting", noun: palm ? "palm tree" : "tree", zoneId });
+      // G5: a tree the client is keeping is a commitment the render must honour, so
+      // it is named as one (and the gate checks it); a design tree is just planting.
+      const kept = u.site_reference === true && u.disposition === "keep";
+      const kind = palm ? "palm tree" : "tree";
+      // The species matters to the client who owns it: a frangipani is not a pine.
+      const keptKind = !palm && typeof s.species === "string" && s.species.trim() ? `${s.species.trim().toLowerCase()} tree` : kind;
+      const tree = sb.object({ key: `plants:${u.id}`, label: kind, category: "planting", noun: kept ? `existing ${keptKind} (kept)` : kind, zoneId });
       const trunk = palm ? 0.14 : 0.1;
       sb.box(p[0] - trunk, lv, p[1] - trunk, p[0] + trunk, lv + H * (palm ? 0.92 : 0.55), p[1] + trunk, "trunk", tree);
       if (palm) canopy(sb, [p[0], lv + H * 0.93, p[1]], R, 0.45, tree);

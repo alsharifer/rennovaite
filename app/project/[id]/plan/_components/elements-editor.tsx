@@ -452,7 +452,7 @@ export function ElementsEditor({
                   fill="none"
                   stroke={selected ? BRASS : meta.color}
                   strokeWidth={el.kind === "boundary_wall" ? 6 : 4}
-                  strokeOpacity={el.site_reference && el.disposition === "remove" ? 0.3 : selected ? 1 : 0.85}
+                  strokeOpacity={el.site_reference && (el.disposition === "remove" || typeof el.spec?.replaced_by === "string") ? 0.3 : selected ? 1 : 0.85}
                   strokeDasharray={el.site_reference ? "5 4" : undefined}
                   strokeLinecap="round"
                   strokeLinejoin="round"

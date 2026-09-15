@@ -37,6 +37,8 @@ export interface PairItem {
   ref: string;
   noun: string;
   disposition: "keep" | "remove" | "replace" | null;
+  /** A replace that becomes something else in the same place (gazebo → louvred pergola). */
+  replacement?: string | null;
 }
 
 export interface PairManifest {
@@ -47,13 +49,13 @@ export interface PairManifest {
   items: PairItem[];
 }
 
-export function pairManifest(input: { projectId: string; assetId: string; zoneName: string; zoneSurface: string; items: { noun: string; disposition: PairItem["disposition"] }[] }): PairManifest {
+export function pairManifest(input: { projectId: string; assetId: string; zoneName: string; zoneSurface: string; items: { noun: string; disposition: PairItem["disposition"]; replacement?: string | null }[] }): PairManifest {
   return {
     projectId: input.projectId,
     assetId: input.assetId,
     zoneName: input.zoneName,
     zoneSurface: input.zoneSurface,
-    items: input.items.map((it, i) => ({ ref: `E${i + 1}`, noun: it.noun, disposition: it.disposition })),
+    items: input.items.map((it, i) => ({ ref: `E${i + 1}`, noun: it.noun, disposition: it.disposition, ...(it.replacement ? { replacement: it.replacement } : {}) })),
   };
 }
 
@@ -61,20 +63,22 @@ export function pairManifest(input: { projectId: string; assetId: string; zoneNa
 export function pairCacheKey(m: PairManifest, styleKey: string): string {
   if (!m.projectId) throw new Error("pairCacheKey: projectId is required");
   return createHash("sha256")
-    .update(JSON.stringify([m.projectId, PHOTO_PAIR_VERSION, m.assetId, m.zoneSurface, m.items.map((i) => [i.noun, i.disposition]), styleKey]))
+    .update(JSON.stringify([m.projectId, PHOTO_PAIR_VERSION, m.assetId, m.zoneSurface, m.items.map((i) => [i.noun, i.disposition, i.replacement ?? null]), styleKey]))
     .digest("hex");
 }
 
 export function pairPrompt(m: PairManifest, style: GardenStyle, failures: string[] = []): string {
   const keep = m.items.filter((i) => i.disposition === "keep" || i.disposition === null);
   const remove = m.items.filter((i) => i.disposition === "remove");
-  const replace = m.items.filter((i) => i.disposition === "replace");
+  const replace = m.items.filter((i) => i.disposition === "replace" && !i.replacement);
+  const becomes = m.items.filter((i) => i.disposition === "replace" && i.replacement);
   return [
     "IMAGE 1 is a real photograph of a client's garden. Produce a photorealistic photograph of the SAME garden after renovation, from exactly the same camera position, lens and framing.",
     "The house, its walls, windows, doors, the boundary walls and the sky line stay exactly as they are.",
     keep.length ? `Keep exactly as they are, same position and size: ${keep.map((i) => i.noun).join("; ")}.` : "",
     remove.length ? `Remove completely and fill their place with the surrounding garden surface: ${remove.map((i) => i.noun).join("; ")}.` : "",
     replace.length ? `Replace with new, clean versions of the same thing in exactly the same position and size: ${replace.map((i) => i.noun).join("; ")}.` : "",
+    ...becomes.map((i) => `Replace ${i.noun} with ${i.replacement}, where it stands now (the new work may be larger than what it replaces).`),
     `The main ground surface of this area is ${m.zoneSurface}.`,
     "Do not add any pergola, gazebo, canopy, wall, bench, counter, planter, pool, fountain, steps or building that is not already in the photo. Change nothing that is not listed.",
     `Style — ${style.name_en}: ${style.one_line} Apply the style to materials, planting and finishes only.`,
@@ -96,16 +100,36 @@ const PairReplySchema = z.object({
       note: z.string().nullable().optional().transform((v) => v ?? ""),
     }),
   ),
-  house_unchanged: z.boolean(),
-  same_viewpoint: z.boolean(),
-  extra_structures: z.array(z.object({ description: z.string(), major: z.boolean() })).nullable().optional().transform((v) => v ?? []),
+  // An unsure null is a "no": it fails the pair with a reason instead of making
+  // the reply unparseable and the gate "unavailable".
+  house_unchanged: z.boolean().nullable().transform((v) => v === true),
+  same_viewpoint: z.boolean().nullable().transform((v) => v === true),
+  // Models name the text field freely ("what", "structure", "item"): take the first
+  // string. An entry that does not say whether it is major is treated as major.
+  extra_structures: z
+    .array(z.record(z.string(), z.unknown()))
+    .nullable()
+    .optional()
+    .transform((v) =>
+      (v ?? []).map((x) => ({
+        description: String(x.description ?? x.what ?? x.structure ?? x.item ?? Object.values(x).find((y) => typeof y === "string") ?? "unnamed structure"),
+        major: x.major !== false,
+      })),
+    ),
   summary: z.string().nullable().optional().transform((v) => v ?? ""),
 });
 export type PairReply = z.infer<typeof PairReplySchema>;
 
 export function pairGatePrompt(m: PairManifest): string {
   const lines = m.items.map((i) => {
-    const want = i.disposition === "remove" ? "should now be GONE" : i.disposition === "replace" ? "should be there, renewed, in the same place" : "should still be there, unchanged, in the same place";
+    const want =
+      i.disposition === "remove"
+        ? "should now be GONE"
+        : i.disposition === "replace" && i.replacement
+          ? `should now be ${i.replacement}, where it was (present = that replacement is visible there; roughly_in_place = it occupies that place — its size follows the design, not the old item)`
+          : i.disposition === "replace"
+            ? "should be there, renewed, in the same place"
+            : "should still be there, unchanged, in the same place";
     return `${i.ref}: ${i.noun} — ${want}`;
   });
   return [
@@ -142,6 +166,18 @@ export function judgePair(m: PairManifest, reply: PairReply): { passed: boolean;
   if (!reply.same_viewpoint) failures.push("viewpoint changed");
   for (const x of reply.extra_structures) if (x.major) failures.push(`invented structure: ${x.description}`);
   return { passed: failures.length === 0, failures };
+}
+
+/**
+ * A withheld pair that never got a verdict: every attempt either produced no
+ * image or could not be judged (the gate was unavailable). That says nothing
+ * about the photo or the design, so it is neither cached nor trusted from cache.
+ */
+export function isVerdictless(attempts: readonly { image_url?: string; passed: boolean; failures: readonly string[] }[]): boolean {
+  return (
+    attempts.length > 0 &&
+    attempts.every((a) => !a.passed && (!a.image_url || (a.failures.length > 0 && a.failures.every((f) => f.startsWith("gate unavailable") || f.startsWith("render error")))))
+  );
 }
 
 export function parsePairReply(text: string): PairReply | null {
@@ -184,7 +220,7 @@ export async function runPairGate(m: PairManifest, before: ImageSource, after: I
       last = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
       reply = parsePairReply(last);
     }
-    if (!reply) return { passed: false, failures: [`gate unavailable: unparseable reply (${last.replace(/s+/g, " ").slice(0, 160)})`], reply: null, status: "unavailable" };
+    if (!reply) return { passed: false, failures: [`gate unavailable: unparseable reply (${last.replace(/\s+/g, " ").slice(0, 160)})`], reply: null, status: "unavailable" };
     return { ...judgePair(m, reply), reply, status: "ran" };
   } catch (e) {
     return { passed: false, failures: [`gate unavailable: ${e instanceof Error ? e.message.slice(0, 160) : "error"}`], reply: null, status: "unavailable" };

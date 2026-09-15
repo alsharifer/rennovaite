@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { changeReport, snapshotOf } from "@/lib/pilot/change-report";
 import { computePilotMetrics, type PilotEvent } from "@/lib/pilot/events";
-import { judgePair, pairCacheKey, pairManifest, pairPrompt, parsePairReply } from "@/lib/scene-render/photo-pair";
+import { isVerdictless, judgePair, pairCacheKey, pairGatePrompt, pairManifest, pairPrompt, parsePairReply } from "@/lib/scene-render/photo-pair";
 import { getGardenStyle } from "@/lib/garden-styles";
 
 const ev = (kind: PilotEvent["kind"], at: string, detail: Record<string, unknown> = {}): PilotEvent => ({ kind, recorded_at: `2026-09-15T${at}:00.000Z`, detail });
@@ -74,6 +74,26 @@ describe("before/after photo pairs", () => {
     expect(judgePair(m, { ...good, house_unchanged: false }).failures).toContain("house or boundary changed");
     expect(judgePair(m, { ...good, extra_structures: [{ description: "a pergola", major: true }] }).passed).toBe(false);
     expect(parsePairReply("looks lovely")).toBeNull();
+  });
+
+  it("parses the reply shapes models actually send, failing rather than going unavailable", () => {
+    // The G5 draft run: extra_structures named its text field "what" — the whole reply was dropped.
+    const reply = parsePairReply(JSON.stringify({ ...good, same_viewpoint: null, extra_structures: [{ what: "boundary wall with a gate", major: false }, { structure: "raised planter" }] }))!;
+    expect(reply).not.toBeNull();
+    expect(reply.extra_structures).toEqual([{ description: "boundary wall with a gate", major: false }, { description: "raised planter", major: true }]);
+    expect(judgePair(m, reply).failures).toEqual(["viewpoint changed", "invented structure: raised planter"]);
+  });
+
+  it("never caches or trusts a withheld pair that got no verdict", () => {
+    expect(isVerdictless([{ image_url: "", passed: false, failures: ["render error: fetch failed"] }, { image_url: "u2", passed: false, failures: ["gate unavailable: unparseable reply (…)"] }])).toBe(true);
+    expect(isVerdictless([{ image_url: "u1", passed: false, failures: ["gate unavailable: x"] }, { image_url: "u2", passed: false, failures: ["viewpoint changed"] }])).toBe(false);
+    expect(isVerdictless([])).toBe(false);
+  });
+
+  it("lets a replacement by a different element be larger than what it replaces", () => {
+    const r = pairManifest({ projectId: "arabella", assetId: "a1", zoneName: "Terrace", zoneSurface: "porcelain paving", items: [{ noun: "the stepping-stone path", disposition: "replace", replacement: "porcelain paving" }] });
+    expect(pairPrompt(r, getGardenStyle("desert-modern")!)).toContain("Replace the stepping-stone path with porcelain paving, where it stands now (the new work may be larger than what it replaces).");
+    expect(pairGatePrompt(r)).toContain("its size follows the design, not the old item");
   });
 
   it("asks the model to change only what the design decided", () => {

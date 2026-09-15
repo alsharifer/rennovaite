@@ -23,6 +23,8 @@ export const GATE_MODEL = "claude-opus-5";
 const STRUCTURE_MIN_SHARE = 0.004;
 const SURFACE_MIN_SHARE = 0.04;
 const CONTEXT_MIN_SHARE = 0.06;
+/** G5: an existing tree the design keeps must be in the render once it is this visible. */
+const KEPT_TREE_MIN_SHARE = 0.01;
 
 export interface GateCheck {
   ref: string;
@@ -36,11 +38,12 @@ export interface GateCheck {
 /** What the gate asks about: required structures, main surfaces, big context. */
 export function gateChecks(m: CameraManifest): GateCheck[] {
   const out: GateCheck[] = [];
-  let s = 0, f = 0, c = 0;
+  let s = 0, f = 0, c = 0, t = 0;
   for (const it of m.items) {
     if (it.category === "structure" && it.share >= STRUCTURE_MIN_SHARE) out.push({ ref: `S${++s}`, key: it.key, noun: it.noun, category: it.category, box: it.box, share: it.share });
     else if (it.category === "surface" && it.share >= SURFACE_MIN_SHARE) out.push({ ref: `F${++f}`, key: it.key, noun: it.noun, category: it.category, box: it.box, share: it.share });
     else if (it.category === "context" && it.share >= CONTEXT_MIN_SHARE && it.noun !== "steps") out.push({ ref: `C${++c}`, key: it.key, noun: it.noun, category: it.category, box: it.box, share: it.share });
+    else if (it.category === "planting" && it.noun.endsWith("(kept)") && it.share >= KEPT_TREE_MIN_SHARE) out.push({ ref: `T${++t}`, key: it.key, noun: it.noun, category: it.category, box: it.box, share: it.share });
   }
   return out;
 }
@@ -94,6 +97,9 @@ export function gatePrompt(checks: GateCheck[], counts: Record<string, number>, 
     countLine ? `Built structures in view (count them): ${countLine}.` : "No built structures are in view.",
     "",
     "For each item: present = it is clearly depicted in IMAGE 2 as the same kind of thing (a pergola is still a pergola with posts and a roof; a counter is still a counter; a lawn is still lawn, not paving). roughly_in_place = it sits in about the same part of the frame at about the same size and height. Materials, colours, planting, lighting and small decor may differ — that is the style. Geometry may not.",
+    ...(checks.some((c) => c.noun.includes("louvred"))
+      ? ["A louvred pergola has a flat roof of parallel louvre blades on square posts and beams; shade sails, fabric canopies, open timber rafters or a pitched roof are a DIFFERENT structure — present = false."]
+      : []),
     "extra_structures: list any BUILT structure in IMAGE 2 that is not in IMAGE 1 — a pergola, gazebo, canopy, wall, counter, bench, planter, pool, fountain, steps or building. Plants, pots, cushions, loose furniture and lighting fixtures do not count. major = true if it would change what gets built.",
     "same_viewpoint = IMAGE 2 is taken from the same camera position and direction as IMAGE 1.",
     ...(opts.nightModel

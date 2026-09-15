@@ -110,8 +110,14 @@ function db(): SupabaseClient {
 export async function loadGardenSceneContext(projectId: string): Promise<GardenSceneContext> {
   const graph = await derivePlanGraph(projectId);
   const sb = db();
+  // G5: the site-reference columns decide whether an existing tree is in the design
+  // (a removed one is not) and whether the gate holds the render to keeping it.
+  const loadFixtures = async () => {
+    const r = await sb.from("plan_fixtures").select("id, layer, type, room_id, position, spec, site_reference, disposition").eq("project_id", projectId);
+    return r.error ? sb.from("plan_fixtures").select("id, layer, type, room_id, position, spec").eq("project_id", projectId) : r;
+  };
   const [fixturesRes, styleRes, variantsRes] = await Promise.all([
-    sb.from("plan_fixtures").select("id, layer, type, room_id, position, spec").eq("project_id", projectId),
+    loadFixtures(),
     sb.from("style_choices").select("style_key").eq("project_id", projectId).is("room_id", null).order("created_at", { ascending: false }).limit(1),
     graph.planId ? sb.from("plan_elements").select("id, variant").eq("plan_id", graph.planId) : Promise.resolve({ data: [] as { id: string; variant: string | null }[] }),
   ]);

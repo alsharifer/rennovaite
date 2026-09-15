@@ -60,7 +60,11 @@ export async function DELETE(
   }
 }
 
-const PatchSchema = z.object({ archived: z.boolean() });
+// G5: `display_name` (migration 038) is the name client-facing documents print;
+// null clears it back to the working name.
+const PatchSchema = z
+  .object({ archived: z.boolean().optional(), display_name: z.string().trim().min(1).max(200).nullable().optional() })
+  .refine((b) => b.archived !== undefined || b.display_name !== undefined, "Body needs archived or display_name.");
 
 // PATCH /api/projects/:id — archive or un-archive. The counterpart to DELETE,
 // and the one that should be reached for first: a parsed plan with renders and
@@ -88,12 +92,22 @@ export async function PATCH(
     const body = PatchSchema.safeParse(await request.json());
     if (!body.success) {
       return NextResponse.json(
-        { success: false, error: "Body must be { archived: boolean }." },
+        { success: false, error: "Body must be { archived?: boolean, display_name?: string | null }." },
         { status: 400 },
       );
     }
 
     const supabase = getSupabaseAdmin();
+    if (body.data.display_name !== undefined && body.data.archived === undefined) {
+      const { data, error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
+        .from("projects")
+        .update({ display_name: body.data.display_name })
+        .eq("id", parsedId.data)
+        .select("id, display_name");
+      if (error) throw new Error(error.message);
+      if (!data || data.length === 0) return NextResponse.json({ success: false, error: "Project not found." }, { status: 404 });
+      return NextResponse.json({ success: true, display_name: body.data.display_name });
+    }
     const archived_at = body.data.archived ? new Date().toISOString() : null;
 
     const { data, error } = await (supabase as unknown as {

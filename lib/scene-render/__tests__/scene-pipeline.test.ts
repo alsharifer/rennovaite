@@ -8,7 +8,8 @@ import { buildGardenScene } from "@/lib/scene/garden-scene";
 import { encodePng } from "@/lib/scene/png";
 import { renderScene } from "@/lib/scene/raster";
 import { gateChecks, gatePrompt, judge, parseGateReply, type GateReply } from "@/lib/scene-render/gate";
-import { isInfrastructureFailure, isStaleEveningSubstitution, sceneCacheKey, sceneHash } from "@/lib/scene-render/prompts";
+import { dayPrompt, isInfrastructureFailure, isStaleEveningSubstitution, sceneCacheKey, sceneHash } from "@/lib/scene-render/prompts";
+import { getGardenStyle } from "@/lib/garden-styles";
 
 const rec = villa94PlanRecords();
 const graphFor = (projectId: string) =>
@@ -33,7 +34,7 @@ const cameras = chooseCameras(scene, graph, rec.fixtures, lit);
 describe("the 3D garden scene", () => {
   it("contains every structure the plan holds, at the plan's heights", () => {
     const nouns = scene.objects.filter((o) => o.category === "structure").map((o) => o.noun).sort();
-    expect(nouns).toEqual(["BBQ counter", "arched wall feature", "bar counter", "built-in bench", "built-in grill", "pergola", "raised planter", "square planter box"].sort());
+    expect(nouns).toEqual(["BBQ counter", "arched wall feature", "bar counter", "built-in bench", "built-in grill", "louvred pergola", "raised planter", "square planter box"].sort());
     const topOf = (key: string) => {
       const id = scene.objects.find((o) => o.key === key)!.id;
       return Math.max(...scene.tris.filter((t) => t.obj === id).flatMap((t) => [t.a[1], t.b[1], t.c[1]]));
@@ -71,7 +72,7 @@ describe("cameras and manifests", () => {
     const cam = cameras.find((c) => c.id === "zone:z-pergola")!;
     const m = buildManifest("villa-94", cam.id, scene, renderScene(scene, cam, 600, 400, { supersample: 1 }));
     const nouns = gateChecks(m).filter((c) => c.category === "structure").map((c) => c.noun);
-    for (const n of ["pergola", "BBQ counter", "bar counter"]) expect(nouns).toContain(n);
+    for (const n of ["louvred pergola", "BBQ counter", "bar counter"]) expect(nouns).toContain(n);
     expect(m.projectId).toBe("villa-94");
   });
 });
@@ -88,11 +89,26 @@ describe("the faithfulness gate's pass rule", () => {
 
   it("fails a missing pergola", () => {
     const r = allGood();
-    const ref = checks.find((c) => c.noun === "pergola")!.ref;
+    const ref = checks.find((c) => c.noun === "louvred pergola")!.ref;
     r.observations = r.observations.map((o) => (o.ref === ref ? { ...o, present: false } : o));
     const v = judge(checks, r);
     expect(v.passed).toBe(false);
     expect(v.failures[0]).toMatch(/pergola: missing/);
+  });
+
+  it("tells the gate a louvred pergola is not shade sails (G5), and only when one is in view", () => {
+    expect(gatePrompt(checks, {})).toContain("shade sails, fabric canopies, open timber rafters or a pitched roof are a DIFFERENT structure");
+    expect(gatePrompt(checks.filter((c) => !c.noun.includes("louvred")), {})).not.toContain("louvre blades");
+  });
+
+  it("checks an existing tree the design keeps, once visible, and tells the renderer to keep it (G5)", () => {
+    const item = (noun: string, share: number) => ({ key: "plants:" + noun + share, noun, label: noun, category: "planting" as const, zoneId: null, share, box: [10, 20, 30, 60] as [number, number, number, number] });
+    const m = { projectId: "p", cameraId: "c", counts: {}, items: [item("existing palm tree (kept)", 0.05), item("tree", 0.2), item("existing tree (kept)", 0.002)] };
+    const kept = gateChecks(m);
+    expect(kept.map((c) => [c.ref, c.noun])).toEqual([["T1", "existing palm tree (kept)"]]);
+    const r = { observations: [{ ref: "T1", present: false, roughly_in_place: false, note: "" }], extra_structures: [], extra_lights: [], same_viewpoint: true, summary: "" };
+    expect(judge(kept, r).failures).toEqual(["T1 existing palm tree (kept): missing"]);
+    expect(dayPrompt(m, getGardenStyle("desert-modern")!)).toContain("the existing trees the client is keeping — palm tree (10–30% across, 20–60% down)");
   });
 
   it("fails an invented structure, a changed viewpoint and an unassessed item", () => {

@@ -9,7 +9,7 @@ import {
   type GardenTakeoffInput,
 } from "@/lib/boq/garden-takeoff";
 import { PUBLIC_SOURCE_LABEL } from "@/lib/ground-truth/villa94-garden";
-import { DRAFT_STATEMENT, draftStatus, isDemolished, isInDesign, isNewWork, isUndecided } from "@/lib/plan/site-reference";
+import { DRAFT_STATEMENT, draftStatus, isDemolished, isInDesign, isNewWork, isUndecided, replacedBy } from "@/lib/plan/site-reference";
 
 const lawn = { id: "z-lawn", name: "Lawn", kind: "artificial_grass", area_m2: 40 };
 const gazebo = (disposition: "keep" | "remove" | "replace" | null) => ({ id: "z-gazebo", name: "Gazebo (existing)", kind: "structure", area_m2: 12.25, site_reference: true, disposition });
@@ -47,6 +47,25 @@ describe("site reference — the keep marker", () => {
     expect(t.removals.map((r) => r.element_id).sort()).toEqual(["r-sink", "z-gazebo"]);
     expect(t.items.find((i) => i.item_key === "garden.pergola")!.quantity).toBe(12.25);
     expect(t.items.find((i) => i.item_key === "garden.counter_bbq")!.quantity).toBe(2.4);
+  });
+
+  it("counts an item replaced by a DIFFERENT design element toward demolition only", () => {
+    const replaced = { ...sink("replace"), replaced_by: "BBQ counter under the new pergola" };
+    const bbq = { id: "r-bbq", kind: "counter_run" as const, length_m: 3, name: "BBQ counter", variant: "bbq" as const };
+    const t = computeGardenTakeoff({ zones: [lawn], runs: [replaced, bbq] });
+    expect(t.removals.map((r) => [r.element_id, r.replaced_by])).toEqual([["r-sink", "BBQ counter under the new pergola"]]);
+    // The new work is the replacing element's alone — never the old item priced again.
+    expect(t.items.find((i) => i.item_key === "garden.counter_bbq")!.quantity).toBe(3);
+    expect(t.elements.some((e) => e.element_id === "r-sink")).toBe(false);
+    expect(t.items.find((i) => i.item_key === "garden.demolition")!.measurement).toContain("replaced by BBQ counter under the new pergola");
+    expect(isNewWork(replaced)).toBe(false);
+    expect(isDemolished(replaced)).toBe(true);
+    expect(isInDesign(replaced)).toBe(false);
+    // Like-for-like (no replaced_by) is still both.
+    expect(isNewWork(sink("replace"))).toBe(true);
+    expect(isInDesign(sink("replace"))).toBe(true);
+    expect(replacedBy({ site_reference: true, disposition: "replace", spec: { replaced_by: " designed lighting " } })).toBe("designed lighting");
+    expect(replacedBy({ site_reference: true, disposition: "remove", spec: { replaced_by: "x" } })).toBeNull();
   });
 
   it("leaves an undecided item out of both, and lists it", () => {

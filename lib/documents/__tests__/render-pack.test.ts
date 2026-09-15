@@ -136,6 +136,38 @@ describe("render pack — the faithfulness gate", () => {
     // The cover leads with the passed whole-garden render.
     expect(pages[0]!.images[0]!.renderId).toBe("g1");
   });
+
+  it("leads the cover with the client's own photo, redesigned, when a pair passed (G5)", () => {
+    const view = { id: "garden:garden-1", label: "Whole garden — view 1", lit: false, day: { id: "g1", image_url: "https://img/g1.png", kind: "render" as const, gate_passed: true }, evening: null };
+    const pair = { id: "pr1", zoneName: "Side garden — lawn", beforeId: "photo-1", after: { id: "pair-after", image_url: "https://img/pa.png", kind: "photo_edit" as const, gate_passed: true }, caption: "" };
+    const { pages } = buildRenderPack({ ...base, renders, gardenViews: [view], photoPairs: [pair] });
+    expect(pages[0]!.images[0]!.renderId).toBe("pair-after");
+  });
+});
+
+describe("render pack — design assumptions", () => {
+  it("lists the proposals right after the plan overview, and only when there are any", () => {
+    const assumptions = {
+      decisions: [{ item: "Existing hardtop gazebo", kind: "structure", decision: "REPLACE" as const, becomes: "Louvred pergola", note: null }],
+      layout: ["Front garden: footprint assumed"],
+    };
+    const { pages } = buildRenderPack({ ...base, renders: {}, assumptions });
+    expect(pages[2]!.kind).toBe("assumptions");
+    expect(pages[2]!.svg).toContain("Existing hardtop gazebo");
+    expect(pages[2]!.svg).toContain("REPLACE");
+    expect(pages[2]!.svg).toContain("Front garden: footprint assumed");
+    const none = buildRenderPack({ ...base, renders: {}, assumptions: { decisions: [], layout: [] } });
+    expect(none.pages.some((pg) => pg.kind === "assumptions")).toBe(false);
+  });
+});
+
+describe("render pack — existing items the design takes out", () => {
+  it("never lists a run that is removed or replaced elsewhere as a built feature", () => {
+    const counter = graph.elements.find((e) => e.kind === "counter_run")!;
+    const replaced = { ...graph, elements: graph.elements.map((e) => (e.id === counter.id ? { ...e, site_reference: true, disposition: "replace", spec: { replaced_by: "a BBQ counter elsewhere" } } : e)) };
+    const count = (g: typeof graph) => buildRenderPack({ ...base, graph: g, renders: {} }).zones.flatMap((z) => z.features).length;
+    expect(count(replaced as typeof graph)).toBe(count(graph) - 1);
+  });
 });
 
 describe("pack primitives", () => {

@@ -14,6 +14,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateDrawingSet } from "@/lib/drawings/export";
 import type { GardenFixture } from "@/lib/drawings/garden-sheets";
 import { gardenStyleFor, getGardenStyle, isGardenStyleKey } from "@/lib/garden-styles";
+import { designDecisions, layoutAssumptions } from "@/lib/documents/design-assumptions";
+import { loadDocumentProject } from "@/lib/documents/project-name";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { graphDraftStatus } from "@/lib/plan/geometry";
 import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
@@ -76,7 +78,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   const [graph, set, projectRes, styleRes, fixturesRes, sceneRes, ctx] = await Promise.all([
     derivePlanGraph(projectId),
     generateDrawingSet(projectId),
-    supabase.from("projects").select("name, city").eq("id", projectId).maybeSingle<{ name: string | null; city: string | null }>(),
+    loadDocumentProject(supabase, projectId),
     supabase
       .from("style_choices")
       .select("style_key")
@@ -196,8 +198,8 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
     renders: byRoom,
     elementVariants: variants,
     style,
-    projectName: projectRes.data?.name?.trim() || "Untitled garden",
-    community: projectRes.data?.city?.trim() || "Dubai",
+    projectName: projectRes.name,
+    community: projectRes.city,
     dateISO: new Date().toISOString().slice(0, 10),
     sitePlanSvg: set.sheets.find((s) => s.kind === "site_plan")?.svg ?? null,
     unavailableRenderIds: unavailable,
@@ -205,12 +207,23 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
     draft: draftStatus.statement,
     draftNote: draftStatus.note,
     photoPairs: photoPairs.filter((p) => !unavailable.has(p.after.id) && !unavailable.has(p.beforeId)),
+    // A proposal page belongs to a draft: a completed garden has nothing to confirm.
+    assumptions: draftStatus.draft
+      ? {
+          decisions: designDecisions(graph, (fixturesRes.data ?? []) as GardenFixture[]),
+          layout: [
+            // The direction itself is a proposal until the client confirms it.
+            ...(style ? [`Design direction: ${style.name_en} — proposed, to confirm with the client`] : []),
+            ...layoutAssumptions(graph),
+          ],
+        }
+      : null,
   });
 
   const { Resvg } = await import("@resvg/resvg-js");
   const { PDFDocument } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`${projectRes.data?.name?.trim() || "Garden"} — render pack`);
+  pdf.setTitle(`${projectRes.name} — render pack`);
   pdf.setAuthor("RennovAIte");
   pdf.setCreator("RennovAIte");
   pdf.setProducer("RennovAIte");

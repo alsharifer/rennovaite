@@ -17,6 +17,8 @@
 //      keep                no          no          yes, as existing
 //      remove              no          yes         no
 //      replace             yes         yes         yes, as new
+//      replace → other     no          yes         no — the replacing design element
+//        (spec.replaced_by)                        carries the new work
 //      not decided         no          no          yes, as existing — and the
 //                                                  pack refuses to export
 //
@@ -50,6 +52,20 @@ export const DRAFT_STATEMENT =
 export interface SiteRefTag {
   site_reference?: boolean | null;
   disposition?: string | null;
+  /**
+   * What replaces it, when the replacement is a DIFFERENT design element (a
+   * stepping-stone path replaced by a porcelain path zone; string lights by the
+   * designed lighting). Read from spec.replaced_by when not given directly.
+   */
+  replaced_by?: string | null;
+  spec?: Record<string, unknown> | null;
+}
+
+/** The text of what replaces an item elsewhere in the design, or null (in place / not replaced). */
+export function replacedBy(t: SiteRefTag): string | null {
+  if (!t.site_reference || t.disposition !== "replace") return null;
+  const v = t.replaced_by ?? (typeof t.spec?.replaced_by === "string" ? t.spec.replaced_by : null);
+  return v && v.trim() ? v.trim() : null;
 }
 
 export function isDisposition(v: unknown): v is Disposition {
@@ -63,7 +79,8 @@ export function dispositionOf(t: SiteRefTag): Disposition | null {
 /** Counts toward new-work quantities. */
 export function isNewWork(t: SiteRefTag): boolean {
   if (!t.site_reference) return true;
-  return t.disposition === "replace";
+  // Replaced by another design element: that element is the new work, not this one.
+  return t.disposition === "replace" && !replacedBy(t);
 }
 
 /** Counts toward demolition quantities. */
@@ -73,7 +90,7 @@ export function isDemolished(t: SiteRefTag): boolean {
 
 /** Stands in the designed garden (3D scene, drawings). A removed item does not. */
 export function isInDesign(t: SiteRefTag): boolean {
-  return !(t.site_reference && t.disposition === "remove");
+  return !(t.site_reference && (t.disposition === "remove" || replacedBy(t) !== null));
 }
 
 /** Stands in the designed garden as the EXISTING item (kept, or not yet decided). */

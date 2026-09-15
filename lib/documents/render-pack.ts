@@ -34,10 +34,13 @@ import {
 } from "@/lib/drawings/sheet";
 import type { GardenStyle } from "@/lib/garden-styles";
 import { LINEAR_ELEMENT_META } from "@/lib/plan/elements";
+import { isInDesign } from "@/lib/plan/site-reference";
 import type { PlanGraph, Room } from "@/lib/plan/geometry";
 import { roomTypeLabel, zoneSurface } from "@/lib/plan/zones";
 import { lightingByZone, wantsEvening, type ZoneLight } from "@/lib/render-batch/plan";
 import type { Style } from "@/lib/styles";
+
+import type { DecisionRow } from "./design-assumptions";
 
 export const PAGE_W = 420; // mm, A3 landscape — same sheet as the drawing set
 export const PAGE_H = 297;
@@ -125,7 +128,7 @@ export interface ImageSlot {
 }
 
 export interface PackPage {
-  kind: "cover" | "plan_overview" | "garden_view" | "zone" | "materials" | "photo_pair";
+  kind: "cover" | "plan_overview" | "garden_view" | "zone" | "materials" | "photo_pair" | "assumptions";
   title: string;
   svg: string;
   images: ImageSlot[];
@@ -154,6 +157,8 @@ export interface RenderPackInput {
   draftNote?: string | null;
   /** G5: before/after pairs — a client photo and its gated photo restyle. */
   photoPairs?: PackPhotoPair[];
+  /** G5: the design's defaulted decisions and layout assumptions — a page when present. */
+  assumptions?: { decisions: DecisionRow[]; layout: string[] } | null;
 }
 
 /**
@@ -221,7 +226,8 @@ export function buildPackZones(input: RenderPackInput): PackZone[] {
     const zoneLights = lights.get(room.id) ?? [];
     const features: string[] = [];
     for (const el of graph.elements) {
-      if (el.kind === "boundary_wall") continue;
+      // An existing run the design removes or replaces elsewhere is not a feature of the design.
+      if (el.kind === "boundary_wall" || !isInDesign(el)) continue;
       const a = el.polyline[0]!;
       const b = el.polyline[el.polyline.length - 1]!;
       const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
@@ -349,12 +355,15 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
   const heroView = (input.gardenViews ?? []).find((v) => v.day?.kind === "render") ?? null;
   const passedZone = [...zones].filter((z) => z.day?.kind === "render").sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ?? null;
   const anyZone = [...zones].filter((z) => z.day).sort((a, b) => b.room.area_m2 - a.room.area_m2)[0] ?? null;
-  // G5: a passed photo restyle beats a 3D design view on the cover. Both are
-  // honest, but the client's own garden redesigned is what a cover is for.
+  // G5: the client's own photo, redesigned and passed by the pair gate, leads the
+  // cover — it is the garden they know; a styled scene render can pass its gate and
+  // still read as somebody else's garden. Then a passed render, then a design view.
   const pair = (input.photoPairs ?? [])[0] ?? null;
-  const hero = heroView
-    ? { ref: "", room: { name_en: heroView.label } as Room, day: heroView.day }
-    : passedZone ?? (pair ? { ref: "", room: { name_en: pair.zoneName } as Room, day: pair.after } : anyZone);
+  const hero = pair
+    ? { ref: "", room: { name_en: pair.zoneName } as Room, day: pair.after }
+    : heroView
+      ? { ref: "", room: { name_en: heroView.label } as Room, day: heroView.day }
+      : passedZone ?? anyZone;
   const images: ImageSlot[] = [];
   const hx = 176;
   const hw = PAGE_W - M - hx;
@@ -593,7 +602,7 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
   y += 6;
   body += text(tx, y, "BUILT FEATURES", { size: 2.6, fill: INK_500, spacing: "0.08em" });
   y += 7;
-  for (const el of input.graph.elements.filter((e) => e.kind !== "boundary_wall")) {
+  for (const el of input.graph.elements.filter((e) => e.kind !== "boundary_wall" && isInDesign(e))) {
     body += text(tx, y, runLabel(el.kind, input.elementVariants?.[el.id]), {
       size: 3,
       fill: el.kind === "counter_run" && !input.elementVariants?.[el.id] ? TERRACOTTA : INK_900,
@@ -664,15 +673,19 @@ export function buildRenderPack(input: RenderPackInput): { pages: PackPage[]; zo
   const zones = buildPackZones(input);
   const views = input.gardenViews ?? [];
   const pairs = input.photoPairs ?? [];
-  const total = 3 + views.length + pairs.length + zones.length;
+  const hasAssumptions = !!input.assumptions && (input.assumptions.decisions.length > 0 || input.assumptions.layout.length > 0);
+  const a = hasAssumptions ? 1 : 0;
+  const total = 3 + a + views.length + pairs.length + zones.length;
   const pages: PackPage[] = [
     coverPage(input, zones, total),
     planOverviewPage(input, total),
-    // G5: the backbone first — the client's own garden before and after — then
-    // the whole-garden design views, then the zones.
-    ...pairs.map((p, i) => photoPairPage(input, p, 3 + i, total)),
-    ...views.map((v, i) => gardenViewPage(input, v, 3 + pairs.length + i, total)),
-    ...zones.map((z, i) => zonePage(input, z, 3 + views.length + pairs.length + i, total)),
+    // G5: what the review meeting works through, right after the plan.
+    ...(hasAssumptions ? [assumptionsPage(input, 3, total)] : []),
+    // The backbone — the client's own garden before and after — then the
+    // whole-garden design views, then the zones.
+    ...pairs.map((p, i) => photoPairPage(input, p, 3 + a + i, total)),
+    ...views.map((v, i) => gardenViewPage(input, v, 3 + a + pairs.length + i, total)),
+    ...zones.map((z, i) => zonePage(input, z, 3 + a + views.length + pairs.length + i, total)),
     materialsPage(input, zones, total, total),
   ];
   return { pages, zones };
@@ -706,3 +719,42 @@ export function containFit(iw: number, ih: number, slot: { x: number; y: number;
   return { x: slot.x + (slot.w - w) / 2, y: slot.y + (slot.h - h) / 2, w, h };
 }
 
+
+/**
+ * G5: "Design assumptions" — every existing item and the design's defaulted call
+ * on it (keep / remove / replace, and what it becomes), then the layout
+ * assumptions the reference dimensions could not settle. This is the agenda of
+ * the review meeting: each line is a decision the client can overturn.
+ */
+function assumptionsPage(input: RenderPackInput, n: number, total: number): PackPage {
+  const a = input.assumptions!;
+  let body = chrome(input, "Design assumptions", n, total);
+  body += text(M, 31, "Design assumptions", { size: 10, fill: INK_900, font: FONT_DISPLAY });
+  body += text(M, 40, "Proposed for review — each line is a decision to confirm or change before the design is final.", { size: 3.2, fill: INK_700 });
+  const cols = [M, M + 120, M + 175, M + 208];
+  let y = 52;
+  ["EXISTING ON SITE", "TYPE", "PROPOSAL", "BECOMES / NOTE"].forEach((h, i) => (body += text(cols[i]!, y, h, { size: 2.6, fill: INK_500, spacing: "0.08em" })));
+  body += `<line x1="${M}" y1="${y + 2}" x2="${PAGE_W - M}" y2="${y + 2}" stroke="${INK_100}" stroke-width="0.3"/>`;
+  y += 8;
+  const tone = { KEEP: INK_700, REMOVE: TERRACOTTA, REPLACE: BRASS, UNDECIDED: TERRACOTTA } as const;
+  for (const d of a.decisions.slice(0, 30)) {
+    body += text(cols[0]!, y, d.item.slice(0, 70), { size: 3, fill: INK_900 });
+    body += text(cols[1]!, y, d.kind.slice(0, 26), { size: 2.8, fill: INK_500 });
+    body += text(cols[2]!, y, d.decision, { size: 3, fill: tone[d.decision], font: FONT_MONO, weight: 700 });
+    const becomes = [d.becomes, d.note].filter(Boolean).join(" — ");
+    const p = paragraph(cols[3]!, y, becomes || "—", 80, 3.8, { size: 2.8, fill: INK_700 });
+    body += p.svg;
+    y += Math.max(5.5, p.height + 1.7);
+  }
+  if (a.layout.length > 0) {
+    y += 6;
+    body += text(M, y, "LAYOUT ASSUMPTIONS", { size: 2.6, fill: INK_500, spacing: "0.08em" });
+    y += 6;
+    for (const line of a.layout.slice(0, 10)) {
+      const p = paragraph(M, y, `• ${line}`, 190, 4, { size: 2.9, fill: INK_700 });
+      body += p.svg;
+      y += p.height + 1.5;
+    }
+  }
+  return { kind: "assumptions", title: "Design assumptions", svg: page(body), images: [] };
+}

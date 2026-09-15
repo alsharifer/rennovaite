@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { renderBoqPdf, type BoqPdfInput } from "@/lib/documents/boq-pdf";
 import { loadPackReadiness, readinessMessage } from "@/lib/documents/pack-readiness";
+import { loadDocumentProject } from "@/lib/documents/project-name";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const [project, boq, readiness] = await Promise.all([
-      sb.from("projects").select("name, city").eq("id", projectId).maybeSingle<{ name: string | null; city: string | null }>(),
+      loadDocumentProject(sb, projectId),
       sb.from("boqs").select("id, sections").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; sections: BoqPdfInput["boq"] }>(),
       loadPackReadiness(sb, projectId),
     ]);
@@ -38,8 +39,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: readinessMessage(readiness), code: "pack_not_ready", readiness }, { status: 409 });
     }
     const { pdf, pages } = await renderBoqPdf({
-      projectName: project.data?.name?.trim() || "Untitled garden",
-      community: project.data?.city?.trim() || "Dubai",
+      projectName: project.name,
+      community: project.city,
       dateISO: new Date().toISOString().slice(0, 10),
       boq: boq.data.sections,
     });

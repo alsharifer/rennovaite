@@ -60,6 +60,7 @@ const post = (path: string, body: unknown) => getJson<Record<string, unknown>>(p
 async function main() {
   const db: SupabaseClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   mkdirSync(OUT_DIR, { recursive: true });
+  const started = new Date().toISOString();
   const { INTERNAL_REF, PUBLIC_SOURCE_LABEL } = await import("@/lib/ground-truth/villa94-garden");
   const { DRAFT_STATEMENT } = await import("@/lib/plan/site-reference");
   const { PHOTO_COVERAGE, RUNS, TREES, ZONES } = await import("@/lib/client-garden/arabella-reference");
@@ -114,13 +115,14 @@ async function main() {
 
   // --- 4. photo pairs --------------------------------------------------------------------
   const { data: plan } = await db.from("plans").select("id").eq("project_id", PROJECT).order("created_at", { ascending: false }).limit(1).single<{ id: string }>();
-  const { data: rooms } = await db.from("rooms").select("id, name_en").eq("plan_id", plan!.id);
+  const { data: rooms } = await db.from("rooms").select("id, name_en, spec").eq("plan_id", plan!.id);
   const { data: els } = await db.from("plan_elements").select("id, spec").eq("plan_id", plan!.id);
   const { data: fx } = await db.from("plan_fixtures").select("id, spec, type").eq("project_id", PROJECT);
   const { data: assets } = await db.from("project_assets").select("id, filename").eq("project_id", PROJECT).eq("kind", "photo");
   const idForKey = (key: string): string | null => {
     const z = ZONES.find((x) => x.key === key);
-    if (z) return (rooms ?? []).find((r) => r.name_en === z.name)?.id ?? null;
+    // A designed zone keeps its reference key in spec.ref_key when it is renamed.
+    if (z) return (rooms ?? []).find((r) => (r.spec as { ref_key?: string } | null)?.ref_key === key)?.id ?? (rooms ?? []).find((r) => r.name_en === z.name)?.id ?? null;
     const r = RUNS.find((x) => x.key === key);
     if (r) return (els ?? []).find((e) => (e.spec as { name?: string } | null)?.name === r.name)?.id ?? null;
     const t = TREES.find((x) => x.key === key);
@@ -129,10 +131,15 @@ async function main() {
   };
   const pairResults: { file: string; zone: string; outcome: string; attempts: unknown }[] = [];
   if (RENDER) {
-    // One pair per zone first, so the pack shows different parts of the garden.
-    const chosen: typeof PHOTO_COVERAGE = [];
-    for (const c of PHOTO_COVERAGE) if (chosen.length < PAIRS && !chosen.some((x) => x.zone === c.zone)) chosen.push(c);
-    for (const c of chosen) {
+    // One pair per zone, so the pack shows different parts of the garden; when a
+    // zone's photo is withheld by the gate, its next photo gets one try.
+    const zones = [...new Set(PHOTO_COVERAGE.map((c) => c.zone))].slice(0, PAIRS);
+    const passedZones = new Set<string>();
+    const triedPerZone = new Map<string, number>();
+    const queue = zones.flatMap((z) => PHOTO_COVERAGE.filter((c) => c.zone === z).slice(0, 2));
+    for (const c of queue) {
+      if (passedZones.has(c.zone) || (triedPerZone.get(c.zone) ?? 0) >= 2) continue;
+      triedPerZone.set(c.zone, (triedPerZone.get(c.zone) ?? 0) + 1);
       const zoneId = idForKey(c.zone);
       const asset = (assets ?? []).find((a) => a.filename === c.file);
       if (!zoneId || !asset) {
@@ -144,6 +151,7 @@ async function main() {
       const r = await post("/api/render/photo-pair", { project_id: PROJECT, asset_id: asset.id, zone_id: zoneId, item_ids: itemIds });
       console.log(`  pair    ${c.file.padEnd(28)} ${String(r.body.outcome ?? `ERROR ${r.body.error}`)} ${Math.round((Date.now() - t0) / 1000)}s`);
       pairResults.push({ file: c.file, zone: c.zone, outcome: String(r.body.outcome ?? `error: ${r.body.error}`), attempts: r.body.attempts ?? [] });
+      if (r.body.outcome === "passed") passedZones.add(c.zone);
     }
   }
 
@@ -179,6 +187,7 @@ async function main() {
   check("watermark: every drawing sheet carries the draft stamp with the statement", set.sheets.every((s) => s.svg.includes('data-draft="true"') && s.svg.includes(stmt)), `${set.sheets.length} sheets`);
   check("watermark: the drawing-set cover carries the statement", set.sheets[0]!.svg.includes("data-draft-cover") && set.sheets[0]!.svg.includes(stmt));
   check("watermark: the render-pack cover carries the statement", pack.pageSvgs[0]!.includes("data-draft-cover") && pack.pageSvgs[0]!.includes(stmt));
+  check("the pack carries the Design assumptions page", pack.pageSvgs.some((s) => s.includes("Design assumptions") && s.includes("PROPOSAL")));
   check("watermark: every BoQ PDF page header carries the statement", boqPages.every((p) => p.includes("data-boq-draft") && p.includes("DRAFT FOR REVIEW — quantities derived from reference layout; firm after site verification.")), `${boqPages.length} pages`);
   const total = derivedTotal(boq.grand_total_aed, boqDerivedInfo(boq as never));
   check("the BoQ total renders with the derived convention, never a bare number", total.derived && total.text.startsWith("≈ AED") && total.text.endsWith("*") && boqPages[0]!.includes(total.text.replace("≈", "≈")), total.text);
@@ -197,12 +206,38 @@ async function main() {
   const leaks = printed.flatMap(([where, text]) => identityTokens.filter((t) => new RegExp(t, "i").test(text)).map((t) => `${where}: ${t}`));
   check("zero contractor-identity leakage across drawings, pack, BoQ PDF, BoQ data and BoQ page", leaks.length === 0 && identityTokens.length > 0, leaks.slice(0, 5).join("; ") || `${identityTokens.length} identity tokens × ${printed.length} documents`);
 
+  // Sales and commercial language is internal: a seeded decision note once printed
+  // "the upsell conversation" on the client's assumptions page.
+  const internal = printed.filter(([where]) => !where.startsWith("BoQ json")).flatMap(([where, text]) => (/\b(upsell|up-sell|margin|mark-?up|commission)\b/i.test(text.replace(/<[^>]+>/g, " ")) ? [where] : []));
+  check("no internal sales or commercial language on any client-facing page", internal.length === 0, internal.slice(0, 5).join("; "));
+
   // --- 7. gate table, metrics, baseline ----------------------------------------------
   const gate = pack.summary.gate;
   const scene = gate.filter((g) => g.view !== "photo_pair");
   console.log("\nFAITHFULNESS GATE");
   for (const g of gate) console.log(`  ${g.label.slice(0, 34).padEnd(34)} ${g.view.padEnd(10)} ${g.outcome.padEnd(12)} ${g.attempts.map((a) => `${a.attempt}:${a.passed ? "pass" : "fail"}`).join(" ")}`);
   console.log(`\nPACK MIX  ${JSON.stringify(pack.summary.mix)}`);
+  // The decision table (what the review meeting works through) and the BoQ's biggest lines.
+  const { derivePlanGraph } = await import("@/lib/plan/derive");
+  const { designDecisions, layoutAssumptions } = await import("@/lib/documents/design-assumptions");
+  const g = await derivePlanGraph(PROJECT);
+  const { data: fxAll } = await db.from("plan_fixtures").select("id, layer, type, room_id, position, spec, site_reference, disposition").eq("project_id", PROJECT);
+  const decisions = designDecisions(g, (fxAll ?? []) as never);
+  console.log("\nDECISIONS");
+  for (const d of decisions) console.log(`  ${d.decision.padEnd(9)} ${d.item.slice(0, 52).padEnd(52)} ${d.becomes ?? ""}`);
+  const top5 = lines
+    .map((l, i) => ({ l, section: boq.sections.find((s) => s.lines.includes(l))?.work_section ?? "", i }))
+    .sort((a, b) => Number(b.l.total_aed) - Number(a.l.total_aed))
+    .slice(0, 5)
+    .map(({ l, section }) => ({ section, description: String(l.description), quantity: Number(l.quantity), unit: String(l.unit), rate_aed: Number(l.rate_aed), total_aed: Number(l.total_aed), qty_derived: l.qty_derived === true, rate_status: l.rate_status }));
+  console.log("\nTOP 5 BoQ LINES");
+  for (const t of top5) console.log(`  AED ${String(Math.round(t.total_aed)).padStart(7)}  ${t.quantity} ${t.unit} × ${t.rate_aed}  ${t.description}`);
+  // The BoQ generation and exports this run caused are script-generated, not the designer.
+  const { data: runEvents } = await db.from("pilot_events").select("id, detail").eq("project_id", PROJECT).gte("recorded_at", started);
+  for (const e of runEvents ?? []) {
+    const d = (e.detail ?? {}) as Record<string, unknown>;
+    if (!d.stage) await db.from("pilot_events").update({ detail: { ...d, stage: "draft_pack", source: "scripts/garden-draft-pack.ts" } }).eq("id", e.id);
+  }
   const metrics = (await getJson<{ metrics: unknown }>(`/api/pilot-events?project_id=${PROJECT}`)).body.metrics;
 
   const { snapshotOf } = await import("@/lib/pilot/change-report");
@@ -213,7 +248,9 @@ async function main() {
   const out = {
     project_id: PROJECT,
     generated_at: new Date().toISOString(),
-    boq: { id: boqRow!.id, grand_total_aed: boq.grand_total_aed, printed_total: total.text, derived_lines: derivedLines.length, lines: lines.length },
+    boq: { id: boqRow!.id, grand_total_aed: boq.grand_total_aed, printed_total: total.text, derived_lines: derivedLines.length, lines: lines.length, top5 },
+    decisions,
+    layout_assumptions: layoutAssumptions(g),
     drawings: set.sheets.map((s) => `${s.sheetNumber} ${s.title}`),
     pack: { pages: pack.summary.pages, missing_images: pack.summary.missing_images },
     gate,

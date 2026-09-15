@@ -27,7 +27,7 @@
 // Deterministic SVG. No LLM, no DOM.
 // =============================================================================
 
-import { isInDesign, isNewWork } from "@/lib/plan/site-reference";
+import { isInDesign, isNewWork, replacedBy } from "@/lib/plan/site-reference";
 import { LINEAR_ELEMENT_META, type LinearElement } from "@/lib/plan/elements";
 import type { ContextVolume, PlanGraph, Point, Room } from "@/lib/plan/geometry";
 import { roomTypeLabel } from "@/lib/plan/zones";
@@ -361,7 +361,7 @@ function runSvg(el: LinearElement, f: Frame, withLabel = true): string {
   const w = Math.max(0.6, (el.width_mm / 1000) * f.k * 0.6);
   // G5: an existing run is dashed; one the design removes is faint.
   const dash = el.site_reference ? ` stroke-dasharray="${f2(Math.max(1.2, w * 1.6))} ${f2(Math.max(0.8, w))}"` : "";
-  const removed = el.site_reference && el.disposition === "remove";
+  const removed = !isInDesign(el);
   const pts = el.polyline.map(([x, y]) => `${f2(f.px(x))},${f2(f.py(y))}`).join(" ");
   const mid = el.polyline[Math.floor(el.polyline.length / 2)] ?? el.polyline[0]!;
   const label = withLabel
@@ -386,8 +386,11 @@ export function designFixtures(fixtures: readonly GardenFixture[]): GardenFixtur
 const DISPOSITION_WORD: Record<string, string> = { keep: "keep", remove: "to remove", replace: "replace" };
 
 /** "existing · keep" — how a site-reference item is named on a sheet. */
-export function existingTag(t: { site_reference?: boolean | null; disposition?: string | null }): string {
-  return t.site_reference ? `existing · ${t.disposition ? DISPOSITION_WORD[t.disposition] ?? t.disposition : "undecided"}` : "";
+export function existingTag(t: { site_reference?: boolean | null; disposition?: string | null; spec?: Record<string, unknown> | null }): string {
+  if (!t.site_reference) return "";
+  const by = replacedBy(t);
+  if (by) return `existing · replace → ${by}`;
+  return `existing · ${t.disposition ? DISPOSITION_WORD[t.disposition] ?? t.disposition : "undecided"}`;
 }
 
 const UNIT_META: Record<string, { code: string; label: string }> = {
@@ -681,7 +684,7 @@ export function renderSitePlan(
   const area = drawingArea();
   const f = frameFor(b, area);
   const zones = gardenZones(graph);
-  const removedZones = fullGraph.rooms.filter((r) => r.site_reference && r.disposition === "remove");
+  const removedZones = fullGraph.rooms.filter((r) => !isInDesign(r));
 
   let body = defs();
   body += contextSvg(graph, f, true);
@@ -699,7 +702,7 @@ export function renderSitePlan(
   body += fullGraph.elements.map((el) => runSvg(el, f)).join("");
   for (const u of allFixtures.filter((x) => x.layer === "landscape")) {
     const m = toMetres(graph, u.position);
-    const removed = u.site_reference && u.disposition === "remove";
+    const removed = !isInDesign({ site_reference: u.site_reference ?? false, disposition: u.disposition ?? null, spec: u.spec ?? null });
     if (u.type === "tree") {
       const s = (u.spec ?? {}) as Record<string, unknown>;
       const r = ((typeof s.canopy_mm === "number" ? s.canopy_mm : 3000) / 2000) * f.k;

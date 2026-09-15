@@ -13,6 +13,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { loadDocumentProject } from "@/lib/documents/project-name";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import type { PlanGraph, Room } from "@/lib/plan/geometry";
 import { zoneSurface } from "@/lib/plan/zones";
@@ -145,13 +146,9 @@ interface ProjectMetaRow {
 }
 
 async function loadProjectMeta(projectId: string): Promise<ProjectMetaRow> {
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from("projects")
-    .select("name, city")
-    .eq("id", projectId)
-    .maybeSingle();
-  return { name: data?.name ?? "Untitled villa", city: data?.city ?? "Dubai" };
+  // G5: a document prints the project's display name when it has one (038).
+  const p = await loadDocumentProject(getSupabaseAdmin() as unknown as SupabaseClient, projectId, "Untitled villa");
+  return { name: p.name, city: p.city };
 }
 
 function sheetMeta(

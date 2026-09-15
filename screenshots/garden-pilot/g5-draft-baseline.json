@@ -1,0 +1,349 @@
+{
+  "captured_at": "2026-09-15T20:16:46.021Z",
+  "boq_id": "32d83ee8-7ae7-48c1-b8d5-969b1137b1df",
+  "draft": true,
+  "derived": [
+    "plot boundary",
+    "zone: Porcelain path — garden gate to side garden",
+    "zone: Side garden — planting bed",
+    "zone: Front garden — lawn",
+    "zone: Front garden — planting bed",
+    "zone: Rear planting bed",
+    "zone: Pergola court — porcelain paving",
+    "zone: Side garden — lawn",
+    "zone: Rear garden — lawn",
+    "zone: Side garden — porcelain paving terrace",
+    "zone: Louvred pergola (replaces existing gazebo)",
+    "run: BBQ counter (under the pergola)",
+    "run: L-seating bench (pergola court)",
+    "context: Existing villa",
+    "context: Garage / drive block",
+    "context: Rear boundary wall",
+    "context: Corner boundary wall (side garden)",
+    "context: Side garden street wall",
+    "context: Rear strip end wall"
+  ],
+  "grand_total_aed": 116942.01,
+  "lines": [
+    {
+      "key": "Demolition|GL-03",
+      "section": "Demolition",
+      "description": "Garden demolition & strip-out",
+      "quantity": 1,
+      "unit": "lump",
+      "rate_aed": 4400,
+      "total_aed": 4400,
+      "qty_derived": false
+    },
+    {
+      "key": "Preliminaries|GL-01",
+      "section": "Preliminaries",
+      "description": "Garden preliminaries & approvals",
+      "quantity": 1,
+      "unit": "lump",
+      "rate_aed": 3520,
+      "total_aed": 3520,
+      "qty_derived": false
+    },
+    {
+      "key": "Preliminaries|GL-02",
+      "section": "Preliminaries",
+      "description": "Garden mobilization & site management",
+      "quantity": 1,
+      "unit": "lump",
+      "rate_aed": 4400,
+      "total_aed": 4400,
+      "qty_derived": false
+    },
+    {
+      "key": "Hardscape & Structures|GL-04",
+      "section": "Hardscape & Structures",
+      "description": "PCC base under paving",
+      "quantity": 62.95,
+      "unit": "m2",
+      "rate_aed": 105.6,
+      "total_aed": 6647.52,
+      "qty_derived": true
+    },
+    {
+      "key": "Hardscape & Structures|GL-05",
+      "section": "Hardscape & Structures",
+      "description": "Porcelain paving installation",
+      "quantity": 62.95,
+      "unit": "m2",
+      "rate_aed": 70.4,
+      "total_aed": 4431.68,
+      "qty_derived": true
+    },
+    {
+      "key": "Hardscape & Structures|GL-06",
+      "section": "Hardscape & Structures",
+      "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+      "quantity": 62.95,
+      "unit": "m2",
+      "rate_aed": 128.1,
+      "total_aed": 8063.9,
+      "qty_derived": true
+    },
+    {
+      "key": "Hardscape & Structures|GL-09",
+      "section": "Hardscape & Structures",
+      "description": "Seating bench, L-shape (0.7x0.6 section)",
+      "quantity": 4,
+      "unit": "lm",
+      "rate_aed": 1320,
+      "total_aed": 5280,
+      "qty_derived": true
+    },
+    {
+      "key": "Hardscape & Structures|GL-11a",
+      "section": "Hardscape & Structures",
+      "description": "BBQ counter (blockwork, clad, sink+MEP+sockets)",
+      "quantity": 3,
+      "unit": "lm",
+      "rate_aed": 5280,
+      "total_aed": 15840,
+      "qty_derived": true
+    },
+    {
+      "key": "Hardscape & Structures|GL-14",
+      "section": "Hardscape & Structures",
+      "description": "Motorized louvered pergola (alum, LED, coated)",
+      "quantity": 12.25,
+      "unit": "m2 plan",
+      "rate_aed": 1366.6928,
+      "total_aed": 16741.99,
+      "qty_derived": true
+    },
+    {
+      "key": "Soft Landscaping|GL-07",
+      "section": "Soft Landscaping",
+      "description": "Artificial grass supply",
+      "quantity": 76.9,
+      "unit": "m2",
+      "rate_aed": 26.4,
+      "total_aed": 2030.16,
+      "qty_derived": true
+    },
+    {
+      "key": "Soft Landscaping|GL-08",
+      "section": "Soft Landscaping",
+      "description": "Artificial grass installation (base+sand+borders)",
+      "quantity": 76.9,
+      "unit": "m2",
+      "rate_aed": 70.4,
+      "total_aed": 5413.76,
+      "qty_derived": true
+    },
+    {
+      "key": "Irrigation|GL-15",
+      "section": "Irrigation",
+      "description": "Irrigation system (drip, pump, valves)",
+      "quantity": 1.6,
+      "unit": "lump",
+      "rate_aed": 11000,
+      "total_aed": 17600,
+      "qty_derived": true
+    },
+    {
+      "key": "Electrical & Lighting|GL-16",
+      "section": "Electrical & Lighting",
+      "description": "Garden lighting cabling",
+      "quantity": 12,
+      "unit": "point",
+      "rate_aed": 264,
+      "total_aed": 3168,
+      "qty_derived": false
+    },
+    {
+      "key": "Electrical & Lighting|GL-17",
+      "section": "Electrical & Lighting",
+      "description": "Garden light fittings (blended LUMO class)",
+      "quantity": 12,
+      "unit": "point",
+      "rate_aed": 308,
+      "total_aed": 3696,
+      "qty_derived": false
+    },
+    {
+      "key": "Electrical & Lighting|GL-18",
+      "section": "Electrical & Lighting",
+      "description": "Boundary wall lights (supply+install)",
+      "quantity": 6,
+      "unit": "point",
+      "rate_aed": 315,
+      "total_aed": 1890,
+      "qty_derived": false
+    }
+  ],
+  "takeoff": [
+    {
+      "work_item_key": "garden.bench_run",
+      "element_id": "b1b17438-29ce-45c2-866a-cf03c20dd093",
+      "qty": 4,
+      "unit": "lm"
+    },
+    {
+      "work_item_key": "garden.counter_bbq",
+      "element_id": "81e1057a-fc85-4a2a-9ae0-a70a9431aac7",
+      "qty": 3,
+      "unit": "lm"
+    },
+    {
+      "work_item_key": "garden.grass_install",
+      "element_id": "3fb94d19-3786-48d4-bb29-48514e8777ba",
+      "qty": 14.88,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.grass_install",
+      "element_id": "dba7027d-519f-4eac-ba3c-f75c1b269b89",
+      "qty": 6.4,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.grass_install",
+      "element_id": "ec59cb9e-41bc-4dbc-819a-649859c672cd",
+      "qty": 55.62,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.grass_supply",
+      "element_id": "3fb94d19-3786-48d4-bb29-48514e8777ba",
+      "qty": 14.88,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.grass_supply",
+      "element_id": "dba7027d-519f-4eac-ba3c-f75c1b269b89",
+      "qty": 6.4,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.grass_supply",
+      "element_id": "ec59cb9e-41bc-4dbc-819a-649859c672cd",
+      "qty": 55.62,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.paving_install",
+      "element_id": "05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "qty": 20.6,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.paving_install",
+      "element_id": "113e3a84-c292-476e-ae2b-cd3cad688d55",
+      "qty": 16.12,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.paving_install",
+      "element_id": "65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+      "qty": 12.25,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.paving_install",
+      "element_id": "94a612f3-9a07-4466-b6fc-53e48c550ed1",
+      "qty": 13.98,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.pcc_base",
+      "element_id": "05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "qty": 20.6,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.pcc_base",
+      "element_id": "113e3a84-c292-476e-ae2b-cd3cad688d55",
+      "qty": 16.12,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.pcc_base",
+      "element_id": "65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+      "qty": 12.25,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.pcc_base",
+      "element_id": "94a612f3-9a07-4466-b6fc-53e48c550ed1",
+      "qty": 13.98,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.pergola",
+      "element_id": "65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+      "qty": 12.25,
+      "unit": "m2 plan"
+    },
+    {
+      "work_item_key": "garden.removal",
+      "element_id": "0069c434-52fb-401c-b762-d3f54a08b9df",
+      "qty": 2.4,
+      "unit": "lm"
+    },
+    {
+      "work_item_key": "garden.removal",
+      "element_id": "615ae275-dd94-4631-bc66-1e88b7b12ea8",
+      "qty": 2.7,
+      "unit": "lm"
+    },
+    {
+      "work_item_key": "garden.removal",
+      "element_id": "65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+      "qty": 12.25,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.removal",
+      "element_id": "d12aee55-f78a-4379-8668-f2faa5e7b170",
+      "qty": 20.1,
+      "unit": "lm"
+    },
+    {
+      "work_item_key": "garden.removal",
+      "element_id": "d50b48f5-639a-4f7a-b755-3064412a501b",
+      "qty": 6.95,
+      "unit": "lm"
+    },
+    {
+      "work_item_key": "garden.removal",
+      "element_id": "d813d938-1041-4d20-812a-b45607276be9",
+      "qty": 26.95,
+      "unit": "lm"
+    },
+    {
+      "work_item_key": "garden.removal",
+      "element_id": "e6cd0add-0d94-4db7-90a8-3cb9568eb9b4",
+      "qty": 9.7,
+      "unit": "lm"
+    },
+    {
+      "work_item_key": "garden.tile_supply",
+      "element_id": "05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "qty": 20.6,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.tile_supply",
+      "element_id": "113e3a84-c292-476e-ae2b-cd3cad688d55",
+      "qty": 16.12,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.tile_supply",
+      "element_id": "65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+      "qty": 12.25,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.tile_supply",
+      "element_id": "94a612f3-9a07-4466-b6fc-53e48c550ed1",
+      "qty": 13.98,
+      "unit": "m2"
+    }
+  ]
+}

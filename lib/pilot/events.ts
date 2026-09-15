@@ -95,12 +95,14 @@ export function computePilotMetrics(
   renders: readonly GateRowLike[],
   corrections: readonly CorrectionLike[],
 ): PilotMetrics {
-  // Events a verification script caused (stage "verification") are not the pilot.
-  const sorted = [...events].filter((e) => e.detail?.stage !== "verification").sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+  // Events a verification script caused (stage "verification") or a reference pack
+  // exported for another project to show (stage "reference_pack") are not the pilot.
+  const sorted = [...events].filter((e) => e.detail?.stage !== "verification" && e.detail?.stage !== "reference_pack").sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
   const started = sorted.find((e) => e.kind === "plan_started") ?? sorted.find((e) => e.kind === "plan_saved" || e.kind === "design_edit");
   const boqs = sorted.filter((e) => e.kind === "boq_generated");
   const full = boqs.find((e) => e.detail?.full === true) ?? null;
-  const edits = sorted.filter((e) => (e.kind === "plan_saved" || e.kind === "design_edit") && e.detail?.stage !== "reference_layout");
+  // Script-seeded edits (Step 1 layout, a seeded design proposal) are not the designer drawing.
+  const edits = sorted.filter((e) => (e.kind === "plan_saved" || e.kind === "design_edit") && e.detail?.stage !== "reference_layout" && e.detail?.stage !== "design_seed");
   const lastEditBeforeFull = full ? [...edits].reverse().find((e) => e.recorded_at <= full.recorded_at) : edits[edits.length - 1];
   const session = lastEditBeforeFull ? edits.filter((e) => e.recorded_at <= lastEditBeforeFull.recorded_at) : [];
   let active = 0;

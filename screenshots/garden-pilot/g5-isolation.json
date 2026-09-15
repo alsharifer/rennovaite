@@ -2,106 +2,111 @@
   "reference": "8d460645-9450-4072-af41-b37adf8512a0",
   "standIn": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
   "checks": [
-    "PASS  regenerating Villa 94's pack touches zero rows, assets or cached images of the client — 60 rows, 14 storage objects unchanged",
-    "PASS  regenerating the client's pack touches zero rows, assets or cached images of Villa 94 — 119 rows, 180 storage objects unchanged",
-    "PASS  [villa94] scene render rows — none rendered on this run — row, manifest and storage assertions not applicable",
+    "PASS  regenerating Villa 94's pack touches zero rows, assets or cached images of the client — 312 rows, 228 storage objects unchanged",
+    "PASS  regenerating the client's pack touches zero rows, assets or cached images of Villa 94 — 155 rows, 254 storage objects unchanged",
+    "PASS  [villa94] every scene render row carries this project — 30 rows",
+    "PASS  [villa94] every camera manifest carries this project",
+    "PASS  [villa94] every image and scene model lives under this project's storage prefix",
     "PASS  [villa94] every drawing sheet carries this project — 25 sheets",
     "PASS  [villa94] every BoQ line's element_refs resolve inside this project — 35 refs",
     "PASS  [villa94] take-off rows carry this project — 35 rows",
-    "PASS  [client] scene render rows — none rendered on this run — row, manifest and storage assertions not applicable",
-    "PASS  [client] every drawing sheet carries this project — 10 sheets",
-    "PASS  [client] every BoQ line's element_refs resolve inside this project — 5 refs",
-    "PASS  [client] take-off rows carry this project — 5 rows",
-    "PASS  no render cache key is shared between the projects (same zones, same scene) — 0 vs 0 keys, 0 shared"
+    "PASS  [client] every scene render row carries this project — 84 rows",
+    "PASS  [client] every camera manifest carries this project",
+    "PASS  [client] every image and scene model lives under this project's storage prefix",
+    "PASS  [client] every photo pair carries this project — manifest, restyle and source photo — 8 pairs",
+    "PASS  [client] every drawing sheet carries this project — 19 sheets",
+    "PASS  [client] every BoQ line's element_refs resolve inside this project — 28 refs",
+    "PASS  [client] take-off rows carry this project — 28 rows",
+    "PASS  no render cache key is shared between the projects (same zones, same scene) — 30 vs 91 keys, 0 shared"
   ],
   "snapshots": {
     "standIn": {
       "before": {
         "counts": {
-          "renders": 0,
-          "boqs": 0,
-          "takeoff_items": 0,
-          "plan_fixtures": 6,
+          "renders": 92,
+          "boqs": 13,
+          "takeoff_items": 28,
+          "plan_fixtures": 26,
           "moodboard_items": 0,
-          "style_choices": 0,
+          "style_choices": 1,
           "boq_outcomes": 0,
           "plans": 1,
-          "rooms": 4,
-          "plan_elements": 6,
+          "rooms": 10,
+          "plan_elements": 8,
           "plan_context": 6,
           "project_assets": 14,
-          "pilot_events": 23,
+          "pilot_events": 113,
           "boq_corrections": 0,
           "room_photos": 0
         },
         "fingerprints": {
-          "renders": "4f53cda18c2baa0c",
-          "boqs": "4f53cda18c2baa0c",
-          "takeoff_items": "4f53cda18c2baa0c",
-          "plan_fixtures": "2d066ff1f7f03f49",
+          "renders": "8a739e5ffdcecee9",
+          "boqs": "fe9b48ae6824e105",
+          "takeoff_items": "b0de87461b60a4f6",
+          "plan_fixtures": "d5362148331485d0",
           "moodboard_items": "4f53cda18c2baa0c",
-          "style_choices": "4f53cda18c2baa0c",
+          "style_choices": "35ae98c60ccc731d",
           "boq_outcomes": "4f53cda18c2baa0c",
           "plans": "c848a621d0e34421",
-          "rooms": "792048c48287aa5d",
-          "plan_elements": "b62fcee7db288276",
-          "plan_context": "dcb45fbc137b7862",
+          "rooms": "46fff4c05d42fabf",
+          "plan_elements": "e4dd131a93826ba2",
+          "plan_context": "ea01c53c12632af0",
           "project_assets": "d0262cf8c0b1c940",
-          "pilot_events": "e6368a371a9e7e91",
+          "pilot_events": "e2af9eef478e2297",
           "boq_corrections": "4f53cda18c2baa0c",
           "room_photos": "4f53cda18c2baa0c"
         },
         "storage": {
-          "objects": 14,
-          "fingerprint": "067a4a086e586203"
+          "objects": 228,
+          "fingerprint": "ce9763baa9043093"
         }
       },
       "after": {
         "counts": {
-          "renders": 0,
-          "boqs": 0,
-          "takeoff_items": 0,
-          "plan_fixtures": 6,
+          "renders": 92,
+          "boqs": 13,
+          "takeoff_items": 28,
+          "plan_fixtures": 26,
           "moodboard_items": 0,
-          "style_choices": 0,
+          "style_choices": 1,
           "boq_outcomes": 0,
           "plans": 1,
-          "rooms": 4,
-          "plan_elements": 6,
+          "rooms": 10,
+          "plan_elements": 8,
           "plan_context": 6,
           "project_assets": 14,
-          "pilot_events": 23,
+          "pilot_events": 113,
           "boq_corrections": 0,
           "room_photos": 0
         },
         "fingerprints": {
-          "renders": "4f53cda18c2baa0c",
-          "boqs": "4f53cda18c2baa0c",
-          "takeoff_items": "4f53cda18c2baa0c",
-          "plan_fixtures": "2d066ff1f7f03f49",
+          "renders": "8a739e5ffdcecee9",
+          "boqs": "fe9b48ae6824e105",
+          "takeoff_items": "b0de87461b60a4f6",
+          "plan_fixtures": "d5362148331485d0",
           "moodboard_items": "4f53cda18c2baa0c",
-          "style_choices": "4f53cda18c2baa0c",
+          "style_choices": "35ae98c60ccc731d",
           "boq_outcomes": "4f53cda18c2baa0c",
           "plans": "c848a621d0e34421",
-          "rooms": "792048c48287aa5d",
-          "plan_elements": "b62fcee7db288276",
-          "plan_context": "dcb45fbc137b7862",
+          "rooms": "46fff4c05d42fabf",
+          "plan_elements": "e4dd131a93826ba2",
+          "plan_context": "ea01c53c12632af0",
           "project_assets": "d0262cf8c0b1c940",
-          "pilot_events": "e6368a371a9e7e91",
+          "pilot_events": "e2af9eef478e2297",
           "boq_corrections": "4f53cda18c2baa0c",
           "room_photos": "4f53cda18c2baa0c"
         },
         "storage": {
-          "objects": 14,
-          "fingerprint": "067a4a086e586203"
+          "objects": 228,
+          "fingerprint": "ce9763baa9043093"
         }
       }
     },
     "villa94": {
       "before": {
         "counts": {
-          "renders": 0,
-          "boqs": 9,
+          "renders": 30,
+          "boqs": 11,
           "takeoff_items": 35,
           "plan_fixtures": 40,
           "moodboard_items": 2,
@@ -112,14 +117,14 @@
           "plan_elements": 4,
           "plan_context": 13,
           "project_assets": 0,
-          "pilot_events": 1,
+          "pilot_events": 5,
           "boq_corrections": 0,
           "room_photos": 0
         },
         "fingerprints": {
-          "renders": "4f53cda18c2baa0c",
-          "boqs": "5f629ff92b89e6c7",
-          "takeoff_items": "34e32ed2737f125b",
+          "renders": "7bae4649c405f7b2",
+          "boqs": "bee8d312c57fd233",
+          "takeoff_items": "1e4751f748efd18f",
           "plan_fixtures": "66564b237f1a3a68",
           "moodboard_items": "6c85059c829de63c",
           "style_choices": "7fcc3402266fc67c",
@@ -129,19 +134,19 @@
           "plan_elements": "996acdc5675d5164",
           "plan_context": "cc8ccedb4a3bad08",
           "project_assets": "4f53cda18c2baa0c",
-          "pilot_events": "8c7f62b7fa215ad2",
+          "pilot_events": "1dadcdabf0a79422",
           "boq_corrections": "4f53cda18c2baa0c",
           "room_photos": "4f53cda18c2baa0c"
         },
         "storage": {
-          "objects": 180,
-          "fingerprint": "2fc663a90062ddc6"
+          "objects": 254,
+          "fingerprint": "2a14db90e0dd5e19"
         }
       },
       "after": {
         "counts": {
-          "renders": 0,
-          "boqs": 9,
+          "renders": 30,
+          "boqs": 11,
           "takeoff_items": 35,
           "plan_fixtures": 40,
           "moodboard_items": 2,
@@ -152,14 +157,14 @@
           "plan_elements": 4,
           "plan_context": 13,
           "project_assets": 0,
-          "pilot_events": 1,
+          "pilot_events": 5,
           "boq_corrections": 0,
           "room_photos": 0
         },
         "fingerprints": {
-          "renders": "4f53cda18c2baa0c",
-          "boqs": "5f629ff92b89e6c7",
-          "takeoff_items": "34e32ed2737f125b",
+          "renders": "7bae4649c405f7b2",
+          "boqs": "bee8d312c57fd233",
+          "takeoff_items": "1e4751f748efd18f",
           "plan_fixtures": "66564b237f1a3a68",
           "moodboard_items": "6c85059c829de63c",
           "style_choices": "7fcc3402266fc67c",
@@ -169,13 +174,13 @@
           "plan_elements": "996acdc5675d5164",
           "plan_context": "cc8ccedb4a3bad08",
           "project_assets": "4f53cda18c2baa0c",
-          "pilot_events": "8c7f62b7fa215ad2",
+          "pilot_events": "1dadcdabf0a79422",
           "boq_corrections": "4f53cda18c2baa0c",
           "room_photos": "4f53cda18c2baa0c"
         },
         "storage": {
-          "objects": 180,
-          "fingerprint": "2fc663a90062ddc6"
+          "objects": 254,
+          "fingerprint": "2a14db90e0dd5e19"
         }
       }
     }
@@ -186,216 +191,644 @@
         "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
         "label": "North planting strip",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
         "label": "North planting strip",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
         "label": "Pergola court paving",
         "view": "day",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
       },
       {
         "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
         "label": "Pergola court paving",
         "view": "evening",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "substituted",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "undesigned light: Two wall-mounted downlights with bright wash pools on the rear boundary wall above the BBQ counter, where the night model shows no glow"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": false,
+            "failures": [
+              "undesigned light: Three vertical wall-mounted light fittings on the rear boundary wall (and one on the left wall) where the night model shows no glow"
+            ]
+          }
+        ]
       },
       {
         "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
         "label": "Wall-feature terrace",
         "view": "day",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
       },
       {
         "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
         "label": "Wall-feature terrace",
         "view": "evening",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "substituted",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "undesigned light: In-ground uplight at the right-hand return of the arched wall feature, washing the wall and paving, where the night model shows no glow"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": false,
+            "failures": [
+              "undesigned light: In-ground uplight fitting and bright wall wash on the right-hand return wall beside the raised planter, where the night model shows no glow",
+              "undesigned light: In-ground uplight and wall wash on the boundary wall immediately left of the arched feature, no corresponding designed light point"
+            ]
+          }
+        ]
       },
       {
         "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
         "label": "Seating-bench court",
         "view": "day",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "substituted",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "invented structure: Lit stone steps descending to a lawn at the bottom right, not present in the design model"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": false,
+            "failures": [
+              "invented structure: Flight of steps with adjoining low wall at far left, not present in the model"
+            ]
+          }
+        ]
       },
       {
         "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
         "label": "Seating-bench court",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
         "label": "Aluminium pergola",
         "view": "day",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
       },
       {
         "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
         "label": "Aluminium pergola",
         "view": "evening",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
       },
       {
         "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
         "label": "Backyard lawn",
         "view": "day",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
       },
       {
         "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
         "label": "Backyard lawn",
         "view": "evening",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
       },
       {
         "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
         "label": "West planting strip",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
         "label": "West planting strip",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
         "label": "Side courtyard",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
         "label": "Side courtyard",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
         "label": "Front lawn — north",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
         "label": "Front lawn — north",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
         "label": "Front approach — upper",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
         "label": "Front approach — upper",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:e15d5e11-f020-477c-930e-ebd1d633535e",
         "label": "Front approach — lower",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
         "label": "Front lawn — south",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
         "label": "Front lawn — south",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "garden:garden-1",
         "label": "Whole garden — view 1",
         "view": "day",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
       },
       {
         "camera": "garden:garden-1",
         "label": "Whole garden — view 1",
         "view": "evening",
-        "outcome": "missing",
-        "attempts": []
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
       },
       {
         "camera": "garden:garden-2",
         "label": "Whole garden — view 2",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "garden:garden-2",
         "label": "Whole garden — view 2",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "garden:front-1",
         "label": "Front garden",
         "view": "day",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       },
       {
         "camera": "garden:front-1",
         "label": "Front garden",
         "view": "evening",
-        "outcome": "missing",
+        "outcome": "substituted",
         "attempts": []
       }
     ],
-    "standIn": []
+    "standIn": [
+      {
+        "camera": "photo:7a37e2af-60ae-41cd-8c71-6b0395f7090c",
+        "label": "Side garden — porcelain paving terrace",
+        "view": "photo_pair",
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": true,
+            "failures": []
+          }
+        ]
+      },
+      {
+        "camera": "photo:6f1c45be-05b2-48c9-954a-39bf23cec001",
+        "label": "Side garden — lawn",
+        "view": "photo_pair",
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "the hardtop gazebo with dark glazed panels: moved or resized (A dark louvred aluminium pergola is visible, but it sits in the centre-rear of the lawn over the dining set, not on the left where the old hardtop gazebo stood; the left-hand structure has vanished entirely.)",
+              "house or boundary changed",
+              "viewpoint changed",
+              "invented structure: New white boundary wall enclosing the left side where the gazebo/house edge previously was"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": true,
+            "failures": []
+          }
+        ]
+      },
+      {
+        "camera": "photo:539ad1ba-4a72-4b51-a0bd-97dd2fbdfb67",
+        "label": "Side garden — porcelain paving terrace",
+        "view": "photo_pair",
+        "outcome": "substituted",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "house or boundary changed"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": false,
+            "failures": [
+              "the stepping-stone path: moved or resized (Large-format porcelain paving is visible, but it covers nearly the whole garden rather than just the side terrace and the narrow rear path; the old stepping-stone line and lawn layout are gone.)",
+              "the hardtop gazebo with dark glazed panels: moved or resized (A dark motorised louvred aluminium pergola replaces the gazebo, but it sits further left/deeper in the plot and reads smaller than the gazebo's footprint from this angle.)",
+              "house or boundary changed",
+              "viewpoint changed"
+            ]
+          }
+        ]
+      },
+      {
+        "camera": "photo:7393e6b5-01e2-45b9-bdf8-39baa5e0e1c5",
+        "label": "Side garden — lawn",
+        "view": "photo_pair",
+        "outcome": "substituted",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "the hardtop gazebo with dark glazed panels: missing (No motorised louvred aluminium pergola is visible; instead a large fully glazed enclosure/room occupies the left-centre of the plot, larger than the old gazebo.)",
+              "viewpoint changed",
+              "invented structure: large glazed enclosure/conservatory-style box replacing the gazebo area",
+              "invented structure: raised stone-edged planter beds along both side walls"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": false,
+            "failures": [
+              "the hardtop gazebo with dark glazed panels: moved or resized (A motorised louvred aluminium pergola does appear, but it is much larger and sits against the house on the right side, not at the far-left position of the old hardtop gazebo.)",
+              "house or boundary changed",
+              "viewpoint changed",
+              "invented structure: stone-clad boundary wall panels and new wall gate/door",
+              "invented structure: large stone paving walkway with grass-jointed stepping slabs along the house",
+              "invented structure: raised/edged planting beds with gravel borders around the lawn"
+            ]
+          }
+        ]
+      },
+      {
+        "camera": "photo:04364c15-11de-4c5c-a7ae-4f2d103e9838",
+        "label": "Rear garden — lawn",
+        "view": "photo_pair",
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "the planter border with stone edging: should have been removed"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": true,
+            "failures": []
+          }
+        ]
+      },
+      {
+        "camera": "zone:f3d76980-13a9-4830-86e2-0c8127bfee42",
+        "label": "Rear planting bed",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:f3d76980-13a9-4830-86e2-0c8127bfee42",
+        "label": "Rear planting bed",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:94a612f3-9a07-4466-b6fc-53e48c550ed1",
+        "label": "Pergola court — porcelain paving",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "S1 BBQ counter: moved or resized (Concrete BBQ counter appears only as a sliver at the extreme right edge (~86-100%) instead of occupying the right 40% of the frame; much smaller/further right than designed.)",
+              "T1 existing frangipani tree (kept): moved or resized (Frangipani is present but sits to the right of centre (x~50-100%) rather than centred at 25-71%.)",
+              "S3 built-in bench: moved or resized (L-shaped concrete bench is present but shifted well right of the modelled position (x~45-84% instead of 10-40%).)",
+              "T2 existing frangipani tree (kept): missing (No second tree on the left side; that area shows only open sky and lawn.)"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": false,
+            "failures": [
+              "T2 existing frangipani tree (kept): moved or resized (Second tree is much smaller and sits lower/right of the modelled upper-left canopy mass.)"
+            ]
+          }
+        ]
+      },
+      {
+        "camera": "zone:65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+        "label": "Louvred pergola (replaces existing gazebo)",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "S1 louvred pergola: moved or resized (A flat louvred-blade roof on square posts and beams is clearly shown, matching the structure type, but it sits in the upper-right of the frame at a different scale/height because the camera has moved.)",
+              "F1 paving: moved or resized (Stone paving is present but spread across the foreground/bottom-centre rather than the mid-left band of the model.)",
+              "T1 existing frangipani tree (kept): moved or resized (Frangipani is depicted and retained, but appears large at the left of the frame instead of small at top-centre.)",
+              "invented structure: Raised timber deck platform with a paved step/riser in front of the pergola",
+              "viewpoint changed"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": false,
+            "failures": [
+              "S1 louvred pergola: moved or resized (Louvred pergola with square posts and beams is correctly depicted, but it sits further right and higher in the frame and reads smaller than in the model.)",
+              "viewpoint changed"
+            ]
+          }
+        ]
+      },
+      {
+        "camera": "zone:65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+        "label": "Louvred pergola (replaces existing gazebo)",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:ec59cb9e-41bc-4dbc-819a-649859c672cd",
+        "label": "Rear garden — lawn",
+        "view": "day",
+        "outcome": "passed",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "T1 existing frangipani tree (kept): moved or resized (A frangipani is present but pushed to the far right edge (roughly x 62–100%) and set much deeper in the scene; the model has its canopy dominating the centre of the frame.)",
+              "F1 lawn: moved or resized (Lawn is depicted as lawn (not paved), but it sits in the centre-left middle distance (about x 12–58%, y 47–78%) instead of the lower-right foreground band.)",
+              "T2 existing frangipani tree (kept): moved or resized (Secondary frangipanis appear, but in the right-centre middle distance rather than the upper-left area of the frame.)",
+              "invented structure: Raised corten steel planter beds flanking the paved walk on the right",
+              "invented structure: Flight of paved steps / level change crossing the garden",
+              "invented structure: Low rendered boundary wall along the left side with desert view beyond",
+              "invented structure: Paved terrace / walkway platform in the foreground",
+              "viewpoint changed"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": true,
+            "failures": []
+          }
+        ]
+      },
+      {
+        "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
+        "label": "Porcelain path — garden gate to side garden",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
+        "label": "Porcelain path — garden gate to side garden",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:113e3a84-c292-476e-ae2b-cd3cad688d55",
+        "label": "Side garden — porcelain paving terrace",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:113e3a84-c292-476e-ae2b-cd3cad688d55",
+        "label": "Side garden — porcelain paving terrace",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:3fb94d19-3786-48d4-bb29-48514e8777ba",
+        "label": "Side garden — lawn",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:3fb94d19-3786-48d4-bb29-48514e8777ba",
+        "label": "Side garden — lawn",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:31cded47-9d42-476f-b60e-583bc532b18f",
+        "label": "Side garden — planting bed",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:31cded47-9d42-476f-b60e-583bc532b18f",
+        "label": "Side garden — planting bed",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+        "label": "Front garden — planting bed",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+        "label": "Front garden — planting bed",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "zone:dba7027d-519f-4eac-ba3c-f75c1b269b89",
+        "label": "Front garden — lawn",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "garden:garden-1",
+        "label": "Whole garden — view 1",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": [
+          {
+            "attempt": 1,
+            "passed": false,
+            "failures": [
+              "T2 existing frangipani tree (kept): moved or resized (Frangipanis appear mid-distance but sit higher and further right/centre than the modelled position, and there are two of them.)",
+              "invented structure: Corten steel raised planter edging running the length of the left border"
+            ]
+          },
+          {
+            "attempt": 2,
+            "passed": false,
+            "failures": [
+              "T1 existing frangipani tree (kept): moved or resized (Large kept frangipani is present but sits high on the left (x 5-45%, y 12-60%) instead of filling the bottom-centre foreground as modelled.)",
+              "viewpoint changed"
+            ]
+          }
+        ]
+      },
+      {
+        "camera": "garden:garden-1",
+        "label": "Whole garden — view 1",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "garden:garden-2",
+        "label": "Whole garden — view 2",
+        "view": "day",
+        "outcome": "substituted",
+        "attempts": []
+      },
+      {
+        "camera": "garden:garden-2",
+        "label": "Whole garden — view 2",
+        "view": "evening",
+        "outcome": "substituted",
+        "attempts": []
+      }
+    ]
   },
   "packs": {
     "villa94": {
       "pages": 18,
-      "bytes": 2071799
+      "bytes": 5867556
     },
     "standIn": {
-      "pages": 7,
-      "bytes": 898488
+      "pages": 19,
+      "bytes": 5159501
     }
   }
 }
