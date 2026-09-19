@@ -219,6 +219,95 @@ regenerating the client's leaves the reference's 155 rows and 254 objects
 unchanged; every render row, manifest, photo pair, sheet and BoQ ref resolves to
 its own project; 30 vs 91 cache keys, 0 shared.
 
+# G5c — the review defects, fixed at the root (2026-09-16 → 17)
+
+Abdallah and a Claude review went through the G5 pack. Everything below is a
+defect they found, fixed where it was wrong.
+
+## A. Geometry
+
+- **The plan was mirrored.** The developer type plan depicts this unit's handed
+  twin. The photos settle it: walking in from the front passage (WA0084–0086) the
+  villa is on the LEFT and the rear walls trees on the RIGHT (WA0077, WA0082),
+  which the type-plan frame reverses. Facing the villa the site reads: entrance
+  and path RIGHT, rear strip, pergola corner, side garden LEFT.
+  `garden-mirror-plan.ts` applied ONE reflection through the editing routes
+  (5/5 checks, `g5c-mirror.json`): every polygon stored exactly as its
+  reflection, and the BoQ byte-identical across it — AED 116,942.01, 15 lines,
+  28 take-off rows, before and after.
+- **The separator wall and its gate** are modelled (migration 039: a gate is an
+  opening that names its context wall). The existing shed is on the plan too,
+  with the default decision KEEP. Kept items add no demolition and no new work,
+  so none of them moved the BoQ.
+- **Scene = graph, proven.** The pergola was reported mid-pathway in the 3D; the
+  scene had always read the same coordinates (x 23.2–26.7 in both). The misread
+  came from an oblique eye-level camera down a 4 m strip, where the far rear wall
+  itself projects to mid-frame. `scene-graph-parity.test.ts` now pins it for
+  both gardens: structure centres equal plan centres to the millimetre, and the
+  pixel at each structure's projected centre is that structure.
+
+## B. BoQ
+
+Planting beds now carry a soil-preparation and planting line (GL-25, 18.48 m²,
+QS-to-price — they were measured for irrigation and never priced); two outdoor
+taps are on the plan, on the irrigation overlay and in the BoQ under Plumbing
+(GL-26); irrigation is ONE allowance line at quantity 1, AED 17,600, with the
+band explained in the note. Total unchanged at AED 116,942.01 — the taps and
+planting lines are QS-to-price at 0 until the QS rates them.
+
+## C. Renders
+
+The flat low-poly pages are gone. The conditioning image is now TEXTURED (the
+walkthrough's finish recipes ported to the server rasteriser: tile joints at the
+1200 × 600 the BoQ prices, grass, mulch, foliage, louvre blades, world-planar
+UVs, sun shadows), cameras stay inside the plot, structures are shot from back,
+the neighbourhood is modelled beyond the walls, and an aerial view was added.
+
+Client pack mix: **15 styled renders, 2 before/after pairs, 8 design views**
+(mostly evenings), 0 missing — against G5's 1 styled render and 20 design views.
+22/22 checks. Cross-view consistency: every passed view consistent with the
+anchor (the pergola court).
+
+**A measured rejection.** Conditioning each view on the anchor IMAGE as well as
+the shared specification text was tried and dropped: it moved the pass rate from
+10/13 to 4/13 (a second image pulls composition, as the G4b style-image
+calibration found). The shared reference is the deterministic design
+specification; the consistency gate enforces the rest.
+
+## D. Parity gate
+
+New and permanent, on every pack export: every BoQ line maps to an element
+visible on ≥ 1 drawing sheet AND in ≥ 1 view; every drawn element with a cost
+impact maps to a line; lumps and absorbed items are exempt with the reason. It
+caught the L-bench (priced, drawn, in no view) and the 6 boundary wall lights,
+whose fittings sat inside the wall geometry where no camera could see them.
+Both packs now report PARITY CLEAN.
+
+## The reference pack — 11/11
+
+**Contemporary Villa Garden — Completed Renovation** (the display name; the
+working name never reaches a page): 18 styled renders, 11 design views, 0
+missing, parity clean, no "ground truth", no house number, no identity, no price,
+no draft watermark.
+
+**The consistency gate found a flaw in my own specification first.** Three
+accurate views were failed for "planting palette" because the spec said "beds
+are level with the paving, not raised planters" — true of the client garden,
+false of the reference garden, which has planter runs and planter boxes. A
+fourth was failed for a second pergola that is really the villa's existing
+timber-slat one. The spec now describes raised planters and existing structures
+where the plan has them (the client garden's text is unchanged, so its renders
+were not re-run). After the fix one view was still inconsistent — a pergola
+roofed in timber battens instead of bronze louvres — and the pack demoted it to
+a design view, which is the gate working.
+
+## Isolation — with renders, both directions — 16/16
+
+Regenerating the reference pack leaves the client's 456 rows and 401 storage
+objects untouched; regenerating the client's leaves the reference's 229 rows and
+498 objects untouched. Every render row, manifest, photo pair, sheet and BoQ ref
+resolves to its own project; 86 vs 130 cache keys, 0 shared.
+
 ## Next
 
 The review session with the client (Step 5 amendment to measured dimensions, then

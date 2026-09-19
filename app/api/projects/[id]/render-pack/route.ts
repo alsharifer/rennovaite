@@ -41,6 +41,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: readinessMessage(readiness), code: "pack_not_ready", readiness }, { status: 409 });
     }
     const { pdf, summary, pageSvgs } = await generateRenderPack(parsed.data);
+    // G5c: no pack leaves with the BoQ, the drawings and the views disagreeing.
+    if (!summary.parity.clean && !json && format !== "pages") {
+      const lines = summary.parity.lines.filter((l) => l.status === "fail").map((l) => `${l.rule_id} ${l.description}: ${l.reason}`);
+      const els = summary.parity.elements.filter((e) => e.status === "fail").map((e) => `${e.name}: ${e.reason}`);
+      return NextResponse.json({ error: `Parity failed: ${[...lines, ...els].slice(0, 6).join("; ")}`, code: "parity_failed", parity: summary.parity }, { status: 409 });
+    }
     if (format === "pages") return NextResponse.json({ readiness, pages: pageSvgs });
     if (json) {
       return NextResponse.json({ ...summary, readiness, bytes: pdf.byteLength });

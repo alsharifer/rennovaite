@@ -23,6 +23,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { parityTableText } from "../lib/documents/parity.ts";
+
 const ROOT = "C:/dev/rennovaite";
 const args = process.argv.slice(2);
 const PROJECT_ARG = args.find((a) => /^[0-9a-f-]{36}$/.test(a));
@@ -94,23 +96,12 @@ async function main() {
   check("every priced landscape line carries the market-reference source label", priced.every((l) => l.vendor_or_source === PUBLIC_SOURCE_LABEL), `${priced.length} priced lines`);
 
   // --- 3. renders ------------------------------------------------------------------------
+  let renderRun: Awaited<ReturnType<typeof import("./lib/garden-render-run.ts").renderAllViews>> | null = null;
   if (RENDER) {
-    const cams = (await getJson<{ cameras: { id: string; label: string; lit: boolean }[]; error?: string }>(`/api/render/scene?project_id=${PROJECT}`)).body;
-    if (!cams.cameras) throw new Error(`cameras: ${cams.error}`);
-    const run = async (jobs: { id: string; view: "day" | "evening" }[]) => {
-      const queue = [...jobs];
-      await Promise.all(
-        [0, 1, 2].map(async () => {
-          for (let j = queue.shift(); j; j = queue.shift()) {
-            const t0 = Date.now();
-            const r = await post("/api/render/scene", { project_id: PROJECT, camera_id: j.id, view: j.view });
-            console.log(`  ${j.view.padEnd(7)} ${j.id.slice(0, 44).padEnd(44)} ${r.body.outcome ?? `ERROR ${r.body.error}`}${r.body.cached ? " (cached)" : ""} ${Math.round((Date.now() - t0) / 1000)}s`);
-          }
-        }),
-      );
-    };
-    await run(cams.cameras.map((c) => ({ id: c.id, view: "day" as const })));
-    await run(cams.cameras.filter((c) => c.lit).map((c) => ({ id: c.id, view: "evening" as const })));
+    // G5c: the anchor view first, every other view conditioned to match it, then
+    // the cross-view consistency gate, then the evenings.
+    const { renderAllViews } = await import("./lib/garden-render-run.ts");
+    renderRun = await renderAllViews({ projectId: PROJECT, get: getJson, post });
   }
 
   // --- 4. photo pairs --------------------------------------------------------------------
@@ -174,7 +165,7 @@ async function main() {
   const set = await generateDrawingSet(PROJECT);
   // The pack page SVGs come from the route (pdf-lib does not load under the
   // script alias hook); the summary is the JSON manifest.
-  const packSummary = (await getJson<{ gate: { label: string; view: string; outcome: string; attempts: { attempt: number; passed: boolean; failures: string[] }[] }[]; pages: unknown[]; missing_images: string[]; mix: Record<string, number> }>(`/api/projects/${PROJECT}/render-pack?format=json`)).body;
+  const packSummary = (await getJson<{ gate: { camera: string; label: string; view: string; outcome: string; reason?: string | null; consistency?: { passed: boolean; failures: string[]; anchor: boolean } | null; attempts: { attempt: number; passed: boolean; failures: string[] }[] }[]; pages: unknown[]; missing_images: string[]; mix: Record<string, number>; parity: import("@/lib/documents/parity").ParityResult }>(`/api/projects/${PROJECT}/render-pack?format=json`)).body;
   const pack = { pageSvgs: (await getJson<{ pages: string[] }>(`/api/projects/${PROJECT}/render-pack?format=pages`)).body.pages ?? [], summary: packSummary };
   const { data: proj } = await db.from("projects").select("name, city").eq("id", PROJECT).single<{ name: string; city: string }>();
   const boqPages = buildBoqPdfPages({ projectName: proj!.name, community: proj!.city, dateISO: "check", boq: boq as never });
@@ -215,8 +206,23 @@ async function main() {
   const gate = pack.summary.gate;
   const scene = gate.filter((g) => g.view !== "photo_pair");
   console.log("\nFAITHFULNESS GATE");
-  for (const g of gate) console.log(`  ${g.label.slice(0, 34).padEnd(34)} ${g.view.padEnd(10)} ${g.outcome.padEnd(12)} ${g.attempts.map((a) => `${a.attempt}:${a.passed ? "pass" : "fail"}`).join(" ")}`);
+  for (const g of gate) console.log(`  ${g.label.slice(0, 34).padEnd(34)} ${g.view.padEnd(10)} ${g.outcome.padEnd(12)} ${(g.reason ?? "").padEnd(16)} ${g.consistency ? (g.consistency.anchor ? "anchor" : g.consistency.passed ? "consistent" : "INCONSISTENT") : ""} ${g.attempts.map((a) => `${a.attempt}:${a.passed ? "pass" : "fail"}`).join(" ")}`);
   console.log(`\nPACK MIX  ${JSON.stringify(pack.summary.mix)}`);
+  if (renderRun) {
+    const bad = renderRun.consistency.filter((c) => !c.passed);
+    const leaked = bad.filter((b) => pack.summary.gate.some((g) => g.camera === b.camera && g.view === "day" && g.outcome === "passed"));
+    check(
+      "no render that disagrees with the anchor view enters the pack (cross-view consistency)",
+      leaked.length === 0,
+      leaked.length
+        ? leaked.map((b) => `${b.camera}: ${b.failures.join("; ")}`).join(" | ")
+        : `${renderRun.consistency.length} views checked against ${renderRun.anchor.camera}${bad.length ? `; ${bad.length} demoted to design views: ${bad.map((b) => b.failures[0]).join(" | ")}` : ""}`,
+    );
+  }
+  // G5c: the BoQ, the drawings and the views agree — or the pack does not export.
+  const parity = pack.summary.parity;
+  console.log(`\n${parityTableText(parity)}`);
+  check("parity: every BoQ line is drawn and shown, every drawn cost is priced", parity.clean === true, [...parity.lines.filter((l) => l.status === "fail").map((l) => `${l.rule_id} ${l.reason}`), ...parity.elements.filter((e) => e.status === "fail").map((e) => `${e.name}: ${e.reason}`)].slice(0, 4).join("; "));
   // The decision table (what the review meeting works through) and the BoQ's biggest lines.
   const { derivePlanGraph } = await import("@/lib/plan/derive");
   const { designDecisions, layoutAssumptions } = await import("@/lib/documents/design-assumptions");
@@ -257,6 +263,9 @@ async function main() {
     // The pack's make-up: before/after pairs and 3D design views are the backbone;
     // styled renders are in where the gate passed.
     mix: pack.summary.mix,
+    parity: pack.summary.parity,
+    consistency: renderRun?.consistency ?? [],
+    cameras: renderRun?.cameras.map((c) => ({ id: c.id, label: c.label, mode: c.mode, clean: c.clean, clean_reasons: c.clean_reasons })) ?? [],
     gate_summary: {
       scene_views: scene.length,
       passed: scene.filter((g) => g.outcome === "passed").length,

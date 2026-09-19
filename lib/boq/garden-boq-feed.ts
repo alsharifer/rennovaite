@@ -193,9 +193,9 @@ export async function captureGarden(
         }
       }
       units = units.filter((u) =>
-        ["planter_box", "wall_feature", "bbq_grill", "tree"].includes(u.kind),
+        ["planter_box", "wall_feature", "bbq_grill", "tree", "shed"].includes(u.kind),
       );
-      points = points.filter((p) => p.type === "garden_light" || p.type === "boundary_light");
+      points = points.filter((p) => p.type === "garden_light" || p.type === "boundary_light" || p.type === "water_tap");
     }
   } catch {
     /* plan_fixtures absent — no units or points */

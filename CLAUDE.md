@@ -963,6 +963,95 @@ mechanism, not a workaround.
 
 **DB step**: `supabase db push` for `037` and `038`.
 
+## Pack defects found in review, fixed at the root (garden pilot G5c)
+
+The G5 draft pack went to review and came back with defects in three places: the
+geometry was mirrored, the BoQ was incomplete, and the renders were not
+client-viable. Each is fixed where it was wrong, not papered over.
+
+- **Handedness** (`HANDEDNESS`/`toSite` in `lib/client-garden/arabella-reference.ts`,
+  `scripts/garden-mirror-plan.ts`). The developer type plan depicts the unit's
+  HANDED TWIN: on site the garden entrance and path are on the RIGHT facing the
+  villa, then the rear strip, the pergola corner, the side garden on the LEFT.
+  Established from the photos, not assumed — walking in from the front passage
+  (WA0084–0086) the villa is on the LEFT and the rear wall's trees on the RIGHT
+  (WA0077, WA0082), which the type-plan frame reverses. The fix is ONE reflection
+  x → W − x applied to zones, runs, fixtures, context and openings through the
+  editing routes, with polygons and polylines reversed so winding (and a run's
+  band side) keeps its orientation. A reflection preserves area and length, so
+  the script asserts the BoQ and every take-off row are byte-identical across it
+  (they were: AED 116,942.01, 15 lines, 28 rows) and refuses to run twice.
+- **The separator wall and its gate** (migration `039`): a garden's walls are
+  `plan_context` footprints, not walls derived from room edges, so an opening
+  could never attach to one. `plan_openings` gains `kind = 'gate'`, `context_id`
+  (the wall it is in, never re-snapped), `spec` and the 037 site-reference
+  columns. Gates are drawn on the site plan and zone sheets (clear opening,
+  jambs, leaf and swing, `GT` tag), built in the 3D scene (posts + leaf), decided
+  in `GardenSitePanel` like every other existing item, and listed on the cover
+  and in the Design assumptions. The existing shed is a `landscape` fixture type
+  with a footprint on the plans and a volume in the scene.
+- **Scene = graph, proven.** The pergola was reported as "in the corner on the
+  drawings, mid-pathway in the 3D". The scene builder was reading the same
+  coordinates all along (x 23.2–26.7 in both); what misled was an oblique
+  eye-level camera down a 4 m strip, where the far rear wall itself projects to
+  the middle of the frame. `lib/scene/__tests__/scene-graph-parity.test.ts`
+  pins it: every structure's scene bounds equal its plan bounds, and the id
+  buffer at each structure's projected centre is that structure.
+- **BoQ completeness**: planting beds carry a soil-preparation and planting line
+  (GL-25, QS-to-price — they were measured for irrigation but never priced);
+  outdoor taps are a placeable `water_tap` fixture on the irrigation/drainage
+  overlay with a line under Plumbing (GL-26); the irrigation allowance is ONE
+  lump at quantity 1 priced at the band factor (`ScopeItem.rate_factor`), so the
+  BoQ reads "1 lump, AED 17,600" with the band explained, not "1.6 lump".
+- **Textured conditioning image** (`lib/scene/textures.ts`, `renderScene({ textured })`):
+  the walkthrough's procedural finish recipes (tile with grout, wood boards,
+  stone veining, plaster mottle, at their true repeat lengths) ported to the
+  server rasteriser as pure functions of world metres, plus garden families
+  (grass blades, mulch, foliage, louvre blades), world-planar UVs and a sun
+  shadow map. Paving tiles at 1200 × 600 — the size the BoQ prices. The flat line
+  model still decides the manifest (identical ids and depth, asserted) and is
+  demoted to a small inset beside a passed render; a substitution ships the
+  TEXTURED model, never the flat one.
+- **Cameras**: every zone attempts a render (`shouldAttemptRender` no longer
+  refuses an unclean camera — a pack of design views is not client-viable);
+  standpoints stay INSIDE the plot (G5's over-the-wall views looked across empty
+  neighbouring land); a structure is photographed from 1.5–2.1 × its extent back;
+  tree canopies are camera obstacles; thin strips (< 1.5 m) get a lower
+  frame-share threshold; and `aerialCamera` adds a plan-aligned bird's-eye of the
+  whole garden. The scene also carries the NEIGHBOURHOOD — a pale two-storey
+  volume beyond every plot edge that has a boundary wall — because a model
+  looking over a wall at nothing invents gardens there.
+- **One garden, not three** (`lib/scene-render/design-spec.ts`,
+  `consistency.ts`): every view shares one deterministic design specification
+  (pergola design, paving size and colour, planting palette, counter with grill
+  and sink, wall finish, kept trees), which also replaces the style's own feature
+  list — Desert Modern's "linear corten planters" and "sandstone paving" argued
+  with the design and appeared in view after view. After the renders, a
+  consistency gate compares each passed view against the ANCHOR view (the first
+  of pergola → aerial → whole-garden → biggest clean zone to pass its own gate);
+  a view that differs on pergola design, paving, planting or wall finish does not
+  enter the pack as a render. **Conditioning on the anchor IMAGE was tried and
+  rejected on measurement**: it moved the client garden from 10/13 to 4/13 passes
+  (a second image pulls composition, exactly as the G4b style-image calibration
+  found), so the shared reference is the text and the gate enforces the rest.
+- **Photo pairs**: the gate adds `house_side_matches` (a mirrored garden is not a
+  render of this one) and `visible_change` 0–3 (an "after" that changes almost
+  nothing is not a before/after; below 2 is withheld), the prompt carries the
+  design specification, and the pack takes ONE pair per zone.
+- **Parity gate** (`lib/documents/parity.ts` + `parity-load.ts`, on every pack
+  export and `GET /api/projects/[id]/parity`): every BoQ line maps to an element
+  visible on ≥ 1 drawing sheet AND in ≥ 1 render/scene view; every drawn element
+  with a cost impact maps to a line. Lines with nothing to point at
+  (preliminaries) and elements the rate book absorbs (drainage points) are
+  EXEMPT with the reason. It caught the L-bench (priced, drawn, in no view) and
+  the 6 boundary wall lights, whose fittings sat inside the wall geometry where
+  no camera could see them (they are now mounted on the garden-facing face).
+  Runs, fixtures, gates and removed zones carry their ids on the sheets so the
+  check can see them; light fittings and taps are `fixture`-category scene
+  objects, listed in a manifest but never on the faithfulness gate's list.
+
+**DB step**: `supabase db push` for `039`.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

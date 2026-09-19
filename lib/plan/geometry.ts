@@ -114,7 +114,7 @@ export interface Opening {
   /** Assigned to the nearest derived wall at build time (null if none). */
   wall_id: string | null;
   room_id: string | null;
-  type: "door" | "window" | "archway";
+  type: "door" | "window" | "archway" | "gate";
   width_mm: number;
   height_mm: number;
   sill_mm: number;
@@ -126,6 +126,14 @@ export interface Opening {
   /** true = dimensions were DEFAULTED (standard door/window), not measured. A
    *  defaulted opening must never silently read as a measured quantity. */
   derived: boolean;
+  /** G5c (039): a garden gate names the context wall it is in — garden walls are
+   *  not room edges, so it is never re-snapped to a derived wall. */
+  context_id?: string | null;
+  spec?: Record<string, unknown> | null;
+  site_reference?: boolean;
+  disposition?: string | null;
+  dims_derived?: boolean;
+  derived_note?: string | null;
 }
 
 /** Standard fallback dimensions (mm) when the source can't measure. */
@@ -136,6 +144,7 @@ export const DEFAULT_OPENING_DIMS: Record<
   door: { width_mm: 900, height_mm: 2100, sill_mm: 0 },
   window: { width_mm: 1200, height_mm: 1200, sill_mm: 900 },
   archway: { width_mm: 1200, height_mm: 2400, sill_mm: 0 },
+  gate: { width_mm: 1000, height_mm: 2000, sill_mm: 0 },
 };
 
 /** Raw persisted/provider opening (normalised space, like rooms.polygon). */
@@ -151,6 +160,12 @@ export interface RawOpening {
   along_offset?: number | null;
   source?: string | null;
   derived?: boolean | null;
+  context_id?: string | null;
+  spec?: Record<string, unknown> | null;
+  site_reference?: boolean | null;
+  disposition?: string | null;
+  dims_derived?: boolean | null;
+  derived_note?: string | null;
 }
 
 /** Where a plan's geometry came from. `user_drawn` = authored on a blank
@@ -757,7 +772,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
   const openings: Opening[] = (input.openings ?? [])
     .map((ro): Opening | null => {
       const type: Opening["type"] =
-        ro.type === "window" || ro.type === "archway" ? ro.type : "door";
+        ro.type === "window" || ro.type === "archway" || ro.type === "gate" ? ro.type : "door";
       const def = DEFAULT_OPENING_DIMS[type];
       const dimsDefaulted = ro.width_mm == null || ro.height_mm == null;
       const posNorm = isNumberPair(ro.position) ? (ro.position as [number, number]) : null;
@@ -766,7 +781,8 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
         : null;
       let wall_id: string | null = null;
       let along: number | null = ro.along_offset ?? null;
-      if (posM && walls.length > 0) {
+      // A gate in a context wall keeps that wall; only room-wall openings re-snap.
+      if (posM && walls.length > 0 && !ro.context_id) {
         let best = Infinity;
         for (const w of walls) {
           const a = w.polyline[0];
@@ -789,6 +805,10 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
         source: ro.source === "parsed" ? "parsed" : "user_drawn",
         // Defaulted dimensions are always derived — never silently "measured".
         derived: ro.derived ?? dimsDefaulted,
+        ...(ro.context_id ? { context_id: ro.context_id } : {}),
+        ...(ro.spec ? { spec: ro.spec } : {}),
+        ...(ro.site_reference ? { site_reference: true, disposition: ro.disposition ?? null } : {}),
+        ...(ro.dims_derived ? { dims_derived: true, derived_note: ro.derived_note ?? null } : {}),
       };
     })
     .filter((o): o is Opening => o !== null);

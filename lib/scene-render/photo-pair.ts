@@ -31,7 +31,8 @@ import type { GardenStyle } from "@/lib/garden-styles";
 
 import { GATE_MODEL, type ImageSource } from "./gate";
 
-export const PHOTO_PAIR_VERSION = "g5-1";
+// g5c-1: orientation + visible-change checks, the design specification in the prompt.
+export const PHOTO_PAIR_VERSION = "g5c-1";
 
 export interface PairItem {
   ref: string;
@@ -47,10 +48,13 @@ export interface PairManifest {
   zoneName: string;
   zoneSurface: string;
   items: PairItem[];
+  /** G5c: the project's design specification — what the renovation looks like. */
+  spec?: string;
 }
 
-export function pairManifest(input: { projectId: string; assetId: string; zoneName: string; zoneSurface: string; items: { noun: string; disposition: PairItem["disposition"]; replacement?: string | null }[] }): PairManifest {
+export function pairManifest(input: { projectId: string; assetId: string; zoneName: string; zoneSurface: string; items: { noun: string; disposition: PairItem["disposition"]; replacement?: string | null }[]; spec?: string }): PairManifest {
   return {
+    ...(input.spec ? { spec: input.spec } : {}),
     projectId: input.projectId,
     assetId: input.assetId,
     zoneName: input.zoneName,
@@ -63,7 +67,7 @@ export function pairManifest(input: { projectId: string; assetId: string; zoneNa
 export function pairCacheKey(m: PairManifest, styleKey: string): string {
   if (!m.projectId) throw new Error("pairCacheKey: projectId is required");
   return createHash("sha256")
-    .update(JSON.stringify([m.projectId, PHOTO_PAIR_VERSION, m.assetId, m.zoneSurface, m.items.map((i) => [i.noun, i.disposition, i.replacement ?? null]), styleKey]))
+    .update(JSON.stringify([m.projectId, PHOTO_PAIR_VERSION, m.assetId, m.zoneSurface, m.items.map((i) => [i.noun, i.disposition, i.replacement ?? null]), styleKey, m.spec ?? null]))
     .digest("hex");
 }
 
@@ -80,6 +84,10 @@ export function pairPrompt(m: PairManifest, style: GardenStyle, failures: string
     replace.length ? `Replace with new, clean versions of the same thing in exactly the same position and size: ${replace.map((i) => i.noun).join("; ")}.` : "",
     ...becomes.map((i) => `Replace ${i.noun} with ${i.replacement}, where it stands now (the new work may be larger than what it replaces).`),
     `The main ground surface of this area is ${m.zoneSurface}.`,
+    // G5c: an "after" that changes almost nothing is not a before/after. The design
+    // specification says what the renovation looks like; make it plainly visible.
+    m.spec ? `The renovation follows this design: ${m.spec} The change must be plainly visible: the new ground finish, planting and fittings of this area as designed — not a light retouch of the old garden.` : "",
+    "Keep the orientation of IMAGE 1 exactly: the house stays on the same side of the frame, nothing is mirrored or swapped left for right.",
     "Do not add any pergola, gazebo, canopy, wall, bench, counter, planter, pool, fountain, steps or building that is not already in the photo. Change nothing that is not listed.",
     `Style — ${style.name_en}: ${style.one_line} Apply the style to materials, planting and finishes only.`,
     failures.length ? `A previous attempt was rejected for: ${failures.join("; ")}. Correct exactly these, and if in doubt change less.` : "",
@@ -104,6 +112,10 @@ const PairReplySchema = z.object({
   // the reply unparseable and the gate "unavailable".
   house_unchanged: z.boolean().nullable().transform((v) => v === true),
   same_viewpoint: z.boolean().nullable().transform((v) => v === true),
+  // G5c: the house on the other side of the frame is a mirrored garden, not a render of this one.
+  house_side_matches: z.boolean().nullable().optional().transform((v) => v === true),
+  // G5c: 0 = almost nothing changed … 3 = clearly transformed. An unanswered count is 0.
+  visible_change: z.number().nullable().optional().transform((v) => (typeof v === "number" ? Math.max(0, Math.min(3, Math.round(v))) : 0)),
   // Models name the text field freely ("what", "structure", "item"): take the first
   // string. An entry that does not say whether it is major is treated as major.
   extra_structures: z
@@ -139,10 +151,15 @@ export function pairGatePrompt(m: PairManifest): string {
     "For each item: present = it is visible in IMAGE 2; roughly_in_place = where visible, it is about where it is in IMAGE 1, about the same size.",
     "house_unchanged = the house walls, windows, doors and boundary walls are the same as in IMAGE 1.",
     "same_viewpoint = IMAGE 2 is taken from the same position and direction as IMAGE 1.",
+    "house_side_matches = the house/villa is on the SAME side of the frame in IMAGE 2 as in IMAGE 1 (left stays left, right stays right) and the scene is not mirrored.",
+    "visible_change = how clearly IMAGE 2 shows a renovated garden compared with IMAGE 1: 0 almost nothing changed, 1 minor retouch, 2 clearly renovated (new ground finish, planting or fittings plainly visible), 3 transformed.",
     "extra_structures: any BUILT structure in IMAGE 2 that is in neither IMAGE 1 nor the list (a pergola, gazebo, canopy, wall, counter, bench, planter, pool, fountain, steps, building). Plants, pots, cushions, loose furniture and light fittings do not count. major = true if it would change what gets built.",
-    `Reply with ONLY one JSON object: {"observations":[{"ref":"E1","present":true,"roughly_in_place":true,"note":""}],"house_unchanged":true,"same_viewpoint":true,"extra_structures":[],"summary":"one sentence"}`,
+    `Reply with ONLY one JSON object: {"observations":[{"ref":"E1","present":true,"roughly_in_place":true,"note":""}],"house_unchanged":true,"same_viewpoint":true,"house_side_matches":true,"visible_change":2,"extra_structures":[],"summary":"one sentence"}`,
   ].join("\n");
 }
+
+/** G5c: an after image must show the renovation clearly (2 = clearly renovated). */
+export const MIN_VISIBLE_CHANGE = 2;
 
 /** The pass rule. Deterministic. */
 export function judgePair(m: PairManifest, reply: PairReply): { passed: boolean; failures: string[] } {
@@ -164,6 +181,8 @@ export function judgePair(m: PairManifest, reply: PairReply): { passed: boolean;
   }
   if (!reply.house_unchanged) failures.push("house or boundary changed");
   if (!reply.same_viewpoint) failures.push("viewpoint changed");
+  if (!reply.house_side_matches) failures.push("orientation changed — the house is not on the same side as in the photo");
+  if (reply.visible_change < MIN_VISIBLE_CHANGE) failures.push(`too little visible change (${reply.visible_change}/3) — not a before/after`);
   for (const x of reply.extra_structures) if (x.major) failures.push(`invented structure: ${x.description}`);
   return { passed: failures.length === 0, failures };
 }

@@ -21,9 +21,34 @@ async function loadOpenings(
 ): Promise<RawOpening[]> {
   try {
     const sb = supabase as unknown as SupabaseClient;
+    const COLS = "id, wall_ref, room_id, kind, width_mm, height_mm, sill_mm, position, along_offset, source, derived";
+    // G5c (039): a garden gate names its context wall and carries the site-reference fields.
+    const COLS_039 = `${COLS}, context_id, spec, site_reference, disposition, dims_derived, derived_note`;
+    const withGates = await sb.from("plan_openings").select(COLS_039).eq("plan_id", planId);
+    if (!withGates.error) {
+      return ((withGates.data ?? []) as unknown as (Record<string, unknown> & { kind: string })[]).map((o) => ({
+        id: o.id as string,
+        wall_ref: (o.wall_ref as string | null) ?? null,
+        room_id: (o.room_id as string | null) ?? null,
+        type: o.kind,
+        width_mm: (o.width_mm as number | null) ?? null,
+        height_mm: (o.height_mm as number | null) ?? null,
+        sill_mm: (o.sill_mm as number | null) ?? null,
+        position: o.position,
+        along_offset: (o.along_offset as number | null) ?? null,
+        source: (o.source as string | null) ?? null,
+        derived: (o.derived as boolean | null) ?? null,
+        context_id: (o.context_id as string | null) ?? null,
+        spec: (o.spec as Record<string, unknown> | null) ?? null,
+        site_reference: (o.site_reference as boolean | null) ?? null,
+        disposition: (o.disposition as string | null) ?? null,
+        dims_derived: (o.dims_derived as boolean | null) ?? null,
+        derived_note: (o.derived_note as string | null) ?? null,
+      }));
+    }
     const { data, error } = await sb
       .from("plan_openings")
-      .select("id, wall_ref, room_id, kind, width_mm, height_mm, sill_mm, position, along_offset, source, derived")
+      .select(COLS)
       .eq("plan_id", planId)
       .returns<
         {

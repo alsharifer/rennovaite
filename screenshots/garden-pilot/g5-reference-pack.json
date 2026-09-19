@@ -1,7 +1,7 @@
 {
   "project_id": "8d460645-9450-4072-af41-b37adf8512a0",
   "display_name": "Contemporary Villa Garden — Completed Renovation",
-  "generated_at": "2026-09-15T20:01:18.645Z",
+  "generated_at": "2026-09-17T20:45:36.563Z",
   "drawings": [
     "L-000 Cover & Sheet Index",
     "L-100 Site Plan — Garden",
@@ -43,6 +43,11 @@
       },
       {
         "kind": "garden_view",
+        "title": "Whole garden — aerial",
+        "images": 2
+      },
+      {
+        "kind": "garden_view",
         "title": "Whole garden — view 1",
         "images": 3
       },
@@ -52,14 +57,9 @@
         "images": 2
       },
       {
-        "kind": "garden_view",
-        "title": "Front garden",
-        "images": 2
-      },
-      {
         "kind": "zone",
         "title": "Z01 North planting strip",
-        "images": 2
+        "images": 3
       },
       {
         "kind": "zone",
@@ -74,12 +74,12 @@
       {
         "kind": "zone",
         "title": "Z04 Seating-bench court",
-        "images": 2
+        "images": 3
       },
       {
         "kind": "zone",
         "title": "Z05 Aluminium pergola",
-        "images": 3
+        "images": 2
       },
       {
         "kind": "zone",
@@ -89,7 +89,7 @@
       {
         "kind": "zone",
         "title": "Z07 West planting strip",
-        "images": 2
+        "images": 3
       },
       {
         "kind": "zone",
@@ -99,22 +99,22 @@
       {
         "kind": "zone",
         "title": "Z09 Front lawn — north",
-        "images": 2
+        "images": 3
       },
       {
         "kind": "zone",
         "title": "Z10 Front approach — upper",
-        "images": 2
+        "images": 3
       },
       {
         "kind": "zone",
         "title": "Z11 Front approach — lower",
-        "images": 1
+        "images": 2
       },
       {
         "kind": "zone",
         "title": "Z12 Front lawn — south",
-        "images": 2
+        "images": 3
       },
       {
         "kind": "materials",
@@ -129,15 +129,51 @@
       "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
       "label": "North planting strip",
       "view": "day",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "S1 BBQ counter with built-in grill and sink: missing (Counter with built-in grill is there and correctly placed, but no sink is visible on the benchtop.)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
       "label": "North planting strip",
       "view": "evening",
       "outcome": "substituted",
-      "attempts": []
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: Strong uplight washing the right-hand wall behind the grasses (approx. x 70-80%), where the night model shows no glow"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "render error: render upload failed (projects/8d460645-9450-4072-af41-b37adf8512a0/scene/748cdcc3cd6b8b4ae5c528fc-evening-attempt2.jpg): fetch failed"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
     },
     {
       "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
@@ -150,29 +186,28 @@
           "passed": true,
           "failures": []
         }
-      ]
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": true
+      },
+      "reason": null
     },
     {
       "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
       "label": "Pergola court paving",
       "view": "evening",
-      "outcome": "substituted",
+      "outcome": "passed",
       "attempts": [
         {
           "attempt": 1,
-          "passed": false,
-          "failures": [
-            "undesigned light: Two wall-mounted downlights with bright wash pools on the rear boundary wall above the BBQ counter, where the night model shows no glow"
-          ]
-        },
-        {
-          "attempt": 2,
-          "passed": false,
-          "failures": [
-            "undesigned light: Three vertical wall-mounted light fittings on the rear boundary wall (and one on the left wall) where the night model shows no glow"
-          ]
+          "passed": true,
+          "failures": []
         }
-      ]
+      ],
+      "consistency": null,
+      "reason": null
     },
     {
       "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
@@ -182,10 +217,23 @@
       "attempts": [
         {
           "attempt": 1,
+          "passed": false,
+          "failures": [
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
           "passed": true,
           "failures": []
         }
-      ]
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
@@ -197,22 +245,74 @@
           "attempt": 1,
           "passed": false,
           "failures": [
-            "undesigned light: In-ground uplight at the right-hand return of the arched wall feature, washing the wall and paving, where the night model shows no glow"
+            "undesigned light: Arched niche interior washed with concealed light (strip/uplight) where IMAGE 3 shows the arch completely unlit"
           ]
         },
         {
           "attempt": 2,
           "passed": false,
           "failures": [
-            "undesigned light: In-ground uplight fitting and bright wall wash on the right-hand return wall beside the raised planter, where the night model shows no glow",
-            "undesigned light: In-ground uplight and wall wash on the boundary wall immediately left of the arched feature, no corresponding designed light point"
+            "undesigned light: Uplight washing the boundary wall behind the left planting bed (agave/grasses), no corresponding glow in the night model",
+            "undesigned light: Uplight in the right-hand planter illuminating grasses and the wall face, not present in the night model"
           ]
         }
-      ]
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
     },
     {
       "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
       "label": "Seating-bench court",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "C3 neighbouring two-storey villas beyond the boundary wall: missing (No neighbouring two-storey villas beyond the wall; the skyline is replaced by open blue sky.)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+      "label": "Seating-bench court",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "invented structure: Timber-tread steps and a raised paved landing across the right foreground, absent from the design model's flat paving",
+            "undesigned light: Two wall-mounted downlights on the left/rear boundary wall, which shows no designed glow in the night model",
+            "undesigned light: Continuous concealed LED strip under the bench seat washing the bench face and paving"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    },
+    {
+      "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
+      "label": "Aluminium pergola",
       "view": "day",
       "outcome": "substituted",
       "attempts": [
@@ -220,50 +320,28 @@
           "attempt": 1,
           "passed": false,
           "failures": [
-            "invented structure: Lit stone steps descending to a lawn at the bottom right, not present in the design model"
+            "S3 BBQ counter with built-in grill and sink: missing (No BBQ counter with grill and sink visible under the pergola; that zone shows only a plain wall and paving.)"
           ]
         },
         {
           "attempt": 2,
           "passed": false,
           "failures": [
-            "invented structure: Flight of steps with adjoining low wall at far left, not present in the model"
+            "S3 BBQ counter with built-in grill and sink: missing (Only a faint dark ledge is visible under the pergola; no counter top with grill and sink is depicted.)"
           ]
         }
-      ]
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
     },
     {
-      "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
-      "label": "Seating-bench court",
+      "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
+      "label": "Aluminium pergola",
       "view": "evening",
       "outcome": "substituted",
-      "attempts": []
-    },
-    {
-      "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
-      "label": "Aluminium pergola",
-      "view": "day",
-      "outcome": "passed",
-      "attempts": [
-        {
-          "attempt": 1,
-          "passed": true,
-          "failures": []
-        }
-      ]
-    },
-    {
-      "camera": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
-      "label": "Aluminium pergola",
-      "view": "evening",
-      "outcome": "passed",
-      "attempts": [
-        {
-          "attempt": 1,
-          "passed": true,
-          "failures": []
-        }
-      ]
+      "attempts": [],
+      "consistency": null,
+      "reason": "no_passed_day"
     },
     {
       "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
@@ -273,10 +351,24 @@
       "attempts": [
         {
           "attempt": 1,
+          "passed": false,
+          "failures": [
+            "invented structure: Broad flight of paved steps occupying the right foreground/bottom-right, where the design model shows only continuous lawn",
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
           "passed": true,
           "failures": []
         }
-      ]
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
@@ -289,84 +381,259 @@
           "passed": true,
           "failures": []
         }
-      ]
+      ],
+      "consistency": null,
+      "reason": null
     },
     {
       "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
       "label": "West planting strip",
       "view": "day",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
       "label": "West planting strip",
       "view": "evening",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "C2 neighbouring two-storey villas beyond the boundary wall: missing (Beyond the wall there is only open night sky; the neighbouring two-storey villas are absent.)",
+            "undesigned light: Small staked spotlight/bollard among the planting at the left of the bed (approx x36%, y56%), where the night model shows no glow"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
     },
     {
       "camera": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
       "label": "Side courtyard",
       "view": "day",
       "outcome": "substituted",
-      "attempts": []
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "S1 BBQ counter with built-in grill and sink: missing (No BBQ counter with grill and sink appears in the top-right sliver; that area is only wall, trees and planting.)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "S1 BBQ counter with built-in grill and sink: missing (No BBQ counter with grill and sink appears in the upper-right; that area shows planting, a boundary wall and a pergola instead.)",
+            "invented structure: Large pergola/canopy with slatted vertical screen and posts beyond the villa corner"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
     },
     {
       "camera": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
       "label": "Side courtyard",
       "view": "evening",
       "outcome": "substituted",
-      "attempts": []
+      "attempts": [],
+      "consistency": null,
+      "reason": "no_passed_day"
     },
     {
       "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
       "label": "Front lawn — north",
       "view": "day",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
       "label": "Front lawn — north",
       "view": "evening",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "F2 lawn: moved or resized (The upper-right lawn area of the model is largely taken up by boundary wall in the visualisation; only a strip of turf remains.)",
+            "undesigned light: Wall-mounted downlight on the rear boundary wall with a bright lit patch above and below it; no glow at that position in the night model"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
     },
     {
       "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
       "label": "Front approach — upper",
       "view": "day",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
       "label": "Front approach — upper",
       "view": "evening",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: Warm wash lighting the outer face of the square planter box at the right edge, where the night model shows no glow"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
     },
     {
       "camera": "zone:e15d5e11-f020-477c-930e-ebd1d633535e",
       "label": "Front approach — lower",
       "view": "day",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
       "label": "Front lawn — south",
       "view": "day",
-      "outcome": "substituted",
-      "attempts": []
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
       "label": "Front lawn — south",
       "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    },
+    {
+      "camera": "garden:aerial",
+      "label": "Whole garden — aerial",
+      "view": "day",
       "outcome": "substituted",
-      "attempts": []
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "F1 lawn: moved or resized (Lawn is real turf as designed but sits in the middle of the frame and is noticeably smaller/narrower than the model's bottom-centre area.)",
+            "S1 louvred pergola: moved or resized (Louvred pergola with blades on square posts is present but shifted right and rendered much larger, filling the lower-right quadrant.)",
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "F1 lawn: moved or resized (Lawn with the same curved cut-out edge is present but shifted up-left and smaller in frame.)",
+            "S1 louvred pergola: moved or resized (Louvred pergola on square posts is correctly depicted, but it sits at mid-right rather than the bottom-right corner and at a smaller apparent size.)",
+            "invented structure: Built-in outdoor kitchen counter with built-in grill along the left paved area",
+            "viewpoint changed"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
+    },
+    {
+      "camera": "garden:aerial",
+      "label": "Whole garden — aerial",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [],
+      "consistency": null,
+      "reason": "no_passed_day"
     },
     {
       "camera": "garden:garden-1",
@@ -379,73 +646,1308 @@
           "passed": true,
           "failures": []
         }
-      ]
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "garden:garden-1",
       "label": "Whole garden — view 1",
       "view": "evening",
-      "outcome": "passed",
+      "outcome": "substituted",
       "attempts": [
         {
           "attempt": 1,
-          "passed": true,
-          "failures": []
+          "passed": false,
+          "failures": [
+            "undesigned light: Row of three wall-mounted downlights on the rear courtyard wall where IMAGE 3 shows only a single glow at that wall",
+            "undesigned light: Recessed soffit downlights under the right-hand pergola/roof overhang (far right) with no corresponding glow in IMAGE 3"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "undesigned light: Small ground/spike fitting visible among the shrubs at the bottom-right planting bed, where the night model shows no designed light point",
+            "viewpoint changed"
+          ]
         }
-      ]
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
     },
     {
       "camera": "garden:garden-2",
       "label": "Whole garden — view 2",
       "view": "day",
       "outcome": "substituted",
-      "attempts": []
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "S3 BBQ counter with built-in grill and sink: missing (Counter shows a built-in stainless grill but no visible sink on its top.)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "S1 louvred pergola: moved or resized (Louvred pergola with square posts and blade roof is present, but it sits much further left and larger (~53-100% vs 79-100%).)",
+            "S2 bar counter: moved or resized (Bar counter present under the pergola but shifted left to ~57-75% of frame and appears larger than modelled.)",
+            "viewpoint changed"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
     },
     {
       "camera": "garden:garden-2",
       "label": "Whole garden — view 2",
       "view": "evening",
       "outcome": "substituted",
-      "attempts": []
-    },
-    {
-      "camera": "garden:front-1",
-      "label": "Front garden",
-      "view": "day",
-      "outcome": "substituted",
-      "attempts": []
-    },
-    {
-      "camera": "garden:front-1",
-      "label": "Front garden",
-      "view": "evening",
-      "outcome": "substituted",
-      "attempts": []
+      "attempts": [],
+      "consistency": null,
+      "reason": "no_passed_day"
     }
   ],
   "mix": {
     "photo_pairs": 0,
-    "design_views_by_choice": 17,
-    "design_views_after_gate": 4,
-    "styled_renders": 8,
+    "design_views_by_choice": 0,
+    "design_views_after_gate": 11,
+    "styled_renders": 18,
     "missing": 0
   },
+  "parity": {
+    "clean": true,
+    "lines": [
+      {
+        "rule_id": "GL-03",
+        "description": "Garden demolition & strip-out",
+        "elements": 0,
+        "sheets": [],
+        "views": [],
+        "status": "exempt",
+        "reason": "demolition of what stood before — no existing item is modelled on this plan; project-level lump"
+      },
+      {
+        "rule_id": "GL-01",
+        "description": "Garden preliminaries & approvals",
+        "elements": 0,
+        "sheets": [],
+        "views": [],
+        "status": "exempt",
+        "reason": "project-level lump (preliminaries, approvals) — no drawn element"
+      },
+      {
+        "rule_id": "GL-02",
+        "description": "Garden mobilization & site management",
+        "elements": 0,
+        "sheets": [],
+        "views": [],
+        "status": "exempt",
+        "reason": "project-level lump (mobilisation, site management) — no drawn element"
+      },
+      {
+        "rule_id": "GL-04",
+        "description": "PCC base under paving",
+        "elements": 7,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "Front approach — lower",
+          "Front approach — upper",
+          "North planting strip",
+          "Pergola court paving",
+          "Seating-bench court",
+          "Side courtyard",
+          "Wall-feature terrace",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-05",
+        "description": "Porcelain paving installation",
+        "elements": 7,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "Front approach — lower",
+          "Front approach — upper",
+          "North planting strip",
+          "Pergola court paving",
+          "Seating-bench court",
+          "Side courtyard",
+          "Wall-feature terrace",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-06",
+        "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+        "elements": 7,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "Front approach — lower",
+          "Front approach — upper",
+          "North planting strip",
+          "Pergola court paving",
+          "Seating-bench court",
+          "Side courtyard",
+          "Wall-feature terrace",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-09",
+        "description": "Seating bench, L-shape (0.7x0.6 section)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-104"
+        ],
+        "views": [
+          "Backyard lawn",
+          "Seating-bench court",
+          "Wall-feature terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-10",
+        "description": "Planter + bench combo (0.7x0.6)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-104"
+        ],
+        "views": [
+          "Backyard lawn",
+          "Seating-bench court",
+          "Wall-feature terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-11a",
+        "description": "BBQ counter (blockwork, clad, sink+MEP+sockets)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-105"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "North planting strip",
+          "Pergola court paving",
+          "Side courtyard",
+          "Wall-feature terrace",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-11b",
+        "description": "Bar counter (blockwork, clad)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-105"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Pergola court paving",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-12",
+        "description": "Planter box, standalone (per unit ~1.8x1.8x0.45)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-402"
+        ],
+        "views": [
+          "Front approach — lower",
+          "Front approach — upper",
+          "Front lawn — north",
+          "Front lawn — south"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-13",
+        "description": "Wall feature with bench (arch, per unit ~2.5m w)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-103"
+        ],
+        "views": [
+          "Wall-feature terrace",
+          "Whole garden — view 1"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-14",
+        "description": "Motorized louvered pergola (alum, LED, coated)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "North planting strip",
+          "Pergola court paving",
+          "Wall-feature terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-19",
+        "description": "BBQ grill, built-in (client-supplied equipment class)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-105"
+        ],
+        "views": [
+          "North planting strip"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-07",
+        "description": "Artificial grass supply",
+        "elements": 3,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "Front approach — lower",
+          "Front approach — upper",
+          "Front lawn — north",
+          "Front lawn — south",
+          "Pergola court paving",
+          "Side courtyard",
+          "Wall-feature terrace",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-08",
+        "description": "Artificial grass installation (base+sand+borders)",
+        "elements": 3,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "Front approach — lower",
+          "Front approach — upper",
+          "Front lawn — north",
+          "Front lawn — south",
+          "Pergola court paving",
+          "Side courtyard",
+          "Wall-feature terrace",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-25",
+        "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+        "elements": 2,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "North planting strip",
+          "Pergola court paving",
+          "West planting strip"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-15",
+        "description": "Irrigation system (drip, pump, valves)",
+        "elements": 3,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "North planting strip",
+          "Pergola court paving",
+          "Seating-bench court",
+          "Wall-feature terrace",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-16",
+        "description": "Garden lighting cabling",
+        "elements": 28,
+        "sheets": [
+          "L-401"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "Front approach — lower",
+          "Front approach — upper",
+          "Front lawn — north",
+          "Front lawn — south",
+          "North planting strip",
+          "Pergola court paving",
+          "Seating-bench court",
+          "Side courtyard",
+          "Wall-feature terrace",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-17",
+        "description": "Garden light fittings (blended LUMO class)",
+        "elements": 28,
+        "sheets": [
+          "L-401"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "Front approach — lower",
+          "Front approach — upper",
+          "Front lawn — north",
+          "Front lawn — south",
+          "North planting strip",
+          "Pergola court paving",
+          "Seating-bench court",
+          "Side courtyard",
+          "Wall-feature terrace",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-18",
+        "description": "Boundary wall lights (supply+install)",
+        "elements": 9,
+        "sheets": [
+          "L-401"
+        ],
+        "views": [
+          "Aluminium pergola",
+          "Backyard lawn",
+          "Pergola court paving",
+          "Seating-bench court",
+          "West planting strip",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      }
+    ],
+    "elements": [
+      {
+        "id": "a0a733df-87a1-4f46-894e-14a8ae98aa30",
+        "name": "Aluminium pergola",
+        "kind": "structure",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06",
+          "GL-14"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+        "name": "Backyard lawn",
+        "kind": "artificial_grass",
+        "lines": [
+          "GL-07",
+          "GL-08"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "e15d5e11-f020-477c-930e-ebd1d633535e",
+        "name": "Front approach — lower",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "d0ff704d-bc71-43a9-99bd-92be290ab810",
+        "name": "Front approach — upper",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "35920676-03f1-4feb-947b-b95ce97381cd",
+        "name": "Front lawn — north",
+        "kind": "artificial_grass",
+        "lines": [
+          "GL-07",
+          "GL-08"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "64cf731c-3000-468e-9f91-25f2756f0c54",
+        "name": "Front lawn — south",
+        "kind": "artificial_grass",
+        "lines": [
+          "GL-07",
+          "GL-08"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "9a496cc5-ef64-487e-bdfd-86fe718bc014",
+        "name": "North planting strip",
+        "kind": "planting_bed",
+        "lines": [
+          "GL-25",
+          "GL-15"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "48f355d1-f925-4b63-90dc-969d0cab42a2",
+        "name": "Pergola court paving",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+        "name": "Seating-bench court",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+        "name": "Side courtyard",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "20e35059-522e-4626-a900-b35fae80a2f0",
+        "name": "Wall-feature terrace",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
+        "name": "West planting strip",
+        "kind": "planting_bed",
+        "lines": [
+          "GL-25",
+          "GL-15"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "2d7de189-b8b4-4204-8457-94c355c8506f",
+        "name": "Counter run",
+        "kind": "counter_run",
+        "lines": [
+          "GL-11a"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "188627a4-a7cf-4373-b3d7-ed3f71dc04a4",
+        "name": "Counter run",
+        "kind": "counter_run",
+        "lines": [
+          "GL-11b"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "de965212-d3a4-4e68-822a-820ad01ea243",
+        "name": "Bench run",
+        "kind": "bench_run",
+        "lines": [
+          "GL-09"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "2fbf1369-5f69-43da-8645-c1b1a379db59",
+        "name": "Planter run",
+        "kind": "planter_run",
+        "lines": [
+          "GL-10",
+          "GL-15"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "130d3e94-e76b-41a0-8ecc-80bdd0218d6c",
+        "name": "wall feature",
+        "kind": "wall_feature",
+        "lines": [
+          "GL-13"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "be53c4f9-18f6-4eaf-bbf3-ec701f32934d",
+        "name": "planter box",
+        "kind": "planter_box",
+        "lines": [
+          "GL-12"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "5439aa87-f498-4c21-8d6b-fbefaef2b253",
+        "name": "bbq grill",
+        "kind": "bbq_grill",
+        "lines": [
+          "GL-19"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "632193ad-d2ed-49e8-b852-98e0b5facfc3",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "7e449404-1dc6-410b-b0af-c9060bbb2172",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "eab2b136-42a8-44b7-99c7-106bea2d2bac",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "4ae48e0f-2b99-4a50-b575-19d1314713da",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "059a650f-688a-4f65-a24c-3fe255675d0f",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "523969e6-0bce-4cda-bbcd-9ac88f3e0bfc",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "e730d870-c1e3-42f1-acb4-c920003d0e3d",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "3066f699-1f9e-4808-99f7-40b6f1c80736",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "217586f9-6bdc-47fe-bcff-be8d88d23135",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "4227cb5f-7518-458a-bc44-9b6f2e3cb224",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "9edbdf25-8e42-4ec7-b307-dc526aebd3a9",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "513ec4a6-3727-4e54-94c0-4a564b51c832",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "1dd6ae62-d1ed-4f34-b140-fcdf84dd43b7",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "ab74cd5f-d5d7-424d-b99a-a14ae788bfc8",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "5f0b114e-f5db-4c0c-bacd-561dd974e6e9",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "e7e64b58-f816-461b-b85c-4ef95926b73e",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "078b749f-5327-44ba-91cd-4f0ce3c481f6",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "da4f2b39-2b06-4491-ba33-f4a4a2ea5c44",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "bfc17afd-ce7a-49d4-aab9-5d65cd89bbb3",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "fce4d5b8-46e0-47d1-9234-1776b7b48cb0",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "eadce9c5-91d4-481e-8767-91bb00f1b778",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "a9d53cf9-4754-412a-b658-1841554a2fb6",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "098522f6-dc39-4e53-b230-40b12eb3c8ff",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "4bb7650d-ef03-4e87-b621-6126a5171eef",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "4bdc32a0-03e2-47df-8f9c-e5214ecf52df",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "87bb6e96-b8c3-4ae5-977d-aa1bc93f3859",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "762c86e5-bbac-4c41-905d-ba0b01e11121",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "e037f3f8-1732-4589-a048-8f1cb23d88d1",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "dccfded7-d711-4f28-ac80-ef0487bc7670",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "106f085c-1c68-45b1-8409-b52cc9c830c3",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "7b426d73-779e-4071-ae9d-d55cc7ebc5b5",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "da893ee7-3332-4a5b-9cd3-3fceb7534b44",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "cd85015b-de16-4f31-924d-23e6f786bf2e",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "0ff078c2-406b-49cb-b33d-e8745668a32e",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "f2b379c1-1a76-494e-a0e2-4e7ee70e3770",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "a5bdacf7-83db-44e1-a24a-a31be34c5578",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "12f8f61b-1447-466d-a69f-b911b65d5835",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      }
+    ]
+  },
+  "consistency": [
+    {
+      "render_id": "f55befc1-c53c-4c6d-8300-c0c2a34a3282",
+      "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "ae91dadf-2b0e-42bd-9aba-5a218068c32e",
+      "camera": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
+      "passed": true,
+      "failures": [],
+      "status": "anchor"
+    },
+    {
+      "render_id": "07df4af4-56c9-4654-93e5-2142979f4de9",
+      "camera": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "71aa1a35-f3ad-4000-a68b-d203611e8e4c",
+      "camera": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "46176661-d0dc-4a0d-98f4-2224d4a411df",
+      "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "edd86645-b21a-4282-8a7b-92b40aa24552",
+      "camera": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "c32d2a5b-28da-460a-bbf8-25054de05207",
+      "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "56a6874f-cdaa-4026-acce-8b80c92595b5",
+      "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "3258bb32-2dec-499e-8db5-ddc8f08088f4",
+      "camera": "zone:e15d5e11-f020-477c-930e-ebd1d633535e",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "decc63e5-fee4-466c-920d-04ff6e9fa58f",
+      "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "bd632e32-8e4f-4fa4-a6ee-61b542f10e18",
+      "camera": "garden:garden-1",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    }
+  ],
   "gate_summary": {
     "scene_views": 29,
-    "passed": 8,
-    "substituted_by_3d_view": 21,
+    "passed": 18,
+    "substituted_by_3d_view": 11,
     "missing": 0
   },
   "pilot_events_tagged": 1,
   "results": [
     "PASS  display name set through the project route — Contemporary Villa Garden — Completed Renovation",
-    "PASS  render pack and drawing set export as PDFs — {\"pack\":5867556,\"drawings\":4580103}",
+    "PASS  render pack and drawing set export as PDFs — {\"pack\":10372419,\"drawings\":4584814}",
     "PASS  the display name is what the documents print",
     "PASS  no \"ground truth\" on any page or in the PDF metadata — 45 documents",
     "PASS  no house number on any page",
     "PASS  zero contractor-identity leakage across drawings and pack — 2 identity tokens × 45 documents",
     "PASS  no draft watermark — a built garden, not a proposal",
     "PASS  no price or rate in the render pack",
-    "PASS  no design-assumptions page (nothing proposed on a completed garden)"
+    "PASS  no design-assumptions page (nothing proposed on a completed garden)",
+    "PASS  no render that disagrees with the anchor view enters the pack — 11 views checked",
+    "PASS  parity: every BoQ line is drawn and shown, every drawn cost is priced"
   ]
 }

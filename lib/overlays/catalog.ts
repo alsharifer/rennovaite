@@ -56,6 +56,9 @@ export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
   wall_feature: { label: "Wall feature", code: "WF", glyph: "water_drop", boqDescription: "Wall feature with seating bench — blockwork, waterproofed and clad", unitRateAed: null },
   bbq_grill: { label: "BBQ grill", code: "BQ", glyph: "outdoor_grill", boqDescription: "Built-in BBQ grill (client-supplied equipment)", unitRateAed: null },
   tree: { label: "Tree", code: "TR", glyph: "park", boqDescription: "Tree supply and planting", unitRateAed: null },
+  // --- G5c ---
+  water_tap: { label: "Outdoor water tap", code: "WT", glyph: "water_drop", boqDescription: "Outdoor water tap (hose bib) with isolation valve", unitRateAed: null },
+  shed: { label: "Garden shed", code: "SH", glyph: "warehouse", boqDescription: "Garden shed", unitRateAed: null },
 };
 
 export function pomiSectionFor(type: FixtureType): string {

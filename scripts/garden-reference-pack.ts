@@ -22,6 +22,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { parityTableText } from "../lib/documents/parity.ts";
+
 const ROOT = "C:/dev/rennovaite";
 const args = process.argv.slice(2);
 const PORT = args.find((a) => /^\d{2,5}$/.test(a)) ?? "3098";
@@ -65,23 +67,10 @@ async function main() {
   check("display name set through the project route", named.body.success === true, DISPLAY_NAME);
 
   // --- 2. renders ------------------------------------------------------------------------
+  let renderRun: Awaited<ReturnType<typeof import("./lib/garden-render-run.ts").renderAllViews>> | null = null;
   if (RENDER) {
-    const cams = (await getJson<{ cameras: { id: string; label: string; lit: boolean }[]; error?: string }>(`/api/render/scene?project_id=${PROJECT}`)).body;
-    if (!cams.cameras) throw new Error(`cameras: ${cams.error}`);
-    const run = async (jobs: { id: string; view: "day" | "evening" }[]) => {
-      const queue = [...jobs];
-      await Promise.all(
-        [0, 1, 2].map(async () => {
-          for (let j = queue.shift(); j; j = queue.shift()) {
-            const t0 = Date.now();
-            const r = await send("POST", "/api/render/scene", { project_id: PROJECT, camera_id: j.id, view: j.view });
-            console.log(`  ${j.view.padEnd(7)} ${j.id.slice(0, 44).padEnd(44)} ${r.body.outcome ?? `ERROR ${r.body.error}`}${r.body.cached ? " (cached)" : ""} ${Math.round((Date.now() - t0) / 1000)}s`);
-          }
-        }),
-      );
-    };
-    await run(cams.cameras.map((c) => ({ id: c.id, view: "day" as const })));
-    await run(cams.cameras.filter((c) => c.lit).map((c) => ({ id: c.id, view: "evening" as const })));
+    const { renderAllViews } = await import("./lib/garden-render-run.ts");
+    renderRun = await renderAllViews({ projectId: PROJECT, get: getJson, post: (path, body) => send("POST", path, body) });
   }
 
   // --- 3. documents ----------------------------------------------------------------------
@@ -96,7 +85,7 @@ async function main() {
   check("render pack and drawing set export as PDFs", [packPdf, drawingsPdf].every((d) => d.status === 200 && d.bytes > 10_000), JSON.stringify({ pack: packPdf.bytes, drawings: drawingsPdf.bytes }));
 
   // --- 4. what is printed ---------------------------------------------------------------
-  const summary = (await getJson<{ gate: { label: string; view: string; outcome: string; attempts: { attempt: number; passed: boolean; failures: string[] }[] }[]; pages: unknown[]; missing_images: string[]; mix: Record<string, number> }>(`/api/projects/${PROJECT}/render-pack?format=json`)).body;
+  const summary = (await getJson<{ gate: { camera: string; label: string; view: string; outcome: string; reason?: string | null; consistency?: { passed: boolean; failures: string[]; anchor: boolean } | null; attempts: { attempt: number; passed: boolean; failures: string[] }[] }[]; pages: unknown[]; missing_images: string[]; mix: Record<string, number>; parity: import("@/lib/documents/parity").ParityResult }>(`/api/projects/${PROJECT}/render-pack?format=json`)).body;
   const packPages = (await getJson<{ pages: string[] }>(`/api/projects/${PROJECT}/render-pack?format=pages`)).body.pages ?? [];
   const { generateDrawingSet } = await import("@/lib/drawings/export");
   const set = await generateDrawingSet(PROJECT);
@@ -128,8 +117,21 @@ async function main() {
   const gate = summary.gate;
   const scene = gate.filter((g) => g.view !== "photo_pair");
   console.log("\nFAITHFULNESS GATE");
-  for (const g of gate) console.log(`  ${g.label.slice(0, 34).padEnd(34)} ${g.view.padEnd(10)} ${g.outcome.padEnd(12)} ${g.attempts.map((a) => `${a.attempt}:${a.passed ? "pass" : "fail"}`).join(" ")}`);
+  for (const g of gate) console.log(`  ${g.label.slice(0, 34).padEnd(34)} ${g.view.padEnd(10)} ${g.outcome.padEnd(12)} ${(g.reason ?? "").padEnd(16)} ${g.consistency ? (g.consistency.anchor ? "anchor" : g.consistency.passed ? "consistent" : "INCONSISTENT") : ""} ${g.attempts.map((a) => `${a.attempt}:${a.passed ? "pass" : "fail"}`).join(" ")}`);
   console.log(`\nPACK MIX  ${JSON.stringify(summary.mix)}`);
+  if (renderRun) {
+    const bad = renderRun.consistency.filter((c) => !c.passed);
+    const leaked = bad.filter((b) => summary.gate.some((g) => g.camera === b.camera && g.view === "day" && g.outcome === "passed"));
+    check(
+      "no render that disagrees with the anchor view enters the pack",
+      leaked.length === 0,
+      leaked.length
+        ? leaked.map((b) => `${b.camera}: ${b.failures.join("; ")}`).join(" | ")
+        : `${renderRun.consistency.length} views checked${bad.length ? `; ${bad.length} demoted to design views: ${bad.map((b) => b.failures[0]).join(" | ")}` : ""}`,
+    );
+  }
+  console.log(`\n${parityTableText(summary.parity)}`);
+  check("parity: every BoQ line is drawn and shown, every drawn cost is priced", summary.parity.clean === true, [...summary.parity.lines.filter((l) => l.status === "fail").map((l) => `${l.rule_id} ${l.reason}`), ...summary.parity.elements.filter((e) => e.status === "fail").map((e) => `${e.name}: ${e.reason}`)].slice(0, 4).join("; "));
 
   // Pilot events this script caused are a reference pack, not the pilot.
   const { data: evs } = await db.from("pilot_events").select("id, detail").eq("project_id", PROJECT).gte("recorded_at", started);
@@ -146,6 +148,8 @@ async function main() {
     pack: { pages: summary.pages, missing_images: summary.missing_images },
     gate,
     mix: summary.mix,
+    parity: summary.parity,
+    consistency: renderRun?.consistency ?? [],
     gate_summary: {
       scene_views: scene.length,
       passed: scene.filter((g) => g.outcome === "passed").length,

@@ -84,7 +84,7 @@ export interface GardenRun extends SiteRefFields {
 /** A discrete built item that is neither a zone nor a run. */
 export interface GardenUnit extends SiteRefFields {
   id: string;
-  kind: "planter_box" | "wall_feature" | "bbq_grill" | "tree";
+  kind: "planter_box" | "wall_feature" | "bbq_grill" | "tree" | "shed";
   name?: string;
 }
 
@@ -175,6 +175,9 @@ const SECTION: Record<string, PomiSection> = {
   "garden.stepping_path": "Hardscape & Structures",
   "garden.string_lights": "Electrical & Lighting",
   "garden.tree": "Soft Landscaping",
+  "garden.planting_bed": "Soft Landscaping",
+  "garden.water_tap": "Plumbing",
+  "garden.shed": "Hardscape & Structures",
 };
 
 /**
@@ -189,6 +192,11 @@ export const UNPRICED_GARDEN_ITEMS: Record<string, { label: string; unit: string
   "garden.stepping_path": { label: "Stepping-stone path, slabs set in lawn (no reference rate — QS to price)", unit: "lm" },
   "garden.string_lights": { label: "Festoon string lights (no reference rate — QS to price)", unit: "lm" },
   "garden.tree": { label: "Tree supply and planting (no reference rate — QS to price)", unit: "no" },
+  // G5c: a planting bed was measured (it sized irrigation) but carried no line of
+  // its own — soil preparation and planting are real work with no reference rate.
+  "garden.planting_bed": { label: "Planting beds — soil preparation and planting (no reference rate — QS to price)", unit: "m2" },
+  "garden.water_tap": { label: "Outdoor water tap (hose bib) with isolation valve (no reference rate — QS to price)", unit: "no" },
+  "garden.shed": { label: "Garden shed, supply and install (no reference rate — QS to price)", unit: "no" },
 };
 
 /** The source label on a line with no reference rate. Never the market-reference label. */
@@ -283,7 +291,8 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   // here, before any rule sees it; a removed one counts only toward demolition.
   const zones = allZones.filter(isNewWork);
   const runs = allRuns.filter(isNewWork);
-  const units = allUnits.filter((u) => isNewWork(u) && u.kind !== "tree");
+  const units = allUnits.filter((u) => isNewWork(u) && u.kind !== "tree" && u.kind !== "shed");
+  const newSheds = allUnits.filter((u) => isNewWork(u) && u.kind === "shed");
   const newTrees = allUnits.filter((u) => isNewWork(u) && u.kind === "tree");
   const points = allPoints.filter(isNewWork);
 
@@ -309,7 +318,7 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   }
 
   // Derived geometry, per element: a line measured off any derived element says so.
-  const derivedIds = new Set([...zones, ...runs, ...newTrees].filter((x) => x.dims_derived).map((x) => x.id));
+  const derivedIds = new Set([...zones, ...runs, ...newTrees, ...newSheds].filter((x) => x.dims_derived).map((x) => x.id));
   const derivedExtra = (ids: readonly string[]): Partial<ScopeItem> =>
     ids.some((id) => derivedIds.has(id)) ? { qty_derived: true } : {};
   const withDerivedNote = (measurement: string, ids: readonly string[]) =>
@@ -497,13 +506,16 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   const irrigationDriver = round2(plantingAreaM2 + planterLm);
   if (irrigationDriver > 0) {
     const band = IRRIGATION_BANDS.find((b) => irrigationDriver <= b.max_driver)!;
+    // G5c: ONE allowance line — quantity 1, the band carried by the rate factor.
+    const reference = rate("garden.irrigation");
     items.push(
       item(
         "GL-15",
         "garden.irrigation",
-        band.factor,
-        `allowance, ${band.label} garden — planting ${plantingAreaM2} m² + planter ${planterLm} lm. Sized by band against one comparable project, NOT measured; confirm on site.`,
+        1,
+        `allowance, ${band.label} band = ${band.factor} × the reference irrigation lump (AED ${reference.toLocaleString("en-US")}) = AED ${Math.round(reference * band.factor).toLocaleString("en-US")}; band set by planting ${plantingAreaM2} m² + planter ${planterLm} lm (small ≤ 4, comparable ≤ 16, large above). Sized against one comparable project, NOT measured; confirm on site.`,
         {
+          rate_factor: band.factor,
           // Both flags, and they say different things. The rate was paid on a
           // real job (site_assessment: confirm it against THIS garden). The size
           // band is inferred from a single comparable (qty_derived).
@@ -556,6 +568,9 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   unpriced("GL-22", "garden.stepping_path", runRows("stepping_path"), "Σ stepping-stone path length = {q} lm");
   unpriced("GL-23", "garden.string_lights", runRows("string_light_run"), "Σ string light run length = {q} lm");
   unpriced("GL-24", "garden.tree", newTrees.map((t) => ({ id: t.id, qty: 1 })), "{q} tree(s) to supply and plant");
+  unpriced("GL-25", "garden.planting_bed", zonesOf("planting_bed"), "Σ planting bed area = {q} m² (soil preparation, planting; plant schedule to follow)");
+  unpriced("GL-26", "garden.water_tap", points.filter((p) => p.type === "water_tap").map((p) => ({ id: p.id, qty: 1 })), "{q} outdoor tap point(s) on the plan");
+  unpriced("GL-27", "garden.shed", newSheds.map((u) => ({ id: u.id, qty: 1 })), "{q} garden shed(s)");
 
   // --- Client-supplied equipment (GL-19) -------------------------------------
   const grills = unitCount("bbq_grill");
@@ -598,7 +613,8 @@ export function priceGardenTakeoff(items: readonly ScopeItem[]): GardenPricedLin
     if (UNPRICED_GARDEN_ITEMS[i.item_key]) {
       return { ...i, rate_aed: 0, total_aed: 0, vendor_or_source: UNPRICED_SOURCE_LABEL };
     }
-    const r = rate(i.item_key);
+    // A banded allowance (G5c) is one lump at the reference rate × its band factor.
+    const r = i.rate_factor == null ? rate(i.item_key) : Math.round(rate(i.item_key) * i.rate_factor * 100) / 100;
     return {
       ...i,
       rate_aed: r,

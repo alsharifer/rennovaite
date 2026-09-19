@@ -58,8 +58,8 @@ export interface GardenCamera extends Camera {
    */
   clean: boolean;
   cleanReasons: string[];
-  /** "eye" (standing in the zone) or "elevated" (up and back along the corridor). */
-  mode: "eye" | "elevated";
+  /** "eye" (standing in the zone), "elevated" (up and back along the corridor) or "aerial" (the whole garden from above, G5c). */
+  mode: "eye" | "elevated" | "aerial";
 }
 
 export interface ManifestItem {
@@ -115,21 +115,29 @@ function obstacles(graph: PlanGraph, fixtures: readonly GardenFixture[]): Point[
   }
   for (const u of fixtures.filter((f) => f.layer === "landscape")) {
     const p = toMetres(graph, u.position);
-    const w = ((typeof u.spec?.width_mm === "number" ? u.spec.width_mm : 1000) as number) / 2000 + 0.4;
+    // G5c: a tree is its canopy — a lens inside the leaves sees nothing else.
+    const canopy = u.type === "tree" && typeof u.spec?.canopy_mm === "number" ? (u.spec.canopy_mm as number) / 2000 + 0.3 : 0;
+    const w = Math.max(canopy, ((typeof u.spec?.width_mm === "number" ? u.spec.width_mm : 1000) as number) / 2000 + 0.4);
     out.push([[p[0] - w, p[1] - w], [p[0] + w, p[1] - w], [p[0] + w, p[1] + w], [p[0] - w, p[1] + w]]);
   }
   return out;
 }
 
-/** G5: an elevated camera may also stand up to 3 m beyond the plot line, clear of any footprint. */
+/**
+ * An elevated camera stands above the garden itself: anywhere inside the plot
+ * clear of buildings and walls (above a bed or a lawn is fine — the lens is up
+ * high), never inside a structure. G5c: never beyond the plot line — the G5
+ * over-the-wall standpoints looked across empty neighbouring land and the render
+ * model filled it with invented gardens.
+ */
 function elevatedStandpoint(graph: PlanGraph, blocked: Point[][], p: Point): boolean {
   if (openGround(graph, blocked, p)) return true;
   const plot = graph.meta.plot;
   if (!plot) return false;
   const [ox, oy] = plot.origin_m;
-  const outsidePlot = p[0] < ox || p[1] < oy || p[0] > ox + plot.width_m || p[1] > oy + plot.depth_m;
-  const withinReach = p[0] > ox - 3 && p[1] > oy - 3 && p[0] < ox + plot.width_m + 3 && p[1] < oy + plot.depth_m + 3;
-  return outsidePlot && withinReach && clearOfBuildings(graph, p);
+  const inPlot = p[0] > ox + 0.4 && p[1] > oy + 0.4 && p[0] < ox + plot.width_m - 0.4 && p[1] < oy + plot.depth_m - 0.4;
+  const inStructure = gardenZones(graph).some((z) => z.type === "structure" && inside(p, z.polygon));
+  return inPlot && !inStructure && clearOfBuildings(graph, p);
 }
 
 /** An elevated lens next to a two-storey wall is a close-up of the wall: keep 2.2 m off buildings. */
@@ -208,21 +216,22 @@ interface ViewScore {
  * nothing solid may sit against the lens, a horizon must show, and no single
  * structure may fill the frame.
  */
-function cleanCheck(scene: Scene, res: RenderResult, focus: Set<number>, structures: Set<number>, blockers: Set<number>): string[] {
+function cleanCheck(scene: Scene, res: RenderResult, focus: Set<number>, structures: Set<number>, blockers: Set<number>, minFocus = 0.1): string[] {
   const n = res.ids.length;
-  const solid = new Set(scene.objects.filter((o) => o.category === "structure" || o.category === "context" || o.category === "planting").filter((o) => o.key !== "ground").map((o) => o.id));
+  const neighbours = objectIdsWhere(scene, (o) => o.key.startsWith("neighbour:"));
+  const solid = new Set(scene.objects.filter((o) => o.category === "structure" || o.category === "context" || o.category === "planting").filter((o) => o.key !== "ground" && !o.key.startsWith("neighbour:")).map((o) => o.id));
   let focusPx = 0, sky = 0, near = 0, block = 0;
   const perStructure = new Map<number, number>();
   for (let i = 0; i < n; i++) {
     const id = res.ids[i]!;
-    if (id === 0) sky++;
+    if (id === 0 || neighbours.has(id)) sky++;
     if (focus.has(id)) focusPx++;
     if (blockers.has(id)) block++;
     if (solid.has(id) && res.depth[i]! < 2.2) near++;
     if (structures.has(id)) perStructure.set(id, (perStructure.get(id) ?? 0) + 1);
   }
   const reasons: string[] = [];
-  if (focusPx / n < 0.1) reasons.push(`zone only ${Math.round((focusPx / n) * 100)}% of frame`);
+  if (focusPx / n < minFocus) reasons.push(`zone only ${Math.round((focusPx / n) * 100)}% of frame`);
   if (near / n > 0.06) reasons.push(`solid mass within 2.2 m of the lens (${Math.round((near / n) * 100)}% of frame)`);
   if (sky / n < 0.03) reasons.push("no horizon in frame");
   if (block / n > 0.45) reasons.push(`house or walls fill ${Math.round((block / n) * 100)}% of frame`);
@@ -231,8 +240,9 @@ function cleanCheck(scene: Scene, res: RenderResult, focus: Set<number>, structu
   return reasons;
 }
 
-function rateView(scene: Scene, cam: Camera, focus: Set<number>, structures: Set<number>, blockers: Set<number>): ViewScore {
+function rateView(scene: Scene, cam: Camera, focus: Set<number>, structures: Set<number>, blockers: Set<number>, minFocus = 0.1): ViewScore {
   const res = renderScene(scene, cam, PROBE_W, PROBE_H, { supersample: 1, outlines: false });
+  const neighbours = objectIdsWhere(scene, (o) => o.key.startsWith("neighbour:"));
   const focusShare = coverage(res, focus);
   let structShare = 0;
   if (structures.size) structShare = coverage(res, structures);
@@ -240,7 +250,7 @@ function rateView(scene: Scene, cam: Camera, focus: Set<number>, structures: Set
   let block = 0;
   const perObject = new Map<number, number>();
   for (const id of res.ids) {
-    if (id === 0) sky++;
+    if (id === 0 || neighbours.has(id)) sky++;
     else if (blockers.has(id)) block++;
     if (id !== 0) perObject.set(id, (perObject.get(id) ?? 0) + 1);
   }
@@ -261,7 +271,7 @@ function rateView(scene: Scene, cam: Camera, focus: Set<number>, structures: Set
     Math.max(0, block / n - 0.35) * 1.5 -
     Math.max(0, sky / n - 0.45) -
     (sky / n < 0.06 ? 0.5 : 0);
-  const reasons = cleanCheck(scene, res, focus, structures, blockers);
+  const reasons = cleanCheck(scene, res, focus, structures, blockers, minFocus);
   return { score, clean: reasons.length === 0, reasons };
 }
 
@@ -289,6 +299,8 @@ function elevatedCandidates(
   focus: Set<number>,
   structures: Set<number>,
   blockers: Set<number>,
+  minFocus = 0.1,
+  prefer = 7,
 ): Candidate[] {
   const out: Candidate[] = [];
   // The corridor the TARGET sits in decides the axis a view looks along — at an
@@ -318,13 +330,13 @@ function elevatedCandidates(
     }
   }
   // Stage 1: a quarter-size probe of the 60 spots nearest a ~7 m stand-back.
-  spots.sort((a, b) => Math.abs(a.d - 7) - Math.abs(b.d - 7) || a.p[0] - b.p[0] || a.p[1] - b.p[1]);
+  spots.sort((a, b) => Math.abs(a.d - prefer) - Math.abs(b.d - prefer) || a.p[0] - b.p[0] || a.p[1] - b.p[1]);
   const screened = spots
     .slice(0, 60)
     .map(({ p }) => {
       const cam: Camera = { pos: [p[0], level + 4.8, p[1]], target: [target[0], targetY, target[1]], fovDeg: ELEVATED_FOV };
       const res = renderScene(scene, cam, PROBE_W / 2, PROBE_H / 2, { supersample: 1, outlines: false });
-      const reasons = cleanCheck(scene, res, focus, structures, blockers);
+      const reasons = cleanCheck(scene, res, focus, structures, blockers, minFocus);
       return { p, screen: coverage(res, focus) - reasons.length * 0.1 };
     })
     .sort((a, b) => b.screen - a.screen || a.p[0] - b.p[0] || a.p[1] - b.p[1]);
@@ -334,7 +346,7 @@ function elevatedCandidates(
     {
       for (const h of [4.2, 5.6]) {
         const cam: Camera = { pos: [x, level + h, y], target: [target[0], targetY, target[1]], fovDeg: ELEVATED_FOV };
-        const r = rateView(scene, cam, focus, structures, blockers);
+        const r = rateView(scene, cam, focus, structures, blockers, minFocus);
         // In a corridor, up-and-back is the view we want: a small bias toward it —
         // for a clean view only; between two unclean views the one that shows more wins.
         out.push({ cam, score: r.score + (r.clean ? 0.1 : 0), clean: r.clean, reasons: r.reasons, mode: "elevated" });
@@ -351,17 +363,26 @@ function zoneCamera(scene: Scene, graph: PlanGraph, blocked: Point[][], zone: Ro
   const level = (zone.level_mm ?? 0) / 1000;
   const focus = objectIdsWhere(scene, (o) => o.zoneId === zone.id);
   const structures = objectIdsWhere(scene, (o) => o.category === "structure" && o.zoneId === zone.id);
-  const blockers = objectIdsWhere(scene, (o) => o.category === "context" && o.noun !== "ground");
+  const blockers = objectIdsWhere(scene, (o) => o.category === "context" && o.noun !== "ground" && !o.key.startsWith("neighbour:"));
+  // G5c: a strip under 1.5 m wide (a bed, a path) is a small part of any honest view of it.
+  const minFocus = Math.min(b.maxX - b.minX, b.maxY - b.minY) < 1.5 ? 0.035 : 0.1;
   // Aim near eye level so the horizon stays in frame.
   const targetY = level + (zone.type === "structure" ? 1.4 : structures.size ? 0.9 : 0.8);
 
+  // G5c: a structure is photographed from BACK, not from under it. A lens 3 m from
+  // a pergola makes the roof the whole frame, and the render model answers by
+  // pulling back and reinventing the view (the gate then fails it for exactly that).
+  const dists = zone.type === "structure"
+    ? [extent * 1.5 + 2, extent * 2.1 + 3, extent * 1.1 + 1.5]
+    : [extent * 0.9 + 1.5, extent * 1.3 + 2.5, extent * 0.6 + 1, extent * 0.45, extent * 0.3];
+  const standBack = zone.type === "structure" ? 9.5 : 7;
   let best = null as Candidate | null;
   let cramped = 0;
   const crampedSpots: { p: Point; eye: number }[] = [];
   const heights = [1.65, 2.6];
   for (const eye of heights) {
     // Large zones are best seen from within them; small ones from beside them.
-    for (const dist of [extent * 0.9 + 1.5, extent * 1.3 + 2.5, extent * 0.6 + 1, extent * 0.45, extent * 0.3]) {
+    for (const dist of dists) {
       for (let k = 0; k < 16; k++) {
         const a = (k / 16) * Math.PI * 2;
         const p: Point = [c[0] + Math.cos(a) * dist, c[1] + Math.sin(a) * dist];
@@ -373,7 +394,7 @@ function zoneCamera(scene: Scene, graph: PlanGraph, blocked: Point[][], zone: Ro
           continue;
         }
         const cam: Camera = { pos: [p[0], level + eye, p[1]], target: [c[0], targetY, c[1]], fovDeg: FOV };
-        const r = rateView(scene, cam, focus, structures, blockers);
+        const r = rateView(scene, cam, focus, structures, blockers, minFocus);
         const cand: Candidate = { cam, score: r.score - (eye > 2 ? 0.05 : 0), clean: r.clean, reasons: r.reasons, mode: "eye" }; // prefer eye level
         if (better(cand, best)) best = cand;
       }
@@ -387,7 +408,7 @@ function zoneCamera(scene: Scene, graph: PlanGraph, blocked: Point[][], zone: Ro
     // target loses the horizon, and a frame with no sky is one the model reframes.
     const elevatedTargetY = level + 1.5;
     let bestElevated = null as Candidate | null;
-    for (const cand of elevatedCandidates(scene, graph, blocked, c, level, elevatedTargetY, focus, structures, blockers)) {
+    for (const cand of elevatedCandidates(scene, graph, blocked, c, level, elevatedTargetY, focus, structures, blockers, minFocus, standBack)) {
       if (better(cand, bestElevated)) bestElevated = cand;
     }
     // In a narrow zone a clean up-and-back view wins outright over eye level.
@@ -398,7 +419,7 @@ function zoneCamera(scene: Scene, graph: PlanGraph, blocked: Point[][], zone: Ro
   if (!best || !best.clean) {
     for (const { p, eye } of crampedSpots) {
       const cam: Camera = { pos: [p[0], level + eye, p[1]], target: [c[0], targetY, c[1]], fovDeg: FOV };
-      const r = rateView(scene, cam, focus, structures, blockers);
+      const r = rateView(scene, cam, focus, structures, blockers, minFocus);
       const cand: Candidate = { cam, score: r.score, clean: false, reasons: r.clean ? ["cramped standpoint (under 6 m of clear width)"] : ["cramped standpoint (under 6 m of clear width)", ...r.reasons], mode: "eye" };
       if (!best || (!best.clean && cand.score > best.score + 1e-9)) best = cand;
     }
@@ -407,7 +428,7 @@ function zoneCamera(scene: Scene, graph: PlanGraph, blocked: Point[][], zone: Ro
   if (!best) {
     const p: Point = [c[0] + extent + 2, c[1] + extent + 2];
     const cam: Camera = { pos: [p[0], level + 4, p[1]], target: [c[0], level, c[1]], fovDeg: FOV };
-    const r = rateView(scene, cam, focus, structures, blockers);
+    const r = rateView(scene, cam, focus, structures, blockers, minFocus);
     best = { cam, score: 0, clean: false, reasons: ["no open ground to stand on", ...r.reasons], mode: "elevated" };
   }
   return { ...best.cam, id: `zone:${zone.id}`, label: zone.name_en, zoneId: zone.id, lit: lightsByZone.has(zone.id) || zone.type === "structure", clean: best.clean, cleanReasons: best.reasons, mode: best.mode };
@@ -445,7 +466,7 @@ function gardenCameras(scene: Scene, graph: PlanGraph, blocked: Point[][]): Gard
   const out: GardenCamera[] = [];
   const groups = clusters(graph);
   const names = ["garden", "front"];
-  const blockers = objectIdsWhere(scene, (o) => o.category === "context" && o.noun !== "ground");
+  const blockers = objectIdsWhere(scene, (o) => o.category === "context" && o.noun !== "ground" && !o.key.startsWith("neighbour:"));
   groups.slice(0, 2).forEach((group, gi) => {
     const ids = new Set(group.map((r) => r.id));
     const focus = objectIdsWhere(scene, (o) => o.zoneId !== null && ids.has(o.zoneId));
@@ -526,10 +547,46 @@ function gardenCameras(scene: Scene, graph: PlanGraph, blocked: Point[][]): Gard
   return out;
 }
 
+/**
+ * G5c: the whole garden from above — the strongest page in a professional pack.
+ * A three-quarter bird's-eye from high over the street side (or a street
+ * corner), aimed at the garden's centre, chosen by how much of the garden it
+ * shows past the villa's roof.
+ */
+export function aerialCamera(scene: Scene, graph: PlanGraph): GardenCamera | null {
+  const zones = gardenZones(graph);
+  if (zones.length === 0) return null;
+  const plot = graph.meta.plot;
+  const b = plot
+    ? { minX: plot.origin_m[0], minY: plot.origin_m[1], maxX: plot.origin_m[0] + plot.width_m, maxY: plot.origin_m[1] + plot.depth_m }
+    : bboxOf(zones.flatMap((z) => z.polygon));
+  // Aim at the GARDEN's centre (the zones), not the plot's: on an L-shaped garden
+  // round a villa the plot centre is the villa's roof.
+  const zb = bboxOf(zones.flatMap((z) => z.polygon));
+  const c: Point = [(zb.minX + zb.maxX) / 2, (zb.minY + zb.maxY) / 2];
+  const span = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  const focus = objectIdsWhere(scene, (o) => o.zoneId !== null);
+  const buildings = objectIdsWhere(scene, (o) => o.category === "context" && o.noun !== "ground" && o.noun !== "boundary wall" && !o.key.startsWith("neighbour:"));
+  let best: { cam: Camera; score: number } | null = null;
+  // From each side of the plot, square to it (a plan-aligned bird's-eye reads like
+  // the site plan), at two heights; the view that shows most garden past the house wins.
+  for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as [number, number][]) {
+    for (const h of [0.75, 0.95]) {
+      const back = (dx !== 0 ? b.maxX - b.minX : b.maxY - b.minY) * 0.5 + 2;
+      const cam: Camera = { pos: [c[0] + dx * back, span * h, c[1] + dy * back], target: [c[0] - dx * 1.5, 0, c[1] - dy * 1.5], fovDeg: 58 };
+      const res = renderScene(scene, cam, PROBE_W, PROBE_H, { supersample: 1, outlines: false });
+      const score = coverage(res, focus) * 2 - coverage(res, buildings) * 0.6;
+      if (!best || score > best.score + 1e-9) best = { cam, score };
+    }
+  }
+  return best ? { ...best.cam, id: "garden:aerial", label: "Whole garden — aerial", zoneId: null, lit: true, clean: true, cleanReasons: [], mode: "aerial" } : null;
+}
+
 export function chooseCameras(scene: Scene, graph: PlanGraph, fixtures: readonly GardenFixture[], litZoneIds: ReadonlySet<string>): GardenCamera[] {
   const lit = new Set(litZoneIds);
   const blocked = obstacles(graph, fixtures);
-  return [...gardenZones(graph).map((z) => zoneCamera(scene, graph, blocked, z, lit)), ...gardenCameras(scene, graph, blocked)];
+  const aerial = aerialCamera(scene, graph);
+  return [...gardenZones(graph).map((z) => zoneCamera(scene, graph, blocked, z, lit)), ...(aerial ? [aerial] : []), ...gardenCameras(scene, graph, blocked)];
 }
 
 /** What a camera sees, from a full-resolution id buffer. */
@@ -554,7 +611,8 @@ export function buildManifest(projectId: string, cameraId: string, scene: Scene,
     const s = stats.get(o.id);
     if (!s || o.key === "ground") continue;
     const share = s.n / total;
-    const min = o.category === "structure" ? 0.002 : o.category === "planting" ? 0.01 : 0.008;
+    // G5c: a fitting is listed as soon as a handful of pixels show it (parity), never gated.
+    const min = o.category === "fixture" ? 0.00001 : o.category === "structure" ? 0.002 : o.category === "planting" ? 0.01 : 0.008;
     if (share < min) continue;
     const pct = (v: number, d: number) => Math.round((v / d) * 100);
     items.push({ key: o.key, noun: o.noun, label: o.label, category: o.category, zoneId: o.zoneId, share: Math.round(share * 10000) / 10000, box: [pct(s.x0, res.width), pct(s.y0, res.height), pct(s.x1 + 1, res.width), pct(s.y1 + 1, res.height)] });

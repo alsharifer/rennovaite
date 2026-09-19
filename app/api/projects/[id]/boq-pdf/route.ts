@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { renderBoqPdf, type BoqPdfInput } from "@/lib/documents/boq-pdf";
 import { loadPackReadiness, readinessMessage } from "@/lib/documents/pack-readiness";
+import { loadParity } from "@/lib/documents/parity-load";
 import { loadDocumentProject } from "@/lib/documents/project-name";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -37,6 +38,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const json = new URL(request.url).searchParams.get("format") === "json";
     if (!readiness.ready && !json) {
       return NextResponse.json({ error: readinessMessage(readiness), code: "pack_not_ready", readiness }, { status: 409 });
+    }
+    // G5c: a BoQ PDF is a pack export — it leaves only when parity holds.
+    const parity = json ? null : await loadParity(sb, projectId);
+    if (parity && !parity.clean) {
+      const fails = [...parity.lines.filter((l) => l.status === "fail").map((l) => `${l.rule_id}: ${l.reason}`), ...parity.elements.filter((e) => e.status === "fail").map((e) => `${e.name}: ${e.reason}`)];
+      return NextResponse.json({ error: `Parity failed: ${fails.slice(0, 6).join("; ")}`, code: "parity_failed", parity }, { status: 409 });
     }
     const { pdf, pages } = await renderBoqPdf({
       projectName: project.name,

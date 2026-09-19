@@ -124,6 +124,13 @@ export type ScopeItem = {
    * and a QS needs to see both.
    */
   qty_derived?: boolean;
+  /**
+   * G5c: an ALLOWANCE banded as a multiple of a reference rate. The line is one
+   * lump (quantity 1) priced at rate × factor, so the BoQ reads "1 lump, AED
+   * 17,600" rather than "1.6 lump" — a fractional lump is not a thing a client
+   * can picture. The band and its factor are stated in the measurement.
+   */
+  rate_factor?: number;
 };
 
 // --- Output --------------------------------------------------------------------

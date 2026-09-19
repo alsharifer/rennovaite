@@ -19,6 +19,8 @@ const BodySchema = z.object({
   project_id: z.string().uuid(),
   camera_id: z.string().min(3).max(120),
   view: z.enum(["day", "evening"]).default("day"),
+  /** G5c: a passed render of this project the view should match in materials and design. */
+  anchor_render_id: z.string().uuid().nullish(),
 });
 
 export async function GET(request: NextRequest) {
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
-  const { project_id, camera_id, view } = parsed.data;
+  const { project_id, camera_id, view, anchor_render_id } = parsed.data;
   try {
     const ctx = await loadGardenSceneContext(project_id);
     const cam = ctx.cameras.find((c) => c.id === camera_id);
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (view === "evening" && !cam.lit) {
       return NextResponse.json({ error: "This view has no designed lighting, so it has no evening render.", code: "no_lighting" }, { status: 422 });
     }
-    const result = await renderGardenCamera(ctx, camera_id, view);
+    const result = await renderGardenCamera(ctx, camera_id, view, { anchorRenderId: anchor_render_id ?? null });
     return NextResponse.json({ ...result, prompt: result.outcome === "passed" ? "Plan-faithful render" : "3D design view (render withheld)" });
   } catch (err) {
     console.error("[api/render/scene] error", err);

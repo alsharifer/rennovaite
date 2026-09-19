@@ -87,18 +87,18 @@ describe("site reference through the take-off", () => {
     return {
       zones: p.rooms.map((r) => ({ id: r.id, name: r.name_en, kind: r.room_type, area_m2: r.area_m2, dims_derived: true, ...(r.site_reference ? { site_reference: true, disposition: r.disposition } : {}) })),
       runs: p.elements.map((e) => ({ id: e.id, kind: e.kind, length_m: 5, name: e.spec.name as string, dims_derived: true, site_reference: true, disposition: e.disposition })),
-      units: p.fixtures.map((f) => ({ id: f.id, kind: "tree" as const, site_reference: true, disposition: f.disposition })),
+      units: p.fixtures.map((f) => ({ id: f.id, kind: f.type as "tree" | "shed", site_reference: true, disposition: f.disposition })),
     };
   };
 
   it("with everything existing KEPT, prices only the design zones and demolishes nothing existing", () => {
-    const all = Object.fromEntries(["gazebo", "path", "sink-counter", "planter-rear", "planter-side", "lights-corner", "lights-across", "tree-1", "tree-2", "palm", "tree-3", "tree-4", "tree-5"].map((k) => [k, "keep" as const]));
+    const all = Object.fromEntries(["gazebo", "path", "sink-counter", "planter-rear", "planter-side", "lights-corner", "lights-across", "tree-1", "tree-2", "palm", "tree-3", "tree-4", "tree-5", "shed"].map((k) => [k, "keep" as const]));
     const built = buildGardenSections(capture(all));
     const keys = built.sections.flatMap((s) => s.lines.map((l) => l.rule_id));
     expect(keys).not.toContain("GL-14"); // no new pergola for a kept gazebo
     expect(keys).not.toContain("GL-22"); // no stepping path
     expect(built.removals).toEqual([]);
-    expect(built.kept).toHaveLength(13);
+    expect(built.kept).toHaveLength(14);
     expect(built.undecided).toEqual([]);
     // The deck strip has no reference rate: visible at 0, never silent.
     const deck = built.sections.flatMap((s) => s.lines).find((l) => l.rule_id === "GL-20")!;

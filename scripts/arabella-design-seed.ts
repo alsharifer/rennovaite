@@ -21,7 +21,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import { PLOT, PROJECT_NAME, SOURCE_NOTE } from "../lib/client-garden/arabella-reference.ts";
+import { PLOT, PROJECT_NAME, SOURCE_NOTE, toSite, toSitePath } from "../lib/client-garden/arabella-reference.ts";
 
 const ROOT = "C:/dev/rennovaite";
 const PORT = process.argv.slice(2).find((a) => /^\d+$/.test(a)) ?? "3098";
@@ -33,7 +33,11 @@ for (const line of readFileSync(`${ROOT}/.env.local`, "utf8").split(/\r?\n/)) {
 }
 
 type Pt = [number, number];
-const n = (p: Pt): Pt => [Math.round((p[0] / PLOT.width_m) * 1e6) / 1e6, Math.round((p[1] / PLOT.width_m) * 1e6) / 1e6];
+// Geometry below is written in the type-plan frame (the dimension set's); it is
+// stored in the SITE frame — the handed twin, see HANDEDNESS in arabella-reference.
+const norm = (p: Pt): Pt => [Math.round((p[0] / PLOT.width_m) * 1e6) / 1e6, Math.round((p[1] / PLOT.width_m) * 1e6) / 1e6];
+const n = (p: Pt): Pt => norm(toSite(p));
+const np = (path: Pt[]): Pt[] => toSitePath(path).map(norm);
 const rect = (x0: number, y0: number, x1: number, y1: number): Pt[] => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 const area = (poly: Pt[]) => Math.round((Math.abs(poly.reduce((s, p, i) => s + p[0] * poly[(i + 1) % poly.length]![1] - poly[(i + 1) % poly.length]![0] * p[1], 0)) / 2) * 100) / 100;
 const inside = (p: Pt, poly: Pt[]) => {
@@ -124,7 +128,7 @@ async function main() {
       name_ar: null,
       room_type: z.type,
       area_m2: area(z.poly),
-      polygon: z.poly.map(n),
+      polygon: np(z.poly),
       unroofed: true,
       // Every zone of the proposal stands on the derived reference layout.
       dims_derived: true,
@@ -149,7 +153,7 @@ async function main() {
   const garage = ctx!.find((c) => c.name === "Garage / drive block")!;
   await call("PATCH", "/api/plan-context", {
     id: garage.id,
-    polygon: ([[0, 4.3], [6.3, 4.3], [6.3, 10.5], [2.2, 10.5], [2.2, 6.5], [0, 6.5]] as Pt[]).map(n),
+    polygon: np([[0, 4.3], [6.3, 4.3], [6.3, 10.5], [2.2, 10.5], [2.2, 6.5], [0, 6.5]]),
     note: `${garage.note}; reshaped around the front garden (${FRONT_ASSUMPTION})`,
     dims_derived: true,
   });
@@ -177,14 +181,14 @@ async function main() {
   const zoneAt = (p: Pt) => ZONES.find((z) => inside(p, z.poly)) ?? null;
   const bbqLine: Pt[] = [[23.45, 0.7], [26.45, 0.7]];
   await call("POST", "/api/plan-elements", {
-    plan_id: planId, room_id: idOf.get("gazebo"), kind: "counter_run", polyline: bbqLine.map(n), variant: "bbq",
+    plan_id: planId, room_id: idOf.get("gazebo"), kind: "counter_run", polyline: np(bbqLine), variant: "bbq",
     height_mm: 900, width_mm: 900, derived: true, dims_derived: true, derived_note: SOURCE_NOTE,
     spec: { name: "BBQ counter (under the pergola)", top_slab_mm: 100, source: "design brief 3.0 lm; section 900 × 900 as the reference project's BBQ counter" },
   });
   logFriction("elements", "The counter run's default section (600 wide) is not a BBQ counter's; the 900 × 900 section had to be entered explicitly.");
   const benchLine: Pt[] = [[20.9, 1.0], [20.9, 3.0], [22.9, 3.0]];
   await call("POST", "/api/plan-elements", {
-    plan_id: planId, room_id: idOf.get("court"), kind: "bench_run", polyline: benchLine.map(n),
+    plan_id: planId, room_id: idOf.get("court"), kind: "bench_run", polyline: np(benchLine),
     height_mm: 450, width_mm: 500, derived: true, dims_derived: true, derived_note: SOURCE_NOTE,
     spec: { name: "L-seating bench (pergola court)", source: "design brief 4.0 lm L; section assumed 450 high × 500 deep" },
   });
@@ -192,7 +196,7 @@ async function main() {
   // --- trees: keep (re-zoned where the layout moved under them) -----------------------------
   for (const t of (fx ?? []).filter((f) => f.type === "tree")) {
     const p = t.position as Pt;
-    const z = zoneAt([p[0] * PLOT.width_m, p[1] * PLOT.width_m]);
+    const z = zoneAt(toSite([p[0] * PLOT.width_m, p[1] * PLOT.width_m]));
     await call("POST", "/api/plan-fixtures", { id: t.id, project_id: projectId, type: "tree", position: p, room_id: z ? idOf.get(z.key) : null, disposition: "keep" });
   }
 

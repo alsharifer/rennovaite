@@ -37,6 +37,9 @@ export const PLUMBING_TYPES = [
   // G1 garden pilot. Distinct from `floor_drain`: an external surface gully on
   // a stormwater or soakaway run, not a wet-room trap.
   "drainage_point",
+  // G5c. An outdoor hose bib on the garden's water supply — a garden carries one
+  // or two, and a BoQ without them has quietly assumed the client has none.
+  "water_tap",
 ] as const;
 
 /**
@@ -52,6 +55,8 @@ export const LANDSCAPE_TYPES = [
   // G5: a tree. Existing ones are placed from site photos as site reference
   // (keep / remove / replace); a NEW tree is design scope with no reference rate.
   "tree",
+  // G5c: an existing garden shed placed from photos (keep / remove / replace).
+  "shed",
 ] as const;
 
 export type ElectricalType = (typeof ELECTRICAL_TYPES)[number];
@@ -67,6 +72,7 @@ export const GARDEN_TYPES: readonly FixtureType[] = [
   "garden_light",
   "boundary_light",
   "drainage_point",
+  "water_tap",
 ];
 
 export function layerOf(type: FixtureType): OverlayLayer {

@@ -342,10 +342,25 @@ function caption(x: number, y: number, view: string, r: PackRender): string {
     );
   }
   const why = r.note ? `: ${r.note}` : "";
+  // G5c: wrapped at word boundaries and ended with an ellipsis when it runs past
+  // three lines — never cut mid-word.
+  const lines = captionLines(`No render passed the checks, so the textured design model is shown${why}`, 105, 3);
   return (
-    text(x, y, `${view.toUpperCase()} — 3D DESIGN VIEW`, { size: 2.6, fill: TERRACOTTA, spacing: "0.06em" }) +
-    text(x, y + 4, `No render passed the faithfulness check, so the design model is shown${why}`.slice(0, 150), { size: 2.2, fill: TERRACOTTA })
+    text(x, y, `${view.toUpperCase()} — 3D DESIGN VIEW (TEXTURED MODEL)`, { size: 2.6, fill: TERRACOTTA, spacing: "0.06em" }) +
+    lines.map((l, i) => text(x, y + 4 + i * 3.1, l, { size: 2.2, fill: TERRACOTTA })).join("")
   );
+}
+
+/** Word-wrapped caption lines, capped, the last one ending in an ellipsis when text was dropped. */
+export function captionLines(s: string, maxChars: number, maxLines: number): string[] {
+  const lines = wrap(s, maxChars);
+  if (lines.length <= maxLines) return lines;
+  const kept = lines.slice(0, maxLines);
+  const last = kept[maxLines - 1]!;
+  const words = last.split(" ");
+  while (words.length > 1 && words.join(" ").length + 2 > maxChars) words.pop();
+  kept[maxLines - 1] = `${words.join(" ").replace(/[,;:—-]+$/, "")} …`;
+  return kept;
 }
 
 // --- Pages -------------------------------------------------------------------------

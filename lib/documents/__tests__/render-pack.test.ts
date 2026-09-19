@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRenderPack, containFit, wrap } from "@/lib/documents/render-pack";
+import { buildRenderPack, captionLines, containFit, wrap } from "@/lib/documents/render-pack";
 import { buildGardenSheets, LIGHTING_SOURCE_STATEMENT } from "@/lib/drawings/garden-sheets";
 import { getGardenStyle } from "@/lib/garden-styles";
 import { villa94PlanRecords } from "@/lib/ground-truth/villa94-garden-geometry";
@@ -123,7 +123,8 @@ describe("render pack — the faithfulness gate", () => {
     const { pages, zones } = buildRenderPack({ ...base, renders: sub });
     const svg = pages[2 + zones.findIndex((z) => z.room.id === lawn)]!.svg;
     expect(svg).toContain("DAY — 3D DESIGN VIEW");
-    expect(svg).toContain("No render passed the faithfulness check");
+    expect(svg).toContain("No render passed the checks, so the textured design model is shown: F1 lawn: missing");
+    expect(svg).toContain("DAY — 3D DESIGN VIEW (TEXTURED MODEL)");
     const passed = pages[2 + zones.findIndex((z) => z.room.id === "z-pergola")]!.svg;
     expect(passed).toContain("DAY — RENDER · FAITHFULNESS CHECK PASSED");
   });
@@ -171,6 +172,15 @@ describe("render pack — existing items the design takes out", () => {
 });
 
 describe("pack primitives", () => {
+  it("wraps a long caption at word boundaries and ends it with an ellipsis, never mid-word (G5c)", () => {
+    const long = "No render passed the checks, so the textured design model is shown: " + "the lawn reads as paving along the whole strip and the far wall is missing ".repeat(4);
+    const lines = captionLines(long, 60, 3);
+    expect(lines).toHaveLength(3);
+    expect(lines[2]!.endsWith(" …")).toBe(true);
+    for (const l of lines) expect(l.length).toBeLessThanOrEqual(62);
+    expect(long.includes(lines[2]!.replace(" …", ""))).toBe(true);
+  });
+
   it("contain-fits a photo inside its slot without distortion", () => {
     const fit = containFit(1024, 768, { x: 10, y: 10, w: 200, h: 100 });
     expect(fit.h).toBe(100);

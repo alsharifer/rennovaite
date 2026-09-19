@@ -102,7 +102,7 @@ export function computePilotMetrics(
   const boqs = sorted.filter((e) => e.kind === "boq_generated");
   const full = boqs.find((e) => e.detail?.full === true) ?? null;
   // Script-seeded edits (Step 1 layout, a seeded design proposal) are not the designer drawing.
-  const edits = sorted.filter((e) => (e.kind === "plan_saved" || e.kind === "design_edit") && e.detail?.stage !== "reference_layout" && e.detail?.stage !== "design_seed");
+  const edits = sorted.filter((e) => (e.kind === "plan_saved" || e.kind === "design_edit") && e.detail?.stage !== "reference_layout" && e.detail?.stage !== "design_seed" && e.detail?.stage !== "geometry_fix");
   const lastEditBeforeFull = full ? [...edits].reverse().find((e) => e.recorded_at <= full.recorded_at) : edits[edits.length - 1];
   const session = lastEditBeforeFull ? edits.filter((e) => e.recorded_at <= lastEditBeforeFull.recorded_at) : [];
   let active = 0;

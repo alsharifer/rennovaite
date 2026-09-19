@@ -31,6 +31,8 @@ import { encodePng } from "@/lib/scene/png";
 import { depthImage, renderScene } from "@/lib/scene/raster";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+import { runConsistencyGate } from "./consistency";
+import { designSpec, specHash } from "./design-spec";
 import { runFaithfulnessGate, type GateVerdict, type ImageSource } from "./gate";
 import {
   dayPrompt,
@@ -55,6 +57,9 @@ export interface GardenSceneContext {
   cameras: GardenCamera[];
   style: GardenStyle;
   sceneHash: string;
+  /** G5c: the design specification every view of this garden shares, and its hash. */
+  spec: string;
+  specHash: string;
 }
 
 export interface AttemptRecord {
@@ -83,8 +88,18 @@ export interface SceneGateRecord {
   camera_reasons?: string[];
   camera: GardenCamera;
   manifest: CameraManifest;
+  /** The conditioning image (G5c: textured) — also the image a substitution ships. */
   scene_url: string;
+  /** G5c: the flat line model, used only as a small inset beside a passed render. */
+  flat_url?: string;
   depth_url: string | null;
+  scene_hash?: string;
+  spec_hash?: string;
+  /** G5c: the passed render this view was conditioned to match, if any. */
+  anchor_id?: string | null;
+  /** G5c: cross-view consistency against the pack's anchor render. A passed render
+   *  that fails it does not enter a pack as a render. */
+  consistency?: { anchor_id: string; passed: boolean; failures: string[]; status: "ran" | "unavailable"; checked_at: string };
   attempts: AttemptRecord[];
   gate_model: string;
 }
@@ -143,7 +158,8 @@ export async function loadGardenSceneContext(projectId: string): Promise<GardenS
     CAMERA_MEMO.set(memoKey, cameras);
     if (CAMERA_MEMO.size > 32) CAMERA_MEMO.delete(CAMERA_MEMO.keys().next().value!);
   }
-  return { projectId, graph, fixtures, variants, scene, cameras, style, sceneHash: hash };
+  const spec = designSpec(graph, fixtures, variants, style);
+  return { projectId, graph, fixtures, variants, scene, cameras, style, sceneHash: hash, spec, specHash: specHash(spec) };
 }
 
 /** G5: shared with the photo-pair runner. */
@@ -202,15 +218,39 @@ function lightsLine(lights: ZoneLight[] | undefined, structure: boolean): string
   return parts.join(", ");
 }
 
+/** The latest PASSED day render for a camera on this scene, spec and pipeline (G5c: any anchor). */
+async function latestPassedDay(ctx: GardenSceneContext, cameraId: string): Promise<{ id: string; image_url: string } | null> {
+  const { data } = await db()
+    .from("renders")
+    .select("id, image_url, gate")
+    .eq("project_id", ctx.projectId)
+    .eq("camera", cameraId)
+    .eq("view", "day")
+    .eq("mode", "scene")
+    .eq("status", "succeeded")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const row = ((data ?? []) as { id: string; image_url: string; gate: SceneGateRecord | null }[]).find(
+    (r) => r.gate?.outcome === "passed" && r.gate.pipeline === SCENE_PIPELINE_VERSION && r.gate.scene_hash === ctx.sceneHash && r.gate.spec_hash === ctx.specHash,
+  );
+  return row ? { id: row.id, image_url: row.image_url } : null;
+}
+
 /**
  * Render one camera/view through the ladder and persist the result. Returns
  * the cached result when this project already has one for the same key.
  */
-export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: string, view: SceneView): Promise<SceneRenderResult> {
+export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: string, view: SceneView, opts: { anchorRenderId?: string | null } = {}): Promise<SceneRenderResult> {
   const cam = ctx.cameras.find((c) => c.id === cameraId);
   if (!cam) throw new Error(`Unknown camera '${cameraId}' for this plan.`);
   const sb = db();
-  const cacheKey = sceneCacheKey({ projectId: ctx.projectId, cameraId, view, sceneHash: ctx.sceneHash, styleKey: ctx.style.key, camera: cam });
+  // G5c: an anchor must be a PASSED render of this project, from another camera.
+  let anchor: { id: string; bytes: Uint8Array } | null = null;
+  if (view === "day" && opts.anchorRenderId) {
+    const { data: a } = await sb.from("renders").select("id, project_id, camera, image_url, gate").eq("id", opts.anchorRenderId).maybeSingle<{ id: string; project_id: string; camera: string; image_url: string; gate: SceneGateRecord | null }>();
+    if (a && a.project_id === ctx.projectId && a.camera !== cameraId && a.gate?.outcome === "passed") anchor = { id: a.id, bytes: await fetchBytes(a.image_url) };
+  }
+  const cacheKey = sceneCacheKey({ projectId: ctx.projectId, cameraId, view, sceneHash: ctx.sceneHash, styleKey: ctx.style.key, camera: cam, specHash: ctx.specHash, anchorId: anchor?.id ?? null });
 
   const { data: cached } = await sb
     .from("renders")
@@ -225,34 +265,30 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
   // passed yet is not a verdict: once a passed day exists it is re-rendered.
   let staleEvening = false;
   if (cached?.gate && view === "evening" && cached.gate.attempts.length === 0) {
-    const dayKey = sceneCacheKey({ projectId: ctx.projectId, cameraId, view: "day", sceneHash: ctx.sceneHash, styleKey: ctx.style.key, camera: cam });
-    const { data: passedDay } = await sb
-      .from("renders")
-      .select("id, gate")
-      .eq("project_id", ctx.projectId)
-      .eq("cache_key", dayKey)
-      .eq("status", "succeeded")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<{ id: string; gate: SceneGateRecord | null }>();
-    staleEvening = isStaleEveningSubstitution(view, cached.gate.attempts, passedDay?.gate?.outcome === "passed");
+    const passedDay = await latestPassedDay(ctx, cameraId);
+    staleEvening = isStaleEveningSubstitution(view, cached.gate.attempts, passedDay !== null);
   }
   if (cached?.image_url && cached.gate && !staleEvening) {
     return { render_id: cached.id, image_url: cached.image_url, view, camera_id: cameraId, outcome: cached.gate.outcome, design_view_reason: cached.gate.design_view_reason ?? null, cached: true, attempts: cached.gate.attempts };
   }
 
   const base = `projects/${ctx.projectId}/scene/${cacheKey.slice(0, 24)}`;
-  const day = renderScene(ctx.scene, cam, RENDER_W, RENDER_H, { lighting: "day" });
-  const manifest = buildManifest(ctx.projectId, cameraId, ctx.scene, day);
+  // The flat line model decides WHAT the camera sees (ids → manifest) and is kept
+  // as a small inset; the TEXTURED model (same ids, same camera) is what the
+  // restyle is conditioned on and what the gate compares against (G5c).
+  const flat = renderScene(ctx.scene, cam, RENDER_W, RENDER_H, { lighting: "day" });
+  const manifest = buildManifest(ctx.projectId, cameraId, ctx.scene, flat);
+  const flatUrl = await uploadRenderBytes(`${base}-day-flat.png`, encodePng(flat.rgb, flat.width, flat.height, 3), "image/png");
+  const day = renderScene(ctx.scene, cam, RENDER_W, RENDER_H, { lighting: "day", textured: true });
   const dayPng = encodePng(day.rgb, day.width, day.height, 3);
   const dayUrl = await uploadRenderBytes(`${base}-day-model.png`, dayPng, "image/png");
   let designPng = dayPng;
   let designUrl = dayUrl;
   let depthUrl: string | null = null;
   if (view === "day") {
-    depthUrl = await uploadRenderBytes(`${base}-depth.png`, encodePng(depthImage(day), day.width, day.height, 1), "image/png");
+    depthUrl = await uploadRenderBytes(`${base}-depth.png`, encodePng(depthImage(flat), flat.width, flat.height, 1), "image/png");
   } else {
-    const night = renderScene(ctx.scene, cam, RENDER_W, RENDER_H, { lighting: "evening" });
+    const night = renderScene(ctx.scene, cam, RENDER_W, RENDER_H, { lighting: "evening", textured: true });
     designPng = encodePng(night.rgb, night.width, night.height, 3);
     designUrl = await uploadRenderBytes(`${base}-evening-model.png`, designPng, "image/png");
   }
@@ -263,17 +299,8 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
   // What an evening edits: the passed day render for this camera, if there is one.
   let dayRenderBytes: Uint8Array | null = null;
   if (view === "evening") {
-    const dayKey = sceneCacheKey({ projectId: ctx.projectId, cameraId, view: "day", sceneHash: ctx.sceneHash, styleKey: ctx.style.key, camera: cam });
-    const { data: dayRow } = await sb
-      .from("renders")
-      .select("image_url, gate")
-      .eq("project_id", ctx.projectId)
-      .eq("cache_key", dayKey)
-      .eq("status", "succeeded")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<{ image_url: string; gate: SceneGateRecord | null }>();
-    if (dayRow?.gate?.outcome === "passed") dayRenderBytes = await fetchBytes(dayRow.image_url);
+    const dayRow = await latestPassedDay(ctx, cameraId);
+    if (dayRow) dayRenderBytes = await fetchBytes(dayRow.image_url);
   }
 
   const zoneLights = cam.zoneId
@@ -294,10 +321,12 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
     let prompt: string;
     let images: string[];
     if (view === "day") {
-      prompt = attempt === 1 ? dayPrompt(manifest, ctx.style) : tightenedDayPrompt(manifest, ctx.style, failures);
+      const promptOpts = { spec: ctx.spec, anchor: anchor !== null };
+      prompt = attempt === 1 ? dayPrompt(manifest, ctx.style, promptOpts) : tightenedDayPrompt(manifest, ctx.style, failures, promptOpts);
       // Style by TEXT only: a style image pulls composition and surfaces
-      // towards itself (calibration: reframed views, lawns paved).
-      images = [sceneUri];
+      // towards itself (calibration: reframed views, lawns paved). G5c: the one
+      // image besides the model is a passed render of THIS garden, for materials.
+      images = anchor ? [sceneUri, `data:image/jpeg;base64,${Buffer.from(anchor.bytes).toString("base64")}`] : [sceneUri];
     } else {
       const lights = lightsLine(zoneLights, zone?.type === "structure");
       prompt = eveningScenePrompt(manifest, lights) + (attempt === 2 && failures.length ? ` A previous attempt was rejected for: ${failures.join("; ")}. Correct exactly these.` : "");
@@ -338,7 +367,7 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
   if (!final) final = { url: designUrl, outcome: "substituted", prompt: "(raw 3D design view)", model: "scene-raster" };
 
   const designViewReason: DesignViewReason | null =
-    final.outcome === "passed" ? null : cam.clean === false ? "no_clean_camera" : view === "evening" && dayRenderBytes === null ? "no_passed_day" : "gate_failed";
+    final.outcome === "passed" ? null : view === "evening" && dayRenderBytes === null ? "no_passed_day" : attempts.length === 0 && cam.clean === false ? "no_clean_camera" : "gate_failed";
   const gate: SceneGateRecord = {
     pipeline: SCENE_PIPELINE_VERSION,
     outcome: final.outcome,
@@ -347,7 +376,11 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
     camera: cam,
     manifest,
     scene_url: dayUrl,
+    flat_url: flatUrl,
     depth_url: depthUrl,
+    scene_hash: ctx.sceneHash,
+    spec_hash: ctx.specHash,
+    anchor_id: anchor?.id ?? null,
     attempts,
     gate_model: "claude-opus-5",
   };
@@ -371,4 +404,39 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
     .single<{ id: string }>();
   if (error || !row) throw new Error(`could not save the render: ${error?.message}`);
   return { render_id: row.id, image_url: final.url, view, camera_id: cameraId, outcome: final.outcome, design_view_reason: designViewReason, cached: false, attempts };
+}
+
+/**
+ * G5c: check every current passed DAY render of this project against the anchor
+ * render (the view the others were conditioned to match) and record the verdict
+ * on each render row. Only renders on the current scene, spec and pipeline are
+ * checked; the anchor itself passes by definition. An unavailable check is
+ * recorded as such and retried on the next call.
+ */
+export async function checkConsistency(ctx: GardenSceneContext, anchorRenderId: string): Promise<{ render_id: string; camera: string; passed: boolean; failures: string[]; status: string }[]> {
+  const sb = db();
+  const { data: anchor } = await sb.from("renders").select("id, project_id, image_url, gate").eq("id", anchorRenderId).maybeSingle<{ id: string; project_id: string; image_url: string; gate: SceneGateRecord | null }>();
+  if (!anchor || anchor.project_id !== ctx.projectId || anchor.gate?.outcome !== "passed") throw new Error("The anchor must be a passed render of this project.");
+  const anchorBytes = await fetchBytes(anchor.image_url);
+  const out: { render_id: string; camera: string; passed: boolean; failures: string[]; status: string }[] = [];
+  for (const cam of ctx.cameras) {
+    const row = await latestPassedDay(ctx, cam.id);
+    if (!row) continue;
+    const { data: full } = await sb.from("renders").select("id, gate").eq("id", row.id).single<{ id: string; gate: SceneGateRecord }>();
+    if (row.id === anchor.id) {
+      await sb.from("renders").update({ gate: { ...full!.gate, consistency: { anchor_id: anchor.id, passed: true, failures: [], status: "ran", checked_at: new Date().toISOString() } } }).eq("id", row.id);
+      out.push({ render_id: row.id, camera: cam.id, passed: true, failures: [], status: "anchor" });
+      continue;
+    }
+    const prior = full!.gate.consistency;
+    if (prior && prior.anchor_id === anchor.id && prior.status === "ran") {
+      out.push({ render_id: row.id, camera: cam.id, passed: prior.passed, failures: prior.failures, status: "cached" });
+      continue;
+    }
+    const bytes = await fetchBytes(row.image_url);
+    const v = await runConsistencyGate(b64(anchorBytes, isJpeg(anchorBytes) ? "image/jpeg" : "image/png"), b64(bytes, isJpeg(bytes) ? "image/jpeg" : "image/png"), ctx.spec);
+    await sb.from("renders").update({ gate: { ...full!.gate, consistency: { anchor_id: anchor.id, passed: v.passed, failures: v.failures, status: v.status, checked_at: new Date().toISOString() } } }).eq("id", row.id);
+    out.push({ render_id: row.id, camera: cam.id, passed: v.passed, failures: v.failures, status: v.status });
+  }
+  return out;
 }

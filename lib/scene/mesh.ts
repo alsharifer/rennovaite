@@ -25,9 +25,13 @@ export type MaterialKey =
   | "trunk"
   // G5: an existing gazebo's glazed panels, and concrete stepping slabs.
   | "glass"
-  | "slab";
+  | "slab"
+  // G5c: an existing steel garden shed (light grey, unlike the dark pergola metal).
+  | "shed";
 
-export type ObjectCategory = "surface" | "structure" | "context" | "planting";
+// G5c: "fixture" — a light fitting or tap. Small, never on the gate's list; it is
+// in the scene so a view can be shown to SEE it (the parity gate).
+export type ObjectCategory = "surface" | "structure" | "context" | "planting" | "fixture";
 
 export interface SceneObject {
   id: number;

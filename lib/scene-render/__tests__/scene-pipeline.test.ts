@@ -34,12 +34,20 @@ const cameras = chooseCameras(scene, graph, rec.fixtures, lit);
 describe("the 3D garden scene", () => {
   it("contains every structure the plan holds, at the plan's heights", () => {
     const nouns = scene.objects.filter((o) => o.category === "structure").map((o) => o.noun).sort();
-    expect(nouns).toEqual(["BBQ counter", "arched wall feature", "bar counter", "built-in bench", "built-in grill", "louvred pergola", "raised planter", "square planter box"].sort());
+    expect(nouns).toEqual(["BBQ counter with sink", "arched wall feature", "bar counter", "built-in bench", "built-in grill", "louvred pergola", "raised planter", "square planter box"].sort());
+    // The WORKTOP, not its fittings: a BBQ counter carries a grill hood, a sink and
+    // a tap above its slab (G5c), and those are not the plan height.
     const topOf = (key: string) => {
+      const id = scene.objects.find((o) => o.key === key)!.id;
+      const tris = scene.tris.filter((t) => t.obj === id && t.mat !== "metal" && t.mat !== "grill");
+      return Math.max(...tris.flatMap((t) => [t.a[1], t.b[1], t.c[1]]));
+    };
+    // The pergola is metal throughout, so it is measured on all of its geometry.
+    const topAll = (key: string) => {
       const id = scene.objects.find((o) => o.key === key)!.id;
       return Math.max(...scene.tris.filter((t) => t.obj === id).flatMap((t) => [t.a[1], t.b[1], t.c[1]]));
     };
-    expect(topOf("structure:z-pergola")).toBeCloseTo(2.8, 6);
+    expect(topAll("structure:z-pergola")).toBeCloseTo(2.8, 6);
     expect(topOf("run:r-counter-bbq")).toBeCloseTo(0.9, 6);
     expect(topOf("run:r-counter-bar")).toBeCloseTo(1.0, 6);
     expect(topOf("run:r-bench-l")).toBeCloseTo(0.35, 6);
@@ -72,7 +80,7 @@ describe("cameras and manifests", () => {
     const cam = cameras.find((c) => c.id === "zone:z-pergola")!;
     const m = buildManifest("villa-94", cam.id, scene, renderScene(scene, cam, 600, 400, { supersample: 1 }));
     const nouns = gateChecks(m).filter((c) => c.category === "structure").map((c) => c.noun);
-    for (const n of ["louvred pergola", "BBQ counter", "bar counter"]) expect(nouns).toContain(n);
+    for (const n of ["louvred pergola", "BBQ counter with sink", "bar counter"]) expect(nouns).toContain(n);
     expect(m.projectId).toBe("villa-94");
   });
 });

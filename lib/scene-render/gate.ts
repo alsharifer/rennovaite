@@ -55,17 +55,27 @@ const ObservationSchema = z.object({
   note: z.string().optional().default(""),
 });
 
+// G5c: models name the text field freely ("what", "item") and sometimes omit
+// "major"; the first string is the description and an unstated major is major.
+// A reply that says what it saw is never thrown away over a field name.
+const FoundSchema = z
+  .array(z.record(z.string(), z.unknown()))
+  .nullable()
+  .optional()
+  .transform((v) =>
+    (v ?? []).map((x) => ({
+      description: String(x.description ?? x.what ?? x.item ?? Object.values(x).find((y) => typeof y === "string") ?? "unnamed"),
+      major: x.major !== false,
+    })),
+  );
+
 export const GateReplySchema = z.object({
   observations: z.array(ObservationSchema),
-  extra_structures: z
-    .array(z.object({ description: z.string(), major: z.boolean() }))
-    .default([]),
+  extra_structures: FoundSchema,
   /** Evening only: light where the night design model shows none. */
-  extra_lights: z
-    .array(z.object({ description: z.string(), major: z.boolean() }))
-    .default([]),
-  same_viewpoint: z.boolean(),
-  summary: z.string().default(""),
+  extra_lights: FoundSchema,
+  same_viewpoint: z.boolean().nullable().transform((v) => v === true),
+  summary: z.string().nullable().optional().transform((v) => v ?? ""),
 });
 export type GateReply = z.infer<typeof GateReplySchema>;
 
@@ -97,6 +107,9 @@ export function gatePrompt(checks: GateCheck[], counts: Record<string, number>, 
     countLine ? `Built structures in view (count them): ${countLine}.` : "No built structures are in view.",
     "",
     "For each item: present = it is clearly depicted in IMAGE 2 as the same kind of thing (a pergola is still a pergola with posts and a roof; a counter is still a counter; a lawn is still lawn, not paving). roughly_in_place = it sits in about the same part of the frame at about the same size and height. Materials, colours, planting, lighting and small decor may differ — that is the style. Geometry may not.",
+    ...(checks.some((c) => c.noun.includes("grill and sink"))
+      ? ["A BBQ counter with built-in grill and sink must visibly show both a grill and a sink on its top; a plain counter without them is NOT present."]
+      : []),
     ...(checks.some((c) => c.noun.includes("louvred"))
       ? ["A louvred pergola has a flat roof of parallel louvre blades on square posts and beams; shade sails, fabric canopies, open timber rafters or a pitched roof are a DIFFERENT structure — present = false."]
       : []),

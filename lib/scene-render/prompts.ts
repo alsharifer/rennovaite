@@ -16,7 +16,9 @@ import { gateChecks } from "./gate";
 
 /** Bump when the pipeline changes what a render is conditioned on. */
 // g5-1: narrow-plot cameras (elevated corridor views, clean-view check).
-export const SCENE_PIPELINE_VERSION = "g5-1";
+// g5c-1: textured conditioning image, shared design specification + anchor render,
+//        in-plot cameras and an aerial view, every zone attempted.
+export const SCENE_PIPELINE_VERSION = "g5c-1";
 
 export type SceneView = "day" | "evening";
 
@@ -38,7 +40,7 @@ export function sceneHash(scene: Scene): string {
  * projects with identical gardens and same-named zones produce identical
  * scenes, cameras and prompts, and must still never share an image.
  */
-export function sceneCacheKey(parts: { projectId: string; cameraId: string; view: SceneView; sceneHash: string; styleKey: string; camera: { pos: number[]; target: number[]; fovDeg: number } }): string {
+export function sceneCacheKey(parts: { projectId: string; cameraId: string; view: SceneView; sceneHash: string; styleKey: string; camera: { pos: number[]; target: number[]; fovDeg: number }; specHash?: string; anchorId?: string | null }): string {
   if (!parts.projectId) throw new Error("sceneCacheKey: projectId is required");
   return createHash("sha256")
     .update(
@@ -52,6 +54,8 @@ export function sceneCacheKey(parts: { projectId: string; cameraId: string; view
         parts.camera.pos.map((v) => v.toFixed(3)),
         parts.camera.target.map((v) => v.toFixed(3)),
         parts.camera.fovDeg,
+        // G5c: what every view shares — the design specification and the anchor render.
+        ...(parts.specHash ? [parts.specHash, parts.anchorId ?? null] : []),
       ]),
     )
     .digest("hex");
@@ -67,12 +71,14 @@ export function isInfrastructureFailure(attempts: readonly { image_url: string }
 }
 
 /**
- * G5: may this camera/view spend a render attempt? Not from a camera with no
- * clean view (the 3D design view ships by choice), and not for an evening with
- * no passed day render to relight.
+ * May this camera/view spend a render attempt? G5c: every day view is attempted
+ * — a pack whose zone pages are flat design views is not client-viable, and the
+ * textured conditioning image plus in-plot cameras give every zone a paintable
+ * view. The camera's clean-view verdict still ranks cameras and is reported. An
+ * evening still needs a passed day render to relight.
  */
-export function shouldAttemptRender(cam: { clean?: boolean }, view: SceneView, hasPassedDay: boolean): boolean {
-  return cam.clean !== false && (view === "day" || hasPassedDay);
+export function shouldAttemptRender(_cam: { clean?: boolean }, view: SceneView, hasPassedDay: boolean): boolean {
+  return view === "day" || hasPassedDay;
 }
 
 /**
@@ -107,15 +113,30 @@ function keepLine(m: CameraManifest): string {
  * TEXT only — calibration showed a style image pulls composition and surfaces
  * towards itself (reframed views, lawns paved to match the art).
  */
-export function dayPrompt(m: CameraManifest, style: GardenStyle): string {
+export interface DayPromptOptions {
+  /** G5c: the project's design specification (lib/scene-render/design-spec.ts). */
+  spec?: string;
+  /** G5c: IMAGE 2 is a passed render of another view of the same garden. */
+  anchor?: boolean;
+}
+
+export function dayPrompt(m: CameraManifest, style: GardenStyle, opts: DayPromptOptions = {}): string {
   return [
-    "This image is a 3D design model of a real garden. Turn it into a photorealistic photograph of that exact garden.",
+    opts.spec
+      ? "IMAGE 1 is a textured 3D design model of a real garden: every surface already shows its material at true scale. Turn it into a photorealistic photograph of that exact garden."
+      : "This image is a 3D design model of a real garden. Turn it into a photorealistic photograph of that exact garden.",
     FRAMING,
     keepLine(m),
     surfaceLine(m),
     "Existing buildings in the model (plain pale volumes) stay buildings of the same size and position: render them as plain rendered villa walls, never as sky.",
     "Do not add, remove, move or resize any structure, wall, step or level. Do not add a pergola, canopy, pool, wall, bench, planter or steps that are not in the model. Only paint materials, planting, sky and daylight.",
-    `Style — ${styleLine(style)} Apply the style to materials and planting only.`,
+    opts.spec ?? "",
+    opts.anchor
+      ? "IMAGE 2 is a finished photograph of ANOTHER part of this same garden. Match its pergola design, paving material and colour, wall finish and planting palette exactly. Take nothing of its layout, camera or composition: the layout is IMAGE 1's."
+      : "",
+    // With a design specification the style sets the mood only: its sentences name
+    // features (corten planters, sandstone) the design may not have.
+    opts.spec ? `Mood — ${style.name_en}: ${style.one_line}` : `Style — ${styleLine(style)} Apply the style to materials and planting only.`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -132,9 +153,9 @@ const FRAMING =
   "Keep the model's exact camera position, lens and horizon: every edge of the frame shows the same things as the model — no wider, tighter or re-centred framing.";
 
 /** Attempt 2: the same, with what the gate found wrong. */
-export function tightenedDayPrompt(m: CameraManifest, style: GardenStyle, failures: string[]): string {
+export function tightenedDayPrompt(m: CameraManifest, style: GardenStyle, failures: string[], opts: DayPromptOptions = {}): string {
   return [
-    dayPrompt(m, style),
+    dayPrompt(m, style, opts),
     failures.length ? `A previous attempt was rejected for: ${failures.map((f) => f.replace(/^[SFC]\d+ /, "")).join("; ")}. Correct exactly these.` : "",
     "If in doubt, change less: a plainer photograph that matches the model beats a richer one that does not.",
   ]

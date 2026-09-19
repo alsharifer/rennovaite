@@ -1,19 +1,19 @@
 {
-  "captured_at": "2026-09-15T20:16:46.021Z",
-  "boq_id": "32d83ee8-7ae7-48c1-b8d5-969b1137b1df",
+  "captured_at": "2026-09-17T20:52:34.693Z",
+  "boq_id": "e66ccda3-1fe4-48a0-8fb2-a7c854174a30",
   "draft": true,
   "derived": [
     "plot boundary",
-    "zone: Porcelain path — garden gate to side garden",
-    "zone: Side garden — planting bed",
-    "zone: Front garden — lawn",
-    "zone: Front garden — planting bed",
-    "zone: Rear planting bed",
     "zone: Pergola court — porcelain paving",
     "zone: Side garden — lawn",
+    "zone: Porcelain path — garden gate to side garden",
+    "zone: Side garden — planting bed",
+    "zone: Rear planting bed",
     "zone: Rear garden — lawn",
     "zone: Side garden — porcelain paving terrace",
+    "zone: Front garden — lawn",
     "zone: Louvred pergola (replaces existing gazebo)",
+    "zone: Front garden — planting bed",
     "run: BBQ counter (under the pergola)",
     "run: L-seating bench (pergola court)",
     "context: Existing villa",
@@ -21,7 +21,8 @@
     "context: Rear boundary wall",
     "context: Corner boundary wall (side garden)",
     "context: Side garden street wall",
-    "context: Rear strip end wall"
+    "context: Rear strip end wall",
+    "context: Separator wall (rear strip | side garden)"
   ],
   "grand_total_aed": 116942.01,
   "lines": [
@@ -33,6 +34,16 @@
       "unit": "lump",
       "rate_aed": 4400,
       "total_aed": 4400,
+      "qty_derived": false
+    },
+    {
+      "key": "Plumbing|GL-26",
+      "section": "Plumbing",
+      "description": "Outdoor water tap (hose bib) with isolation valve (no reference rate — QS to price)",
+      "quantity": 2,
+      "unit": "no",
+      "rate_aed": 0,
+      "total_aed": 0,
       "qty_derived": false
     },
     {
@@ -136,12 +147,22 @@
       "qty_derived": true
     },
     {
+      "key": "Soft Landscaping|GL-25",
+      "section": "Soft Landscaping",
+      "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+      "quantity": 18.48,
+      "unit": "m2",
+      "rate_aed": 0,
+      "total_aed": 0,
+      "qty_derived": true
+    },
+    {
       "key": "Irrigation|GL-15",
       "section": "Irrigation",
       "description": "Irrigation system (drip, pump, valves)",
-      "quantity": 1.6,
+      "quantity": 1,
       "unit": "lump",
-      "rate_aed": 11000,
+      "rate_aed": 17600,
       "total_aed": 17600,
       "qty_derived": true
     },
@@ -280,6 +301,24 @@
       "unit": "m2 plan"
     },
     {
+      "work_item_key": "garden.planting_bed",
+      "element_id": "31cded47-9d42-476f-b60e-583bc532b18f",
+      "qty": 3.72,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.planting_bed",
+      "element_id": "5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+      "qty": 2.4,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.planting_bed",
+      "element_id": "f3d76980-13a9-4830-86e2-0c8127bfee42",
+      "qty": 12.36,
+      "unit": "m2"
+    },
+    {
       "work_item_key": "garden.removal",
       "element_id": "0069c434-52fb-401c-b762-d3f54a08b9df",
       "qty": 2.4,
@@ -344,6 +383,18 @@
       "element_id": "94a612f3-9a07-4466-b6fc-53e48c550ed1",
       "qty": 13.98,
       "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.water_tap",
+      "element_id": "1d49ff77-3771-4cd1-b5c4-45bb27e72931",
+      "qty": 1,
+      "unit": "no"
+    },
+    {
+      "work_item_key": "garden.water_tap",
+      "element_id": "d31398ae-ded8-4b69-bcf1-0fb67f08c06e",
+      "qty": 1,
+      "unit": "no"
     }
   ]
 }

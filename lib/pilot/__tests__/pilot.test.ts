@@ -65,7 +65,7 @@ describe("the change-propagation receipt", () => {
 
 describe("before/after photo pairs", () => {
   const m = pairManifest({ projectId: "arabella", assetId: "a1", zoneName: "Side garden — lawn", zoneSurface: "artificial grass lawn", items: [{ noun: "the gazebo", disposition: "keep" }, { noun: "the sink counter", disposition: "remove" }, { noun: "the planter border", disposition: "replace" }] });
-  const good = { observations: [{ ref: "E1", present: true, roughly_in_place: true, note: "" }, { ref: "E2", present: false, roughly_in_place: false, note: "" }, { ref: "E3", present: true, roughly_in_place: true, note: "" }], house_unchanged: true, same_viewpoint: true, extra_structures: [], summary: "" };
+  const good = { observations: [{ ref: "E1", present: true, roughly_in_place: true, note: "" }, { ref: "E2", present: false, roughly_in_place: false, note: "" }, { ref: "E3", present: true, roughly_in_place: true, note: "" }], house_unchanged: true, same_viewpoint: true, house_side_matches: true, visible_change: 2, extra_structures: [], summary: "" };
 
   it("passes only when kept items stay, removed items go, replaced items stay in place", () => {
     expect(judgePair(m, good).passed).toBe(true);
@@ -82,6 +82,14 @@ describe("before/after photo pairs", () => {
     expect(reply).not.toBeNull();
     expect(reply.extra_structures).toEqual([{ description: "boundary wall with a gate", major: false }, { description: "raised planter", major: true }]);
     expect(judgePair(m, reply).failures).toEqual(["viewpoint changed", "invented structure: raised planter"]);
+  });
+
+  it("fails a mirrored garden and an after that barely changes (G5c)", () => {
+    expect(judgePair(m, { ...good, house_side_matches: false }).failures).toEqual(["orientation changed — the house is not on the same side as in the photo"]);
+    expect(judgePair(m, { ...good, visible_change: 1 }).failures).toEqual(["too little visible change (1/3) — not a before/after"]);
+    // A reply that does not answer the new questions fails on them, never passes silently.
+    const legacy = parsePairReply(JSON.stringify({ observations: good.observations, house_unchanged: true, same_viewpoint: true, extra_structures: [], summary: "" }))!;
+    expect(judgePair(m, legacy).passed).toBe(false);
   });
 
   it("never caches or trusts a withheld pair that got no verdict", () => {

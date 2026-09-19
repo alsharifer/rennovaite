@@ -14,7 +14,7 @@
 import { runBand, runSegments } from "@/lib/drawings/garden-elevations";
 import { bboxOf, gardenZones, toMetres, type GardenFixture } from "@/lib/drawings/garden-sheets";
 import type { PlanGraph, Point } from "@/lib/plan/geometry";
-import { isInDesign } from "@/lib/plan/site-reference";
+import { isInDesign, type Disposition } from "@/lib/plan/site-reference";
 
 import { SceneBuilder, type MaterialKey, type Scene } from "./mesh";
 
@@ -85,6 +85,43 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
   const g1: Point = plot ? [plot.origin_m[0] + plot.width_m, plot.origin_m[1] + plot.depth_m] : [all.maxX, all.maxY];
   const ground = sb.object({ key: "ground", label: "Ground", category: "context", noun: "ground", zoneId: null });
   sb.box(g0[0] - 30, -0.05, g0[1] - 30, g1[0] + 30, -0.001, g1[1] + 30, "ground", ground);
+
+  // G5c: the neighbourhood. Beyond every plot edge that carries a boundary wall
+  // stands a neighbouring villa (the client photos show two-storey houses behind
+  // each wall). Without them the model looks over the wall at empty land and
+  // invents what should be there — gardens, trees, structures. Generic massing,
+  // never a claim about the neighbour: a pale two-storey volume set back 3 m.
+  if (plot) {
+    const walls = graph.context.filter((c) => c.kind === "boundary_wall");
+    const edges: { a: Point; b: Point; out: Point }[] = [
+      { a: [g0[0], g0[1]], b: [g1[0], g0[1]], out: [0, -1] },
+      { a: [g0[0], g1[1]], b: [g1[0], g1[1]], out: [0, 1] },
+      { a: [g0[0], g0[1]], b: [g0[0], g1[1]], out: [-1, 0] },
+      { a: [g1[0], g0[1]], b: [g1[0], g1[1]], out: [1, 0] },
+    ];
+    let n = 0;
+    for (const e of edges) {
+      const alongX = e.out[1] !== 0;
+      const len = alongX ? e.b[0] - e.a[0] : e.b[1] - e.a[1];
+      // Wall length lying on this edge (within 0.5 m of it).
+      let covered = 0;
+      for (const w of walls) {
+        const wb = bboxOf(w.polygon);
+        const onEdge = alongX ? Math.abs((e.out[1] < 0 ? wb.minY : wb.maxY) - e.a[1]) < 0.5 : Math.abs((e.out[0] < 0 ? wb.minX : wb.maxX) - e.a[0]) < 0.5;
+        if (onEdge) covered += alongX ? wb.maxX - wb.minX : wb.maxY - wb.minY;
+      }
+      if (covered < len * 0.3) continue;
+      const id = sb.object({ key: `neighbour:${n++}`, label: "neighbouring villa", category: "context", noun: "neighbouring two-storey villas beyond the boundary wall", zoneId: null });
+      const set = 3, depth = 11, H = 7.2;
+      if (alongX) {
+        const y0 = e.out[1] < 0 ? e.a[1] - set - depth : e.a[1] + set;
+        sb.box(e.a[0] - 2, 0, y0, e.b[0] + 2, H, y0 + depth, "building", id);
+      } else {
+        const x0 = e.out[0] < 0 ? e.a[0] - set - depth : e.a[0] + set;
+        sb.box(x0, 0, e.a[1] - 2, x0 + depth, H, e.b[1] + 2, "building", id);
+      }
+    }
+  }
 
   // Zone surfaces at their levels.
   for (const z of zones) {
@@ -162,7 +199,10 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
     const H = el.height_mm / 1000;
     const variant = variants[el.id] ?? null;
     const form = typeof spec.form === "string" ? spec.form : null;
-    const noun = el.kind === "counter_run" ? (variant === "bbq" ? "BBQ counter" : variant === "bar" ? "bar counter" : form === "sink counter" ? "outdoor sink counter" : "counter") : el.kind === "bench_run" ? "built-in bench" : form === "planter border" ? "planter border" : "raised planter";
+    // G5c: a BBQ counter is priced with its grill and sink (the rate carries them), so
+    // the model shows both and the gate checks for them.
+    const hasGrillUnit = fixtures.some((u) => u.type === "bbq_grill" && (u.spec as Record<string, unknown> | null)?.on === el.id);
+    const noun = el.kind === "counter_run" ? (variant === "bbq" ? (hasGrillUnit ? "BBQ counter with sink" : "BBQ counter with built-in grill and sink") : variant === "bar" ? "bar counter" : form === "sink counter" ? "outdoor sink counter" : "counter") : el.kind === "bench_run" ? "built-in bench" : form === "planter border" ? "planter border" : "raised planter";
     const id = sb.object({ key: `run:${el.id}`, label: noun, category: "structure", noun, zoneId: zoneIdAt(mid) });
     segs.forEach((seg, i) => {
       const ext = 0;
@@ -188,6 +228,20 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
           sb.bandBox(seg.a, seg.b, o0, o1, lv, lv + H - slab, "stone", id);
         }
         sb.bandBox(seg.a, seg.b, o0 - 0.02, o1 + 0.02, lv + H - slab, lv + H, "stone", id, 0.02);
+        if (variant === "bbq" && i === 0 && seg.len >= 1.6) {
+          // Built-in grill (a dark hood) toward one end, a sink toward the other.
+          const at = (t: number, o: number): Point => [seg.a[0] + seg.dir[0] * t + seg.normal[0] * o, seg.a[1] + seg.dir[1] * t + seg.normal[1] * o];
+          const oc = (o0 + o1) / 2;
+          const top = lv + H;
+          if (!hasGrillUnit) {
+            const g0 = at(seg.len * 0.22, oc - 0.25), g1 = at(seg.len * 0.22 + 0.75, oc + 0.25);
+            sb.box(Math.min(g0[0], g1[0]), top, Math.min(g0[1], g1[1]), Math.max(g0[0], g1[0]), top + 0.22, Math.max(g0[1], g1[1]), "grill", id);
+          }
+          const s0 = at(seg.len * 0.72, oc - 0.2), s1 = at(seg.len * 0.72 + 0.5, oc + 0.2);
+          sb.box(Math.min(s0[0], s1[0]), top - 0.005, Math.min(s0[1], s1[1]), Math.max(s0[0], s1[0]), top + 0.012, Math.max(s0[1], s1[1]), "metal", id);
+          const tap = at(seg.len * 0.72 + 0.25, oc + 0.28);
+          sb.box(tap[0] - 0.02, top, tap[1] - 0.02, tap[0] + 0.02, top + 0.25, tap[1] + 0.02, "metal", id);
+        }
       } else {
         sb.bandBox(seg.a, seg.b, o0, o1, lv, lv + H, "stone", id);
       }
@@ -200,6 +254,17 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
     const p = toMetres(graph, u.position);
     const lv = levelAt(p);
     const zoneId = zoneIdAt(p);
+    if (u.type === "shed") {
+      // G5c: an existing shed the client keeps stands in every view that sees it.
+      const W = (num(s.width_mm) ?? 1500) / 1000;
+      const D = (num(s.depth_mm) ?? 1000) / 1000;
+      const H = (num(s.height_mm) ?? 2000) / 1000;
+      const kept = u.site_reference === true && u.disposition === "keep";
+      const id = sb.object({ key: `unit:${u.id}`, label: "garden shed", category: "structure", noun: kept ? "existing grey steel garden shed (kept)" : "garden shed", zoneId });
+      sb.box(p[0] - W / 2, lv, p[1] - D / 2, p[0] + W / 2, lv + H - 0.12, p[1] + D / 2, "shed", id);
+      sb.box(p[0] - W / 2 - 0.05, lv + H - 0.12, p[1] - D / 2 - 0.05, p[0] + W / 2 + 0.05, lv + H, p[1] + D / 2 + 0.05, "shed", id);
+      continue;
+    }
     if (u.type === "wall_feature" && num(s.width_mm) && num(s.height_mm)) {
       const W = num(s.width_mm)! / 1000;
       const D = (num(s.depth_mm) ?? 300) / 1000;
@@ -325,12 +390,63 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
     }
   }
 
+  // G5c: garden gates in context walls — two posts and the leaf, drawn open at 90°
+  // toward the plot centre so the view through the opening stays readable.
+  for (const o of (graph.openings ?? []).filter((x) => x.type === "gate" && x.position && isInDesign({ site_reference: x.site_reference ?? false, disposition: (x.disposition as Disposition | null) ?? null }))) {
+    const wall = graph.context.find((c) => c.id === o.context_id);
+    const b = wall ? bboxOf(wall.polygon) : null;
+    const alongX = b ? b.maxX - b.minX >= b.maxY - b.minY : true;
+    const w = o.width_mm / 1000;
+    const H = o.height_mm / 1000;
+    const [cx, cz] = o.position!;
+    const kept = o.site_reference === true && o.disposition === "keep";
+    const id = sb.object({ key: `opening:${o.id}`, label: "garden gate", category: "structure", noun: kept ? "existing garden gate (kept)" : "garden gate", zoneId: null });
+    const plot = graph.meta.plot;
+    const centre = plot ? [plot.origin_m[0] + plot.width_m / 2, plot.origin_m[1] + plot.depth_m / 2] : [cx, cz];
+    const side = alongX ? Math.sign(centre[1]! - cz) || 1 : Math.sign(centre[0]! - cx) || 1;
+    const post = 0.08;
+    if (alongX) {
+      sb.box(cx - w / 2 - post, 0, cz - post / 2, cx - w / 2, H, cz + post / 2, "metal", id);
+      sb.box(cx + w / 2, 0, cz - post / 2, cx + w / 2 + post, H, cz + post / 2, "metal", id);
+      const z0 = side > 0 ? cz : cz - w;
+      sb.box(cx - w / 2, 0.05, z0, cx - w / 2 + 0.04, H - 0.1, z0 + w, "metal", id);
+    } else {
+      sb.box(cx - post / 2, 0, cz - w / 2 - post, cx + post / 2, H, cz - w / 2, "metal", id);
+      sb.box(cx - post / 2, 0, cz + w / 2, cx + post / 2, H, cz + w / 2 + post, "metal", id);
+      const x0 = side > 0 ? cx : cx - w;
+      sb.box(x0, 0.05, cz - w / 2, x0 + w, H - 0.1, cz - w / 2 + 0.04, "metal", id);
+    }
+  }
+
+  // G5c: outdoor water taps — a small wall-mounted body with its valve.
+  for (const t of fixtures.filter((x) => x.type === "water_tap")) {
+    const p = toMetres(graph, t.position);
+    const lv = levelAt(p);
+    const id = sb.object({ key: `point:${t.id}`, label: "outdoor water tap", category: "fixture", noun: "outdoor water tap", zoneId: zoneIdAt(p) });
+    sb.box(p[0] - 0.08, lv + 0.45, p[1] - 0.08, p[0] + 0.08, lv + 0.75, p[1] + 0.08, "metal", id);
+  }
+
   // Designed lighting points (for the evening view).
   for (const f of fixtures.filter((x) => x.type === "garden_light" || x.type === "boundary_light")) {
     const p = toMetres(graph, f.position);
     const lv = levelAt(p);
     const fitting = String((f.spec as Record<string, unknown> | null)?.fitting ?? "").toLowerCase();
-    if (f.type === "boundary_light") sb.lights.push({ pos: [p[0], 1.6, p[1]], radius: 1.4, kind: "wall" });
+    // G5c: the fitting itself, small (spike post, flush disc, wall box).
+    const fid = sb.object({ key: `point:${f.id}`, label: f.type === "boundary_light" ? "wall light" : "garden light", category: "fixture", noun: f.type === "boundary_light" ? "wall light" : "garden light", zoneId: zoneIdAt(p) });
+    // A wall light sits ON the garden-facing face: placed at the wall centreline it
+    // would be buried inside the wall, and no view could show what the BoQ prices.
+    const face = ((): Point => {
+      if (f.type !== "boundary_light" || !plot) return p;
+      const centre: Point = [plot.origin_m[0] + plot.width_m / 2, plot.origin_m[1] + plot.depth_m / 2];
+      const d: Point = [centre[0] - p[0], centre[1] - p[1]];
+      const len = Math.hypot(d[0], d[1]) || 1;
+      const off = 0.16;
+      return [p[0] + (d[0] / len) * off, p[1] + (d[1] / len) * off];
+    })();
+    if (f.type === "boundary_light") sb.box(face[0] - 0.07, 1.5, face[1] - 0.07, face[0] + 0.07, 1.72, face[1] + 0.07, "metal", fid);
+    else if (fitting.includes("spike")) sb.box(p[0] - 0.03, lv, p[1] - 0.03, p[0] + 0.03, lv + 0.4, p[1] + 0.03, "metal", fid);
+    else sb.box(p[0] - 0.07, lv + 0.02, p[1] - 0.07, p[0] + 0.07, lv + 0.045, p[1] + 0.07, "metal", fid);
+    if (f.type === "boundary_light") sb.lights.push({ pos: [face[0], 1.6, face[1]], radius: 1.4, kind: "wall" });
     else if (fitting.includes("strip")) sb.lights.push({ pos: [p[0], lv + 0.08, p[1]], radius: 0.9, kind: "strip" });
     else if (fitting.includes("spike")) sb.lights.push({ pos: [p[0], lv + 0.35, p[1]], radius: 1.0, kind: "spike" });
     else sb.lights.push({ pos: [p[0], lv + 0.03, p[1]], radius: 0.8, kind: "uplight" });
@@ -348,14 +464,32 @@ function plantMasses(sb: SceneBuilder, poly: readonly Point[], base: number, see
   }, 0)) / 2;
   const id = sb.object({ key: seed, label: "planting", category: "planting", noun: "planting", zoneId });
   const r = rng(seed);
-  const n = Math.min(60, Math.max(2, Math.round(area * 2.2)));
+  // G5c: dense enough to read as a planted bed (≈ 5 plants / m²), in three forms.
+  const n = Math.min(220, Math.max(3, Math.round(area * 5)));
   let placed = 0;
   for (let tries = 0; placed < n && tries < n * 8; tries++) {
     const p: Point = [b.minX + r() * (b.maxX - b.minX), b.minY + r() * (b.maxY - b.minY)];
     if (!pointInPolygon(p, poly)) continue;
-    const s = 0.18 + r() * 0.2;
-    const h = 0.35 + r() * 0.5;
-    canopy(sb, [p[0], base + h / 2, p[1]], s, h / 2, id, "plant");
+    const kind = r();
+    if (kind < 0.55) {
+      // Mounded shrub.
+      const s = 0.2 + r() * 0.25;
+      const h = 0.35 + r() * 0.45;
+      canopy(sb, [p[0], base + h / 2, p[1]], s, h / 2, id, "plant");
+    } else if (kind < 0.8) {
+      // Ornamental grass: a tall narrow tuft.
+      const h = 0.6 + r() * 0.5;
+      canopy(sb, [p[0], base + h / 2, p[1]], 0.12 + r() * 0.06, h / 2, id, "plant");
+    } else {
+      // Spiky rosette (agave-like): a low star of blades.
+      const len = 0.35 + r() * 0.2;
+      for (let k = 0; k < 7; k++) {
+        const a = (k / 7) * Math.PI * 2 + r();
+        const tip: [number, number, number] = [p[0] + Math.cos(a) * len, base + 0.3 + r() * 0.2, p[1] + Math.sin(a) * len];
+        const w = 0.05;
+        sb.tri([p[0] - Math.sin(a) * w, base + 0.02, p[1] + Math.cos(a) * w], tip, [p[0] + Math.sin(a) * w, base + 0.02, p[1] - Math.cos(a) * w], "plant", id);
+      }
+    }
     placed++;
   }
 }

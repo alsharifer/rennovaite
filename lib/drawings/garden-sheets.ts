@@ -367,7 +367,7 @@ function runSvg(el: LinearElement, f: Frame, withLabel = true): string {
   const label = withLabel
     ? `<text x="${f2(f.px(mid[0]) + 1.2)}" y="${f2(f.py(mid[1]) - 1.2)}" font-size="2.4" fill="${meta.color}" style="font-family:${FONT_MONO}" data-dim="run" data-mm="${Math.round(el.length_m * 1000)}">${meta.code} ${Math.round(el.length_m * 1000)}</text>`
     : "";
-  return `<polyline points="${pts}" fill="none" stroke="${meta.color}" stroke-width="${f2(w)}" stroke-opacity="${removed ? 0.3 : 0.85}"${dash} stroke-linecap="butt" stroke-linejoin="miter"/>${label}`;
+  return `<polyline points="${pts}" fill="none" stroke="${meta.color}" stroke-width="${f2(w)}" stroke-opacity="${removed ? 0.3 : 0.85}"${dash} stroke-linecap="butt" stroke-linejoin="miter" data-run="${esc(el.id)}"/>${label}`;
 }
 
 /**
@@ -398,18 +398,19 @@ const UNIT_META: Record<string, { code: string; label: string }> = {
   wall_feature: { code: "WF", label: "Wall feature with bench" },
   bbq_grill: { code: "BQ", label: "Built-in BBQ grill" },
   tree: { code: "TR", label: "Tree" },
+  shed: { code: "SH", label: "Garden shed" },
 };
 
-function unitSymbol(x: number, y: number, code: string, color = INK_900): string {
+function unitSymbol(x: number, y: number, code: string, color = INK_900, id?: string): string {
   return (
-    `<rect x="${f2(x - 2.4)}" y="${f2(y - 1.7)}" width="4.8" height="3.4" rx="0.4" fill="${PAPER}" stroke="${color}" stroke-width="0.3"/>` +
+    `<rect x="${f2(x - 2.4)}" y="${f2(y - 1.7)}" width="4.8" height="3.4" rx="0.4" fill="${PAPER}" stroke="${color}" stroke-width="0.3"${id ? ` data-fixture="${esc(id)}"` : ""}/>` +
     `<text x="${f2(x)}" y="${f2(y + 0.8)}" text-anchor="middle" font-size="2" fill="${color}" style="font-family:${FONT_UI};font-weight:600">${esc(code)}</text>`
   );
 }
 
-function ringSymbol(x: number, y: number, code: string, color: string, r = 1.9): string {
+function ringSymbol(x: number, y: number, code: string, color: string, r = 1.9, id?: string): string {
   return (
-    `<circle cx="${f2(x)}" cy="${f2(y)}" r="${r}" fill="${PAPER}" stroke="${color}" stroke-width="0.32"/>` +
+    `<circle cx="${f2(x)}" cy="${f2(y)}" r="${r}" fill="${PAPER}" stroke="${color}" stroke-width="0.32"${id ? ` data-fixture="${esc(id)}"` : ""}/>` +
     `<text x="${f2(x)}" y="${f2(y + 0.7)}" text-anchor="middle" font-size="${code.length > 2 ? 1.5 : 1.85}" fill="${color}" style="font-family:${FONT_UI};font-weight:600">${esc(code)}</text>`
   );
 }
@@ -480,6 +481,52 @@ function contextSvg(graph: PlanGraph, f: Frame, withLabels: boolean): string {
     }
   }
   return s;
+}
+
+/**
+ * G5c: garden gates — an opening in a context wall. Drawn as the clear opening
+ * (jamb ticks across the wall line), the leaf open at 90° with its swing, and a
+ * GT tag. The wall's long axis sets the direction; the leaf swings toward the
+ * plot centre so it never draws outside the site.
+ */
+export function gatesSvg(graph: PlanGraph, f: Frame): string {
+  let s = "";
+  for (const o of (graph.openings ?? []).filter((x) => x.type === "gate" && x.position)) {
+    const wall = graph.context.find((c) => c.id === o.context_id);
+    const b = wall ? bboxOf(wall.polygon) : null;
+    const alongX = b ? b.maxX - b.minX >= b.maxY - b.minY : true;
+    const t = b ? Math.max(0.15, alongX ? b.maxY - b.minY : b.maxX - b.minX) : 0.2;
+    const w = o.width_mm / 1000;
+    const [cx, cy] = o.position!;
+    const color = o.site_reference ? BRASS : INK_900;
+    const jamb = (d: number) =>
+      alongX
+        ? `<line x1="${f2(f.px(cx + d))}" y1="${f2(f.py(cy - t / 2))}" x2="${f2(f.px(cx + d))}" y2="${f2(f.py(cy + t / 2))}" stroke="${INK_900}" stroke-width="0.35"/>`
+        : `<line x1="${f2(f.px(cx - t / 2))}" y1="${f2(f.py(cy + d))}" x2="${f2(f.px(cx + t / 2))}" y2="${f2(f.py(cy + d))}" stroke="${INK_900}" stroke-width="0.35"/>`;
+    s += jamb(-w / 2) + jamb(w / 2);
+    const plot = graph.meta.plot;
+    const centre: Point = plot ? [plot.origin_m[0] + plot.width_m / 2, plot.origin_m[1] + plot.depth_m / 2] : [cx, cy];
+    const side = alongX ? Math.sign(centre[1] - cy) || 1 : Math.sign(centre[0] - cx) || 1;
+    const hinge: Point = alongX ? [cx - w / 2, cy] : [cx, cy - w / 2];
+    const tip: Point = alongX ? [hinge[0], cy + side * w] : [cx + side * w, hinge[1]];
+    const shut: Point = alongX ? [cx + w / 2, cy] : [cx, cy + w / 2];
+    const r = w * f.k;
+    const sweep = (alongX ? side > 0 : side < 0) ? 1 : 0;
+    s += `<line x1="${f2(f.px(hinge[0]))}" y1="${f2(f.py(hinge[1]))}" x2="${f2(f.px(tip[0]))}" y2="${f2(f.py(tip[1]))}" stroke="${color}" stroke-width="0.45" data-opening="${esc(o.id)}"/>`;
+    s += `<path d="M ${f2(f.px(tip[0]))} ${f2(f.py(tip[1]))} A ${f2(r)} ${f2(r)} 0 0 ${sweep} ${f2(f.px(shut[0]))} ${f2(f.py(shut[1]))}" fill="none" stroke="${color}" stroke-width="0.25" stroke-dasharray="0.9 0.6"/>`;
+    s += ringSymbol(f.px(cx) + (alongX ? 0 : side * 3.2), f.py(cy) + (alongX ? side * 3.2 : 0), "GT", color, 1.9);
+  }
+  return s;
+}
+
+/** A shed's footprint (G5c) — dashed when it already stands on site. */
+function shedFootprint(graph: PlanGraph, u: GardenFixture, f: Frame, removed: boolean): string {
+  const sp = (u.spec ?? {}) as Record<string, unknown>;
+  const w = (typeof sp.width_mm === "number" ? sp.width_mm : 1500) / 1000;
+  const d = (typeof sp.depth_mm === "number" ? sp.depth_mm : 1000) / 1000;
+  const [x, y] = toMetres(graph, u.position);
+  const dash = u.site_reference ? ` stroke-dasharray="1 0.6"` : "";
+  return `<rect x="${f2(f.px(x - w / 2))}" y="${f2(f.py(y - d / 2))}" width="${f2(w * f.k)}" height="${f2(d * f.k)}" fill="#D9DCDF" fill-opacity="${removed ? 0.15 : 0.6}" stroke="${u.site_reference ? BRASS : INK_700}" stroke-width="0.3"${dash}/>`;
 }
 
 /** Tags for step treads (only the top tread of each footprint is readable, so all are tagged). */
@@ -690,6 +737,7 @@ export function renderSitePlan(
   body += contextSvg(graph, f, true);
   body += graph.rooms.map((r) => zoneShape(r, f, r.site_reference ? { highlight: BRASS } : {})).join("");
   body += wallsSvg(graph, f);
+  body += gatesSvg(fullGraph, f);
 
   // Plot outline + overall site extents.
   const plot = graph.meta.plot;
@@ -708,12 +756,13 @@ export function renderSitePlan(
       const r = ((typeof s.canopy_mm === "number" ? s.canopy_mm : 3000) / 2000) * f.k;
       body += `<circle cx="${f2(f.px(m[0]))}" cy="${f2(f.py(m[1]))}" r="${f2(r)}" fill="#4F7A52" fill-opacity="${removed ? 0.04 : 0.12}" stroke="#4F7A52" stroke-width="0.25"${u.site_reference ? ' stroke-dasharray="1 0.6"' : ""}/>`;
     }
-    body += unitSymbol(f.px(m[0]), f.py(m[1]), `${removed ? "×" : ""}${UNIT_META[u.type]?.code ?? "?"}`, u.site_reference ? BRASS : INK_900);
+    if (u.type === "shed") body += shedFootprint(graph, u, f, removed);
+    body += unitSymbol(f.px(m[0]), f.py(m[1]), `${removed ? "×" : ""}${UNIT_META[u.type]?.code ?? "?"}`, u.site_reference ? BRASS : INK_900, u.id);
   }
   // Existing zones the design removes: faint, crossed, named.
   for (const r of removedZones) {
     const p = labelPoint(r.polygon);
-    body += `<polygon points="${polyPts(r.polygon, f)}" fill="none" stroke="${TERRACOTTA}" stroke-width="0.35" stroke-dasharray="1.4 0.9"/>`;
+    body += `<polygon points="${polyPts(r.polygon, f)}" fill="none" stroke="${TERRACOTTA}" stroke-width="0.35" stroke-dasharray="1.4 0.9" data-zone="${esc(r.id)}"/>`;
     body += `<text x="${f2(f.px(p[0]))}" y="${f2(f.py(p[1]))}" text-anchor="middle" font-size="2.2" fill="${TERRACOTTA}" style="font-family:${FONT_UI};font-weight:600">${esc(r.name_en)} — TO REMOVE</text>`;
   }
 
@@ -735,15 +784,30 @@ export function renderSitePlan(
   y += 5.5;
   body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.2" fill="${INK_500}" style="font-family:${FONT_UI}">REF</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.2" fill="${INK_500}" style="font-family:${FONT_UI}">ZONE</text><text x="${panelX() + 70}" y="${f2(y)}" font-size="2.2" fill="${INK_500}" style="font-family:${FONT_UI}">TYPE</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.2" fill="${INK_500}" style="font-family:${FONT_UI}">AREA m²</text>`;
   y += 3.8;
+  const truncated: { ref: string; name: string }[] = [];
   zones.forEach((r, i) => {
     const flag = r.area_derived_m2 ? "*" : "";
     const approx = r.dims_derived ? "≈ " : "";
-    body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${BRASS}" style="font-family:${FONT_MONO}">${zoneRef(i)}</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(r.name_en.slice(0, 32))}</text><text x="${panelX() + 70}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(zoneStyle(r.type).label)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO}" data-area="${r.area_m2}">${approx}${r.area_m2.toFixed(2)}${flag}</text>`;
+    const short = r.name_en.length > 32 ? `${r.name_en.slice(0, 31).trimEnd()}…` : r.name_en;
+    if (short !== r.name_en) truncated.push({ ref: zoneRef(i), name: r.name_en });
+    body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${BRASS}" style="font-family:${FONT_MONO}">${zoneRef(i)}</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(short)}</text><text x="${panelX() + 70}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(zoneStyle(r.type).label)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO}" data-area="${r.area_m2}">${approx}${r.area_m2.toFixed(2)}${flag}</text>`;
     y += 3.5;
   });
   const total = r2(zones.reduce((s, r) => s + r.area_m2, 0));
   body += `<text x="${panelX() + 10}" y="${f2(y + 0.6)}" font-size="2.4" fill="${INK_500}" style="font-family:${FONT_UI};font-weight:600">Total drawn zones</text><text x="${panelX() + PANEL_W}" y="${f2(y + 0.6)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO};font-weight:700">${total.toFixed(2)}</text>`;
-  y += 7;
+  y += 6;
+  // Zone names too long for the schedule column, in full (G5c).
+  if (truncated.length > 0) {
+    for (const t of truncated) {
+      const lines = wrap(`${t.ref} — ${t.name}`, 74);
+      for (const line of lines) {
+        body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.1" fill="${INK_500}" style="font-family:${FONT_UI}">${esc(line)}</text>`;
+        y += 2.8;
+      }
+    }
+    y += 1;
+  }
+  y += 2;
 
   body += panelHeading(y, "Legend");
   y += 5;
@@ -770,6 +834,8 @@ export function renderSitePlan(
     ...fullGraph.rooms.filter((r) => r.site_reference).map((r) => `${r.name_en} — ${existingTag(r)}`),
     ...fullGraph.elements.filter((e) => e.site_reference).map((e) => `${typeof e.spec?.name === "string" ? e.spec.name : LINEAR_ELEMENT_META[e.kind].label} — ${existingTag(e)}`),
     ...allFixtures.filter((u) => u.site_reference).map((u) => `${typeof u.spec?.name === "string" ? u.spec.name : UNIT_META[u.type]?.label ?? u.type} — ${existingTag(u)}`),
+    ...fullGraph.context.filter((c) => c.site_reference).map((c) => `${c.name} — ${existingTag(c)}`),
+    ...(fullGraph.openings ?? []).filter((o) => o.site_reference).map((o) => `${typeof o.spec?.name === "string" ? o.spec.name : o.type} — ${existingTag(o)}`),
   ];
   if (existing.length > 0) {
     body += panelHeading(y, "Existing on site (dashed)");
@@ -864,6 +930,7 @@ export function renderZoneSheet(
   body += `<clipPath id="${clipId}"><rect x="${f2(area.x)}" y="${f2(area.y)}" width="${f2(area.w)}" height="${f2(area.h)}"/></clipPath>`;
   body += `<g clip-path="url(#${clipId})">`;
   body += contextSvg(graph, f, false);
+  body += gatesSvg(graph, f);
   body += graph.rooms.filter((r) => r.id !== zone.id).map((r) => zoneShape(r, f, { faint: true })).join("");
   body += zoneShape(zone, f, { highlight: BRASS });
   body += wallsSvg(graph, f);
@@ -876,7 +943,8 @@ export function renderZoneSheet(
   const units = fixtures.filter((u) => u.layer === "landscape" && inZone(toMetres(graph, u.position)));
   for (const u of units) {
     const m = toMetres(graph, u.position);
-    body += unitSymbol(f.px(m[0]), f.py(m[1]), UNIT_META[u.type]?.code ?? "?");
+    if (u.type === "shed") body += shedFootprint(graph, u, f, false);
+    body += unitSymbol(f.px(m[0]), f.py(m[1]), UNIT_META[u.type]?.code ?? "?", INK_900, u.id);
   }
   const lights = fixtures.filter((p) => (p.type === "garden_light" || p.type === "boundary_light") && (p.room_id === zone.id || inZone(toMetres(graph, p.position))));
   for (const p of lights) {
@@ -1021,7 +1089,7 @@ export function renderLightingOverlay(
     body += `<line x1="${f2(f.px(pts[a]![0]))}" y1="${f2(f.py(pts[a]![1]))}" x2="${f2(f.px(pts[b]![0]))}" y2="${f2(f.py(pts[b]![1]))}" stroke="${LIGHT_AMBER}" stroke-width="0.3" stroke-dasharray="1.2 0.8"/>`;
   }
   lights.forEach((p, i) => {
-    body += ringSymbol(f.px(pts[i]![0]), f.py(pts[i]![1]), fittingCode(p.spec, p.type), LIGHT_AMBER, 1.6);
+    body += ringSymbol(f.px(pts[i]![0]), f.py(pts[i]![1]), fittingCode(p.spec, p.type), LIGHT_AMBER, 1.6, p.id);
   });
   for (const el of stringRuns) {
     const pl = el.polyline.map(([x, yy]) => `${f2(f.px(x))},${f2(f.py(yy))}`).join(" ");
@@ -1089,6 +1157,7 @@ export function renderIrrigationOverlay(
   const planterRuns = graph.elements.filter((e) => e.kind === "planter_run");
   const planterBoxes = fixtures.filter((u) => u.layer === "landscape" && u.type === "planter_box");
   const drains = fixtures.filter((p) => p.type === "drainage_point");
+  const taps = fixtures.filter((p) => p.type === "water_tap");
 
   // Anchors the indicative irrigation network must reach.
   const anchors: Point[] = [
@@ -1107,14 +1176,18 @@ export function renderIrrigationOverlay(
   }
   for (const u of planterBoxes) {
     const m = toMetres(graph, u.position);
-    body += ringSymbol(f.px(m[0]), f.py(m[1]), "PB", IRRIGATION_BLUE, 1.9);
+    body += ringSymbol(f.px(m[0]), f.py(m[1]), "PB", IRRIGATION_BLUE, 1.9, u.id);
   }
   for (const [a, b] of tree.edges) {
     body += `<line x1="${f2(f.px(anchors[a]![0]))}" y1="${f2(f.py(anchors[a]![1]))}" x2="${f2(f.px(anchors[b]![0]))}" y2="${f2(f.py(anchors[b]![1]))}" stroke="${IRRIGATION_BLUE}" stroke-width="0.3" stroke-dasharray="1.6 0.9"/>`;
   }
   for (const d of drains) {
     const m = toMetres(graph, d.position);
-    body += ringSymbol(f.px(m[0]), f.py(m[1]), "DR", INK_900, 1.6);
+    body += ringSymbol(f.px(m[0]), f.py(m[1]), "DR", INK_900, 1.6, d.id);
+  }
+  for (const t of taps) {
+    const m = toMetres(graph, t.position);
+    body += ringSymbol(f.px(m[0]), f.py(m[1]), "WT", IRRIGATION_BLUE, 1.8, t.id);
   }
 
   let y = SHEET_MARGIN + 8;
@@ -1127,6 +1200,7 @@ export function renderIrrigationOverlay(
     ["Planter runs (drip lines)", `${planterRuns.length}`, `${runLm.toFixed(2)} m`],
     ["Planter boxes", `${planterBoxes.length}`, ""],
     ["Drainage points", `${drains.length}`, ""],
+    ["Outdoor water taps (WT)", `${taps.length}`, ""],
   ];
   for (const [k, n, v] of rows) {
     body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.5" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(k)}</text><text x="${panelX() + 80}" y="${f2(y)}" text-anchor="end" font-size="2.5" fill="${INK_900}" style="font-family:${FONT_MONO}">${n}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.5" fill="${INK_900}" style="font-family:${FONT_MONO}">${v}</text>`;
@@ -1290,15 +1364,28 @@ export function renderCoverSheet(
     ...fullGraph.elements.filter((e) => e.site_reference).map((e) => ({ name: typeof e.spec?.name === "string" ? e.spec.name : LINEAR_ELEMENT_META[e.kind].label, tag: existingTag(e) })),
     ...allFixtures.filter((u) => u.site_reference).map((u) => ({ name: typeof u.spec?.name === "string" ? u.spec.name : UNIT_META[u.type]?.label ?? u.type, tag: existingTag(u) })),
     ...fullGraph.context.filter((c) => c.site_reference).map((c) => ({ name: c.name, tag: existingTag(c) })),
+    ...(fullGraph.openings ?? []).filter((o) => o.site_reference).map((o) => ({ name: typeof o.spec?.name === "string" ? o.spec.name : o.type, tag: existingTag(o) })),
   ];
   if (existing.length > 0) {
     let py = SHEET_MARGIN + 18;
     const px = panelX();
     body += panelHeading(py, "Existing on site");
     py += 5.5;
-    for (const e of existing.slice(0, 40)) {
-      body += `<text x="${px}" y="${f2(py)}" font-size="2.35" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(e.name.slice(0, 54))}</text><text x="${px + PANEL_W}" y="${f2(py)}" text-anchor="end" font-size="2.35" fill="${e.tag.endsWith("undecided") ? TERRACOTTA : BRASS}" style="font-family:${FONT_MONO}">${esc(e.tag.replace("existing · ", ""))}</text>`;
-      py += 3.6;
+    for (const e of existing.slice(0, 26)) {
+      const decision = e.tag.replace("existing · ", "");
+      const colour = e.tag.endsWith("undecided") ? TERRACOTTA : BRASS;
+      body += `<text x="${px}" y="${f2(py)}" font-size="2.35" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(e.name)}</text>`;
+      py += 3.1;
+      // The decision under the name, wrapped — a long "replace → …" never runs
+      // back under the name (the G5c review found it colliding).
+      for (const line of wrap(decision, 58)) {
+        body += `<text x="${px + 3}" y="${f2(py)}" font-size="2.2" fill="${colour}" style="font-family:${FONT_MONO}">${esc(line)}</text>`;
+        py += 2.9;
+      }
+      py += 1.1;
+    }
+    if (existing.length > 26) {
+      body += `<text x="${px}" y="${f2(py)}" font-size="2.2" fill="${INK_500}" style="font-family:${FONT_UI}">… and ${existing.length - 26} more, on the site plan (L-100).</text>`;
     }
   }
 

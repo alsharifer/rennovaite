@@ -230,6 +230,12 @@
       "version": "20260101003800",
       "name": "project_display_name",
       "sha256": "92ceefef9147a4885311c65d967aef350684e9ad2c31497ebc824e857b5c82c6"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003900",
+      "name": "garden_gates",
+      "sha256": "fc78401167f7d42beef80786514cbe2ff9401d3a8a7fd16d620929f4c8d84557"
     }
   ]
 }

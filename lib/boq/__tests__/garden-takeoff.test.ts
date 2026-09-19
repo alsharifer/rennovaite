@@ -211,13 +211,18 @@ describe("garden take-off — quantities", () => {
       runs: [{ id: "r", kind: "planter_run", length_m: 60 }],
     });
     const scaled = big.items.find((i) => i.item_key === "garden.irrigation")!;
-    expect(scaled.quantity).toBe(1.6); // the large band, not 59×
-    expect(scaled.measurement).toMatch(/large garden/);
+    // G5c: one allowance line — quantity 1, the band in the rate — never "1.6 lump".
+    expect(scaled.quantity).toBe(1);
+    expect(scaled.rate_factor).toBe(1.6); // the large band, not 59×
+    expect(scaled.measurement).toContain("large band = 1.6 × the reference irrigation lump (AED 11,000) = AED 17,600");
+    const [priced] = priceGardenTakeoff([scaled]);
+    expect([priced!.quantity, priced!.rate_aed, priced!.total_aed]).toEqual([1, 17_600, 17_600]);
 
     const small = computeGardenTakeoff({
       zones: [{ id: "p", name: "Bed", kind: "planting_bed", area_m2: 2 }],
     });
-    expect(small.items.find((i) => i.item_key === "garden.irrigation")!.quantity).toBe(0.6);
+    const smallIrr = small.items.find((i) => i.item_key === "garden.irrigation")!;
+    expect([smallIrr.quantity, smallIrr.rate_factor]).toEqual([1, 0.6]);
   });
 
   it("flags an untyped counter instead of silently pricing it as a bar", () => {

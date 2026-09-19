@@ -13,7 +13,7 @@ import { roomTypeLabel } from "./zones";
 
 export interface GardenSiteItem {
   id: string;
-  table: "zone" | "element" | "fixture" | "context";
+  table: "zone" | "element" | "fixture" | "context" | "opening";
   name: string;
   kindLabel: string;
   disposition: "keep" | "remove" | "replace" | null;
@@ -77,6 +77,11 @@ export async function loadGardenSiteData(sb: SupabaseClient, projectId: string, 
   }
   for (const c of graph.context.filter((x) => x.site_reference)) {
     items.push({ id: c.id, table: "context", name: c.name, kindLabel: CONTEXT_LABEL[c.kind] ?? c.kind, disposition: c.disposition, dims_derived: c.dims_derived, note: c.note });
+  }
+  // G5c (039): an existing gate is decided like every other existing item.
+  for (const o of graph.openings.filter((x) => x.site_reference)) {
+    const name = typeof o.spec?.name === "string" ? o.spec.name : `${o.type} (existing)`;
+    items.push({ id: o.id, table: "opening", name, kindLabel: o.type, disposition: disp(o.disposition), dims_derived: o.dims_derived === true, note: o.derived_note ?? null });
   }
 
   // Context outlines, back in normalised plot space for the editors.

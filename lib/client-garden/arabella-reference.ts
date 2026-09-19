@@ -42,6 +42,29 @@ const area = (poly: Pt[]) => Math.abs(poly.reduce((s, p, i) => {
   return s + p[0] * q[1] - q[0] * p[1];
 }, 0)) / 2;
 
+/**
+ * HANDEDNESS (G5c). The developer type plan depicts this unit's HANDED TWIN: the
+ * coordinates in this module are measured in the type plan's frame, and the site
+ * is its mirror image across the plot's width. Established from the client
+ * photos, not assumed: walking in from the garden entrance (WA0084–0086, the
+ * front passage) along the rear strip toward the gazebo (WA0077, WA0082), the
+ * villa is on the LEFT and the rear boundary wall with its trees on the RIGHT —
+ * which in the type-plan frame would put the villa on the right. Facing the villa
+ * from the street, the site reads: garden entrance and path on the RIGHT, then
+ * the rear strip, the gazebo/pergola corner, and the side garden on the LEFT.
+ *
+ * One reflection, x → W − x, maps type-plan frame to site; polygons and
+ * polylines are reversed with it so winding (and a run's band side) keeps its
+ * orientation. Every area and length is invariant, so every quantity is too.
+ */
+export const HANDEDNESS = { mirrored_from_type_plan: true, axis: "x" } as const;
+
+/** Type-plan frame (metres) → site frame (metres). An involution: toSite(toSite(p)) = p. */
+export const toSite = (p: Pt): Pt => [Math.round((PLOT.width_m - p[0]) * 1e6) / 1e6, p[1]];
+/** A polygon or polyline into the site frame, order reversed to keep its handedness. */
+export const toSitePath = (path: readonly Pt[]): Pt[] => path.map(toSite).reverse();
+
+/** Type-plan frame metrics (the dimension set); positions reach the site through toSite. */
 export const X = { garage: 6.3, sideGarden: 21.1, deckEdge: 23.2, plot: 26.7 } as const;
 export const Y = { rearStrip: 4.3, houseFront: 10.4, gazebo: 3.5, plot: 10.5 } as const;
 
@@ -95,6 +118,11 @@ export const CONTEXT: RefContext[] = [
   { key: "wall-corner", kind: "boundary_wall", name: "Corner boundary wall (side garden)", polygon: rect(X.plot - 0.2, 0.2, X.plot, Y.plot), height_mm: 2000, note: `${PHOTO_NOTE}; string lights fixed along it; height scaled from photos`, site_reference: true },
   { key: "wall-front", kind: "boundary_wall", name: "Side garden street wall", polygon: rect(X.sideGarden, Y.plot - 0.2, X.plot - 0.2, Y.plot), height_mm: 2000, note: `${PHOTO_NOTE}; garden entrance side`, site_reference: true },
   { key: "wall-left", kind: "boundary_wall", name: "Rear strip end wall", polygon: rect(0, 0.2, 0.2, Y.rearStrip), height_mm: 2000, note: `${PHOTO_NOTE}; height scaled from photos`, site_reference: true },
+  // G5c: the wall that separates the rear strip from the side garden, running from
+  // the rear boundary to 1.0 m short of the villa's rear face — the garden gate
+  // fills that last metre (WA0079: the opening beside the villa, the side garden's
+  // shade cloth visible through it).
+  { key: "wall-separator", kind: "boundary_wall", name: "Separator wall (rear strip | side garden)", polygon: rect(X.sideGarden - 0.7, 0.2, X.sideGarden - 0.5, Y.rearStrip - 1.0), height_mm: 2000, note: `${PHOTO_NOTE}; photo WA0079 — white wall across the strip with the garden gate beside the villa; height scaled from photos`, site_reference: true },
 ];
 
 export interface RefRun {
@@ -182,13 +210,58 @@ export const TREES: RefTree[] = [
   frangipani("tree-5", "Frangipani (existing) — side garden", [22.2, 0.8]),
 ];
 
+/** G5c: openings — the garden gate in the separator wall. */
+export interface RefOpening {
+  key: string;
+  kind: "gate";
+  name: string;
+  /** The context wall it is in. */
+  context: string;
+  position: Pt;
+  width_mm: number;
+  height_mm: number;
+  spec: Record<string, unknown>;
+}
+
+export const OPENINGS: RefOpening[] = [
+  {
+    key: "gate",
+    kind: "gate",
+    name: "Garden entrance gate (existing)",
+    context: "wall-separator",
+    position: [X.sideGarden - 0.6, Y.rearStrip - 0.5],
+    width_mm: 1000,
+    height_mm: 2000,
+    spec: { name: "Garden entrance gate (existing)", leaf: "single leaf", source: "photo WA0079 — opening in the separator wall beside the villa; width and height scaled from the photo" },
+  },
+];
+
+/** G5c: existing discrete items other than trees. */
+export interface RefUnit {
+  key: string;
+  type: "shed";
+  name: string;
+  position: Pt;
+  spec: Record<string, unknown>;
+}
+
+export const UNITS: RefUnit[] = [
+  {
+    key: "shed",
+    type: "shed",
+    name: "Garden shed (existing)",
+    position: [9.8, 2.6],
+    spec: { name: "Garden shed (existing)", width_mm: 1500, depth_mm: 1000, height_mm: 2000, source: "photos WA0079/0084/0086 — grey steel shed beside the path, before the palm" },
+  },
+];
+
 /**
  * Which client photo shows which zone, and what site-reference items are in
  * view — the manifest a before/after photo pair is checked against. Photos not
  * listed show the street frontage (outside the garden zones) and pair nothing.
  */
 export const PHOTO_COVERAGE: { file: string; zone: string; shows: string[] }[] = [
-  { file: "IMG-20260911-WA0079.jpg", zone: "rear-lawn", shows: ["path", "palm", "tree-3", "tree-4", "planter-rear"] },
+  { file: "IMG-20260911-WA0079.jpg", zone: "rear-lawn", shows: ["path", "palm", "tree-3", "tree-4", "planter-rear", "shed", "gate"] },
   { file: "IMG-20260911-WA0082.jpg", zone: "rear-lawn", shows: ["path", "planter-rear", "tree-1", "tree-2"] },
   { file: "IMG-20260911-WA0080.jpg", zone: "side-lawn", shows: ["gazebo", "sink-counter", "lights-corner"] },
   { file: "IMG-20260911-WA0083.jpg", zone: "side-lawn", shows: ["gazebo", "sink-counter", "lights-across"] },
@@ -202,14 +275,16 @@ export const PHOTO_COVERAGE: { file: string; zone: string; shows: string[] }[] =
 export const photoAssetFiles = (): string[] =>
   ["0073", "0074", "0075", "0076", "0077", "0078", "0079", "0080", "0081", "0082", "0083", "0084", "0085", "0086"].map((n) => `IMG-20260911-WA${n}.jpg`);
 
-/** The records in normalised plan space, as the routes store them. */
+/** The records in normalised plan space, as the routes store them — in the SITE frame. */
 export function arabellaReferenceRecords() {
   return {
     plot: PLOT,
-    zones: ZONES.map((z) => ({ ...z, polygon: z.polygon.map(norm) })),
-    context: CONTEXT.map((c) => ({ ...c, polygon: c.polygon.map(norm) })),
-    runs: RUNS.map((r) => ({ ...r, polyline: r.polyline.map(norm) })),
-    trees: TREES.map((t) => ({ ...t, position: norm(t.position) })),
+    zones: ZONES.map((z) => ({ ...z, polygon: toSitePath(z.polygon).map(norm) })),
+    context: CONTEXT.map((c) => ({ ...c, polygon: toSitePath(c.polygon).map(norm) })),
+    runs: RUNS.map((r) => ({ ...r, polyline: toSitePath(r.polyline).map(norm) })),
+    trees: TREES.map((t) => ({ ...t, position: norm(toSite(t.position)) })),
+    openings: OPENINGS.map((o) => ({ ...o, position: norm(toSite(o.position)) })),
+    units: UNITS.map((u) => ({ ...u, position: norm(toSite(u.position)) })),
   };
 }
 
@@ -272,16 +347,45 @@ export function arabellaPlanInput(dispositions: Record<string, "keep" | "remove"
       site_reference: c.site_reference === true,
       disposition: c.site_reference ? disp(c.key) : null,
     })),
-    fixtures: rec.trees.map((t) => ({
-      id: `t-${t.key}`,
-      layer: "landscape",
-      type: "tree",
-      room_id: null as string | null,
-      position: t.position,
-      spec: t.spec as Record<string, unknown> | null,
+    fixtures: [
+      ...rec.trees.map((t) => ({
+        id: `t-${t.key}`,
+        layer: "landscape",
+        type: "tree",
+        room_id: null as string | null,
+        position: t.position,
+        spec: t.spec as Record<string, unknown> | null,
+        site_reference: true,
+        disposition: disp(t.key),
+        dims_derived: true,
+      })),
+      ...rec.units.map((u) => ({
+        id: `u-${u.key}`,
+        layer: "landscape",
+        type: u.type as string,
+        room_id: null as string | null,
+        position: u.position,
+        spec: u.spec as Record<string, unknown> | null,
+        site_reference: true,
+        disposition: disp(u.key),
+        dims_derived: true,
+      })),
+    ],
+    openings: rec.openings.map((o) => ({
+      id: `o-${o.key}`,
+      type: o.kind as string,
+      width_mm: o.width_mm,
+      height_mm: o.height_mm,
+      sill_mm: 0,
+      position: o.position,
+      source: "user_drawn",
+      derived: true,
+      context_id: `c-${o.context}`,
+      spec: o.spec,
       site_reference: true,
-      disposition: disp(t.key),
+      disposition: disp(o.key),
       dims_derived: true,
+      derived_note: SOURCE_NOTE,
     })),
   };
 }

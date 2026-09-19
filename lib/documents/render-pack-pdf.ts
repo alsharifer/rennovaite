@@ -19,8 +19,11 @@ import { loadDocumentProject } from "@/lib/documents/project-name";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { graphDraftStatus } from "@/lib/plan/geometry";
 import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
+import { SCENE_PIPELINE_VERSION } from "@/lib/scene-render/prompts";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+import { loadParity } from "./parity-load";
+import type { ParityResult } from "./parity";
 import { PAGE_H, PAGE_W, buildRenderPack, containFit, packMix, type PackGardenView, type PackMix, type PackPhotoPair, type PackRender, type PackZone } from "./render-pack";
 
 const MM_TO_PT = 72 / 25.4;
@@ -31,6 +34,10 @@ export interface GateRow {
   view: "day" | "evening" | "photo_pair";
   outcome: "passed" | "substituted" | "missing";
   attempts: { attempt: number; passed: boolean; failures: string[] }[];
+  /** G5c: cross-view consistency of a passed day render against the anchor view. */
+  consistency?: { passed: boolean; failures: string[]; anchor: boolean } | null;
+  /** G5c: why a design view shipped (gate_failed, inconsistent, no_passed_day…). */
+  reason?: string | null;
 }
 
 export interface RenderPackSummary {
@@ -40,6 +47,8 @@ export interface RenderPackSummary {
   missing_images: string[];
   /** G5: before/after pairs + 3D design views (the backbone) and the styled renders that passed. */
   mix: PackMix;
+  /** G5c: does the BoQ agree with the drawings and the views? */
+  parity: ParityResult;
 }
 
 async function fetchBytes(url: string): Promise<Uint8Array | null> {
@@ -111,19 +120,59 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   const styleKey = (styleRes.data?.[0]?.style_key as string | undefined) ?? null;
   const style = styleKey ? getGardenStyle(isGardenStyleKey(styleKey) ? styleKey : gardenStyleFor(styleKey)) : null;
 
-  type SceneRow = { id: string; camera: string; view: string; image_url: string; project_id: string; gate: { outcome: "passed" | "substituted"; design_view_reason?: string | null; scene_url?: string; attempts: { attempt: number; passed: boolean; failures: string[] }[] } | null };
+  type SceneRow = {
+    id: string;
+    camera: string;
+    view: string;
+    image_url: string;
+    project_id: string;
+    gate: {
+      outcome: "passed" | "substituted";
+      design_view_reason?: string | null;
+      scene_url?: string;
+      flat_url?: string;
+      pipeline?: string;
+      scene_hash?: string;
+      spec_hash?: string;
+      consistency?: { anchor_id: string; passed: boolean; failures: string[]; status: string };
+      attempts: { attempt: number; passed: boolean; failures: string[] }[];
+    } | null;
+  };
   const designUrls = new Map<string, string>();
-  const rows = ((sceneRes.data ?? []) as SceneRow[]).filter((r) => r.project_id === projectId && r.gate);
-  const latest = (camera: string, view: "day" | "evening") => rows.find((r) => r.camera === camera && (r.view === "evening" ? "evening" : "day") === view) ?? null;
+  // G5c: only renders of THIS design — current pipeline, scene and specification.
+  // An older render of a camera id that still exists is not a view of the garden
+  // as it now stands.
+  const rows = ((sceneRes.data ?? []) as SceneRow[]).filter(
+    (r) => r.project_id === projectId && r.gate && (!ctx || (r.gate.pipeline === SCENE_PIPELINE_VERSION && r.gate.scene_hash === ctx.sceneHash && r.gate.spec_hash === ctx.specHash)),
+  );
+  // G5c: the BEST render of this design for a camera, not merely the newest one.
+  // Several rows can exist for one view (a re-run with different conditioning);
+  // they are all renders of the same garden, so a view that passed its gate — and
+  // the anchor's consistency check — is what may ship, newest first.
+  const latest = (camera: string, view: "day" | "evening") => {
+    const forView = rows.filter((r) => r.camera === camera && (r.view === "evening" ? "evening" : "day") === view);
+    const passed = forView.filter((r) => r.gate!.outcome === "passed" && r.gate!.attempts.some((a) => a.passed));
+    const consistent = passed.filter((r) => r.gate!.consistency?.status !== "ran" || r.gate!.consistency.passed);
+    return consistent[0] ?? passed[0] ?? forView[0] ?? null;
+  };
   const toPack = (r: SceneRow | null): PackRender | null => {
     if (!r) return null;
-    const passed = r.gate!.outcome === "passed" && r.gate!.attempts.some((a) => a.passed);
-    const lastFailure = r.gate!.attempts.at(-1)?.failures?.[0] ?? null;
-    const byChoice = !passed && r.gate!.design_view_reason === "no_clean_camera";
-    // A passed DAY render carries the day design model it was checked against.
-    const design = passed && r.view !== "evening" && r.gate!.scene_url ? { id: `design:${r.id}` } : null;
-    if (design) designUrls.set(design.id, r.gate!.scene_url!);
-    return { id: r.id, image_url: r.image_url, kind: passed ? "render" : "design_view", gate_passed: passed, note: passed || byChoice ? null : lastFailure, by_choice: byChoice, design };
+    const gatePassed = r.gate!.outcome === "passed" && r.gate!.attempts.some((a) => a.passed);
+    // G5c: a render that passed its own gate but shows a different garden from the
+    // anchor view does not enter the pack as a render.
+    const inconsistent = gatePassed && r.view !== "evening" && r.gate!.consistency?.status === "ran" && r.gate!.consistency.passed === false;
+    const passed = gatePassed && !inconsistent;
+    const lastFailure = inconsistent ? `render withheld — ${r.gate!.consistency!.failures[0] ?? "inconsistent with the other views"}` : (r.gate!.attempts.at(-1)?.failures?.[0] ?? null);
+    const byChoice = !passed && !inconsistent && r.gate!.design_view_reason === "no_clean_camera";
+    // A passed DAY render carries the FLAT line model it was checked against, as a
+    // small inset (G5c: the line model is never a main image).
+    const insetUrl = r.gate!.flat_url ?? r.gate!.scene_url;
+    const design = passed && r.view !== "evening" && insetUrl ? { id: `design:${r.id}` } : null;
+    if (design) designUrls.set(design.id, insetUrl!);
+    // A design view's main image is the TEXTURED model (the substitution's image_url;
+    // for an inconsistent render, the model it was conditioned on).
+    const image_url = inconsistent ? (r.gate!.scene_url ?? r.image_url) : r.image_url;
+    return { id: inconsistent ? `textured:${r.id}` : r.id, image_url, kind: passed ? "render" : "design_view", gate_passed: passed, note: passed || byChoice ? null : lastFailure, by_choice: byChoice, design };
   };
   const cameras = ctx?.cameras ?? [];
   const byRoom: Record<string, { day: PackRender | null; evening: PackRender | null }> = {};
@@ -146,8 +195,14 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   const pairRows = ((pairData ?? []) as (PairRow & { project_id: string })[]).filter((r) => r.project_id === projectId && r.gate);
   const latestPair = new Map<string, PairRow>();
   for (const r of pairRows) if (!latestPair.has(r.camera)) latestPair.set(r.camera, r);
-  const photoPairs: PackPhotoPair[] = [...latestPair.values()]
-    .filter((r) => r.gate!.outcome === "passed" && r.gate!.attempts.some((a) => a.passed))
+  // G5c: ONE pair per zone. Two photos of the same zone can both pass, and two
+  // before/after pages of the same corner is a pack repeating itself.
+  const perZone = new Map<string, PairRow>();
+  for (const r of [...latestPair.values()].filter((r) => r.gate!.outcome === "passed" && r.gate!.attempts.some((a) => a.passed))) {
+    const zone = r.room_id ?? r.gate!.zone_name ?? r.camera;
+    if (!perZone.has(zone)) perZone.set(zone, r);
+  }
+  const photoPairs: PackPhotoPair[] = [...perZone.values()]
     .map((r) => ({
       id: r.id,
       zoneName: r.gate!.zone_name ?? graph.rooms.find((z) => z.id === r.room_id)?.name_en ?? "Garden",
@@ -169,7 +224,17 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   gate.push(...cameras.flatMap((c) =>
     (c.lit ? (["day", "evening"] as const) : (["day"] as const)).map((view) => {
       const r = latest(c.id, view);
-      return { camera: c.id, label: c.label, view, outcome: (r ? r.gate!.outcome : "missing") as GateRow["outcome"], attempts: r ? r.gate!.attempts.map((a) => ({ attempt: a.attempt, passed: a.passed, failures: a.failures })) : [] };
+      const cons = r && view === "day" && r.gate!.outcome === "passed" && r.gate!.consistency ? r.gate!.consistency : null;
+      const inconsistent = cons?.status === "ran" && cons.passed === false;
+      return {
+        camera: c.id,
+        label: c.label,
+        view,
+        outcome: (r ? (inconsistent ? "substituted" : r.gate!.outcome) : "missing") as GateRow["outcome"],
+        attempts: r ? r.gate!.attempts.map((a) => ({ attempt: a.attempt, passed: a.passed, failures: a.failures })) : [],
+        consistency: cons ? { passed: cons.passed, failures: cons.failures, anchor: cons.anchor_id === r!.id } : null,
+        reason: r && (inconsistent || r.gate!.outcome !== "passed") ? (inconsistent ? "inconsistent" : (r.gate!.design_view_reason ?? null)) : null,
+      };
     }),
   ));
 
@@ -255,7 +320,10 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
     }
   }
 
+  // G5c: the parity gate runs on every pack export.
+  const parity = await loadParity(supabase, projectId);
   const summary: RenderPackSummary = {
+    parity,
     gate,
     pages: pages.map((p) => ({ kind: p.kind, title: p.title, images: p.images.length })),
     zones: zones.map((z: PackZone) => ({

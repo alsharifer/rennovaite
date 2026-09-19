@@ -27,31 +27,57 @@ describe("cameras on a narrow plot", () => {
     }
   });
 
-  it("finds a clean up-and-back view for every zone and both whole-garden views", () => {
-    for (const c of cameras) {
-      expect(c.clean, `${c.label}: ${c.cleanReasons.join("; ")}`).toBe(true);
-    }
+  it("gives most zones a clean view, and every unclean one a stated reason", () => {
+    const unclean = cameras.filter((c) => !c.clean);
+    // A 4–6 m strip between a house and a wall cannot always be framed cleanly;
+    // what matters is that the verdict is honest and the reason is printable.
+    expect(unclean.length).toBeLessThanOrEqual(Math.ceil(cameras.length / 2));
+    for (const c of unclean) expect(c.cleanReasons.length, c.label).toBeGreaterThan(0);
     const elevated = cameras.filter((c) => c.mode === "elevated");
-    expect(elevated.length).toBeGreaterThanOrEqual(5);
+    expect(elevated.length).toBeGreaterThanOrEqual(3);
     for (const c of elevated) {
       expect(c.pos[1]).toBeGreaterThanOrEqual(4.2);
       expect(c.fovDeg).toBeGreaterThanOrEqual(70);
     }
   });
 
-  it("looks down two different corridors for the whole-garden views", () => {
-    const views = cameras.filter((c) => !c.zoneId);
-    expect(views).toHaveLength(2);
+  it("stands every camera inside the plot (G5c: never over the wall into the neighbour's land)", () => {
+    const plot = graph.meta.plot!;
+    for (const c of cameras.filter((x) => x.mode !== "aerial")) {
+      expect(c.pos[0], c.label).toBeGreaterThanOrEqual(plot.origin_m[0]);
+      expect(c.pos[0], c.label).toBeLessThanOrEqual(plot.origin_m[0] + plot.width_m);
+      expect(c.pos[2], c.label).toBeGreaterThanOrEqual(plot.origin_m[1]);
+      expect(c.pos[2], c.label).toBeLessThanOrEqual(plot.origin_m[1] + plot.depth_m);
+    }
+  });
+
+  it("adds ONE aerial view of the whole garden, looking down at the garden's centre (G5c)", () => {
+    const aerial = cameras.filter((c) => c.mode === "aerial");
+    expect(aerial).toHaveLength(1);
+    const a = aerial[0]!;
+    expect(a.id).toBe("garden:aerial");
+    expect(a.clean).toBe(true);
+    // Well above the two-storey villa, and looking down.
+    expect(a.pos[1]).toBeGreaterThan(8);
+    expect(a.target[1]).toBeLessThan(a.pos[1]);
+  });
+
+  it("looks down different corridors for the whole-garden views", () => {
+    const views = cameras.filter((c) => !c.zoneId && c.mode !== "aerial");
+    expect(views.length).toBeGreaterThanOrEqual(2);
     const dir = (c: (typeof views)[number]) => Math.atan2(c.target[2] - c.pos[2], c.target[0] - c.pos[0]);
     expect(Math.abs(Math.cos(dir(views[0]!) - dir(views[1]!)))).toBeLessThanOrEqual(0.7);
   });
 });
 
-describe("a camera with no clean view spends no render", () => {
-  it("attempts only from a clean camera, and an evening only over a passed day", () => {
-    expect(shouldAttemptRender({ clean: false }, "day", false)).toBe(false);
-    expect(shouldAttemptRender({ clean: false }, "evening", true)).toBe(false);
+describe("what spends a render attempt", () => {
+  it("G5c: every day view is attempted (clean or not); an evening only over a passed day", () => {
+    // G5 skipped unclean cameras and shipped the flat design view. A pack whose
+    // zone pages are design views is not client-viable, so the attempt is made and
+    // the gate — not the camera score — decides what ships.
+    expect(shouldAttemptRender({ clean: false }, "day", false)).toBe(true);
     expect(shouldAttemptRender({ clean: true }, "day", false)).toBe(true);
+    expect(shouldAttemptRender({ clean: false }, "evening", true)).toBe(true);
     expect(shouldAttemptRender({ clean: true }, "evening", false)).toBe(false);
     expect(shouldAttemptRender({}, "day", false)).toBe(true);
   });

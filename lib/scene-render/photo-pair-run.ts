@@ -91,7 +91,7 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
       items.push({ noun: `the ${species} tree`, disposition: f.site_reference && isDisposition(f.disposition) ? f.disposition : null });
     }
   }
-  const manifest: PairManifest = pairManifest({ projectId: input.projectId, assetId: input.assetId, zoneName: zone.name_en, zoneSurface: SURFACE_NOUN[zone.type ?? ""] ?? "garden surface", items });
+  const manifest: PairManifest = pairManifest({ projectId: input.projectId, assetId: input.assetId, zoneName: zone.name_en, zoneSurface: SURFACE_NOUN[zone.type ?? ""] ?? "garden surface", items, spec: ctx.spec });
   const cacheKey = pairCacheKey(manifest, ctx.style.key);
   const camera = `photo:${input.assetId}`;
 

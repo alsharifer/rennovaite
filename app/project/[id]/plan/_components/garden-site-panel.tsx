@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 //  - A friction log, because the list of what got in the designer's way is pilot
 //    data and is only accurate when written down at the moment.
 
-export type SiteItemTable = "zone" | "element" | "fixture" | "context";
+export type SiteItemTable = "zone" | "element" | "fixture" | "context" | "opening";
 
 export interface SiteItem {
   id: string;
@@ -84,6 +84,7 @@ export function GardenSitePanel({
       if (item.table === "zone") await send("/api/plan-zones", "PATCH", { id: item.id, disposition });
       else if (item.table === "element") await send("/api/plan-elements", "PATCH", { id: item.id, disposition });
       else if (item.table === "context") await send("/api/plan-context", "PATCH", { id: item.id, disposition });
+      else if (item.table === "opening") await send("/api/plan-openings", "PATCH", { id: item.id, disposition });
       else if (item.fixture) await send("/api/plan-fixtures", "POST", { id: item.id, project_id: projectId, ...item.fixture, disposition });
       router.refresh();
     } catch (e) {
@@ -128,6 +129,7 @@ export function GardenSitePanel({
     { table: "element", label: "Runs" },
     { table: "fixture", label: "Trees & points" },
     { table: "context", label: "Boundary" },
+    { table: "opening", label: "Gates" },
   ];
   const ready = untypedCounters.length === 0 && undecided.length === 0;
 

@@ -50,6 +50,9 @@ export function designDecisions(graph: PlanGraph, fixtures: readonly GardenFixtu
   for (const c of graph.context.filter((x) => x.site_reference)) {
     rows.push({ item: c.name, kind: "boundary", decision: decisionOf(c.disposition), becomes: null, note: null });
   }
+  for (const o of (graph.openings ?? []).filter((x) => x.site_reference)) {
+    rows.push({ item: clean(str(o.spec?.name) ?? o.type), kind: o.type, decision: decisionOf(o.disposition), becomes: o.disposition === "replace" ? str(o.spec?.replaced_by) ?? "renewed in place" : null, note: str(o.spec?.decision_note) });
+  }
   const order = { REPLACE: 0, REMOVE: 1, KEEP: 2, UNDECIDED: 3 } as const;
   return rows.sort((a, b) => order[a.decision] - order[b.decision] || a.item.localeCompare(b.item));
 }
