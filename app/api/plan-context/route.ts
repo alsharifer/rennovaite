@@ -22,7 +22,7 @@ function enabled(): boolean {
   return process.env.GARDEN_PILOT_ENABLED === "true";
 }
 
-const COLS = "id, plan_id, kind, name, polygon, base_mm, height_mm, derived, note, source, dims_derived, site_reference, disposition, created_at";
+const COLS = "id, plan_id, kind, name, polygon, base_mm, height_mm, derived, note, source, dims_derived, site_reference, disposition, spec, created_at";
 
 const KindSchema = z.enum(["existing_building", "existing_structure", "steps", "boundary_wall"]);
 const PolygonSchema = z.array(z.tuple([z.number().finite(), z.number().finite()])).min(3);
@@ -39,6 +39,8 @@ const Fields = {
   dims_derived: z.boolean().optional(),
   site_reference: z.boolean().optional(),
   disposition: z.enum(["keep", "remove", "replace"]).nullish(),
+  /** G5d (040): what stands beyond a boundary wall — the 3D scene reads it. */
+  spec: z.object({ beyond: z.enum(["neighbour", "street", "open"]).optional() }).passthrough().nullish(),
 };
 
 const CreateSchema = z.object({ plan_id: z.string().uuid(), ...Fields });
@@ -77,6 +79,7 @@ export async function POST(request: NextRequest) {
         dims_derived: b.dims_derived ?? false,
         site_reference: b.site_reference ?? false,
         disposition: b.disposition ?? null,
+        ...(b.spec ? { spec: b.spec } : {}),
       })
       .select(COLS)
       .single();

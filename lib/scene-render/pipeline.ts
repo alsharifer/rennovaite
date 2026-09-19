@@ -70,6 +70,9 @@ export interface AttemptRecord {
   failures: string[];
   summary: string;
   gate_status: GateVerdict["status"];
+  /** G5d: the built-feature placement check ran on this attempt, and what it found. */
+  placement_checked?: boolean;
+  placements?: GateVerdict["placements"];
 }
 
 /**
@@ -354,7 +357,7 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
       b64(bytes, isJpeg(bytes) ? "image/jpeg" : "image/png"),
       view === "evening" ? b64(designPng, "image/png") : undefined,
     );
-    attempts.push({ attempt, model: PRIMARY_MODEL, image_url: url, passed: verdict.passed, failures: verdict.failures, summary: verdict.reply?.summary ?? "", gate_status: verdict.status });
+    attempts.push({ attempt, model: PRIMARY_MODEL, image_url: url, passed: verdict.passed, failures: verdict.failures, summary: verdict.reply?.summary ?? "", gate_status: verdict.status, placement_checked: verdict.placement_checked === true, placements: verdict.placements });
     if (verdict.passed) final = { url, outcome: "passed", prompt, model: PRIMARY_MODEL };
   }
   // A model that could not run at all (no credit, outage) is not a render that
@@ -384,7 +387,8 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
     attempts,
     gate_model: "claude-opus-5",
   };
-  const { data: row, error } = await sb
+  // G5d: retry a dropped connection — the render is paid for; losing its row loses it.
+  const insertRow = () => sb
     .from("renders")
     .insert({
       project_id: ctx.projectId,
@@ -402,6 +406,18 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
     })
     .select("id")
     .single<{ id: string }>();
+  let saved: Awaited<ReturnType<typeof insertRow>> | null = null;
+  for (let i = 0; i < 4; i++) {
+    try {
+      saved = await insertRow();
+      if (!saved.error || !/fetch failed|network|timeout/i.test(saved.error.message)) break;
+    } catch (e) {
+      if (i === 3) throw e;
+    }
+    await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+  }
+  const row = saved?.data;
+  const error = saved?.error;
   if (error || !row) throw new Error(`could not save the render: ${error?.message}`);
   return { render_id: row.id, image_url: final.url, view, camera_id: cameraId, outcome: final.outcome, design_view_reason: designViewReason, cached: false, attempts };
 }

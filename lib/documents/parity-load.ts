@@ -23,7 +23,7 @@ const COSTED_FIXTURES = new Set(["garden_light", "boundary_light", "water_tap", 
 
 export async function loadParity(sb: SupabaseClient, projectId: string): Promise<ParityResult> {
   const [boqRes, graph, ctx, set] = await Promise.all([
-    sb.from("boqs").select("sections").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ sections: { sections: { lines: ParityBoqLine[] }[] } }>(),
+    sb.from("boqs").select("sections").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ sections: { sections: { lines: (ParityBoqLine & { measurement?: string })[] }[] } }>(),
     derivePlanGraph(projectId),
     loadGardenSceneContext(projectId).catch(() => null),
     generateDrawingSet(projectId),
@@ -50,6 +50,8 @@ export async function loadParity(sb: SupabaseClient, projectId: string): Promise
   ];
 
   const sheets = set.sheets.map((s) => ({ sheetNumber: s.sheetNumber, ids: sheetIds(s.svg) }));
+  // G5d: the services overlays, whose symbols are counted against their lines.
+  const overlaySheets = set.sheets.filter((s) => s.kind === "lighting_overlay" || s.kind === "irrigation_overlay").map((s) => s.sheetNumber);
 
   // What each pack view shows. The manifest is read off the flat model at render
   // resolution — the same image the pipeline builds the manifest from.
@@ -79,5 +81,5 @@ export async function loadParity(sb: SupabaseClient, projectId: string): Promise
   // A pair names items by noun; match them back to the elements they are.
   const pairBeforeIds = elements.filter((e) => e.status === "removed" && [...pairNouns].some((n) => n.includes(e.name.toLowerCase().split(" (")[0]!) || e.name.toLowerCase().includes(n.replace(/^the /, "")))).map((e) => e.id);
 
-  return buildParity({ lines, elements, sheets, views, pairBeforeIds });
+  return buildParity({ lines, elements, sheets, views, pairBeforeIds, overlaySheets });
 }

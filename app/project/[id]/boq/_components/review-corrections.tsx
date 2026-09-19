@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 // count and the mix of types are the pilot's headline metric. Nothing here edits
 // the BoQ or the rate book.
 
-type CorrectionType = "rate" | "quantity" | "scope" | "design";
+type CorrectionType = "rate" | "quantity" | "scope" | "design" | "confirm";
 
 interface LineOption {
   key: string;
@@ -35,6 +35,8 @@ const TYPES: { value: CorrectionType; label: string; hint: string }[] = [
   { value: "quantity", label: "Quantity", hint: "The measured quantity is wrong" },
   { value: "scope", label: "Scope", hint: "A line is missing, extra, or covers the wrong work" },
   { value: "design", label: "Design", hint: "The design itself changes (a different element or finish)" },
+  // G5d: "this looks right" is a milestone, captured like any other reaction.
+  { value: "confirm", label: "Confirm", hint: "The line (or the whole BoQ) is right as priced" },
 ];
 
 export function ReviewCorrections({ projectId, boqId, lines }: { projectId: string; boqId: string | null; lines: LineOption[] }) {
@@ -60,7 +62,7 @@ export function ReviewCorrections({ projectId, boqId, lines }: { projectId: stri
 
   const line = lines.find((l) => l.key === lineKey) ?? null;
   const counts = useMemo(() => {
-    const c: Record<CorrectionType, number> = { rate: 0, quantity: 0, scope: 0, design: 0 };
+    const c: Record<CorrectionType, number> = { rate: 0, quantity: 0, scope: 0, design: 0, confirm: 0 };
     for (const i of items) c[i.correction_type] += 1;
     return c;
   }, [items]);
@@ -68,7 +70,7 @@ export function ReviewCorrections({ projectId, boqId, lines }: { projectId: stri
   const oldValue = type === "rate" ? line?.rate_aed ?? null : type === "quantity" ? line?.quantity ?? null : null;
 
   const save = async () => {
-    if (!line && type !== "scope" && type !== "design") return;
+    if (!line && type !== "scope" && type !== "design" && type !== "confirm") return;
     setSaving(true);
     setError(null);
     try {

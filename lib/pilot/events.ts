@@ -14,7 +14,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type PilotEventKind = "plan_started" | "plan_saved" | "design_edit" | "boq_generated" | "pack_exported" | "friction";
+export type PilotEventKind = "plan_started" | "plan_saved" | "design_edit" | "boq_generated" | "pack_exported" | "friction" | "session_decision" | "correction";
 
 export interface PilotEvent {
   kind: PilotEventKind;
@@ -85,7 +85,13 @@ export interface PilotMetrics {
     attempt_pass_rate: number | null;
   };
   friction: { at: string; note: string; area: string | null }[];
-  corrections: { total: number; by_type: Record<"rate" | "quantity" | "scope" | "design", number> };
+  corrections: { total: number; by_type: Record<"rate" | "quantity" | "scope" | "design" | "confirm", number> };
+  /**
+   * G5d: real design-session data — the decisions applied and the corrections
+   * captured at a working session with a firm, per instrumentation record
+   * ("three-firms #1"). Script-applied geometry is not counted as designer time.
+   */
+  sessions: { record: string; decisions: number; corrections: Record<string, number> }[];
 }
 
 const minutes = (a: string, b: string) => Math.round(((Date.parse(b) - Date.parse(a)) / 60000) * 10) / 10;
@@ -102,7 +108,7 @@ export function computePilotMetrics(
   const boqs = sorted.filter((e) => e.kind === "boq_generated");
   const full = boqs.find((e) => e.detail?.full === true) ?? null;
   // Script-seeded edits (Step 1 layout, a seeded design proposal) are not the designer drawing.
-  const edits = sorted.filter((e) => (e.kind === "plan_saved" || e.kind === "design_edit") && e.detail?.stage !== "reference_layout" && e.detail?.stage !== "design_seed" && e.detail?.stage !== "geometry_fix");
+  const edits = sorted.filter((e) => (e.kind === "plan_saved" || e.kind === "design_edit") && e.detail?.stage !== "reference_layout" && e.detail?.stage !== "design_seed" && e.detail?.stage !== "geometry_fix" && e.detail?.stage !== "session_apply");
   const lastEditBeforeFull = full ? [...edits].reverse().find((e) => e.recorded_at <= full.recorded_at) : edits[edits.length - 1];
   const session = lastEditBeforeFull ? edits.filter((e) => e.recorded_at <= lastEditBeforeFull.recorded_at) : [];
   let active = 0;
@@ -114,8 +120,19 @@ export function computePilotMetrics(
   const gated = renders.filter((r) => r.gate?.outcome === "passed" || r.gate?.outcome === "substituted");
   const passed = gated.filter((r) => r.gate!.outcome === "passed").length;
   const attempts = gated.flatMap((r) => r.gate!.attempts ?? []);
-  const byType = { rate: 0, quantity: 0, scope: 0, design: 0 };
+  const byType = { rate: 0, quantity: 0, scope: 0, design: 0, confirm: 0 };
   for (const c of corrections) if (c.correction_type in byType) byType[c.correction_type as keyof typeof byType]++;
+  const records = new Map<string, { record: string; decisions: number; corrections: Record<string, number> }>();
+  for (const e of sorted.filter((x) => (x.kind === "session_decision" || x.kind === "correction") && typeof x.detail?.record === "string")) {
+    const key = String(e.detail!.record);
+    const r = records.get(key) ?? { record: key, decisions: 0, corrections: {} };
+    if (e.kind === "session_decision") r.decisions++;
+    else {
+      const t = String(e.detail?.correction_type ?? "unknown");
+      r.corrections[t] = (r.corrections[t] ?? 0) + 1;
+    }
+    records.set(key, r);
+  }
 
   return {
     time_to_draw_plan_min: session.length ? minutes(session[0]!.recorded_at, lastEditBeforeFull!.recorded_at) : null,
@@ -134,5 +151,6 @@ export function computePilotMetrics(
       .filter((e) => e.kind === "friction")
       .map((e) => ({ at: e.recorded_at, note: String(e.detail?.note ?? ""), area: typeof e.detail?.area === "string" ? e.detail.area : null })),
     corrections: { total: corrections.length, by_type: byType },
+    sessions: [...records.values()],
   };
 }

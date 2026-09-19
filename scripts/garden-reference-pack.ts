@@ -112,6 +112,16 @@ async function main() {
   const price = packPages.map((s, i) => [i + 1, textOf(s)] as const).filter(([, t]) => /\bAED\b|\brates?\b/.test(t) || /\bprice/i.test(t)).map(([i]) => `pack page ${i}`);
   check("no price or rate in the render pack", price.length === 0, price.join("; "));
   check("no design-assumptions page (nothing proposed on a completed garden)", !packPages.some((s) => s.includes("Design assumptions")));
+  // G5d: the same client-facing rules as the client pack.
+  const packText = packPages.map(textOf).join(" ");
+  check("client-safe captions: no QA text in the pack", !/No render passed the checks|textured design model is shown|gate unavailable/i.test(packText) && !/Evening view not rendered/.test(packText));
+  const fonts = packPages.flatMap((s, i) => ((summary.pages[i] as { kind?: string } | undefined)?.kind === "plan_overview" ? [] : [...s.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1]))));
+  check("legibility: no text in the render pack under 3.1 mm", fonts.every((f) => f >= 3.1), `min ${Math.min(...fonts)} mm`);
+  const { SCENE_PIPELINE_VERSION } = await import("@/lib/scene-render/prompts");
+  const { data: rows } = await db.from("renders").select("camera, gate").eq("project_id", PROJECT).eq("mode", "scene").eq("status", "succeeded");
+  const passedNow = ((rows ?? []) as { camera: string; gate: { pipeline?: string; outcome?: string; attempts?: { passed: boolean; placement_checked?: boolean }[] } | null }[]).filter((r) => r.gate?.pipeline === SCENE_PIPELINE_VERSION && r.gate.outcome === "passed");
+  const unplaced = passedNow.filter((r) => !r.gate!.attempts!.some((a) => a.passed && a.placement_checked === true));
+  if (RENDER) check("extended gate: every passed render checked built-feature placement against the scene", unplaced.length === 0 && passedNow.length > 0, `${passedNow.length} passed render(s)${unplaced.length ? `; unchecked: ${unplaced.map((r) => r.camera).join(", ")}` : ""}`);
 
   // --- 5. gate table + mix --------------------------------------------------------------
   const gate = summary.gate;

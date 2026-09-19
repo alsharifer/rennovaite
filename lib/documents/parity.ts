@@ -46,6 +46,19 @@ export interface ParityInput {
   views: { camera: string; label: string; ids: string[] }[];
   /** Existing items a passed before/after pair shows in its BEFORE photo (for demolition). */
   pairBeforeIds?: string[];
+  /** G5d: overlay sheet numbers (L-401 lighting, L-402 irrigation & drainage) — their symbols are counted. */
+  overlaySheets?: string[];
+}
+
+/** G5d: one overlay symbol type, counted on the overlay sheets and in its BoQ line. */
+export interface ParityOverlayRow {
+  type: string;
+  symbols: number;
+  sheets: string[];
+  rule_id: string | null;
+  line_qty: number | null;
+  status: "ok" | "fail";
+  reason: string | null;
 }
 
 export interface ParityLineRow {
@@ -71,7 +84,21 @@ export interface ParityResult {
   clean: boolean;
   lines: ParityLineRow[];
   elements: ParityElementRow[];
+  /** G5d: overlay symbol counts against their BoQ lines. */
+  overlays: ParityOverlayRow[];
 }
+
+/**
+ * G5d: the overlay symbol types a BoQ line counts, and the line that counts them.
+ * Garden lights are two lines (cabling + fitting) of the same quantity; the
+ * cabling line stands for both.
+ */
+const OVERLAY_LINES: Record<string, string> = {
+  garden_light: "GL-16",
+  boundary_light: "GL-18",
+  water_tap: "GL-26",
+  drainage_point: "GL-28",
+};
 
 /** Lines that are the project, not an element. */
 const PROJECT_LEVEL: Record<string, string> = {
@@ -79,10 +106,13 @@ const PROJECT_LEVEL: Record<string, string> = {
   "GL-02": "project-level lump (mobilisation, site management) — no drawn element",
 };
 
-/** Elements with a cost impact that the rate book prices inside another line. */
-const ABSORBED: Record<string, string> = {
-  drainage_point: "absorbed into the contract rate (reference project quoted drainage points at zero) — no line by rule",
-};
+/**
+ * Elements with a cost impact that the rate book prices inside another line.
+ * G5d: none today — drainage points were here (absorbed at zero in the reference
+ * contract) until L-402 drew two that no line counted; they are now a QS-to-price
+ * line (GL-28), and the overlay count below holds every symbol type to its line.
+ */
+const ABSORBED: Record<string, string> = {};
 
 /** Which elements a line stands for, when its element_refs do not say. */
 function lineElements(line: ParityBoqLine, elements: readonly ParityElement[]): string[] {
@@ -96,6 +126,10 @@ function lineElements(line: ParityBoqLine, elements: readonly ParityElement[]): 
       return newOf((e) => e.table === "fixture" && e.kind === "garden_light");
     case "GL-18":
       return newOf((e) => e.table === "fixture" && e.kind === "boundary_light");
+    case "GL-26":
+      return newOf((e) => e.table === "fixture" && e.kind === "water_tap");
+    case "GL-28":
+      return newOf((e) => e.table === "fixture" && e.kind === "drainage_point");
     case "GL-03":
       return elements.filter((e) => e.status === "removed").map((e) => e.id);
     default:
@@ -142,7 +176,49 @@ export function buildParity(input: ParityInput): ParityResult {
       return { id: e.id, name: e.name, kind: e.kind, lines: [], status: "fail", reason: e.status === "removed" ? "taken out on the plan but not in the demolition line" : "drawn with a cost impact but no BoQ line prices it" };
     });
 
-  return { clean: lines.every((r) => r.status !== "fail") && elements.every((r) => r.status !== "fail"), lines, elements };
+  const overlays = overlayCounts(input);
+  return { clean: lines.every((r) => r.status !== "fail") && elements.every((r) => r.status !== "fail") && overlays.every((r) => r.status !== "fail"), lines, elements, overlays };
+}
+
+/**
+ * G5d: every symbol type on the services overlays against the quantity of the
+ * line that prices it. A symbol drawn and not counted (two drainage points on
+ * L-402, none in the BoQ) or counted and not drawn fails. A line may carry fewer
+ * points than are drawn only where it says so ("less N carried by the structure
+ * rate" — a pergola's integral downlights).
+ */
+function overlayCounts(input: ParityInput): ParityOverlayRow[] {
+  const overlay = new Set(input.overlaySheets ?? []);
+  if (overlay.size === 0) return [];
+  const drawn = input.sheets.filter((s) => overlay.has(s.sheetNumber));
+  const byId = new Map(input.elements.filter((e) => e.table === "fixture" && e.status === "new").map((e) => [e.id, e]));
+  const rows: ParityOverlayRow[] = [];
+  for (const [type, rule] of Object.entries(OVERLAY_LINES)) {
+    const ids = new Set<string>();
+    const sheets = new Set<string>();
+    for (const s of drawn) {
+      for (const id of s.ids) {
+        if (byId.get(id)?.kind !== type) continue;
+        ids.add(id);
+        sheets.add(s.sheetNumber);
+      }
+    }
+    const line = input.lines.find((l) => l.rule_id === rule) ?? null;
+    if (ids.size === 0 && !line) continue;
+    const carried = Number(/less (\d+) carried by/.exec([line?.description, (line as { notes?: string | null; measurement?: string } | null)?.notes, (line as { measurement?: string } | null)?.measurement].filter(Boolean).join(" "))?.[1] ?? 0);
+    const qty = line ? line.quantity + carried : null;
+    const ok = qty === ids.size;
+    rows.push({
+      type,
+      symbols: ids.size,
+      sheets: [...sheets].sort(),
+      rule_id: line?.rule_id ?? null,
+      line_qty: line ? line.quantity : null,
+      status: ok ? "ok" : "fail",
+      reason: ok ? null : !line ? `${ids.size} drawn on ${[...sheets].join(" ")}, no BoQ line counts them` : `${ids.size} drawn, ${qty} in ${line.rule_id}`,
+    });
+  }
+  return rows;
 }
 
 /** The ids a drawing sheet shows. */
@@ -164,6 +240,8 @@ export function parityTableText(p: ParityResult): string {
   for (const r of p.lines) out.push(`  ${pad(r.status.toUpperCase(), 7)} ${pad(r.rule_id, 7)} ${pad(r.description, 44)} ${pad(r.sheets.join(" ") || "—", 26)} ${pad(r.views.length ? `${r.views.length} view(s)` : "—", 12)} ${r.reason ?? ""}`);
   out.push("DRAWN ELEMENT → BoQ LINE");
   for (const r of p.elements) out.push(`  ${pad(r.status.toUpperCase(), 7)} ${pad(r.name, 48)} ${pad(r.kind, 16)} ${pad(r.lines.join(" ") || "—", 24)} ${r.reason ?? ""}`);
+  out.push("OVERLAY SYMBOLS → BoQ QUANTITY");
+  for (const r of p.overlays ?? []) out.push(`  ${pad(r.status.toUpperCase(), 7)} ${pad(r.type, 16)} ${pad(`${r.symbols} on ${r.sheets.join(" ") || "—"}`, 26)} ${pad(r.rule_id ? `${r.rule_id} × ${r.line_qty}` : "no line", 16)} ${r.reason ?? ""}`);
   out.push(`PARITY ${p.clean ? "CLEAN" : "NOT CLEAN"}`);
   return out.join("\n");
 }

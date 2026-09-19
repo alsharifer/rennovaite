@@ -86,6 +86,19 @@ export function designSpec(graph: PlanGraph, fixtures: readonly GardenFixture[],
     const species = [...new Set(trees.map((t) => String((t.spec as Record<string, unknown> | null)?.species ?? "tree")))];
     parts.push(`existing trees kept exactly as they are (${species.join(", ")})`);
   }
+  // G5d (session comment 3): the surroundings come from the plan. The aerial had
+  // painted a neighbouring villa where the client's own entrance is; where the plan
+  // says what stands beyond a wall, every view is told — and nothing else is added.
+  const beyond = graph.context.filter((c) => c.kind === "boundary_wall" && typeof c.spec?.beyond === "string");
+  if (beyond.length) {
+    const say: Record<string, string> = {
+      neighbour: "neighbouring two-storey villas",
+      street: "the street — open sky, no building",
+      open: "open ground — the villa's own drive and entrance side, no building",
+    };
+    parts.push(`surroundings — ${beyond.map((c) => `beyond the ${c.name.toLowerCase()}: ${say[String(c.spec!.beyond)] ?? "as modelled"}`).join("; ")}; invent no other buildings around the plot`);
+  }
+  if (graph.openings.some((o) => o.type === "gate" && o.context_id)) parts.push("the garden entrance gate stands in its wall as modelled, a plain single-leaf gate");
   return `Design specification — identical in every view of this garden: ${parts.join("; ")}. Add no planters, screens, water features, steps or structures that are not in the model.`;
 }
 

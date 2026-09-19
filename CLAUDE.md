@@ -1052,6 +1052,93 @@ client-viable. Each is fixed where it was wrong, not papered over.
 
 **DB step**: `supabase db push` for `039`.
 
+## The design session, applied (garden pilot G5d)
+
+The first working session with a landscape firm (Newspace) came back as a filled
+workbook, `data/garden pilot/Arabella_Session_Capture.xlsx`, and a list of pack
+comments. `scripts/arabella-session-apply.ts` applies it through the authored
+routes — the workbook is unzipped and parsed, never retyped, and every value it
+applies is asserted against it.
+
+- **Measurements, honestly** (`lib/client-garden/arabella-session.ts`). Five
+  point measures (path from the garden gate 12.2 m, entrance area 5.85 m,
+  separator → end-of-pathway wall 6.0 m, front border 5.3 m, door landing
+  1.20 × 1.30 m) and two AGGREGATES (grass ≈ 50 m², tiled ≈ 69.4 m²). The refit
+  rule: every cross-section the draft designed stays as designed; the measured
+  runs set lengths; the aggregates are met by sizing the only surfaces the draft
+  never designed — the new entrance area's paved depth and the front lawn patch —
+  whose sizes are derived and noted "sized to measured aggregate". Only zones with
+  a measured boundary-critical dimension flip to measured (the path, the landing);
+  a zone with one measured and one aggregate-sized extent stays derived. The
+  2.35 m of the (derived) 26.7 m plot the measured runs do not reach is left
+  UNALLOCATED at the garage end and stated — never spread across zones. The plot
+  is unmeasured, so the DRAFT watermark stays. The door landing is a typed paving
+  zone (priced as paving). `reconciliation()` prints every zone draft → point
+  measures → aggregate refit with its driver(s).
+- **Staged, so every movement has one cause.** The script regenerates the BoQ
+  after each stage — fix → design decision → dimension update → aggregate refit →
+  correction — and attributes each stage's diff to that cause
+  (`screenshots/garden-pilot/g5d-session.json`). Result: grass 76.9 → 50.0 m²,
+  tiled 62.95 → 69.41 m², AED 116,942 → 116,217.
+- **Session data** (migration `040`): `boq_corrections` gains `confirm` ("the BoQ
+  looks right" is a milestone), `attributed_to` (the firm — on its own
+  corrections, nowhere else), `confidence` and `session_ref`; every correction
+  also writes a `correction` pilot event, and a Sheet B/C answer applied is a
+  `session_decision` event, both tagged `stage: design_session` with the
+  instrumentation record ("three-firms #1"). `computePilotMetrics` reports
+  corrections by type (confirms included) and per session record. A rate
+  correction is captured, never applied to the `actual_transaction` rate book.
+- **Built-feature placement gate** (pipeline `g5d-2`). Three passed renders had
+  shown three arrangements of the same pergola, counter and bench. The gate now
+  asks the vision model WHERE each built feature is (a box) and how many copies
+  there are; `judgePlacement` (pure) fails a feature that is not located, moved
+  (centre off by more than max(12% of the frame, 60% of its extent)), duplicated,
+  or on the wrong side left/right of another feature or a landmark wall (a wall
+  seen end-on — the separator). The restyle prompt states the arrangement left
+  to right, each exactly once. `assertPackable` refuses a passed render whose
+  placement was never checked, so two passed renders cannot disagree
+  (`lib/scene-render/__tests__/placement.test.ts`, on the real client scene).
+  The model answers in PIXELS about one reply in eight despite being asked for
+  percent; `normalisePlacements` converts with the candidate's real size
+  (`imageSize`, from the header) before judging — g5d-1 had failed correct renders
+  as "moved" on exactly that.
+- **Photo pairs** (`g5d-1`): a structure replaced in place carries what the plan
+  builds inside it — the BBQ counter under the pergola is an `add` item that must
+  show, or the gate reports it out of crop and the caption says so.
+- **Surroundings from the graph** (`plan_context.spec.beyond` = neighbour |
+  street | open). The G5c neighbourhood volume stood behind every walled edge,
+  and the aerial painted a neighbouring villa over the client's own entrance.
+  Where the plan declares what is beyond a wall, the scene follows it (only a
+  wall that RUNS along an edge speaks for it); undeclared gardens are unchanged.
+  The design specification names the surroundings and the gate; the aerial
+  camera prefers a view that shows the garden entrance.
+- **BoQ**: drainage points on L-402 are a QS-to-price line (GL-28, rate 0 — the
+  reference contract absorbed them at no charge, so a visible line invents no
+  cost; the double-count guard ignores rate-0 lines). The parity gate now counts
+  overlay SYMBOLS (lights, boundary lights, taps, drainage) against their line's
+  quantity. An **indicative delivery programme** (`lib/boq/programme.ts`) is
+  stored on the BoQ — the reference 90 days scaled by value, clamped 0.5–1.5×,
+  phases split by the value of their work, labelled indicative / derived — and
+  shown on the BoQ page and PDF. It is never a line.
+- **Pack fixes**: body/caption sizes raised (render pack ≥ 3.1 mm, BoQ PDF ≥ 2.6
+  mm; paragraphs re-wrap); the facts band sits below the tallest caption; a view
+  that is not a passed render carries ONE neutral line ("Visualisation pending —
+  …, see L-100 / L-401") — the gate's findings stay in the run report; an evening
+  that did not pass is DROPPED (the day view says "lighting as designed, see
+  L-401"); a zone whose own camera failed shows the passed view that shows it best
+  (a structure ≥ 12% of the frame), captioned with where it is from. L-201 prints
+  "Ground (external works)"; the pergola elevation falls back to the scene's
+  corner posts, and the client pergola now carries its four posts.
+- **Pricing question for the firm's written review** (not changed): the reference
+  pergola line (E1.1, "3.5 × 3.5 × 2.8 m, alum 150 × 150 structure, 8 downlights,
+  coating") names no slab, and the G3 dry-run showed the paving under it was
+  bought separately (66.24 m² of tile against 64.27 m² drawn INCLUDING the
+  footprint) — so the rate excludes its base and the 12.25 m² stays in the paving
+  lines. Were it included, the deduction would be 12.25 × (105.6 + 70.4 + 128.1) =
+  AED 3,725 before contingency and VAT.
+
+**DB step**: `supabase db push` for `040`.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

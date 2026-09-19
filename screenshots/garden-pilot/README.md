@@ -308,7 +308,67 @@ objects untouched; regenerating the client's leaves the reference's 229 rows and
 498 objects untouched. Every render row, manifest, photo pair, sheet and BoQ ref
 resolves to its own project; 86 vs 130 cache keys, 0 shared.
 
+# G5d — the Newspace design session, applied (2026-09-19)
+
+`scripts/arabella-session-apply.ts` reads `Arabella_Session_Capture.xlsx` (parsed,
+never retyped; 19/19 checks) and applies it in stages, regenerating the BoQ after
+each so every movement has one cause (`g5d-session.json`).
+
+## Reconciliation (type-plan frame; the site is its mirror)
+
+| Zone | Draft | Point measures | Aggregate refit | Driver |
+| --- | --- | --- | --- | --- |
+| Porcelain path (measured) | 20.60 × 1.00 = 20.60 | 12.20 × 1.00 = 12.20 | 12.20 | dimension update |
+| Garden entrance area (new) | — | 4.65 | 5.85 × 2.54 (less landing) = 13.30 | dimension → aggregate |
+| Door landing (new, measured) | — | 1.20 × 1.30 = 1.56 | 1.56 | dimension update |
+| Rear lawn | 55.62 | 48.38 | 12.20 × 2.70 = 32.94 | dimension → aggregate |
+| Rear planting bed | 12.36 | 10.83 | 17.62 | dimension → aggregate |
+| Pergola court | 13.98 | 13.98 | 13.98 | unchanged (6.0 m measure confirms) |
+| Pergola / side terrace / side lawn / side bed | 12.25 / 16.12 / 14.88 / 3.72 | same | same | unchanged |
+| Front lawn | 6.40 | 18.80 | 0.93 × 2.34 = 2.18 | dimension → aggregate |
+| Front planting bed | 2.40 | 2.40 | 19.02 | aggregate refit |
+| **Grass / tiled / planting** | 76.90 / 62.95 / 18.48 | 82.06 / 60.76 / 16.95 | **50.00 / 69.41** / 40.36 | aggregates ≈ 50 / ≈ 69.4 |
+
+2.35 m of the (derived) 26.7 m plot at the garage end is UNALLOCATED — the
+measured runs do not reach it. The plot is unmeasured, so the DRAFT stays.
+
+## Change report — AED 116,942.01 → 116,216.57 (−725.44, −0.62%)
+
+fix +0 (posts, surroundings; GL-28 drainage 2 no. at rate 0 in a late fix stage)
+· design decision +0 · dimension update −188.50 · aggregate refit −536.94 ·
+correction +0 (the programme section). Top movers: grass install −1,893.76,
+tile supply +827.52, grass supply −710.16, PCC +682.18, paving install +454.78.
+
+## Session record (three-firms #1)
+
+4 decisions (shed KEEP; pergola = the drawings; programme; nothing else raised)
+and 3 corrections attributed to Newspace — confirm (estimate), scope (firm),
+design (firm). No rate was corrected; none would touch the rate book.
+
+## The client pack — 31/31
+
+Pipeline g5d-2 (g5d-1 plus placement boxes normalised: about one gate reply in
+eight gave PIXELS, clamped to 100% — 17 of 121 boxes failed correct renders as
+"moved"; the gate now converts them with the image size). Day views: 11/15 passed
+the gate, 1 (whole garden view 2 — the old p8) then demoted by the consistency
+gate; evenings 7/12, the rest dropped from the pack with "lighting as designed,
+see L-401". Every passed render checked built-feature placement. Anchor: the
+pergola court. The p4 pair shows the BBQ counter under the new pergola; Z01 shows
+the court render ("render from the Z02 view"). The aerial passes with the
+entrance side open (only the rear edge carries a neighbour volume). Mix: 2 pairs,
+16 styled renders, 11 design views. Parity clean including overlay counts
+(lights 12/12, wall lights 6/6, taps 2/2, drainage 2/2).
+
+## The reference pack — 14/14
+
+Villa 94 under g5d-2: 8/15 day views passed (1 then inconsistent), 5 evenings;
+parity clean (lights 28/28, wall lights 9/9). No price, no identity, no draft.
+
+## Isolation — with renders, both directions — 16/16
+
+624 client rows / 752 objects untouched by the reference pack; 291 reference rows
+/ 742 objects untouched by the client pack; 144 vs 214 cache keys, 0 shared.
+
 ## Next
 
-The review session with the client (Step 5 amendment to measured dimensions, then
-`garden-change-report.ts`).
+Newspace's written line-by-line review (rate corrections become market_fair records), the plot survey (the unallocated 2.35 m, the 1 m drive), then the client review — `garden-change-report.ts` for the receipt.

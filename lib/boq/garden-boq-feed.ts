@@ -29,6 +29,7 @@ import {
   type GardenTakeoffInput,
   type GardenUnit,
 } from "./garden-takeoff";
+import { indicativeProgramme } from "./programme";
 import { SECTION_ORDER } from "./rules";
 import type { PomiSection, ScopeItem } from "./schema";
 
@@ -195,7 +196,8 @@ export async function captureGarden(
       units = units.filter((u) =>
         ["planter_box", "wall_feature", "bbq_grill", "tree", "shed"].includes(u.kind),
       );
-      points = points.filter((p) => p.type === "garden_light" || p.type === "boundary_light" || p.type === "water_tap");
+      // G5d: drainage points reach the take-off too — L-402 drew two that no line counted.
+      points = points.filter((p) => p.type === "garden_light" || p.type === "boundary_light" || p.type === "water_tap" || p.type === "drainage_point");
     }
   } catch {
     /* plan_fixtures absent — no units or points */
@@ -413,6 +415,10 @@ export async function appendGardenSections<T extends BoqLike>(
       ((boq.subtotal_aed + boq.contingency_aed) * boq.vat_pct) / 100,
     );
     boq.grand_total_aed = boq.subtotal_aed + boq.contingency_aed + boq.vat_aed;
+    // G5d: an indicative delivery programme, scaled from the reference project's
+    // 90-day anchor. Stored on the BoQ document, never a line: it prices nothing.
+    const programme = indicativeProgramme(boq.sections, boq.subtotal_aed);
+    if (programme) (boq as T & { programme?: typeof programme }).programme = programme;
     return boq;
   } catch (e) {
     console.warn(

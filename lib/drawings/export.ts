@@ -273,7 +273,9 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
       kind: "finish_schedule",
       title: "Finish Schedule",
       sheetNumber: "L-201",
-      svg: renderFinishSchedule(buildFinishRows(asBuilt, styleKey), gardenMeta, {
+      // G5d: a garden schedule is external works at ground level, never the
+      // interior level the plan meta defaults to ("first floor").
+      svg: renderFinishSchedule(buildFinishRows(asBuilt, styleKey), { ...gardenMeta, level: "Ground (external works)" }, {
         sheetNumber: "L-201",
         title: "Finish Schedule",
       }),

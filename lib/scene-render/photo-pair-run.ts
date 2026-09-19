@@ -20,6 +20,16 @@ import { isInfrastructureFailure, PRIMARY_MODEL } from "./prompts";
 import { isVerdictless, pairCacheKey, pairManifest, pairPrompt, PHOTO_PAIR_VERSION, runPairGate, type PairManifest } from "./photo-pair";
 import { fetchSceneBytes, loadGardenSceneContext, runRenderModel } from "./pipeline";
 
+function insidePoly(p: [number, number], poly: readonly (readonly [number, number])[]): boolean {
+  let hit = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]!;
+    const [xj, yj] = poly[j]!;
+    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+
 const SURFACE_NOUN: Record<string, string> = {
   artificial_grass: "artificial grass lawn",
   paving: "porcelain paving",
@@ -59,7 +69,7 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
     .select("id, type, spec, site_reference, disposition")
     .eq("project_id", input.projectId)
     .in("id", input.itemIds.length ? input.itemIds : ["00000000-0000-0000-0000-000000000000"]);
-  const items: { noun: string; disposition: "keep" | "remove" | "replace" | null; replacement?: string | null }[] = [];
+  const items: { noun: string; disposition: "keep" | "remove" | "replace" | "add" | null; replacement?: string | null; within?: string | null }[] = [];
   const clean = (s: string) => s.replace(/\s*\(existing\)\s*/i, " ").replace(/\s+—\s+/g, " — ").trim().toLowerCase();
   for (const id of input.itemIds) {
     const r = ctx.graph.rooms.find((x) => x.id === id);
@@ -68,7 +78,21 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
       const was = typeof r.spec?.replaces_existing === "string" ? r.spec.replaces_existing : null;
       if (r.disposition === "replace" && was) {
         // Replaced in place by something else (gazebo → louvred pergola).
-        items.push({ noun: `the ${was}`, disposition: "replace", replacement: `a ${String(r.spec?.system ?? r.name_en).toLowerCase()}` });
+        const becomes = String(r.spec?.system ?? r.name_en).toLowerCase();
+        items.push({ noun: `the ${was}`, disposition: "replace", replacement: `a ${becomes}` });
+        // G5d: what the plan builds inside it comes with it — the BBQ counter under the
+        // pergola (session: "the drawing is the layout of record").
+        for (const el of ctx.graph.elements.filter((e) => e.kind === "counter_run" || e.kind === "bench_run")) {
+          // Existing runs are decided elsewhere; only the design's new built features come with it.
+          if (el.site_reference) continue;
+          const mid = el.polyline[Math.floor(el.polyline.length / 2)]!;
+          const a = el.polyline[0]!;
+          const midpoint: [number, number] = el.polyline.length === 2 ? [(a[0] + el.polyline[1]![0]) / 2, (a[1] + el.polyline[1]![1]) / 2] : [mid[0], mid[1]];
+          if (!insidePoly(midpoint, r.polygon)) continue;
+          const variant = ctx.variants[el.id] ?? null;
+          const noun = el.kind === "bench_run" ? "a built-in bench" : variant === "bbq" ? "a built-in BBQ counter with a stainless gas grill and an inset sink, along the back of the pergola" : "a built-in counter";
+          items.push({ noun, disposition: "add", within: `the new ${becomes}` });
+        }
       } else {
         items.push({ noun: form === "gazebo" ? "the hardtop gazebo with dark glazed panels" : clean(r.name_en), disposition: r.disposition });
       }
@@ -114,6 +138,7 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
   const attempts: (PhotoPairResult["attempts"][number] & { image_url: string })[] = [];
   let passedUrl: string | null = null;
   let prompt = "";
+  let outOfCrop: string[] = [];
   for (let attempt = 1; attempt <= 2 && !passedUrl; attempt++) {
     prompt = pairPrompt(manifest, ctx.style, attempts.at(-1)?.failures ?? []);
     let bytes: Uint8Array;
@@ -139,7 +164,10 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
     let verdict = await gateOnce();
     if (verdict.status === "unavailable") verdict = await gateOnce();
     attempts.push({ attempt, image_url: url, passed: verdict.passed, failures: verdict.failures, summary: verdict.reply?.summary ?? "" });
-    if (verdict.passed) passedUrl = url;
+    if (verdict.passed) {
+      passedUrl = url;
+      outOfCrop = verdict.out_of_crop ?? [];
+    }
   }
   if (!passedUrl && isInfrastructureFailure(attempts)) {
     throw new Error(`render model unavailable: ${attempts.at(-1)!.failures[0] ?? "unknown error"}`);
@@ -149,7 +177,11 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
   }
 
   const outcome: "passed" | "withheld" = passedUrl ? "passed" : "withheld";
-  const caption = `${zone.name_en}: the client's photo restyled in ${ctx.style.name_en}, with the design's decisions on the existing items in view (${manifest.items.map((i) => `${i.noun} — ${i.disposition ?? "kept as is"}`).join("; ") || "none in view"}). Layout and dimensions are on the drawing set; structures the design adds out of this camera's view are in the plan-faithful renders.`;
+  // G5d: a client caption — the design's decisions in view, and, where a feature the
+  // plan builds here is outside the photo's crop, that it is (never QA detail).
+  const decisions = manifest.items.filter((i) => i.disposition !== "add").map((i) => `${i.noun} — ${i.disposition === "replace" && i.replacement ? `becomes ${i.replacement}` : (i.disposition ?? "kept as is")}`);
+  const crop = outOfCrop.length ? ` Out of this photo's crop: ${outOfCrop.join("; ")} — see the plan (L-100) and the zone views.` : "";
+  const caption = `${zone.name_en}: the client's photo restyled in ${ctx.style.name_en}, with the design's decisions on the existing items in view (${decisions.join("; ") || "none in view"}).${crop} Layout and dimensions are on the drawing set.`;
   const { data: row, error } = await sb
     .from("renders")
     .insert({
@@ -162,7 +194,7 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
       mode: "photo_pair",
       camera,
       cache_key: cacheKey,
-      gate: { pipeline: PHOTO_PAIR_VERSION, outcome, manifest, attempts, caption, zone_name: zone.name_en, gate_model: "claude-opus-5" },
+      gate: { pipeline: PHOTO_PAIR_VERSION, outcome, manifest, attempts, caption, out_of_crop: outOfCrop, zone_name: zone.name_en, gate_model: "claude-opus-5" },
       status: "succeeded",
     })
     .select("id")

@@ -135,7 +135,8 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
       scene_hash?: string;
       spec_hash?: string;
       consistency?: { anchor_id: string; passed: boolean; failures: string[]; status: string };
-      attempts: { attempt: number; passed: boolean; failures: string[] }[];
+      attempts: { attempt: number; passed: boolean; failures: string[]; placement_checked?: boolean }[];
+      manifest?: { items: { key: string; share: number; box?: [number, number, number, number] }[] };
     } | null;
   };
   const designUrls = new Map<string, string>();
@@ -172,7 +173,10 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
     // A design view's main image is the TEXTURED model (the substitution's image_url;
     // for an inconsistent render, the model it was conditioned on).
     const image_url = inconsistent ? (r.gate!.scene_url ?? r.image_url) : r.image_url;
-    return { id: inconsistent ? `textured:${r.id}` : r.id, image_url, kind: passed ? "render" : "design_view", gate_passed: passed, note: passed || byChoice ? null : lastFailure, by_choice: byChoice, design };
+    // G5d: the attempt that passed must also have passed the built-feature placement check.
+    const placementVerified = r.gate!.attempts.some((a) => a.passed && a.placement_checked === true);
+    const shows = (r.gate!.manifest?.items ?? []).map((i) => ({ key: i.key, share: i.share, ...(i.box ? { box: i.box } : {}) }));
+    return { id: inconsistent ? `textured:${r.id}` : r.id, image_url, kind: passed ? "render" : "design_view", gate_passed: passed, note: passed || byChoice ? null : lastFailure, by_choice: byChoice, design, shows, ...(passed ? { placement_verified: placementVerified } : {}) };
   };
   const cameras = ctx?.cameras ?? [];
   const byRoom: Record<string, { day: PackRender | null; evening: PackRender | null }> = {};

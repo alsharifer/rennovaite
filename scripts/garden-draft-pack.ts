@@ -197,6 +197,33 @@ async function main() {
   const leaks = printed.flatMap(([where, text]) => identityTokens.filter((t) => new RegExp(t, "i").test(text)).map((t) => `${where}: ${t}`));
   check("zero contractor-identity leakage across drawings, pack, BoQ PDF, BoQ data and BoQ page", leaks.length === 0 && identityTokens.length > 0, leaks.slice(0, 5).join("; ") || `${identityTokens.length} identity tokens × ${printed.length} documents`);
 
+  // --- G5d: what the session asked of the documents ---------------------------------------
+  const packText = pack.pageSvgs.map((s) => s.replace(/<[^>]+>/g, " ")).join(" ");
+  check("client-safe captions: no QA text in the pack", !/No render passed the checks|textured design model is shown|faithfulness gate found|gate unavailable/i.test(packText) && !/Evening view not rendered/.test(packText));
+  // Legibility: every font in the pack's own chrome ≥ 3.1 mm (the plan overview nests the drawing sheet at 85% and is a drawing).
+  const packFonts = pack.pageSvgs.flatMap((s, i) => (packSummary.pages[i] as { kind?: string } | undefined)?.kind === "plan_overview" ? [] : [...s.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1])));
+  check("legibility: no text in the render pack under 3.1 mm", packFonts.every((f) => f >= 3.1), `min ${Math.min(...packFonts)} mm over ${packFonts.length} runs`);
+  const boqFonts = boqPages.flatMap((s) => [...s.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1])));
+  check("legibility: no text in the BoQ PDF under 2.6 mm (A4)", boqFonts.every((f) => f >= 2.6), `min ${Math.min(...boqFonts)} mm`);
+  check("the BoQ PDF carries the indicative delivery programme", boqPages.some((p) => p.includes("INDICATIVE DELIVERY PROGRAMME") && p.includes("data-programme-phase")));
+  const l201 = set.sheets.find((s) => s.sheetNumber === "L-201");
+  check("L-201 title block says ground (external works), not an interior level", !!l201 && l201.svg.includes("Level: Ground (external works)") && !/first floor/i.test(l201.svg));
+  const l301 = set.sheets.find((s) => s.kind === "structure_elevation" && /pergola/i.test(s.title + s.svg.slice(0, 4000)));
+  check("L-301 pergola: four posts on the graph and drawn", !!l301 && /Posts<\/text>[^]*?>4<\/text>/.test(l301.svg) && (l301.svg.match(/data-dim="pergola-post"/g) ?? []).length >= 2, l301 ? `${(l301.svg.match(/data-dim="pergola-post"/g) ?? []).length} post dimensions` : "no pergola elevation");
+  // The extended faithfulness gate: every passed scene render the pack can use checked built-feature placement.
+  const { SCENE_PIPELINE_VERSION } = await import("@/lib/scene-render/prompts");
+  const { data: passedRows } = await db.from("renders").select("id, camera, view, gate").eq("project_id", PROJECT).eq("mode", "scene").eq("status", "succeeded");
+  const current = ((passedRows ?? []) as { id: string; camera: string; view: string; gate: { pipeline?: string; outcome?: string; attempts?: { passed: boolean; placement_checked?: boolean }[] } | null }[]).filter((r) => r.gate?.pipeline === SCENE_PIPELINE_VERSION && r.gate.outcome === "passed");
+  const unplaced = current.filter((r) => !r.gate!.attempts!.some((a) => a.passed && a.placement_checked === true));
+  check("extended gate: every passed render checked built-feature placement against the scene", unplaced.length === 0 && current.length > 0, `${current.length} passed render(s)${unplaced.length ? `; unchecked: ${unplaced.map((r) => r.camera).join(", ")}` : ""}`);
+  // p4: a pair whose photo shows the pergola must show the counter under it, or say it is out of crop.
+  const { data: pairRowsAll } = await db.from("renders").select("id, gate").eq("project_id", PROJECT).eq("mode", "photo_pair");
+  const { PHOTO_PAIR_VERSION } = await import("@/lib/scene-render/photo-pair");
+  const pairRows = (pairRowsAll ?? []).filter((r) => (r.gate as { pipeline?: string } | null)?.pipeline === PHOTO_PAIR_VERSION);
+  const withAdds = ((pairRows ?? []) as { id: string; gate: { outcome: string; caption?: string; out_of_crop?: string[]; manifest?: { items: { noun: string; disposition: string }[] } } | null }[]).filter((r) => r.gate?.outcome === "passed" && r.gate.manifest?.items.some((i) => i.disposition === "add"));
+  check("before/after: the counter under the pergola is visible, or the caption says it is out of crop", withAdds.every((r) => (r.gate!.out_of_crop ?? []).length === 0 || /Out of this photo's crop/.test(r.gate!.caption ?? "")), `${withAdds.length} passed pair(s) with a built feature added under the pergola`);
+  check("parity counts overlay symbols against their lines (drainage, taps, lighting)", (packSummary.parity.overlays ?? []).some((o) => o.type === "drainage_point" && o.status === "ok") && (packSummary.parity.overlays ?? []).every((o) => o.status === "ok"), (packSummary.parity.overlays ?? []).map((o) => `${o.type} ${o.symbols}/${o.line_qty ?? "—"}`).join(", "));
+
   // Sales and commercial language is internal: a seeded decision note once printed
   // "the upsell conversation" on the client's assumptions page.
   const internal = printed.filter(([where]) => !where.startsWith("BoQ json")).flatMap(([where, text]) => (/\b(upsell|up-sell|margin|mark-?up|commission)\b/i.test(text.replace(/<[^>]+>/g, " ")) ? [where] : []));

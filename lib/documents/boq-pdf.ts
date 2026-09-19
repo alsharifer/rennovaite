@@ -61,6 +61,8 @@ export interface BoqPdfInput {
       removals?: { name: string; qty: number; unit: string; disposition: string }[];
       undecided?: { name: string }[];
     } | null;
+    /** G5d: the indicative delivery programme (lib/boq/programme.ts). */
+    programme?: { total_days: number; phases: { name: string; start_day: number; days: number }[]; basis: string } | null;
   };
 }
 
@@ -76,8 +78,16 @@ const STATUS_MARK: Record<string, { mark: string; label: string }> = {
 const aed = (n: number) => Math.round(n).toLocaleString("en-US");
 const f1 = (n: number) => (Math.round(n * 10) / 10).toString();
 
+/**
+ * G5d (session comment 7 — client legibility): body, note and label sizes are
+ * set about 22% larger (never under 2.6 mm ≈ 7.4 pt on A4); headings keep theirs.
+ * Row heights and wrap widths below are scaled with it (K).
+ */
+const K = 1.22;
+export const boqLegible = (size: number) => (size >= 3.4 ? size : Math.round(Math.max(2.6, size * K) * 100) / 100);
+
 function t(x: number, y: number, s: string, o: { size?: number; fill?: string; font?: string; anchor?: string; weight?: number; spacing?: string } = {}): string {
-  return `<text x="${f1(x)}" y="${f1(y)}" font-size="${o.size ?? 2.6}" fill="${o.fill ?? INK_900}"${o.anchor ? ` text-anchor="${o.anchor}"` : ""} style="font-family:${o.font ?? FONT_UI}${o.weight ? `;font-weight:${o.weight}` : ""}${o.spacing ? `;letter-spacing:${o.spacing}` : ""}">${esc(s)}</text>`;
+  return `<text x="${f1(x)}" y="${f1(y)}" font-size="${boqLegible(o.size ?? 2.6)}" fill="${o.fill ?? INK_900}"${o.anchor ? ` text-anchor="${o.anchor}"` : ""} style="font-family:${o.font ?? FONT_UI}${o.weight ? `;font-weight:${o.weight}` : ""}${o.spacing ? `;letter-spacing:${o.spacing}` : ""}">${esc(s)}</text>`;
 }
 
 function wrap(text: string, max: number): string[] {
@@ -109,12 +119,14 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   for (const s of boq.sections) {
     rows.push({ kind: "section", title: s.work_section });
     for (const l of s.lines) {
-      const sub = [derivedLineNote(l), l.vendor_or_source ? `Source: ${l.vendor_or_source}` : null].filter((x): x is string => !!x);
-      rows.push({ kind: "line", line: l, desc: wrap(l.description, 58).slice(0, 3), sub });
+      const sub = [derivedLineNote(l), l.vendor_or_source ? `Source: ${l.vendor_or_source}` : null].filter((x): x is string => !!x).flatMap((x) => wrap(x, 72));
+      rows.push({ kind: "line", line: l, desc: wrap(l.description, 48).slice(0, 4), sub });
     }
     rows.push({ kind: "section_total", title: s.work_section, total: s.section_total_aed });
   }
-  const rowH = (r: Row) => (r.kind === "section" ? 8 : r.kind === "section_total" ? 7 : 3.4 * r.desc.length + 3 * r.sub.length + 2.6);
+  const DESC_H = 3.4 * K;
+  const SUB_H = 3 * K;
+  const rowH = (r: Row) => (r.kind === "section" ? 9 : r.kind === "section_total" ? 8 : DESC_H * r.desc.length + SUB_H * r.sub.length + 2.6);
 
   const header = (n: number) => {
     let s = t(M, 14, "RennovAIte", { size: 4.4, fill: BRASS, font: FONT_DISPLAY });
@@ -152,9 +164,9 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   svg += t(BOQ_PAGE_W - M, y + 19, "grand total incl. contingency and VAT", { size: 2.4, fill: INK_500, anchor: "end" });
   y += 24;
   if (total.footnote) {
-    for (const line of wrap(total.footnote, 105)) {
+    for (const line of wrap(total.footnote, 88)) {
       svg += t(M, y, line, { size: 2.4, fill: TERRACOTTA });
-      y += 3.2;
+      y += 3.2 * K;
     }
     y += 1;
   }
@@ -166,9 +178,9 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
       g.undecided?.length ? `Not yet decided (in no quantity): ${g.undecided.map((u) => u.name).join(", ")}.` : null,
     ].filter((x): x is string => !!x);
     for (const para of lines) {
-      for (const line of wrap(para, 110)) {
+      for (const line of wrap(para, 90)) {
         svg += t(M, y, line, { size: 2.3, fill: INK_700 });
-        y += 3.1;
+        y += 3.1 * K;
       }
     }
     y += 2;
@@ -200,7 +212,7 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
       const l = r.line;
       const status = STATUS_MARK[l.rate_status ?? ""];
       r.desc.forEach((d, i) => {
-        svg += t(M + 4, y + 2.6 + i * 3.4, d, { size: 2.55 });
+        svg += t(M + 4, y + 2.6 + i * DESC_H, d, { size: 2.55 });
       });
       if (status) svg += t(M, y + 2.6, status.mark, { size: 2.2, fill: status.mark === "A" ? BRASS : TERRACOTTA, font: FONT_MONO, weight: 700 });
       const qty = `${l.qty_derived ? "≈ " : ""}${l.quantity}`;
@@ -208,10 +220,10 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
       svg += t(131, y + 2.6, l.unit, { size: 2.4, fill: INK_700 });
       svg += t(162, y + 2.6, aed(l.rate_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
       svg += t(BOQ_PAGE_W - M, y + 2.6, aed(l.total_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
-      let sy = y + 2.6 + r.desc.length * 3.4;
+      let sy = y + 2.6 + r.desc.length * DESC_H;
       for (const s of r.sub) {
         svg += t(M + 4, sy - 0.4, s, { size: 2.1, fill: s.startsWith("≈") || s.startsWith("Quantity") ? TERRACOTTA : INK_500 });
-        sy += 3;
+        sy += SUB_H;
       }
       y += rowH(r);
     }
@@ -231,20 +243,49 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   sumRow(`VAT ${boq.vat_pct}%`, aed(boq.vat_aed));
   sumRow("Grand total", total.text, true);
   if (total.footnote) {
-    for (const line of wrap(total.footnote, 105)) {
+    for (const line of wrap(total.footnote, 88)) {
       svg += t(M, y, line, { size: 2.4, fill: TERRACOTTA });
-      y += 3.2;
+      y += 3.2 * K;
     }
   }
   y += 4;
   svg += t(M, y, "RATE STATUS", { size: 2.2, fill: INK_500, spacing: "0.06em" });
-  y += 4;
+  y += 4.6;
   for (const [, v] of Object.entries(STATUS_MARK).filter(([k]) => boq.sections.some((s) => s.lines.some((l) => l.rate_status === k)))) {
     svg += t(M, y, v.mark, { size: 2.3, fill: v.mark === "A" ? BRASS : TERRACOTTA, font: FONT_MONO, weight: 700 });
     svg += t(M + 5, y, v.label, { size: 2.3, fill: INK_700 });
-    y += 3.4;
+    y += 3.4 * K;
   }
   svg += t(M, y + 2, "≈ quantity derived from the reference layout or inferred — see the note under the line.", { size: 2.3, fill: INK_700 });
+  y += 8;
+
+  // G5d (Newspace session ask #5): an INDICATIVE delivery programme, never a line.
+  const prog = boq.programme;
+  if (prog && prog.phases.length) {
+    const basis = wrap(prog.basis, 92);
+    const need = 16 + prog.phases.length * 6.5 + basis.length * 3.2 * K;
+    if (y + need > bottom) flush();
+    svg += t(M, y + 2, "INDICATIVE DELIVERY PROGRAMME", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
+    svg += t(BOQ_PAGE_W - M, y + 2, `≈ ${prog.total_days} days · indicative · derived`, { size: 2.6, fill: TERRACOTTA, font: FONT_MONO, anchor: "end" });
+    y += 7;
+    const barX = 92;
+    const barW = BOQ_PAGE_W - M - barX;
+    for (const ph of prog.phases) {
+      svg += t(M, y + 3, ph.name, { size: 2.5, fill: INK_900 });
+      svg += t(barX - 3, y + 3, `${ph.days} d`, { size: 2.5, fill: INK_700, font: FONT_MONO, anchor: "end" });
+      const x0 = barX + ((ph.start_day - 1) / prog.total_days) * barW;
+      const w = Math.max(0.8, (ph.days / prog.total_days) * barW);
+      svg += `<rect x="${f1(x0)}" y="${f1(y + 0.6)}" width="${f1(w)}" height="3.2" rx="0.6" fill="${BRASS}" fill-opacity="0.75" data-programme-phase="${esc(ph.name)}"/>`;
+      y += 6.5;
+    }
+    svg += t(barX, y + 1.5, "day 1", { size: 2.1, fill: INK_500, font: FONT_MONO });
+    svg += t(BOQ_PAGE_W - M, y + 1.5, `day ${prog.total_days}`, { size: 2.1, fill: INK_500, font: FONT_MONO, anchor: "end" });
+    y += 6;
+    for (const line of basis) {
+      svg += t(M, y, line, { size: 2.2, fill: INK_700 });
+      y += 3.2 * K;
+    }
+  }
   pages.push(page(svg));
   return pages;
 }

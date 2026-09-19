@@ -178,6 +178,7 @@ const SECTION: Record<string, PomiSection> = {
   "garden.planting_bed": "Soft Landscaping",
   "garden.water_tap": "Plumbing",
   "garden.shed": "Hardscape & Structures",
+  "garden.drainage_point": "Plumbing",
 };
 
 /**
@@ -197,6 +198,11 @@ export const UNPRICED_GARDEN_ITEMS: Record<string, { label: string; unit: string
   "garden.planting_bed": { label: "Planting beds — soil preparation and planting (no reference rate — QS to price)", unit: "m2" },
   "garden.water_tap": { label: "Outdoor water tap (hose bib) with isolation valve (no reference rate — QS to price)", unit: "no" },
   "garden.shed": { label: "Garden shed, supply and install (no reference rate — QS to price)", unit: "no" },
+  // G5d: L-402 drew two drainage points and the BoQ priced none — exactly the gap
+  // the parity gate exists for. The reference contract absorbed its drainage points
+  // at no charge, so there is no reference rate: a visible line at rate 0 for the QS,
+  // never a charged one (the absorbed-scope rule is about inventing a COST).
+  "garden.drainage_point": { label: "Drainage point / gully in paving (absorbed at no charge in the reference project — QS to confirm)", unit: "no" },
 };
 
 /** The source label on a line with no reference rate. Never the market-reference label. */
@@ -571,6 +577,7 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   unpriced("GL-25", "garden.planting_bed", zonesOf("planting_bed"), "Σ planting bed area = {q} m² (soil preparation, planting; plant schedule to follow)");
   unpriced("GL-26", "garden.water_tap", points.filter((p) => p.type === "water_tap").map((p) => ({ id: p.id, qty: 1 })), "{q} outdoor tap point(s) on the plan");
   unpriced("GL-27", "garden.shed", newSheds.map((u) => ({ id: u.id, qty: 1 })), "{q} garden shed(s)");
+  unpriced("GL-28", "garden.drainage_point", points.filter((p) => p.type === "drainage_point").map((p) => ({ id: p.id, qty: 1 })), "{q} drainage point(s) on the plan (L-402)");
 
   // --- Client-supplied equipment (GL-19) -------------------------------------
   const grills = unitCount("bbq_grill");
@@ -648,7 +655,9 @@ export interface DoubleCountViolation {
  * line for it does not read as wrong.
  */
 export function findDoubleCounts(items: readonly ScopeItem[]): DoubleCountViolation[] {
-  const emitted = new Set(items.map((i) => i.item_key));
+  // G5d: a QS-to-price line (rate 0, needs_qs) is visible, never charged — it cannot
+  // double-count a cost, which is what both rules below protect against.
+  const emitted = new Set(items.filter((i) => i.rate_status !== "needs_qs").map((i) => i.item_key));
   const out: DoubleCountViolation[] = [];
 
   for (const [parent, included] of Object.entries(INCLUSIVE_SCOPE)) {

@@ -105,12 +105,22 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
       const len = alongX ? e.b[0] - e.a[0] : e.b[1] - e.a[1];
       // Wall length lying on this edge (within 0.5 m of it).
       let covered = 0;
+      const declared: string[] = [];
       for (const w of walls) {
         const wb = bboxOf(w.polygon);
         const onEdge = alongX ? Math.abs((e.out[1] < 0 ? wb.minY : wb.maxY) - e.a[1]) < 0.5 : Math.abs((e.out[0] < 0 ? wb.minX : wb.maxX) - e.a[0]) < 0.5;
-        if (onEdge) covered += alongX ? wb.maxX - wb.minX : wb.maxY - wb.minY;
+        if (!onEdge) continue;
+        covered += alongX ? wb.maxX - wb.minX : wb.maxY - wb.minY;
+        // Only a wall that RUNS along this edge speaks for it — the rear wall's end
+        // touches the side edges too, and must not declare what is beyond them.
+        const runsAlong = alongX ? wb.maxX - wb.minX >= wb.maxY - wb.minY : wb.maxY - wb.minY >= wb.maxX - wb.minX;
+        if (runsAlong && typeof w.spec?.beyond === "string") declared.push(w.spec.beyond);
       }
-      if (covered < len * 0.3) continue;
+      // G5d: where the plan SAYS what is beyond a wall, that decides — a street or an
+      // open entrance side gets no volume (the G5c default put a neighbouring villa
+      // over the client's own entrance, and the aerial painted it). Undeclared edges
+      // keep the G5c rule, so gardens without the field are unchanged.
+      if (declared.length ? !declared.includes("neighbour") : covered < len * 0.3) continue;
       const id = sb.object({ key: `neighbour:${n++}`, label: "neighbouring villa", category: "context", noun: "neighbouring two-storey villas beyond the boundary wall", zoneId: null });
       const set = 3, depth = 11, H = 7.2;
       if (alongX) {
@@ -424,6 +434,16 @@ export function buildGardenScene({ graph: fullGraph, fixtures: allFixtures, vari
     const lv = levelAt(p);
     const id = sb.object({ key: `point:${t.id}`, label: "outdoor water tap", category: "fixture", noun: "outdoor water tap", zoneId: zoneIdAt(p) });
     sb.box(p[0] - 0.08, lv + 0.45, p[1] - 0.08, p[0] + 0.08, lv + 0.75, p[1] + 0.08, "metal", id);
+  }
+
+  // G5d: drainage points — a flush 300 mm gully grating in the paving. Priced (GL-28)
+  // and drawn on L-402, so a view must be able to show one (parity); a fixture,
+  // listed in manifests and never on the faithfulness gate's list.
+  for (const d of fixtures.filter((x) => x.type === "drainage_point")) {
+    const p = toMetres(graph, d.position);
+    const lv = levelAt(p) + 0.025;
+    const id = sb.object({ key: `point:${d.id}`, label: "drainage gully", category: "fixture", noun: "drainage gully grating", zoneId: zoneIdAt(p) });
+    sb.box(p[0] - 0.15, lv, p[1] - 0.15, p[0] + 0.15, lv + 0.006, p[1] + 0.15, "metal", id);
   }
 
   // Designed lighting points (for the evening view).

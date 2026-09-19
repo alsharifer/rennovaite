@@ -241,6 +241,8 @@ export interface ContextVolume {
   dims_derived: boolean;
   site_reference: boolean;
   disposition: Disposition | null;
+  /** G5d (040): e.g. `beyond` — what stands past a boundary wall (neighbour | street | open). */
+  spec?: Record<string, unknown> | null;
 }
 
 export interface RawContext {
@@ -255,6 +257,7 @@ export interface RawContext {
   dims_derived?: boolean | null;
   site_reference?: boolean | null;
   disposition?: string | null;
+  spec?: Record<string, unknown> | null;
 }
 
 export interface PlanGraph {
@@ -761,6 +764,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
         dims_derived: c.dims_derived === true,
         site_reference: c.site_reference === true,
         disposition: dispositionOf(c),
+        ...(c.spec && typeof c.spec === "object" ? { spec: c.spec } : {}),
       };
     })
     .filter((c): c is ContextVolume => c !== null);

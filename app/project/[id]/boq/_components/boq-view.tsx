@@ -71,6 +71,8 @@ export type BoqPayload = {
     undecided: { element_id: string; name: string }[];
     needs_selection: string[];
   };
+  /** G5d: an indicative delivery programme — never a line, never a commitment. */
+  programme?: { total_days: number; phases: { name: string; start_day: number; days: number }[]; basis: string } | null;
 };
 
 export type VendorOption = {
@@ -597,6 +599,7 @@ export function BoqView({
         </div>
       )}
 
+      {boq.programme ? <ProgrammePanel programme={boq.programme} /> : null}
       {view === "byroom" ? (
         <ByRoomView byRoom={byRoom} highlightRoom={highlightRoom} />
       ) : (
@@ -1307,5 +1310,32 @@ function VendorMini({
         <span className="text-ink-500"> / {unit}</span>
       </p>
     </div>
+  );
+}
+
+/** G5d (Newspace session ask #5): the indicative programme, scaled from one comparable garden. */
+function ProgrammePanel({ programme }: { programme: NonNullable<BoqPayload["programme"]> }) {
+  return (
+    <section className="mt-xl rounded-xl border border-ink-100 bg-paper p-lg">
+      <div className="flex items-baseline justify-between gap-md">
+        <span className="label-caps text-brass-600">Indicative delivery programme</span>
+        <span className="font-mono text-body-sm tabular-nums text-[#9d3e1d]">≈ {programme.total_days} days · indicative · derived</span>
+      </div>
+      <ul className="mt-md space-y-sm">
+        {programme.phases.map((p) => (
+          <li key={p.name} className="grid grid-cols-[220px_56px_1fr] items-center gap-md">
+            <span className="text-body-sm text-ink-900">{p.name}</span>
+            <span className="text-right font-mono text-body-sm tabular-nums text-ink-700">{p.days} d</span>
+            <span className="relative h-3 rounded bg-canvas">
+              <span
+                className="absolute inset-y-0 rounded bg-brass-600/75"
+                style={{ left: `${((p.start_day - 1) / programme.total_days) * 100}%`, width: `${Math.max(1, (p.days / programme.total_days) * 100)}%` }}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-md text-body-sm text-ink-500">{programme.basis}</p>
+    </section>
   );
 }

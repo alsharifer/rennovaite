@@ -335,13 +335,16 @@ describe("anti-double-count invariants", () => {
     expect(bad.some((v) => v.kind === "absorbed" && v.offender === "garden.manhole_cover")).toBe(true);
   });
 
-  it("never prices a drainage point, which is both absorbed and BBQ-inclusive", () => {
+  it("never CHARGES a drainage point (absorbed and BBQ-inclusive) but shows the drawn ones to the QS (G5d)", () => {
     const t = computeGardenTakeoff({
       zones: [{ id: "p", name: "Patio", kind: "paving", area_m2: 30 }],
       runs: [{ id: "c", kind: "counter_run", length_m: 3, variant: "bbq" }],
       points: Array.from({ length: 4 }, (_, i) => ({ id: `d${i}`, type: "drainage_point", zone_id: "p" })),
     });
-    expect(t.items.some((i) => i.item_key === "garden.drainage_point")).toBe(false);
+    const line = t.items.find((i) => i.item_key === "garden.drainage_point")!;
+    expect(line.quantity).toBe(4);
+    expect(line.rate_status).toBe("needs_qs");
+    expect(priceGardenTakeoff([line])[0]!.total_aed).toBe(0);
     expect(findDoubleCounts(t.items)).toEqual([]);
   });
 });

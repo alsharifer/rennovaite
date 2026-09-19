@@ -12,13 +12,17 @@ import type { GardenStyle } from "@/lib/garden-styles";
 import type { Scene } from "@/lib/scene/mesh";
 import type { CameraManifest } from "@/lib/scene/cameras";
 
-import { gateChecks } from "./gate";
+import { gateChecks, placementLandmarks } from "./gate";
 
 /** Bump when the pipeline changes what a render is conditioned on. */
 // g5-1: narrow-plot cameras (elevated corridor views, clean-view check).
 // g5c-1: textured conditioning image, shared design specification + anchor render,
 //        in-plot cameras and an aerial view, every zone attempted.
-export const SCENE_PIPELINE_VERSION = "g5c-1";
+// g5d-1: built-feature placement — the gate locates every built feature and holds
+//        it to the scene (missing / moved / duplicated / swapped), and the restyle
+//        is told the left-to-right order of built features and landmark walls.
+// g5d-2: placement boxes normalised (pixel replies had failed correct renders).
+export const SCENE_PIPELINE_VERSION = "g5d-2";
 
 export type SceneView = "day" | "evening";
 
@@ -105,7 +109,25 @@ function keepLine(m: CameraManifest): string {
   if (kept.length) parts.push(`the existing trees the client is keeping — ${kept.map((c) => `${c.noun.replace(/^existing | \(kept\)$/g, "")} (${region(c.box)})`).join("; ")}`);
   if (structures.length) parts.push(`built elements — ${structures.map((c) => `the ${c.noun} (${region(c.box)})`).join("; ")}`);
   if (context.length) parts.push(`${[...new Set(context.map((c) => c.noun))].join(", ")}`);
-  return parts.length ? `Keep exactly as modelled, same position, shape, size and height: ${parts.join("; ")}; plus every step and level.` : "Keep every wall, step and level exactly as modelled.";
+  const keep = parts.length ? `Keep exactly as modelled, same position, shape, size and height: ${parts.join("; ")}; plus every step and level.` : "Keep every wall, step and level exactly as modelled.";
+  return [keep, arrangementLine(m)].filter(Boolean).join(" ");
+}
+
+/**
+ * G5d: the arrangement, stated. Built features and landmark walls, left to right
+ * as the scene projects them, each exactly once — the restyle drifted and invented
+ * placement (a bench on the other side of the separator wall, a second counter)
+ * when all it had was "keep as modelled".
+ */
+export function arrangementLine(m: CameraManifest): string {
+  const built = gateChecks(m).filter((c) => c.category === "structure");
+  if (built.length === 0) return "";
+  const items = [...built, ...placementLandmarks(m)].sort((a, b) => a.box[0] + a.box[2] - (b.box[0] + b.box[2]));
+  const order = items.map((c) => `the ${c.noun}`).join(", then ");
+  const counts = new Map<string, number>();
+  for (const c of built) counts.set(c.noun, (counts.get(c.noun) ?? 0) + 1);
+  const once = [...counts.entries()].map(([n, k]) => `${k === 1 ? "one" : k} ${n}`).join(", ");
+  return `The built arrangement is fixed by the plan: from left to right in the frame, ${order}. The picture shows exactly ${once} — never a second copy, never moved to another side, never mirrored.`;
 }
 
 /**

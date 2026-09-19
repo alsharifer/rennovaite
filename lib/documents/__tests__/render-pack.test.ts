@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRenderPack, captionLines, containFit, wrap } from "@/lib/documents/render-pack";
+import { buildRenderPack, captionLines, containFit, PENDING_DAY, PENDING_EVENING, wrap } from "@/lib/documents/render-pack";
 import { buildGardenSheets, LIGHTING_SOURCE_STATEMENT } from "@/lib/drawings/garden-sheets";
 import { getGardenStyle } from "@/lib/garden-styles";
 import { villa94PlanRecords } from "@/lib/ground-truth/villa94-garden-geometry";
@@ -101,8 +101,9 @@ describe("render pack — Villa 94", () => {
     expect(partial.pages.every((p) => p.images.length === 0)).toBe(true);
     expect(partial.pages[0]!.svg).toContain("0 of 12 zones rendered");
     expect(partial.pages[2]!.svg).toContain("Not yet rendered");
+    // G5d: no evening that has not passed is shown — the lighting is referred to the plan.
     const lit = partial.zones.findIndex((z) => z.eveningExpected);
-    expect(partial.pages[2 + lit]!.svg).toContain("Evening view not rendered");
+    expect(partial.pages[2 + lit]!.svg).toContain("Evening — lighting as designed, see L-401");
   });
 });
 
@@ -123,10 +124,59 @@ describe("render pack — the faithfulness gate", () => {
     const { pages, zones } = buildRenderPack({ ...base, renders: sub });
     const svg = pages[2 + zones.findIndex((z) => z.room.id === lawn)]!.svg;
     expect(svg).toContain("DAY — 3D DESIGN VIEW");
-    expect(svg).toContain("No render passed the checks, so the textured design model is shown: F1 lawn: missing");
-    expect(svg).toContain("DAY — 3D DESIGN VIEW (TEXTURED MODEL)");
+    // G5d: one neutral line for the client; the gate's findings stay in the run report.
+    expect(svg).toContain(PENDING_DAY);
+    expect(svg).not.toContain("F1 lawn: missing");
+    expect(svg).not.toMatch(/No render passed the checks/);
     const passed = pages[2 + zones.findIndex((z) => z.room.id === "z-pergola")]!.svg;
     expect(passed).toContain("DAY — RENDER · FAITHFULNESS CHECK PASSED");
+  });
+
+  it("drops an evening that did not pass, and keeps one that did (G5d)", () => {
+    const pergola = "z-pergola";
+    const failedEvening = { ...renders, [pergola]: { day: renders[pergola]!.day, evening: { id: "ev", image_url: "https://img/ev.png", kind: "design_view" as const, gate_passed: false, note: "undesigned light" } } };
+    const { pages, zones } = buildRenderPack({ ...base, renders: failedEvening });
+    const page = pages[2 + zones.findIndex((z) => z.room.id === pergola)]!;
+    expect(page.images.map((i) => i.renderId)).toEqual([`d-${pergola}`]);
+    expect(page.svg).toContain("Evening — lighting as designed, see L-401");
+    expect(page.svg).not.toContain(PENDING_EVENING);
+    const kept = buildRenderPack({ ...base, renders });
+    expect(kept.pages[2 + kept.zones.findIndex((z) => z.room.id === pergola)]!.images.map((i) => i.renderId)).toEqual([`d-${pergola}`, `e-${pergola}`]);
+  });
+
+  it("shows a passed view of the same structure on a zone whose own view failed (G5d, Z01)", () => {
+    const court = "z-paving-bench-court";
+    const pergola = "z-pergola";
+    const withShows = {
+      ...renders,
+      [court]: { day: { ...renders[court]!.day!, shows: [{ key: `structure:${pergola}`, share: 0.3 }] }, evening: renders[court]!.evening },
+      [pergola]: { day: { id: "dv", image_url: "https://img/dv.png", kind: "design_view" as const, gate_passed: false }, evening: null },
+    };
+    const { pages, zones } = buildRenderPack({ ...base, renders: withShows });
+    const i = zones.findIndex((z) => z.room.id === pergola);
+    expect(pages[2 + i]!.images[0]!.renderId).toBe(`d-${court}`);
+    expect(pages[2 + i]!.svg).toContain(`RENDER FROM THE ${zones.find((z) => z.room.id === court)!.ref} VIEW`);
+  });
+
+  it("borrows a view that FRAMES an open structure even when its members fill little of the frame (G5d)", () => {
+    const court = "z-paving-bench-court";
+    const pergola = "z-pergola";
+    const r = {
+      ...renders,
+      [court]: { day: { ...renders[court]!.day!, shows: [{ key: `structure:${pergola}`, share: 0.06, box: [23, 0, 90, 90] as [number, number, number, number] }] }, evening: renders[court]!.evening },
+      [pergola]: { day: { id: "dv", image_url: "https://img/dv.png", kind: "design_view" as const, gate_passed: false }, evening: null },
+    };
+    const { pages, zones } = buildRenderPack({ ...base, renders: r });
+    expect(pages[2 + zones.findIndex((z) => z.room.id === pergola)]!.images[0]!.renderId).toBe(`d-${court}`);
+    // A small, unframed glimpse is not borrowed.
+    const glimpse = { ...r, [court]: { day: { ...renders[court]!.day!, shows: [{ key: `structure:${pergola}`, share: 0.03, box: [80, 10, 95, 30] as [number, number, number, number] }] }, evening: null } };
+    const g = buildRenderPack({ ...base, renders: glimpse });
+    expect(g.pages[2 + g.zones.findIndex((z) => z.room.id === pergola)]!.images[0]!.renderId).toBe("dv");
+  });
+
+  it("refuses a passed render whose built-feature placement was never checked (G5d)", () => {
+    const unchecked = { ...renders, [lawn]: { day: { id: "u", image_url: "https://img/u.png", kind: "render" as const, gate_passed: true, placement_verified: false }, evening: null } };
+    expect(() => buildRenderPack({ ...base, renders: unchecked })).toThrow(/built-feature placement/);
   });
 
   it("adds a page per whole-garden view, after the plan overview", () => {

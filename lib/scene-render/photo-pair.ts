@@ -32,14 +32,19 @@ import type { GardenStyle } from "@/lib/garden-styles";
 import { GATE_MODEL, type ImageSource } from "./gate";
 
 // g5c-1: orientation + visible-change checks, the design specification in the prompt.
-export const PHOTO_PAIR_VERSION = "g5c-1";
+// g5d-1: built features the design ADDS inside a structure replaced in place (the
+//        BBQ counter under the pergola) must show, or be stated out of crop.
+export const PHOTO_PAIR_VERSION = "g5d-1";
 
 export interface PairItem {
   ref: string;
   noun: string;
-  disposition: "keep" | "remove" | "replace" | null;
+  /** G5d: "add" = a new built feature of the design inside something in view. */
+  disposition: "keep" | "remove" | "replace" | "add" | null;
   /** A replace that becomes something else in the same place (gazebo → louvred pergola). */
   replacement?: string | null;
+  /** G5d: for an "add", the structure it stands in ("the new louvred pergola"). */
+  within?: string | null;
 }
 
 export interface PairManifest {
@@ -52,14 +57,14 @@ export interface PairManifest {
   spec?: string;
 }
 
-export function pairManifest(input: { projectId: string; assetId: string; zoneName: string; zoneSurface: string; items: { noun: string; disposition: PairItem["disposition"]; replacement?: string | null }[]; spec?: string }): PairManifest {
+export function pairManifest(input: { projectId: string; assetId: string; zoneName: string; zoneSurface: string; items: { noun: string; disposition: PairItem["disposition"]; replacement?: string | null; within?: string | null }[]; spec?: string }): PairManifest {
   return {
     ...(input.spec ? { spec: input.spec } : {}),
     projectId: input.projectId,
     assetId: input.assetId,
     zoneName: input.zoneName,
     zoneSurface: input.zoneSurface,
-    items: input.items.map((it, i) => ({ ref: `E${i + 1}`, noun: it.noun, disposition: it.disposition, ...(it.replacement ? { replacement: it.replacement } : {}) })),
+    items: input.items.map((it, i) => ({ ref: `E${i + 1}`, noun: it.noun, disposition: it.disposition, ...(it.replacement ? { replacement: it.replacement } : {}), ...(it.within ? { within: it.within } : {}) })),
   };
 }
 
@@ -67,7 +72,7 @@ export function pairManifest(input: { projectId: string; assetId: string; zoneNa
 export function pairCacheKey(m: PairManifest, styleKey: string): string {
   if (!m.projectId) throw new Error("pairCacheKey: projectId is required");
   return createHash("sha256")
-    .update(JSON.stringify([m.projectId, PHOTO_PAIR_VERSION, m.assetId, m.zoneSurface, m.items.map((i) => [i.noun, i.disposition, i.replacement ?? null]), styleKey, m.spec ?? null]))
+    .update(JSON.stringify([m.projectId, PHOTO_PAIR_VERSION, m.assetId, m.zoneSurface, m.items.map((i) => [i.noun, i.disposition, i.replacement ?? null, i.within ?? null]), styleKey, m.spec ?? null]))
     .digest("hex");
 }
 
@@ -76,6 +81,7 @@ export function pairPrompt(m: PairManifest, style: GardenStyle, failures: string
   const remove = m.items.filter((i) => i.disposition === "remove");
   const replace = m.items.filter((i) => i.disposition === "replace" && !i.replacement);
   const becomes = m.items.filter((i) => i.disposition === "replace" && i.replacement);
+  const adds = m.items.filter((i) => i.disposition === "add");
   return [
     "IMAGE 1 is a real photograph of a client's garden. Produce a photorealistic photograph of the SAME garden after renovation, from exactly the same camera position, lens and framing.",
     "The house, its walls, windows, doors, the boundary walls and the sky line stay exactly as they are.",
@@ -83,12 +89,15 @@ export function pairPrompt(m: PairManifest, style: GardenStyle, failures: string
     remove.length ? `Remove completely and fill their place with the surrounding garden surface: ${remove.map((i) => i.noun).join("; ")}.` : "",
     replace.length ? `Replace with new, clean versions of the same thing in exactly the same position and size: ${replace.map((i) => i.noun).join("; ")}.` : "",
     ...becomes.map((i) => `Replace ${i.noun} with ${i.replacement}, where it stands now (the new work may be larger than what it replaces).`),
+    // G5d: what the plan builds INSIDE that replacement is part of it — the p4 "after"
+    // showed the new pergola over loose seating with no counter.
+    ...adds.map((i) => `Inside ${i.within ?? "it"}, as the plan draws it: ${i.noun}. It is part of the design and must be clearly visible wherever that part of the garden is in the frame.`),
     `The main ground surface of this area is ${m.zoneSurface}.`,
     // G5c: an "after" that changes almost nothing is not a before/after. The design
     // specification says what the renovation looks like; make it plainly visible.
     m.spec ? `The renovation follows this design: ${m.spec} The change must be plainly visible: the new ground finish, planting and fittings of this area as designed — not a light retouch of the old garden.` : "",
     "Keep the orientation of IMAGE 1 exactly: the house stays on the same side of the frame, nothing is mirrored or swapped left for right.",
-    "Do not add any pergola, gazebo, canopy, wall, bench, counter, planter, pool, fountain, steps or building that is not already in the photo. Change nothing that is not listed.",
+    `Do not add any pergola, gazebo, canopy, wall, bench, counter, planter, pool, fountain, steps or building that is not already in the photo${adds.length ? " or listed above" : ""}. Change nothing that is not listed.`,
     `Style — ${style.name_en}: ${style.one_line} Apply the style to materials, planting and finishes only.`,
     failures.length ? `A previous attempt was rejected for: ${failures.join("; ")}. Correct exactly these, and if in doubt change less.` : "",
   ]
@@ -106,6 +115,8 @@ const PairReplySchema = z.object({
       // null must not make the whole reply unparseable (it cost a render once).
       roughly_in_place: z.boolean().nullable().optional().transform((v) => v ?? false),
       note: z.string().nullable().optional().transform((v) => v ?? ""),
+      /** G5d: an added feature whose place is outside IMAGE 2's frame. */
+      out_of_crop: z.boolean().nullable().optional().transform((v) => v === true),
     }),
   ),
   // An unsure null is a "no": it fails the pair with a reason instead of making
@@ -134,6 +145,9 @@ export type PairReply = z.infer<typeof PairReplySchema>;
 
 export function pairGatePrompt(m: PairManifest): string {
   const lines = m.items.map((i) => {
+    if (i.disposition === "add") {
+      return `${i.ref}: ${i.noun} — a NEW built feature of the design, which should now stand inside ${i.within ?? "the new structure"} (present = it is visible there). If the spot where it stands is outside IMAGE 2's frame, set out_of_crop = true.`;
+    }
     const want =
       i.disposition === "remove"
         ? "should now be GONE"
@@ -154,7 +168,7 @@ export function pairGatePrompt(m: PairManifest): string {
     "house_side_matches = the house/villa is on the SAME side of the frame in IMAGE 2 as in IMAGE 1 (left stays left, right stays right) and the scene is not mirrored.",
     "visible_change = how clearly IMAGE 2 shows a renovated garden compared with IMAGE 1: 0 almost nothing changed, 1 minor retouch, 2 clearly renovated (new ground finish, planting or fittings plainly visible), 3 transformed.",
     "extra_structures: any BUILT structure in IMAGE 2 that is in neither IMAGE 1 nor the list (a pergola, gazebo, canopy, wall, counter, bench, planter, pool, fountain, steps, building). Plants, pots, cushions, loose furniture and light fittings do not count. major = true if it would change what gets built.",
-    `Reply with ONLY one JSON object: {"observations":[{"ref":"E1","present":true,"roughly_in_place":true,"note":""}],"house_unchanged":true,"same_viewpoint":true,"house_side_matches":true,"visible_change":2,"extra_structures":[],"summary":"one sentence"}`,
+    `Reply with ONLY one JSON object: {"observations":[{"ref":"E1","present":true,"roughly_in_place":true,"out_of_crop":false,"note":""}],"house_unchanged":true,"same_viewpoint":true,"house_side_matches":true,"visible_change":2,"extra_structures":[],"summary":"one sentence"}`,
   ].join("\n");
 }
 
@@ -162,8 +176,9 @@ export function pairGatePrompt(m: PairManifest): string {
 export const MIN_VISIBLE_CHANGE = 2;
 
 /** The pass rule. Deterministic. */
-export function judgePair(m: PairManifest, reply: PairReply): { passed: boolean; failures: string[] } {
+export function judgePair(m: PairManifest, reply: PairReply): { passed: boolean; failures: string[]; out_of_crop: string[] } {
   const failures: string[] = [];
+  const outOfCrop: string[] = [];
   const byRef = new Map(reply.observations.map((o) => [o.ref, o]));
   for (const it of m.items) {
     const o = byRef.get(it.ref);
@@ -171,7 +186,12 @@ export function judgePair(m: PairManifest, reply: PairReply): { passed: boolean;
       failures.push(`${it.noun}: not assessed`);
       continue;
     }
-    if (it.disposition === "remove") {
+    if (it.disposition === "add") {
+      // A new feature has no place in the BEFORE photo to be "in": it must be there,
+      // or honestly out of crop — and then the caption says so.
+      if (!o.present && o.out_of_crop) outOfCrop.push(it.noun);
+      else if (!o.present) failures.push(`${it.noun}: missing — the design puts it inside ${it.within ?? "the new structure"}${o.note ? ` (${o.note})` : ""}`);
+    } else if (it.disposition === "remove") {
       if (o.present) failures.push(`${it.noun}: should have been removed`);
     } else if (!o.present) {
       failures.push(`${it.noun}: missing${o.note ? ` (${o.note})` : ""}`);
@@ -184,7 +204,7 @@ export function judgePair(m: PairManifest, reply: PairReply): { passed: boolean;
   if (!reply.house_side_matches) failures.push("orientation changed — the house is not on the same side as in the photo");
   if (reply.visible_change < MIN_VISIBLE_CHANGE) failures.push(`too little visible change (${reply.visible_change}/3) — not a before/after`);
   for (const x of reply.extra_structures) if (x.major) failures.push(`invented structure: ${x.description}`);
-  return { passed: failures.length === 0, failures };
+  return { passed: failures.length === 0, failures, out_of_crop: outOfCrop };
 }
 
 /**
@@ -216,7 +236,7 @@ function block(src: ImageSource): Anthropic.Messages.ImageBlockParam {
 }
 
 /** Run the pair gate. Never throws; an unavailable gate fails. */
-export async function runPairGate(m: PairManifest, before: ImageSource, after: ImageSource): Promise<{ passed: boolean; failures: string[]; reply: PairReply | null; status: "ran" | "unavailable" }> {
+export async function runPairGate(m: PairManifest, before: ImageSource, after: ImageSource): Promise<{ passed: boolean; failures: string[]; out_of_crop?: string[]; reply: PairReply | null; status: "ran" | "unavailable" }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { passed: false, failures: ["gate unavailable: ANTHROPIC_API_KEY not set"], reply: null, status: "unavailable" };
   try {

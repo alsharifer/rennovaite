@@ -1,0 +1,802 @@
+{
+  "project_id": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
+  "applied_at": "2026-09-19T04:56:56.165Z",
+  "workbook": {
+    "sheetA": {
+      "entrance_area_width_m": 5.85,
+      "path_from_gate_m": 12.2,
+      "separator_to_end_wall_m": 6,
+      "front_border_width_m": 5.3,
+      "door_landing_m": [
+        1.2,
+        1.3
+      ],
+      "total_grass_m2": 50,
+      "total_tiled_m2": 69.4
+    },
+    "sheetB": {
+      "shed": "Keep"
+    },
+    "sheetC": [
+      {
+        "row": "4",
+        "question": "Pergola: final size, louvered-motorized confirmed, ONE design across all views",
+        "draft": "3.5 × 3.5 m, h 2.8, louvered, at side/rear junction",
+        "answer": "Layout intent = the DRAWINGS (BBQ counter under pergola, bench in adjacent court). Session flagged that renders show three different arrangements (pp4/8/10) — renders must be re-conditioned to match the graph, not redesigned."
+      },
+      {
+        "row": "16",
+        "question": "Timeline expectation",
+        "draft": "Reference project duration: ~90 days",
+        "answer": "Newspace ask: add an indicative delivery timeline/programme to the BoQ"
+      },
+      {
+        "row": "17",
+        "question": "Anything the client asked for that is NOT in the draft",
+        "draft": "—",
+        "answer": "None raised in session; detailed comments to follow with their BoQ review"
+      }
+    ],
+    "sheetD": [
+      {
+        "row": "22",
+        "section": "General",
+        "line": "Whole BoQ",
+        "corrected": null,
+        "type": "confirm",
+        "confidence": "estimate",
+        "basis": "Newspace: 'BoQ seems reasonable' — detailed line-by-line review to follow in writing; no rates disputed in session"
+      },
+      {
+        "row": "23",
+        "section": "General",
+        "line": "Add delivery timeline / indicative programme section",
+        "corrected": "add section",
+        "type": "scope",
+        "confidence": "firm",
+        "basis": "Newspace session ask #5 — derive from reference-project 90-day anchor, scaled to garden scope, labelled indicative"
+      },
+      {
+        "row": "24",
+        "section": "Presentation",
+        "line": "Font size too small across pack + BoQ",
+        "corrected": null,
+        "type": "design",
+        "confidence": "firm",
+        "basis": "Newspace session ask #7 — raise body/caption/annotation sizes for client legibility"
+      }
+    ]
+  },
+  "reconciliation": {
+    "rows": [
+      {
+        "key": "rear-path",
+        "name": "Porcelain path — garden gate to side garden",
+        "type": "path",
+        "aggregate": "tiled",
+        "old_extent": "20.60 × 1.00 m",
+        "old_m2": 20.6,
+        "measured_extent": "12.20 × 1.00 m",
+        "measured_m2": 12.2,
+        "new_extent": "12.20 × 1.00 m",
+        "new_m2": 12.2,
+        "drivers": [
+          "dimension update"
+        ],
+        "because": "path run from the garden gate measured 12.2 m (drafted 20.6)",
+        "measured": true
+      },
+      {
+        "key": "entrance",
+        "name": "Garden entrance area — porcelain paving",
+        "type": "paving",
+        "aggregate": "tiled",
+        "old_extent": null,
+        "old_m2": null,
+        "measured_extent": "4.65 × 1.00 m",
+        "measured_m2": 4.65,
+        "new_extent": "5.85 × 2.54 m (shaped)",
+        "new_m2": 13.3,
+        "drivers": [
+          "dimension update",
+          "aggregate refit"
+        ],
+        "because": "width measured 5.85 m; paved depth sized so the tiled total is ≈ 69.4 m²",
+        "measured": false
+      },
+      {
+        "key": "landing",
+        "name": "Door landing — villa door",
+        "type": "paving",
+        "aggregate": "tiled",
+        "old_extent": null,
+        "old_m2": null,
+        "measured_extent": "1.20 × 1.30 m",
+        "measured_m2": 1.56,
+        "new_extent": "1.20 × 1.30 m",
+        "new_m2": 1.56,
+        "drivers": [
+          "dimension update"
+        ],
+        "because": "door landing measured 1.20 × 1.30 m (new element)",
+        "measured": true
+      },
+      {
+        "key": "rear-lawn",
+        "name": "Rear garden — lawn",
+        "type": "artificial_grass",
+        "aggregate": "grass",
+        "old_extent": "20.60 × 2.70 m",
+        "old_m2": 55.62,
+        "measured_extent": "18.05 × 2.70 m (shaped)",
+        "measured_m2": 48.38,
+        "new_extent": "12.20 × 2.70 m",
+        "new_m2": 32.94,
+        "drivers": [
+          "dimension update",
+          "aggregate refit"
+        ],
+        "because": "strip shortened by the measured runs, then confined to the 12.2 m path by the grass aggregate (the entrance area is paved and planted)",
+        "measured": false
+      },
+      {
+        "key": "rear-bed",
+        "name": "Rear planting bed",
+        "type": "planting_bed",
+        "aggregate": null,
+        "old_extent": "20.60 × 0.60 m",
+        "old_m2": 12.36,
+        "measured_extent": "18.05 × 0.60 m",
+        "measured_m2": 10.83,
+        "new_extent": "18.05 × 1.76 m (shaped)",
+        "new_m2": 17.62,
+        "drivers": [
+          "dimension update",
+          "aggregate refit"
+        ],
+        "because": "starts at the entrance area (x 2.55 m); takes the entrance-area ground the aggregates leave unpaved and ungrassed",
+        "measured": false
+      },
+      {
+        "key": "court",
+        "name": "Pergola court — porcelain paving",
+        "type": "paving",
+        "aggregate": "tiled",
+        "old_extent": "6.10 × 4.30 m (shaped)",
+        "old_m2": 13.98,
+        "measured_extent": "6.10 × 4.30 m (shaped)",
+        "measured_m2": 13.98,
+        "new_extent": "6.10 × 4.30 m (shaped)",
+        "new_m2": 13.98,
+        "drivers": [],
+        "because": "separator wall → end-of-pathway wall measured 6 m — confirms the draft",
+        "measured": false
+      },
+      {
+        "key": "pergola",
+        "name": "Louvred pergola (replaces existing gazebo)",
+        "type": "structure",
+        "aggregate": "tiled",
+        "old_extent": "3.50 × 3.50 m",
+        "old_m2": 12.25,
+        "measured_extent": "3.50 × 3.50 m",
+        "measured_m2": 12.25,
+        "new_extent": "3.50 × 3.50 m",
+        "new_m2": 12.25,
+        "drivers": [],
+        "because": "design (unchanged)",
+        "measured": false
+      },
+      {
+        "key": "side-terrace",
+        "name": "Side garden — porcelain paving terrace",
+        "type": "paving",
+        "aggregate": "tiled",
+        "old_extent": "2.60 × 6.20 m",
+        "old_m2": 16.12,
+        "measured_extent": "2.60 × 6.20 m",
+        "measured_m2": 16.12,
+        "new_extent": "2.60 × 6.20 m",
+        "new_m2": 16.12,
+        "drivers": [],
+        "because": "designed split (unchanged)",
+        "measured": false
+      },
+      {
+        "key": "side-lawn",
+        "name": "Side garden — lawn",
+        "type": "artificial_grass",
+        "aggregate": "grass",
+        "old_extent": "2.40 × 6.20 m",
+        "old_m2": 14.88,
+        "measured_extent": "2.40 × 6.20 m",
+        "measured_m2": 14.88,
+        "new_extent": "2.40 × 6.20 m",
+        "new_m2": 14.88,
+        "drivers": [],
+        "because": "designed split (unchanged)",
+        "measured": false
+      },
+      {
+        "key": "side-bed",
+        "name": "Side garden — planting bed",
+        "type": "planting_bed",
+        "aggregate": null,
+        "old_extent": "0.60 × 6.20 m",
+        "old_m2": 3.72,
+        "measured_extent": "0.60 × 6.20 m",
+        "measured_m2": 3.72,
+        "new_extent": "0.60 × 6.20 m",
+        "new_m2": 3.72,
+        "drivers": [],
+        "because": "designed split (unchanged)",
+        "measured": false
+      },
+      {
+        "key": "front-lawn",
+        "name": "Front garden — lawn",
+        "type": "artificial_grass",
+        "aggregate": "grass",
+        "old_extent": "1.60 × 4.00 m",
+        "old_m2": 6.4,
+        "measured_extent": "4.70 × 4.00 m",
+        "measured_m2": 18.8,
+        "new_extent": "0.93 × 2.34 m",
+        "new_m2": 2.18,
+        "drivers": [
+          "dimension update",
+          "aggregate refit"
+        ],
+        "because": "border widened to 5.3 m, then the lawn cut to a patch so the grass total is ≈ 50 m²",
+        "measured": false
+      },
+      {
+        "key": "front-bed",
+        "name": "Front garden — planting bed",
+        "type": "planting_bed",
+        "aggregate": null,
+        "old_extent": "0.60 × 4.00 m",
+        "old_m2": 2.4,
+        "measured_extent": "0.60 × 4.00 m",
+        "measured_m2": 2.4,
+        "new_extent": "5.30 × 4.00 m (shaped)",
+        "new_m2": 19.02,
+        "drivers": [
+          "aggregate refit"
+        ],
+        "because": "the border less the lawn patch the grass aggregate allows",
+        "measured": false
+      }
+    ],
+    "totals": {
+      "grass": {
+        "old": 76.9,
+        "measured": 82.06,
+        "new": 50,
+        "target": 50
+      },
+      "tiled": {
+        "old": 62.95,
+        "measured": 60.76,
+        "new": 69.41,
+        "target": 69.4
+      },
+      "planting": {
+        "old": 18.48,
+        "measured": 16.95,
+        "new": 40.36
+      }
+    },
+    "residual": {
+      "x0": 0.2,
+      "x1": 2.55,
+      "width_m": 2.35
+    }
+  },
+  "stages": [
+    {
+      "label": "baseline — the BoQ Newspace reviewed",
+      "boq_id": "a0e69070-0510-4db7-bddf-49d3a566cff2",
+      "grand_total_aed": 116942.01
+    },
+    {
+      "label": "fix",
+      "boq_id": "260598d1-7b8d-474d-880a-70b2f5763fe2",
+      "grand_total_aed": 116942.01
+    },
+    {
+      "label": "design decision",
+      "boq_id": "94e6dcd6-87a4-4ae5-aa3b-202ff2fd8bd5",
+      "grand_total_aed": 116942.01
+    },
+    {
+      "label": "dimension update",
+      "boq_id": "99a2ae8e-34f1-4c77-9a5a-8bdb5db56bfb",
+      "grand_total_aed": 116753.51
+    },
+    {
+      "label": "aggregate refit",
+      "boq_id": "c414ad66-7ddc-4286-9b14-f243c6942326",
+      "grand_total_aed": 116216.57
+    },
+    {
+      "label": "correction",
+      "boq_id": "c414ad66-7ddc-4286-9b14-f243c6942326",
+      "grand_total_aed": 116216.57
+    },
+    {
+      "label": "fix (late — drainage points reach the take-off)",
+      "boq_id": "fbef954d-319b-4d64-b020-8cb976ff440d",
+      "grand_total_aed": 116216.57
+    }
+  ],
+  "change_report": [
+    {
+      "cause": "fix",
+      "boq": {
+        "old_total_aed": 116942.01,
+        "new_total_aed": 116942.01,
+        "delta_aed": 0,
+        "delta_pct": 0
+      },
+      "moved": []
+    },
+    {
+      "cause": "design decision",
+      "boq": {
+        "old_total_aed": 116942.01,
+        "new_total_aed": 116942.01,
+        "delta_aed": 0,
+        "delta_pct": 0
+      },
+      "moved": []
+    },
+    {
+      "cause": "dimension update",
+      "boq": {
+        "old_total_aed": 116942.01,
+        "new_total_aed": 116753.51,
+        "delta_aed": -188.5,
+        "delta_pct": -0.16
+      },
+      "moved": [
+        {
+          "key": "Hardscape & Structures|GL-04",
+          "section": "Hardscape & Structures",
+          "description": "PCC base under paving",
+          "unit": "m2",
+          "old_qty": 62.95,
+          "new_qty": 60.76,
+          "delta_qty": -2.19,
+          "delta_pct": -3.48,
+          "old_total_aed": 6647.52,
+          "new_total_aed": 6416.26,
+          "delta_aed": -231.26,
+          "status": "moved"
+        },
+        {
+          "key": "Hardscape & Structures|GL-05",
+          "section": "Hardscape & Structures",
+          "description": "Porcelain paving installation",
+          "unit": "m2",
+          "old_qty": 62.95,
+          "new_qty": 60.76,
+          "delta_qty": -2.19,
+          "delta_pct": -3.48,
+          "old_total_aed": 4431.68,
+          "new_total_aed": 4277.5,
+          "delta_aed": -154.18,
+          "status": "moved"
+        },
+        {
+          "key": "Hardscape & Structures|GL-06",
+          "section": "Hardscape & Structures",
+          "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+          "unit": "m2",
+          "old_qty": 62.95,
+          "new_qty": 60.76,
+          "delta_qty": -2.19,
+          "delta_pct": -3.48,
+          "old_total_aed": 8063.9,
+          "new_total_aed": 7783.36,
+          "delta_aed": -280.54,
+          "status": "moved"
+        },
+        {
+          "key": "Soft Landscaping|GL-07",
+          "section": "Soft Landscaping",
+          "description": "Artificial grass supply",
+          "unit": "m2",
+          "old_qty": 76.9,
+          "new_qty": 82.06,
+          "delta_qty": 5.16,
+          "delta_pct": 6.71,
+          "old_total_aed": 2030.16,
+          "new_total_aed": 2166.38,
+          "delta_aed": 136.22,
+          "status": "moved"
+        },
+        {
+          "key": "Soft Landscaping|GL-08",
+          "section": "Soft Landscaping",
+          "description": "Artificial grass installation (base+sand+borders)",
+          "unit": "m2",
+          "old_qty": 76.9,
+          "new_qty": 82.06,
+          "delta_qty": 5.16,
+          "delta_pct": 6.71,
+          "old_total_aed": 5413.76,
+          "new_total_aed": 5777.02,
+          "delta_aed": 363.26,
+          "status": "moved"
+        },
+        {
+          "key": "Soft Landscaping|GL-25",
+          "section": "Soft Landscaping",
+          "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+          "unit": "m2",
+          "old_qty": 18.48,
+          "new_qty": 16.95,
+          "delta_qty": -1.53,
+          "delta_pct": -8.28,
+          "old_total_aed": 0,
+          "new_total_aed": 0,
+          "delta_aed": 0,
+          "status": "moved"
+        }
+      ]
+    },
+    {
+      "cause": "aggregate refit",
+      "boq": {
+        "old_total_aed": 116753.51,
+        "new_total_aed": 116216.57,
+        "delta_aed": -536.94,
+        "delta_pct": -0.46
+      },
+      "moved": [
+        {
+          "key": "Hardscape & Structures|GL-04",
+          "section": "Hardscape & Structures",
+          "description": "PCC base under paving",
+          "unit": "m2",
+          "old_qty": 60.76,
+          "new_qty": 69.41,
+          "delta_qty": 8.65,
+          "delta_pct": 14.24,
+          "old_total_aed": 6416.26,
+          "new_total_aed": 7329.7,
+          "delta_aed": 913.44,
+          "status": "moved"
+        },
+        {
+          "key": "Hardscape & Structures|GL-05",
+          "section": "Hardscape & Structures",
+          "description": "Porcelain paving installation",
+          "unit": "m2",
+          "old_qty": 60.76,
+          "new_qty": 69.41,
+          "delta_qty": 8.65,
+          "delta_pct": 14.24,
+          "old_total_aed": 4277.5,
+          "new_total_aed": 4886.46,
+          "delta_aed": 608.96,
+          "status": "moved"
+        },
+        {
+          "key": "Hardscape & Structures|GL-06",
+          "section": "Hardscape & Structures",
+          "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+          "unit": "m2",
+          "old_qty": 60.76,
+          "new_qty": 69.41,
+          "delta_qty": 8.65,
+          "delta_pct": 14.24,
+          "old_total_aed": 7783.36,
+          "new_total_aed": 8891.42,
+          "delta_aed": 1108.06,
+          "status": "moved"
+        },
+        {
+          "key": "Soft Landscaping|GL-07",
+          "section": "Soft Landscaping",
+          "description": "Artificial grass supply",
+          "unit": "m2",
+          "old_qty": 82.06,
+          "new_qty": 50,
+          "delta_qty": -32.06,
+          "delta_pct": -39.07,
+          "old_total_aed": 2166.38,
+          "new_total_aed": 1320,
+          "delta_aed": -846.38,
+          "status": "moved"
+        },
+        {
+          "key": "Soft Landscaping|GL-08",
+          "section": "Soft Landscaping",
+          "description": "Artificial grass installation (base+sand+borders)",
+          "unit": "m2",
+          "old_qty": 82.06,
+          "new_qty": 50,
+          "delta_qty": -32.06,
+          "delta_pct": -39.07,
+          "old_total_aed": 5777.02,
+          "new_total_aed": 3520,
+          "delta_aed": -2257.02,
+          "status": "moved"
+        },
+        {
+          "key": "Soft Landscaping|GL-25",
+          "section": "Soft Landscaping",
+          "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+          "unit": "m2",
+          "old_qty": 16.95,
+          "new_qty": 40.36,
+          "delta_qty": 23.41,
+          "delta_pct": 138.11,
+          "old_total_aed": 0,
+          "new_total_aed": 0,
+          "delta_aed": 0,
+          "status": "moved"
+        }
+      ]
+    },
+    {
+      "cause": "correction",
+      "boq": {
+        "old_total_aed": 116216.57,
+        "new_total_aed": 116216.57,
+        "delta_aed": 0,
+        "delta_pct": 0
+      },
+      "moved": []
+    },
+    {
+      "cause": "fix",
+      "note": "late fix stage: the BoQ feed passed only lights and taps to the take-off, so the GL-28 drainage line (stage 1's code fix) did not appear until the feed passed drainage points too; independent of geometry, rate 0",
+      "boq": {
+        "old_total_aed": 116216.57,
+        "new_total_aed": 116216.57,
+        "delta_aed": 0,
+        "delta_pct": 0
+      },
+      "moved": [
+        {
+          "key": "Plumbing|GL-28",
+          "section": "Plumbing",
+          "description": "Drainage point / gully in paving (absorbed at no charge in the reference project — QS to confirm)",
+          "unit": "no",
+          "old_qty": null,
+          "new_qty": 2,
+          "delta_qty": 2,
+          "delta_pct": null,
+          "old_total_aed": 0,
+          "new_total_aed": 0,
+          "delta_aed": 0,
+          "status": "added"
+        }
+      ]
+    }
+  ],
+  "overall": {
+    "boq": {
+      "old_total_aed": 116942.01,
+      "new_total_aed": 116216.57,
+      "delta_aed": -725.44,
+      "delta_pct": -0.62
+    },
+    "top5": [
+      {
+        "key": "Soft Landscaping|GL-08",
+        "section": "Soft Landscaping",
+        "description": "Artificial grass installation (base+sand+borders)",
+        "unit": "m2",
+        "old_qty": 76.9,
+        "new_qty": 50,
+        "delta_qty": -26.9,
+        "delta_pct": -34.98,
+        "old_total_aed": 5413.76,
+        "new_total_aed": 3520,
+        "delta_aed": -1893.76,
+        "status": "moved"
+      },
+      {
+        "key": "Hardscape & Structures|GL-06",
+        "section": "Hardscape & Structures",
+        "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+        "unit": "m2",
+        "old_qty": 62.95,
+        "new_qty": 69.41,
+        "delta_qty": 6.46,
+        "delta_pct": 10.26,
+        "old_total_aed": 8063.9,
+        "new_total_aed": 8891.42,
+        "delta_aed": 827.52,
+        "status": "moved"
+      },
+      {
+        "key": "Soft Landscaping|GL-07",
+        "section": "Soft Landscaping",
+        "description": "Artificial grass supply",
+        "unit": "m2",
+        "old_qty": 76.9,
+        "new_qty": 50,
+        "delta_qty": -26.9,
+        "delta_pct": -34.98,
+        "old_total_aed": 2030.16,
+        "new_total_aed": 1320,
+        "delta_aed": -710.16,
+        "status": "moved"
+      },
+      {
+        "key": "Hardscape & Structures|GL-04",
+        "section": "Hardscape & Structures",
+        "description": "PCC base under paving",
+        "unit": "m2",
+        "old_qty": 62.95,
+        "new_qty": 69.41,
+        "delta_qty": 6.46,
+        "delta_pct": 10.26,
+        "old_total_aed": 6647.52,
+        "new_total_aed": 7329.7,
+        "delta_aed": 682.18,
+        "status": "moved"
+      },
+      {
+        "key": "Hardscape & Structures|GL-05",
+        "section": "Hardscape & Structures",
+        "description": "Porcelain paving installation",
+        "unit": "m2",
+        "old_qty": 62.95,
+        "new_qty": 69.41,
+        "delta_qty": 6.46,
+        "delta_pct": 10.26,
+        "old_total_aed": 4431.68,
+        "new_total_aed": 4886.46,
+        "delta_aed": 454.78,
+        "status": "moved"
+      }
+    ]
+  },
+  "fixtures_rezoned": 4,
+  "events_tagged_session_apply": 41,
+  "metrics": {
+    "time_to_draw_plan_min": null,
+    "active_design_min": null,
+    "time_to_first_full_boq_min": 1517.7,
+    "first_full_boq_at": "2026-09-15T17:58:42.314283+00:00",
+    "boq_generations": 26,
+    "render_gate": {
+      "renders": 121,
+      "passed": 27,
+      "substituted": 94,
+      "pass_rate": 0.223,
+      "attempt_pass_rate": 0.293
+    },
+    "friction": [
+      {
+        "at": "2026-09-15T17:58:36.86132+00:00",
+        "note": "No style direction was locked, and renders cannot run without one — Desert Modern set as the proposed default (it matches the photos' modern boundary walls); the client confirms or changes it at the review.",
+        "area": "renders"
+      },
+      {
+        "at": "2026-09-15T17:58:37.019273+00:00",
+        "note": "The type-plan dimension set has no front-garden footprint; the front lawn + bed beside the drive are an assumed 2.2 × 4.0 m, and the garage/drive block had to be reshaped around them through /api/plan-context — context footprints have no editor in the UI.",
+        "area": "plan"
+      },
+      {
+        "at": "2026-09-15T17:58:37.157779+00:00",
+        "note": "The garden gate is not on the plan (a boundary wall has no gate/opening element); the 1.0 m path assumes the gate at the rear strip's west end.",
+        "area": "plan"
+      },
+      {
+        "at": "2026-09-15T17:58:37.276207+00:00",
+        "note": "A pergola's variant (louvred, fixed, timber) has no field: every structure zone prices at the one motorised louvred pergola rate, and the variant lives in spec only.",
+        "area": "plan"
+      },
+      {
+        "at": "2026-09-15T17:58:37.407437+00:00",
+        "note": "Replace meant like-for-like; a replacement by a DIFFERENT element (stepping path → porcelain path zone, sink counter → BBQ counter elsewhere, string lights → designed lighting) had no representation and would have priced both. Added spec.replaced_by (old item = demolition only, the new element carries the work) — API only, no editor control yet.",
+        "area": "elements"
+      },
+      {
+        "at": "2026-09-15T17:58:37.531712+00:00",
+        "note": "PATCH /api/plan-elements and /api/plan-zones replace spec wholesale: adding one key means re-sending the stored spec.",
+        "area": "elements"
+      },
+      {
+        "at": "2026-09-15T17:58:37.653697+00:00",
+        "note": "The counter run's default section (600 wide) is not a BBQ counter's; the 900 × 900 section had to be entered explicitly.",
+        "area": "elements"
+      },
+      {
+        "at": "2026-09-15T17:58:37.781959+00:00",
+        "note": "Irrigation zones are not drawn: the allowance derives from the planting beds as built (rear, side and front beds).",
+        "area": "drainage"
+      },
+      {
+        "at": "2026-09-15T18:18:35.968435+00:00",
+        "note": "One existing run replaced by TWO design elements (the stepping-stone path became the side-garden terrace along the house and the 1.0 m rear path) has a single replaced_by text; the first wording named only the path, and the before/after gate on a side-garden photo rightly rejected a wide terrace as not a 1.0 m path. Split runs, or per-segment replacements, would model it.",
+        "area": "elements"
+      },
+      {
+        "at": "2026-09-17T15:00:20.196175+00:00",
+        "note": "The garden gate and the wall it sits in had no place in the plan vocabulary: an opening could only snap to a wall derived from room edges, and garden walls are context footprints. Added gates as openings that name their context wall (migration 039).",
+        "area": "plan"
+      },
+      {
+        "at": "2026-09-17T15:00:20.336382+00:00",
+        "note": "A garden BoQ had no line for outdoor water taps or for planting-bed soil preparation: both are real work a client expects priced; added as QS-to-price lines (GL-25, GL-26).",
+        "area": "boq"
+      }
+    ],
+    "corrections": {
+      "total": 3,
+      "by_type": {
+        "rate": 0,
+        "quantity": 0,
+        "scope": 1,
+        "design": 1,
+        "confirm": 1
+      }
+    },
+    "sessions": [
+      {
+        "record": "three-firms #1 — Arabella design session, Sep 2026",
+        "decisions": 4,
+        "corrections": {
+          "confirm": 1,
+          "scope": 1,
+          "design": 1
+        }
+      }
+    ]
+  },
+  "draft": {
+    "draft": true,
+    "derived": [
+      "plot boundary",
+      "zone: Front garden — lawn",
+      "zone: Front garden — planting bed",
+      "zone: Garden entrance area — porcelain paving",
+      "zone: Louvred pergola (replaces existing gazebo)",
+      "zone: Pergola court — porcelain paving",
+      "zone: Rear garden — lawn",
+      "zone: Rear planting bed",
+      "zone: Side garden — lawn",
+      "zone: Side garden — planting bed",
+      "zone: Side garden — porcelain paving terrace",
+      "run: BBQ counter (under the pergola)",
+      "run: L-seating bench (pergola court)",
+      "context: Existing villa",
+      "context: Garage / drive block",
+      "context: Rear boundary wall",
+      "context: Corner boundary wall (side garden)",
+      "context: Side garden street wall",
+      "context: Rear strip end wall"
+    ],
+    "note": "calibrated from developer type plan (42 px/m, room-dims cross-checked); corner plot — side garden likely wider; pending affection plan / site measurement",
+    "statement": "DRAFT FOR REVIEW — quantities derived from reference layout; firm after site verification."
+  },
+  "results": [
+    "PASS  Sheet A: entrance area width — 5.85",
+    "PASS  Sheet A: path run from the garden gate — 12.2",
+    "PASS  Sheet A: front border width — 5.3",
+    "PASS  Sheet A: separator → end-of-pathway wall — 6.0",
+    "PASS  Sheet A: door landing — 1.20 × 1.30",
+    "PASS  Sheet A: total grass aggregate — ≈50 (10 × 4) + (10 x 1)",
+    "PASS  Sheet A: total tiled aggregate — ≈69.4 (6.20 × 11.2)",
+    "PASS  Sheet B: shed override is KEEP (the only override) — Keep",
+    "PASS  Sheet C: three answered questions — Pergola: final size, louvered- | Timeline expectation | Anything the client asked for ",
+    "PASS  Sheet D: confirm / scope / design rows — confirm:estimate, scope:firm, design:firm",
+    "PASS  baseline is the reviewed BoQ (AED 116,942.01) — 116942.01",
+    "PASS  grass reconciles to the measured aggregate — 50 m²",
+    "PASS  tiled area reconciles to the measured aggregate — 69.41 m²",
+    "PASS  every line that moved overall is attributed to a cause — 6 line(s)",
+    "PASS  the session's corrections are recorded by type, confirms included",
+    "PASS  three-firms instrumentation record #1 is real session data — {\"record\":\"three-firms #1 — Arabella design session, Sep 2026\",\"decisions\":4,\"corrections\":{\"confirm\":1,\"scope\":1,\"design\":1}}",
+    "PASS  the export gate passes: nothing untyped, undecided or needs_selection — {\"ready\":true,\"untyped_counters\":[],\"undecided\":[],\"stale_boq_needs_selection\":[],\"has_boq\":true}",
+    "PASS  the BoQ carries the indicative programme — 60 days: Mobilisation & setting out 5 · Demolition & site clearance 3 · Hardscape & structures 31 · Soft landscaping, irrigation & MEP 16 · Snagging & handover 5",
+    "PASS  the plan is still a DRAFT (the plot is not measured) — plot boundary; zone: Front garden — lawn; zone: Front garden — planting bed; zone: Garden entrance area — porcelain paving"
+  ]
+}

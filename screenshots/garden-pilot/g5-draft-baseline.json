@@ -1,18 +1,18 @@
 {
-  "captured_at": "2026-09-17T20:52:34.693Z",
-  "boq_id": "e66ccda3-1fe4-48a0-8fb2-a7c854174a30",
+  "captured_at": "2026-09-19T07:12:31.873Z",
+  "boq_id": "449e25b7-5333-42d0-aaad-9d05b1c4bc5b",
   "draft": true,
   "derived": [
     "plot boundary",
     "zone: Pergola court — porcelain paving",
     "zone: Side garden — lawn",
-    "zone: Porcelain path — garden gate to side garden",
-    "zone: Side garden — planting bed",
     "zone: Rear planting bed",
+    "zone: Side garden — planting bed",
+    "zone: Louvred pergola (replaces existing gazebo)",
+    "zone: Garden entrance area — porcelain paving",
     "zone: Rear garden — lawn",
     "zone: Side garden — porcelain paving terrace",
     "zone: Front garden — lawn",
-    "zone: Louvred pergola (replaces existing gazebo)",
     "zone: Front garden — planting bed",
     "run: BBQ counter (under the pergola)",
     "run: L-seating bench (pergola court)",
@@ -21,10 +21,9 @@
     "context: Rear boundary wall",
     "context: Corner boundary wall (side garden)",
     "context: Side garden street wall",
-    "context: Rear strip end wall",
-    "context: Separator wall (rear strip | side garden)"
+    "context: Rear strip end wall"
   ],
-  "grand_total_aed": 116942.01,
+  "grand_total_aed": 116216.57,
   "lines": [
     {
       "key": "Demolition|GL-03",
@@ -40,6 +39,16 @@
       "key": "Plumbing|GL-26",
       "section": "Plumbing",
       "description": "Outdoor water tap (hose bib) with isolation valve (no reference rate — QS to price)",
+      "quantity": 2,
+      "unit": "no",
+      "rate_aed": 0,
+      "total_aed": 0,
+      "qty_derived": false
+    },
+    {
+      "key": "Plumbing|GL-28",
+      "section": "Plumbing",
+      "description": "Drainage point / gully in paving (absorbed at no charge in the reference project — QS to confirm)",
       "quantity": 2,
       "unit": "no",
       "rate_aed": 0,
@@ -70,30 +79,30 @@
       "key": "Hardscape & Structures|GL-04",
       "section": "Hardscape & Structures",
       "description": "PCC base under paving",
-      "quantity": 62.95,
+      "quantity": 69.41,
       "unit": "m2",
       "rate_aed": 105.6,
-      "total_aed": 6647.52,
+      "total_aed": 7329.7,
       "qty_derived": true
     },
     {
       "key": "Hardscape & Structures|GL-05",
       "section": "Hardscape & Structures",
       "description": "Porcelain paving installation",
-      "quantity": 62.95,
+      "quantity": 69.41,
       "unit": "m2",
       "rate_aed": 70.4,
-      "total_aed": 4431.68,
+      "total_aed": 4886.46,
       "qty_derived": true
     },
     {
       "key": "Hardscape & Structures|GL-06",
       "section": "Hardscape & Structures",
       "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
-      "quantity": 62.95,
+      "quantity": 69.41,
       "unit": "m2",
       "rate_aed": 128.1,
-      "total_aed": 8063.9,
+      "total_aed": 8891.42,
       "qty_derived": true
     },
     {
@@ -130,27 +139,27 @@
       "key": "Soft Landscaping|GL-07",
       "section": "Soft Landscaping",
       "description": "Artificial grass supply",
-      "quantity": 76.9,
+      "quantity": 50,
       "unit": "m2",
       "rate_aed": 26.4,
-      "total_aed": 2030.16,
+      "total_aed": 1320,
       "qty_derived": true
     },
     {
       "key": "Soft Landscaping|GL-08",
       "section": "Soft Landscaping",
       "description": "Artificial grass installation (base+sand+borders)",
-      "quantity": 76.9,
+      "quantity": 50,
       "unit": "m2",
       "rate_aed": 70.4,
-      "total_aed": 5413.76,
+      "total_aed": 3520,
       "qty_derived": true
     },
     {
       "key": "Soft Landscaping|GL-25",
       "section": "Soft Landscaping",
       "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
-      "quantity": 18.48,
+      "quantity": 40.36,
       "unit": "m2",
       "rate_aed": 0,
       "total_aed": 0,
@@ -211,6 +220,18 @@
       "unit": "lm"
     },
     {
+      "work_item_key": "garden.drainage_point",
+      "element_id": "3f14481c-9fd6-4c51-9b01-4f358bdc4974",
+      "qty": 1,
+      "unit": "no"
+    },
+    {
+      "work_item_key": "garden.drainage_point",
+      "element_id": "ec245b47-4c61-4333-98b8-99882066605a",
+      "qty": 1,
+      "unit": "no"
+    },
+    {
       "work_item_key": "garden.grass_install",
       "element_id": "3fb94d19-3786-48d4-bb29-48514e8777ba",
       "qty": 14.88,
@@ -219,13 +240,13 @@
     {
       "work_item_key": "garden.grass_install",
       "element_id": "dba7027d-519f-4eac-ba3c-f75c1b269b89",
-      "qty": 6.4,
+      "qty": 2.18,
       "unit": "m2"
     },
     {
       "work_item_key": "garden.grass_install",
       "element_id": "ec59cb9e-41bc-4dbc-819a-649859c672cd",
-      "qty": 55.62,
+      "qty": 32.94,
       "unit": "m2"
     },
     {
@@ -237,19 +258,25 @@
     {
       "work_item_key": "garden.grass_supply",
       "element_id": "dba7027d-519f-4eac-ba3c-f75c1b269b89",
-      "qty": 6.4,
+      "qty": 2.18,
       "unit": "m2"
     },
     {
       "work_item_key": "garden.grass_supply",
       "element_id": "ec59cb9e-41bc-4dbc-819a-649859c672cd",
-      "qty": 55.62,
+      "qty": 32.94,
       "unit": "m2"
     },
     {
       "work_item_key": "garden.paving_install",
       "element_id": "05430548-c9bf-4e5a-9735-25abcfc62caa",
-      "qty": 20.6,
+      "qty": 12.2,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.paving_install",
+      "element_id": "08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
+      "qty": 13.3,
       "unit": "m2"
     },
     {
@@ -271,9 +298,21 @@
       "unit": "m2"
     },
     {
+      "work_item_key": "garden.paving_install",
+      "element_id": "dffac8a5-5c8a-4be7-85de-917ea6becb62",
+      "qty": 1.56,
+      "unit": "m2"
+    },
+    {
       "work_item_key": "garden.pcc_base",
       "element_id": "05430548-c9bf-4e5a-9735-25abcfc62caa",
-      "qty": 20.6,
+      "qty": 12.2,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.pcc_base",
+      "element_id": "08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
+      "qty": 13.3,
       "unit": "m2"
     },
     {
@@ -292,6 +331,12 @@
       "work_item_key": "garden.pcc_base",
       "element_id": "94a612f3-9a07-4466-b6fc-53e48c550ed1",
       "qty": 13.98,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.pcc_base",
+      "element_id": "dffac8a5-5c8a-4be7-85de-917ea6becb62",
+      "qty": 1.56,
       "unit": "m2"
     },
     {
@@ -309,13 +354,13 @@
     {
       "work_item_key": "garden.planting_bed",
       "element_id": "5542fe1d-d6f5-4aa8-b889-67781f2e0715",
-      "qty": 2.4,
+      "qty": 19.02,
       "unit": "m2"
     },
     {
       "work_item_key": "garden.planting_bed",
       "element_id": "f3d76980-13a9-4830-86e2-0c8127bfee42",
-      "qty": 12.36,
+      "qty": 17.62,
       "unit": "m2"
     },
     {
@@ -351,7 +396,7 @@
     {
       "work_item_key": "garden.removal",
       "element_id": "d813d938-1041-4d20-812a-b45607276be9",
-      "qty": 26.95,
+      "qty": 19.55,
       "unit": "lm"
     },
     {
@@ -363,7 +408,13 @@
     {
       "work_item_key": "garden.tile_supply",
       "element_id": "05430548-c9bf-4e5a-9735-25abcfc62caa",
-      "qty": 20.6,
+      "qty": 12.2,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.tile_supply",
+      "element_id": "08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
+      "qty": 13.3,
       "unit": "m2"
     },
     {
@@ -382,6 +433,12 @@
       "work_item_key": "garden.tile_supply",
       "element_id": "94a612f3-9a07-4466-b6fc-53e48c550ed1",
       "qty": 13.98,
+      "unit": "m2"
+    },
+    {
+      "work_item_key": "garden.tile_supply",
+      "element_id": "dffac8a5-5c8a-4be7-85de-917ea6becb62",
+      "qty": 1.56,
       "unit": "m2"
     },
     {

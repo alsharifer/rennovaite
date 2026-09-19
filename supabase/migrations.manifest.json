@@ -236,6 +236,12 @@
       "version": "20260101003900",
       "name": "garden_gates",
       "sha256": "fc78401167f7d42beef80786514cbe2ff9401d3a8a7fd16d620929f4c8d84557"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004000",
+      "name": "session_capture",
+      "sha256": "f0a46cb911feb87f7e17115b534e5b8797dba4e05cbf483a2910ca80fcaecc1a"
     }
   ]
 }

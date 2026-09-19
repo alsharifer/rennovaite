@@ -61,6 +61,15 @@ export interface PackRender {
   by_choice?: boolean;
   /** G5: a passed render carries its 3D design view as an inset (image-slot id). */
   design?: { id: string } | null;
+  /** G5d: which scene objects the camera shows, and how much of the frame each takes. */
+  shows?: { key: string; share: number; box?: [number, number, number, number] }[];
+  /**
+   * G5d: the built-feature placement check ran on the attempt that passed. A render
+   * without it cannot prove it shows the plan's arrangement, and never enters a pack.
+   */
+  placement_verified?: boolean;
+  /** G5d: this zone's own camera did not pass; the image is another passed view that shows it. */
+  borrowed_from?: string | null;
 }
 
 /** G5: what the pack is made of — the backbone and the extras. */
@@ -93,7 +102,43 @@ export function assertPackable(r: PackRender): PackRender {
   if ((r.kind === "render" || r.kind === "photo_edit") && !r.gate_passed) {
     throw new Error(`render ${r.id} has not passed the faithfulness gate and cannot enter a pack`);
   }
+  // G5d: two passed renders must not show two arrangements of the same structures.
+  // Each is held to the one scene by the placement check — one without it is out.
+  if (r.kind === "render" && r.placement_verified === false) {
+    throw new Error(`render ${r.id} has not been checked for built-feature placement and cannot enter a pack`);
+  }
   return r;
+}
+
+/** G5d: may this image stand as a view's picture? Only a passed, placement-checked render. */
+export const isPassedRender = (r: PackRender | null | undefined): r is PackRender => !!r && r.kind === "render" && r.gate_passed && r.placement_verified !== false;
+
+/**
+ * G5d: a zone whose own camera did not pass borrows the passed view that shows it
+ * best — the Z01 pergola page led with a failed low-poly model while the Z02 court
+ * render showed the same pergola, passed. A structure must fill ≥ 12% of the frame
+ * or frame ≥ 20% of it (an open louvred pergola is mostly sky between its members),
+ * a surface ≥ 20%, or the borrowed picture would be about something else.
+ */
+export function borrowPassedViews(zones: PackZone[], views: readonly PackGardenView[]): PackZone[] {
+  const pool: { r: PackRender; label: string }[] = [
+    ...zones.filter((z) => isPassedRender(z.day)).map((z) => ({ r: z.day!, label: `the ${z.ref} view` })),
+    ...views.filter((v) => isPassedRender(v.day)).map((v) => ({ r: v.day!, label: `the ${v.label.toLowerCase()}` })),
+  ];
+  return zones.map((z) => {
+    if (isPassedRender(z.day)) return z;
+    let best: { r: PackRender; label: string; score: number } | null = null;
+    for (const c of pool) {
+      const s = c.r.shows ?? [];
+      const st = s.find((x) => x.key === `structure:${z.room.id}`);
+      const framed = st?.box ? ((st.box[2] - st.box[0]) * (st.box[3] - st.box[1])) / 10000 : 0;
+      const structure = Math.max(st?.share ?? 0, framed >= 0.2 ? Math.max(0.12, st?.share ?? 0) : 0);
+      const surface = s.find((x) => x.key === `zone:${z.room.id}`)?.share ?? 0;
+      const score = structure >= 0.12 ? 1 + structure : surface >= 0.2 ? surface : 0;
+      if (score > 0 && (!best || score > best.score)) best = { ...c, score };
+    }
+    return best ? { ...z, day: { ...best.r, borrowed_from: best.label } } : z;
+  });
 }
 
 /** A whole-garden camera view for the pack. */
@@ -260,13 +305,23 @@ export function buildPackZones(input: RenderPackInput): PackZone[] {
 
 const f1 = (n: number) => (Math.round(n * 10) / 10).toString();
 
+/**
+ * G5d (session comment 7 — client legibility): every body, caption and label size
+ * under 4 mm is set 25% larger, never below 3.1 mm (≈ 9 pt on A3). Headings are
+ * already legible and keep their size. Applied here and in paragraph(), whose
+ * wrap width and leading scale with it, so layouts reflow rather than overprint.
+ */
+export function legible(size: number): number {
+  return size >= 4 ? size : Math.round(Math.max(3.1, size * 1.25) * 100) / 100;
+}
+
 function text(
   x: number,
   y: number,
   s: string,
   o: { size?: number; fill?: string; font?: string; anchor?: "start" | "middle" | "end"; weight?: number; spacing?: string } = {},
 ): string {
-  return `<text x="${f1(x)}" y="${f1(y)}" font-size="${o.size ?? 3.2}" fill="${o.fill ?? INK_700}"${o.anchor ? ` text-anchor="${o.anchor}"` : ""} style="font-family:${o.font ?? FONT_UI}${o.weight ? `;font-weight:${o.weight}` : ""}${o.spacing ? `;letter-spacing:${o.spacing}` : ""}">${esc(s)}</text>`;
+  return `<text x="${f1(x)}" y="${f1(y)}" font-size="${legible(o.size ?? 3.2)}" fill="${o.fill ?? INK_700}"${o.anchor ? ` text-anchor="${o.anchor}"` : ""} style="font-family:${o.font ?? FONT_UI}${o.weight ? `;font-weight:${o.weight}` : ""}${o.spacing ? `;letter-spacing:${o.spacing}` : ""}">${esc(s)}</text>`;
 }
 
 /** Greedy word wrap by an average glyph width — deterministic, no font metrics. */
@@ -287,8 +342,10 @@ export function wrap(s: string, maxChars: number): string[] {
 }
 
 function paragraph(x: number, y: number, s: string, maxChars: number, lineH: number, o: Parameters<typeof text>[3] = {}) {
-  const lines = wrap(s, maxChars);
-  return { svg: lines.map((l, i) => text(x, y + i * lineH, l, o)).join(""), height: lines.length * lineH };
+  const size = o.size ?? 3.2;
+  const k = legible(size) / size;
+  const lines = wrap(s, Math.floor(maxChars / k));
+  return { svg: lines.map((l, i) => text(x, y + i * lineH * k, l, o)).join(""), height: lines.length * lineH * k };
 }
 
 function page(body: string): string {
@@ -330,25 +387,29 @@ function placeholder(x: number, y: number, w: number, h: number, line1: string, 
 
 const areaText = (r: Room) => `${r.area_m2.toFixed(2)} m²${r.area_derived_m2 ? " *" : ""}`;
 
-/** What an image IS, printed under it: a gated render, or the design view shipped instead. */
-function caption(x: number, y: number, view: string, r: PackRender): string {
+/**
+ * G5d: the ONE neutral line a client reads under a view that is not a styled
+ * render yet. The gate's findings ("No render passed the checks, so …") are QA
+ * detail for the run report, never for the client.
+ */
+export const PENDING_DAY = "Visualisation pending — layout as drawn, see L-100";
+export const PENDING_EVENING = "Visualisation pending — lighting as designed, see L-401";
+
+/** What an image IS, printed under it: a gated render, or the design view shipped instead. Returns its height. */
+function caption(x: number, y: number, view: string, r: PackRender): { svg: string; height: number } {
+  const line = legible(2.6) + 1.6;
   if (r.kind === "render") {
-    return text(x, y, `${view.toUpperCase()} — RENDER · FAITHFULNESS CHECK PASSED${r.design ? " · INSET: 3D DESIGN VIEW" : ""}`, { size: 2.6, fill: INK_500, spacing: "0.06em" });
+    const head = r.borrowed_from
+      ? `${view.toUpperCase()} — RENDER FROM ${r.borrowed_from.toUpperCase()} · FAITHFULNESS CHECK PASSED`
+      : `${view.toUpperCase()} — RENDER · FAITHFULNESS CHECK PASSED${r.design ? " · INSET: 3D DESIGN VIEW" : ""}`;
+    return { svg: text(x, y, head, { size: 2.6, fill: INK_500, spacing: "0.04em" }), height: line };
   }
-  if (r.by_choice) {
-    return (
-      text(x, y, `${view.toUpperCase()} — 3D DESIGN VIEW`, { size: 2.6, fill: INK_700, spacing: "0.06em" }) +
-      text(x, y + 4, "The design model, shown by choice: no camera position on this plot gives a styled render a clean view.", { size: 2.2, fill: INK_500 })
-    );
-  }
-  const why = r.note ? `: ${r.note}` : "";
-  // G5c: wrapped at word boundaries and ended with an ellipsis when it runs past
-  // three lines — never cut mid-word.
-  const lines = captionLines(`No render passed the checks, so the textured design model is shown${why}`, 105, 3);
-  return (
-    text(x, y, `${view.toUpperCase()} — 3D DESIGN VIEW (TEXTURED MODEL)`, { size: 2.6, fill: TERRACOTTA, spacing: "0.06em" }) +
-    lines.map((l, i) => text(x, y + 4 + i * 3.1, l, { size: 2.2, fill: TERRACOTTA })).join("")
-  );
+  return {
+    svg:
+      text(x, y, `${view.toUpperCase()} — 3D DESIGN VIEW`, { size: 2.6, fill: INK_500, spacing: "0.04em" }) +
+      text(x, y + line, view.toLowerCase() === "evening" ? PENDING_EVENING : PENDING_DAY, { size: 2.6, fill: INK_700 }),
+    height: line * 2,
+  };
 }
 
 /** Word-wrapped caption lines, capped, the last one ending in an ellipsis when text was dropped. */
@@ -424,9 +485,9 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
 
   body += text(M, y, "CONTENTS", { size: 2.8, fill: INK_500, spacing: "0.08em" });
   const mix = packMix(input);
-  body += text(M, y + 7, `Plan overview · ${mix.photo_pairs} before/after · ${zones.length} zones · materials & finishes`, { size: 3.4, fill: INK_700 });
-  body += text(M, y + 19, `${mix.design_views_by_choice + mix.design_views_after_gate} 3D design views · ${mix.styled_renders} styled renders (faithfulness check passed)`, { size: 3, fill: INK_700, font: FONT_MONO });
-  body += text(M, y + 13, `${rendered} of ${zones.length} zones rendered · dated ${input.dateISO}`, {
+  body += text(M, y + 8, `Plan overview · ${mix.photo_pairs} before/after · ${zones.length} zones · materials & finishes`, { size: 3.4, fill: INK_700 });
+  body += text(M, y + 22, `${mix.design_views_by_choice + mix.design_views_after_gate} 3D design views · ${mix.styled_renders} styled renders (faithfulness check passed)`, { size: 3, fill: INK_700, font: FONT_MONO });
+  body += text(M, y + 15, `${rendered} of ${zones.length} zones rendered · dated ${input.dateISO}`, {
     size: 3.4,
     fill: rendered < zones.length ? TERRACOTTA : INK_700,
     font: FONT_MONO,
@@ -440,8 +501,8 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
     body += text(hx, hy + hh + 7, `${hero.ref ? `${hero.ref} · ` : ""}${hero.room.name_en}`, { size: 3, fill: INK_500 });
     body +=
       hero.day!.kind === "photo_edit"
-        ? text(hx, hy + hh + 12, "AFTER — PHOTO RESTYLE · FAITHFULNESS CHECK PASSED", { size: 2.6, fill: INK_500, spacing: "0.06em" })
-        : caption(hx, hy + hh + 12, "Day", hero.day!);
+        ? text(hx, hy + hh + 13, "AFTER — PHOTO RESTYLE · FAITHFULNESS CHECK PASSED", { size: 2.6, fill: INK_500, spacing: "0.06em" })
+        : caption(hx, hy + hh + 13, "Day", hero.day!).svg;
   } else {
     body += placeholder(hx, hy, hw, hh, "No renders yet", "Generate the zone views from the render step, then rebuild the pack.");
   }
@@ -475,8 +536,12 @@ function gardenViewPage(input: RenderPackInput, v: PackGardenView, n: number, to
   const top = 40;
   const gap = 8;
   const colW = (PAGE_W - 2 * M - gap) / 2;
-  const photoH = v.lit ? Math.round((colW - 6) / PHOTO_ASPECT + 6) : 200;
-  const boxes = v.lit
+  // G5d: an evening that did not pass is DROPPED from the client pack — the day
+  // view stands alone with the lighting referred to the plan, never a near-black
+  // design model. The failure stays in the run report.
+  const twoUp = v.lit && isPassedRender(v.evening);
+  const photoH = twoUp ? Math.round((colW - 6) / PHOTO_ASPECT + 6) : 200;
+  const boxes = twoUp
     ? [{ x: M, w: colW, view: "Day", r: v.day }, { x: M + colW + gap, w: colW, view: "Evening", r: v.evening }]
     : [{ x: (PAGE_W - (photoH - 6) * PHOTO_ASPECT - 6) / 2, w: (photoH - 6) * PHOTO_ASPECT + 6, view: "Day", r: v.day }];
   for (const b of boxes) {
@@ -486,7 +551,9 @@ function gardenViewPage(input: RenderPackInput, v: PackGardenView, n: number, to
       body += frame(b.x, top, b.w, photoH);
       images.push({ renderId: assertPackable(b.r).id, x: b.x + 3, y: top + 3, w: b.w - 6, h: photoH - 6 });
       images.push(...designInset(b.r, b.x, top, b.w, photoH));
-      body += caption(b.x, top + photoH + 6, b.view, b.r);
+      const c = caption(b.x, top + photoH + 6, b.view, b.r);
+      body += c.svg;
+      if (v.lit && !twoUp) body += text(b.x, top + photoH + 6 + c.height + 1, "Evening — lighting as designed, see L-401", { size: 2.6, fill: INK_700 });
     } else {
       body += placeholder(b.x, top, b.w, photoH, "Not yet rendered", "Generate the whole-garden views from the render step.");
     }
@@ -496,7 +563,8 @@ function gardenViewPage(input: RenderPackInput, v: PackGardenView, n: number, to
 
 /** G5: the 3D design view a passed render was checked against, as a corner inset. */
 function designInset(r: PackRender, x: number, y: number, w: number, h: number): ImageSlot[] {
-  if (r.kind !== "render" || !r.design) return [];
+  // A borrowed view's inset is another camera's model — it would explain nothing here.
+  if (r.kind !== "render" || !r.design || r.borrowed_from) return [];
   const iw = (w - 6) * 0.3;
   const ih = iw / PHOTO_ASPECT;
   return [{ renderId: r.design.id, x: x + w - 3 - iw - 2, y: y + h - 3 - ih - 2, w: iw, h: ih }];
@@ -513,40 +581,49 @@ function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number)
   const gap = 8;
   const colW = (PAGE_W - 2 * M - gap) / 2;
   // Two-up: each slot is a 3:2 photo plus its mat. One-up: a larger 3:2 slot.
-  const photoH = z.eveningExpected ? Math.round((colW - 6) / PHOTO_ASPECT + 6) : 176;
-  const boxes = z.eveningExpected
+  // G5d: only a PASSED evening earns the second slot; a failed one is dropped and
+  // the day view says where the lighting is (L-401).
+  const twoUp = z.eveningExpected && isPassedRender(z.evening);
+  const photoH = twoUp ? Math.round((colW - 6) / PHOTO_ASPECT + 6) : 164;
+  const boxes = twoUp
     ? [
         { x: M, w: colW, view: "Day", r: z.day },
         { x: M + colW + gap, w: colW, view: "Evening", r: z.evening },
       ]
     : [{ x: M, w: PAGE_W - 2 * M, view: "Day", r: z.day }];
 
+  let captionH = 0;
   for (const b of boxes) {
     // A single day view keeps a photographic aspect instead of a letterbox.
-    const w = z.eveningExpected ? b.w : Math.min(b.w, (photoH - 6) * PHOTO_ASPECT + 6);
-    const x = z.eveningExpected ? b.x : (PAGE_W - w) / 2;
+    const w = twoUp ? b.w : Math.min(b.w, (photoH - 6) * PHOTO_ASPECT + 6);
+    const x = twoUp ? b.x : (PAGE_W - w) / 2;
     if (b.r && input.unavailableRenderIds?.has(b.r.id)) {
       body += placeholder(x, top, w, photoH, "Image unavailable", "The render could not be fetched when this pack was built; rebuild the pack.");
     } else if (b.r) {
       body += frame(x, top, w, photoH);
       images.push({ renderId: assertPackable(b.r).id, x: x + 3, y: top + 3, w: w - 6, h: photoH - 6 });
       images.push(...designInset(b.r, x, top, w, photoH));
-    } else if (b.view === "Evening") {
-      body += placeholder(x, top, w, photoH, "Evening view not rendered", "This zone has lighting on the plan; generate its evening view.");
     } else {
       body += placeholder(x, top, w, photoH, "Not yet rendered", "Generate this zone's view from the render step.");
     }
-    body += b.r ? caption(x, top + photoH + 6, b.view, b.r) : text(x, top + photoH + 6, b.view.toUpperCase(), { size: 2.8, fill: INK_500, spacing: "0.08em" });
+    const c = b.r ? caption(x, top + photoH + 6, b.view, b.r) : { svg: text(x, top + photoH + 6, b.view.toUpperCase(), { size: 2.8, fill: INK_500, spacing: "0.08em" }), height: 4 };
+    body += c.svg;
+    let h = c.height;
+    if (z.eveningExpected && !twoUp) {
+      body += text(x, top + photoH + 6 + h + 1, "Evening — lighting as designed, see L-401", { size: 2.6, fill: INK_700 });
+      h += legible(2.6) + 2;
+    }
+    captionH = Math.max(captionH, h);
   }
 
-  // Facts band.
-  const fy = top + photoH + 16;
+  // Facts band — below the tallest caption, so a caption never runs into a column head.
+  const fy = top + photoH + 6 + captionH + 8;
   const col = (i: number) => M + i * ((PAGE_W - 2 * M) / 3);
   body += text(col(0), fy, "SURFACE", { size: 2.6, fill: INK_500, spacing: "0.08em" });
-  body += text(col(0), fy + 6, z.surface, { size: 3.4, fill: INK_900 });
-  body += text(col(0), fy + 12, `Area ${areaText(z.room)}`, { size: 3.2, fill: INK_700, font: FONT_MONO });
+  body += text(col(0), fy + 7, z.surface, { size: 3.4, fill: INK_900 });
+  body += text(col(0), fy + 14, `Area ${areaText(z.room)}`, { size: 3.2, fill: INK_700, font: FONT_MONO });
   if (z.room.area_derived_m2 && z.room.derived_note) {
-    body += paragraph(col(0), fy + 18, `* Derived area: ${z.room.derived_note}`, 62, 3.6, {
+    body += paragraph(col(0), fy + 21, `* Derived area: ${z.room.derived_note}`, 62, 3.6, {
       size: 2.5,
       fill: TERRACOTTA,
     }).svg;
@@ -554,18 +631,18 @@ function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number)
 
   body += text(col(1), fy, "BUILT FEATURES", { size: 2.6, fill: INK_500, spacing: "0.08em" });
   (z.features.length ? z.features : ["None drawn in this zone"]).slice(0, 5).forEach((f, i) => {
-    body += text(col(1), fy + 6 + i * 5, f, { size: 3.2, fill: z.features.length ? INK_900 : INK_500 });
+    body += text(col(1), fy + 7 + i * 6, f, { size: 3.2, fill: z.features.length ? INK_900 : INK_500 });
   });
 
   body += text(col(2), fy, "LIGHTING — AS DESIGNED", { size: 2.6, fill: INK_500, spacing: "0.08em" });
   if (z.lights.length === 0) {
-    body += text(col(2), fy + 6, z.room.type === "structure" ? "Integral downlights (part of the structure)" : "No lighting on the plan", {
+    body += text(col(2), fy + 7, z.room.type === "structure" ? "Integral downlights (part of the structure)" : "No lighting on the plan", {
       size: 3.2,
       fill: INK_500,
     });
   } else {
     z.lights.forEach((l, i) => {
-      body += text(col(2), fy + 6 + i * 5, `${l.count} × ${l.label}`, { size: 3.2, fill: INK_900 });
+      body += text(col(2), fy + 7 + i * 6, `${l.count} × ${l.label}`, { size: 3.2, fill: INK_900 });
     });
   }
   return { kind: "zone", title: `${z.ref} ${z.room.name_en}`, svg: page(body), images };
@@ -685,7 +762,8 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
 }
 
 export function buildRenderPack(input: RenderPackInput): { pages: PackPage[]; zones: PackZone[] } {
-  const zones = buildPackZones(input);
+  // G5d: a zone whose own view did not pass shows the passed view that shows it best.
+  const zones = borrowPassedViews(buildPackZones(input), input.gardenViews ?? []);
   const views = input.gardenViews ?? [];
   const pairs = input.photoPairs ?? [];
   const hasAssumptions = !!input.assumptions && (input.assumptions.decisions.length > 0 || input.assumptions.layout.length > 0);

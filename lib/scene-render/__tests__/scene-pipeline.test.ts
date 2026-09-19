@@ -89,7 +89,7 @@ describe("the faithfulness gate's pass rule", () => {
   const cam = cameras.find((c) => c.id === "zone:z-pergola")!;
   const m = buildManifest("villa-94", cam.id, scene, renderScene(scene, cam, 600, 400, { supersample: 1 }));
   const checks = gateChecks(m);
-  const allGood = (): GateReply => ({ observations: checks.map((c) => ({ ref: c.ref, present: true, roughly_in_place: true, note: "" })), extra_structures: [], extra_lights: [], same_viewpoint: true, summary: "" });
+  const allGood = (): GateReply => ({ observations: checks.map((c) => ({ ref: c.ref, present: true, roughly_in_place: true, note: "" })), placements: [], extra_structures: [], extra_lights: [], same_viewpoint: true, summary: "" });
 
   it("passes only when everything is present, in place, from the same camera", () => {
     expect(judge(checks, allGood()).passed).toBe(true);
@@ -114,7 +114,7 @@ describe("the faithfulness gate's pass rule", () => {
     const m = { projectId: "p", cameraId: "c", counts: {}, items: [item("existing palm tree (kept)", 0.05), item("tree", 0.2), item("existing tree (kept)", 0.002)] };
     const kept = gateChecks(m);
     expect(kept.map((c) => [c.ref, c.noun])).toEqual([["T1", "existing palm tree (kept)"]]);
-    const r = { observations: [{ ref: "T1", present: false, roughly_in_place: false, note: "" }], extra_structures: [], extra_lights: [], same_viewpoint: true, summary: "" };
+    const r = { observations: [{ ref: "T1", present: false, roughly_in_place: false, note: "" }], placements: [], extra_structures: [], extra_lights: [], same_viewpoint: true, summary: "" };
     expect(judge(kept, r).failures).toEqual(["T1 existing palm tree (kept): missing"]);
     expect(dayPrompt(m, getGardenStyle("desert-modern")!)).toContain("the existing trees the client is keeping — palm tree (10–30% across, 20–60% down)");
   });

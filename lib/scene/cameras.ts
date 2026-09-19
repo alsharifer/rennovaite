@@ -567,6 +567,13 @@ export function aerialCamera(scene: Scene, graph: PlanGraph): GardenCamera | nul
   const span = Math.max(b.maxX - b.minX, b.maxY - b.minY);
   const focus = objectIdsWhere(scene, (o) => o.zoneId !== null);
   const buildings = objectIdsWhere(scene, (o) => o.category === "context" && o.noun !== "ground" && o.noun !== "boundary wall" && !o.key.startsWith("neighbour:"));
+  // G5d (session comment 3): the aerial must show the garden ENTRANCE — a view that
+  // hides the gate behind the villa is not the garden's overview.
+  const gates = scene.objects.filter((o) => o.key.startsWith("opening:"));
+  const seen = (res: ReturnType<typeof renderScene>, id: number) => {
+    for (let i = 0; i < res.ids.length; i++) if (res.ids[i] === id) return true;
+    return false;
+  };
   let best: { cam: Camera; score: number } | null = null;
   // From each side of the plot, square to it (a plan-aligned bird's-eye reads like
   // the site plan), at two heights; the view that shows most garden past the house wins.
@@ -575,7 +582,8 @@ export function aerialCamera(scene: Scene, graph: PlanGraph): GardenCamera | nul
       const back = (dx !== 0 ? b.maxX - b.minX : b.maxY - b.minY) * 0.5 + 2;
       const cam: Camera = { pos: [c[0] + dx * back, span * h, c[1] + dy * back], target: [c[0] - dx * 1.5, 0, c[1] - dy * 1.5], fovDeg: 58 };
       const res = renderScene(scene, cam, PROBE_W, PROBE_H, { supersample: 1, outlines: false });
-      const score = coverage(res, focus) * 2 - coverage(res, buildings) * 0.6;
+      const entrance = gates.length ? gates.filter((g) => seen(res, g.id)).length / gates.length : 0;
+      const score = coverage(res, focus) * 2 - coverage(res, buildings) * 0.6 + entrance * 0.25;
       if (!best || score > best.score + 1e-9) best = { cam, score };
     }
   }

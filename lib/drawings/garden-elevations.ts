@@ -319,7 +319,16 @@ function pergolaSheet(graph: PlanGraph, zone: Room, meta: SheetMeta, number: str
   const H = zone.height_mm! / 1000;
   const member = (num(s.member_mm) ?? 150) / 1000;
   const beam = (num(s.beam_depth_mm) ?? 150) / 1000;
-  const posts = (Array.isArray(s.posts_mm) ? s.posts_mm : []) as [number, number][];
+  // G5d: a pergola always has posts. The 3D scene has always stood one at each
+  // corner when the plan listed none; L-301 printed "Posts: 0" and drew none. The
+  // elevation now falls back to the same corners, so the two cannot disagree (the
+  // client garden's graph now carries its four posts explicitly).
+  const corners = (): [number, number][] => {
+    const w = Math.round((bboxOf(zone.polygon).maxX - bboxOf(zone.polygon).minX) * 1000) - 150;
+    const d = Math.round((bboxOf(zone.polygon).maxY - bboxOf(zone.polygon).minY) * 1000) - 150;
+    return [[0, 0], [w, 0], [0, d], [w, d]];
+  };
+  const posts = (Array.isArray(s.posts_mm) && s.posts_mm.length ? s.posts_mm : corners()) as [number, number][];
   const postU = [...new Set(posts.map((p) => p[0]))].sort((a, c) => a - c);
   const postV = [...new Set(posts.map((p) => p[1]))].sort((a, c) => a - c);
   const beamsX = (Array.isArray(s.beams_x_mm) ? s.beams_x_mm : []) as number[];

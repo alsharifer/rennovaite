@@ -113,6 +113,7 @@ async function loadContext(
   try {
     const sb = supabase as unknown as SupabaseClient;
     for (const cols of [
+      "id, kind, name, polygon, base_mm, height_mm, derived, note, dims_derived, site_reference, disposition, spec",
       "id, kind, name, polygon, base_mm, height_mm, derived, note, dims_derived, site_reference, disposition",
       "id, kind, name, polygon, base_mm, height_mm, derived, note",
     ]) {

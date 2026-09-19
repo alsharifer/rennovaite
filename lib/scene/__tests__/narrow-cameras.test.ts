@@ -95,11 +95,13 @@ describe("the pack's backbone", () => {
     expect(packMix({ renders, gardenViews: [], photoPairs: [pair] })).toEqual({ photo_pairs: 1, design_views_by_choice: zones.length - 2, design_views_after_gate: 1, styled_renders: 1, missing: 0 });
   });
 
-  it("puts the before/after pairs right after the plan, says why a design view was chosen, and insets the design view on a passed render", () => {
+  it("puts the before/after pairs right after the plan, captions a design view neutrally, and insets the design view on a passed render", () => {
     const { pages } = buildRenderPack({ graph, fixtures: p.fixtures, renders, style: null, projectName: "Arabella", community: "Dubai", dateISO: "2026-09-15", sitePlanSvg: null, photoPairs: [pair], gardenViews: [] });
     expect(pages.map((x) => x.kind).slice(0, 3)).toEqual(["cover", "plan_overview", "photo_pair"]);
     const all = pages.map((x) => x.svg).join("");
-    expect(all).toContain("shown by choice: no camera position on this plot gives a styled render a clean view");
+    // G5d: the client reads one neutral line; why a design view was chosen is in the run report.
+    expect(all).toContain("Visualisation pending — layout as drawn, see L-100");
+    expect(all).not.toContain("no camera position on this plot");
     expect(all).toContain("INSET: 3D DESIGN VIEW");
     expect(pages.flatMap((x) => x.images).some((s) => s.renderId === "design:r1")).toBe(true);
     expect(pages[0]!.svg).toContain("1 before/after");

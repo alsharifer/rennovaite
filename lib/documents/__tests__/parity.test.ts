@@ -56,13 +56,50 @@ describe("parity — BoQ ↔ drawings ↔ views (G5c)", () => {
     expect(p.elements[0]!.reason).toContain("no BoQ line prices it");
   });
 
-  it("exempts a project-level lump and an element the rate book absorbs, with the reason", () => {
-    const p = buildParity(base({ elements: [...base().elements, fixture("dr1", "drainage_point")] }));
+  it("exempts a project-level lump, with the reason", () => {
+    const p = buildParity(base());
     expect(p.lines.find((l) => l.rule_id === "GL-01")!.status).toBe("exempt");
-    const drain = p.elements.find((e) => e.id === "dr1")!;
-    expect(drain.status).toBe("exempt");
-    expect(drain.reason).toContain("absorbed into the contract rate");
-    expect(p.clean).toBe(true);
+    expect(p.lines.find((l) => l.rule_id === "GL-01")!.reason).toContain("project-level lump");
+  });
+
+  it("fails a drawn drainage point no line counts — the miss the G5 pack shipped with (G5d)", () => {
+    const drains = [fixture("dr1", "drainage_point"), fixture("dr2", "drainage_point")];
+    const sheets = [...base().sheets, { sheetNumber: "L-402", ids: ["dr1", "dr2"] }];
+    const views = [{ camera: "zone:a", label: "Pergola court", ids: ["bench", "bl1", "dr1", "dr2"] }];
+    const without = buildParity(base({ elements: [...base().elements, ...drains], sheets, views, overlaySheets: ["L-401", "L-402"] }));
+    expect(without.elements.find((e) => e.id === "dr1")!.status).toBe("fail");
+    expect(without.overlays.find((o) => o.type === "drainage_point")).toMatchObject({ symbols: 2, rule_id: null, status: "fail" });
+    expect(without.clean).toBe(false);
+    const withLine = buildParity(
+      base({
+        lines: [...base().lines, { rule_id: "GL-28", description: "Drainage point / gully in paving", quantity: 2, unit: "no", total_aed: 0 }],
+        elements: [...base().elements, ...drains],
+        sheets,
+        views,
+        overlaySheets: ["L-401", "L-402"],
+      }),
+    );
+    expect(withLine.overlays.find((o) => o.type === "drainage_point")).toMatchObject({ symbols: 2, rule_id: "GL-28", line_qty: 2, status: "ok" });
+    expect(withLine.clean).toBe(true);
+  });
+
+  it("holds each overlay symbol count to its line's quantity (G5d)", () => {
+    // Two boundary lights on L-401; a line that counts three is wrong both ways round.
+    const p = buildParity(base({ lines: base().lines.map((l) => (l.rule_id === "GL-18" ? { ...l, quantity: 3 } : l)), overlaySheets: ["L-401"] }));
+    expect(p.overlays.find((o) => o.type === "boundary_light")).toMatchObject({ symbols: 2, line_qty: 3, status: "fail", reason: "2 drawn, 3 in GL-18" });
+    expect(p.clean).toBe(false);
+    // A line may carry fewer points than are drawn only where it says so (a pergola's own downlights).
+    const lights = [fixture("g1", "garden_light"), fixture("g2", "garden_light"), fixture("g3", "garden_light")];
+    const q = buildParity(
+      base({
+        lines: [...base().lines, { rule_id: "GL-16", description: "Lighting cabling", quantity: 1, unit: "point", total_aed: 264, notes: "3 garden light point(s) less 2 carried by the structure rate" } as never],
+        elements: [...base().elements, ...lights],
+        sheets: [base().sheets[0]!, { sheetNumber: "L-401", ids: ["bl1", "bl2", "g1", "g2", "g3"] }],
+        views: [{ camera: "zone:a", label: "Pergola court", ids: ["bench", "bl1", "g1", "g2", "g3"] }],
+        overlaySheets: ["L-401"],
+      }),
+    );
+    expect(q.overlays.find((o) => o.type === "garden_light")).toMatchObject({ symbols: 3, line_qty: 1, status: "ok" });
   });
 
   it("maps a lump to what it stands for: irrigation to the planting it waters, lights to their fittings", () => {

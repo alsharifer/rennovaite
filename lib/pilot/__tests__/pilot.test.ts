@@ -38,7 +38,26 @@ describe("pilot metrics", () => {
     expect(m.boq_generations).toBe(2);
     expect(m.render_gate).toEqual({ renders: 3, passed: 2, substituted: 1, pass_rate: 0.667, attempt_pass_rate: 0.4 });
     expect(m.friction).toEqual([{ at: "2026-09-15T10:05:00.000Z", note: "could not reshape a run", area: "elements" }]);
-    expect(m.corrections).toEqual({ total: 3, by_type: { rate: 2, quantity: 0, scope: 1, design: 0 } });
+    expect(m.corrections).toEqual({ total: 3, by_type: { rate: 2, quantity: 0, scope: 1, design: 0, confirm: 0 } });
+  });
+
+  it("counts a design session as its own record — decisions and corrections by type, confirms included (G5d)", () => {
+    const rec = "three-firms #1";
+    const m = computePilotMetrics(
+      [
+        ev("session_decision", "12:00", { record: rec, stage: "design_session" }),
+        ev("session_decision", "12:01", { record: rec, stage: "design_session" }),
+        ev("correction", "12:02", { record: rec, correction_type: "confirm", stage: "design_session" }),
+        ev("correction", "12:03", { record: rec, correction_type: "scope", stage: "design_session" }),
+        // Script-applied geometry is not the designer drawing.
+        ev("plan_saved", "12:04", { stage: "session_apply" }),
+      ],
+      [],
+      [{ correction_type: "confirm" }, { correction_type: "scope" }],
+    );
+    expect(m.sessions).toEqual([{ record: rec, decisions: 2, corrections: { confirm: 1, scope: 1 } }]);
+    expect(m.corrections.by_type.confirm).toBe(1);
+    expect(m.time_to_draw_plan_min).toBeNull();
   });
 });
 
@@ -65,7 +84,7 @@ describe("the change-propagation receipt", () => {
 
 describe("before/after photo pairs", () => {
   const m = pairManifest({ projectId: "arabella", assetId: "a1", zoneName: "Side garden — lawn", zoneSurface: "artificial grass lawn", items: [{ noun: "the gazebo", disposition: "keep" }, { noun: "the sink counter", disposition: "remove" }, { noun: "the planter border", disposition: "replace" }] });
-  const good = { observations: [{ ref: "E1", present: true, roughly_in_place: true, note: "" }, { ref: "E2", present: false, roughly_in_place: false, note: "" }, { ref: "E3", present: true, roughly_in_place: true, note: "" }], house_unchanged: true, same_viewpoint: true, house_side_matches: true, visible_change: 2, extra_structures: [], summary: "" };
+  const good = { observations: [{ ref: "E1", present: true, roughly_in_place: true, note: "", out_of_crop: false }, { ref: "E2", present: false, roughly_in_place: false, note: "", out_of_crop: false }, { ref: "E3", present: true, roughly_in_place: true, note: "", out_of_crop: false }], house_unchanged: true, same_viewpoint: true, house_side_matches: true, visible_change: 2, extra_structures: [], summary: "" };
 
   it("passes only when kept items stay, removed items go, replaced items stay in place", () => {
     expect(judgePair(m, good).passed).toBe(true);
@@ -74,6 +93,19 @@ describe("before/after photo pairs", () => {
     expect(judgePair(m, { ...good, house_unchanged: false }).failures).toContain("house or boundary changed");
     expect(judgePair(m, { ...good, extra_structures: [{ description: "a pergola", major: true }] }).passed).toBe(false);
     expect(parsePairReply("looks lovely")).toBeNull();
+  });
+
+  it("holds a replacement to what the plan builds inside it — the counter under the pergola (G5d, p4)", () => {
+    const pm = pairManifest({ projectId: "arabella", assetId: "a2", zoneName: "Side garden", zoneSurface: "porcelain paving", items: [{ noun: "the hardtop gazebo", disposition: "replace", replacement: "a motorised louvred aluminium pergola" }, { noun: "a built-in BBQ counter with grill and sink", disposition: "add", within: "the new pergola" }] });
+    const ok = (e2: { present: boolean; out_of_crop: boolean }) => ({ ...good, observations: [{ ref: "E1", present: true, roughly_in_place: true, note: "", out_of_crop: false }, { ref: "E2", roughly_in_place: false, note: "", ...e2 }] });
+    expect(judgePair(pm, ok({ present: true, out_of_crop: false })).passed).toBe(true);
+    // Pergola over loose seating, counter nowhere, though its spot is in frame: fails.
+    expect(judgePair(pm, ok({ present: false, out_of_crop: false })).failures[0]).toMatch(/BBQ counter.*missing — the design puts it inside the new pergola/);
+    // Its spot outside the frame: passes, and the caption must say so.
+    const cropped = judgePair(pm, ok({ present: false, out_of_crop: true }));
+    expect(cropped.passed).toBe(true);
+    expect(cropped.out_of_crop).toEqual(["a built-in BBQ counter with grill and sink"]);
+    expect(pairPrompt(pm, getGardenStyle("desert-modern")!)).toContain("Inside the new pergola, as the plan draws it: a built-in BBQ counter");
   });
 
   it("parses the reply shapes models actually send, failing rather than going unavailable", () => {
