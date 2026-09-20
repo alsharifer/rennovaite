@@ -43,6 +43,17 @@ export interface SheetMeta {
   level: string;
   scale: string; // "1:100"
   dateISO: string; // YYYY-MM-DD
+  /**
+   * G4b: stamps the sheet with the project it belongs to (data-project-id on
+   * the root). Absent on interior sheets, which therefore render unchanged.
+   */
+  projectId?: string;
+  /**
+   * G5: the draft statement. Present → every sheet carries it in a stamp above
+   * the title block and data-draft="true" on its root. Absent on every sheet
+   * built before G5, which therefore renders unchanged.
+   */
+  draft?: string | null;
 }
 
 /** Region available for drawing content (inside margins, above the title block). */
@@ -104,6 +115,20 @@ function titleBlock(meta: SheetMeta, sheetNumber: string, sheetTitle: string): s
   </g>`;
 }
 
+/** G5: the draft stamp — terracotta, directly above the title block, on every sheet. */
+export const DRAFT_STAMP_BOX = { h: 13, gap: 2 };
+function draftStamp(statement: string): string {
+  const x = SHEET_W - SHEET_MARGIN - TITLE_W;
+  const y = SHEET_H - SHEET_MARGIN - TITLE_H - DRAFT_STAMP_BOX.gap - DRAFT_STAMP_BOX.h;
+  const [head, ...rest] = statement.split(" — ");
+  return `
+  <g data-draft-stamp="true" data-draft-statement="${esc(statement)}">
+    <rect x="${x}" y="${y}" width="${TITLE_W}" height="${DRAFT_STAMP_BOX.h}" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.6"/>
+    <text x="${x + 3}" y="${y + 5.4}" font-size="4.2" fill="${TERRACOTTA}" style="font-family:${FONT_UI};font-weight:700;letter-spacing:0.06em">${esc(head ?? statement)}</text>
+    <text x="${x + 3}" y="${y + 10.2}" font-size="2.55" fill="${TERRACOTTA}" style="font-family:${FONT_UI}">${esc(rest.join(" — "))}</text>
+  </g>`;
+}
+
 function northArrow(cx: number, cy: number, northDeg: number): string {
   // Arrow points "up" then rotates by north_deg (0 = up).
   return `
@@ -113,17 +138,17 @@ function northArrow(cx: number, cy: number, northDeg: number): string {
   </g>`;
 }
 
-function scaleBar(x: number, y: number): string {
-  // 0–5 m bar at 1:100 → 50 mm, alternating filled/empty 1 m (10 mm) cells.
-  const cell = MM_PER_M; // 10 mm = 1 m
-  const cells = 5;
+function scaleBar(x: number, y: number, mmPerM: number = MM_PER_M, cells = 5, stepM = 1): string {
+  // Default: 0–5 m bar at 1:100 → 50 mm, alternating filled/empty 1 m (10 mm)
+  // cells. G4 garden sheets pass their own scale so the bar stays true.
+  const cell = mmPerM * stepM;
   let bars = "";
   for (let i = 0; i < cells; i++) {
     bars += `<rect x="${x + i * cell}" y="${y}" width="${cell}" height="1.6" fill="${i % 2 === 0 ? INK_900 : PAPER}" stroke="${INK_900}" stroke-width="0.3"/>`;
   }
   let ticks = "";
   for (let i = 0; i <= cells; i++) {
-    ticks += `<text x="${x + i * cell}" y="${y + 5.5}" text-anchor="middle" font-size="3" fill="${INK_700}" style="font-family:${FONT_MONO}">${i}</text>`;
+    ticks += `<text x="${x + i * cell}" y="${y + 5.5}" text-anchor="middle" font-size="3" fill="${INK_700}" style="font-family:${FONT_MONO}">${i * stepM}</text>`;
   }
   return `<g>${bars}${ticks}<text x="${x + cells * cell + 3}" y="${y + 2}" font-size="3" fill="${INK_500}" style="font-family:${FONT_UI}">m</text></g>`;
 }
@@ -137,6 +162,11 @@ export interface RenderSheetOptions {
   /** Show north arrow + scale bar (plans yes, schedule no). */
   showNorthScale?: boolean;
   northDeg?: number;
+  /**
+   * G4: a non-1:100 sheet's scale bar. Absent → the original 1:100 bar, so
+   * every existing sheet renders byte-identically.
+   */
+  scaleBar?: { mmPerM: number; cells: number; stepM: number };
 }
 
 /** Compose a full A3 sheet: frame + body + north/scale + title block. */
@@ -144,13 +174,15 @@ export function renderSheet(o: RenderSheetOptions): string {
   const showNS = o.showNorthScale ?? true;
   const ns = showNS
     ? northArrow(SHEET_W - SHEET_MARGIN - TITLE_W - 14, SHEET_H - SHEET_MARGIN - 16, o.northDeg ?? 0) +
-      scaleBar(SHEET_MARGIN + 2, SHEET_H - SHEET_MARGIN - 5)
+      (o.scaleBar
+        ? scaleBar(SHEET_MARGIN + 2, SHEET_H - SHEET_MARGIN - 5, o.scaleBar.mmPerM, o.scaleBar.cells, o.scaleBar.stepM)
+        : scaleBar(SHEET_MARGIN + 2, SHEET_H - SHEET_MARGIN - 5))
     : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}mm" height="${SHEET_H}mm" viewBox="0 0 ${SHEET_W} ${SHEET_H}" role="img" aria-label="${esc(o.title)}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}mm" height="${SHEET_H}mm" viewBox="0 0 ${SHEET_W} ${SHEET_H}" role="img" aria-label="${esc(o.title)}"${o.meta.projectId ? ` data-project-id="${esc(o.meta.projectId)}"` : ""}${o.meta.draft ? ` data-draft="true"` : ""}>
   <rect x="0" y="0" width="${SHEET_W}" height="${SHEET_H}" fill="${PAPER}"/>
   <rect x="${SHEET_MARGIN / 2}" y="${SHEET_MARGIN / 2}" width="${SHEET_W - SHEET_MARGIN}" height="${SHEET_H - SHEET_MARGIN}" fill="none" stroke="${INK_900}" stroke-width="0.5"/>
   ${o.body}
   ${ns}
-  ${titleBlock(o.meta, o.sheetNumber, o.title)}
+  ${titleBlock(o.meta, o.sheetNumber, o.title)}${o.meta.draft ? `\n  ${draftStamp(o.meta.draft)}` : ""}
 </svg>`;
 }

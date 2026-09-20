@@ -1,0 +1,110 @@
+{
+  "project_id": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
+  "seeded_at": "2026-09-15T17:58:07.106Z",
+  "before": {
+    "rooms": 4,
+    "elements": 6,
+    "fixtures": 6
+  },
+  "after": {
+    "rooms": 10,
+    "elements": 8,
+    "fixtures": 26
+  },
+  "zones": [
+    {
+      "name": "Rear planting bed",
+      "type": "planting_bed",
+      "area_m2": 12.36
+    },
+    {
+      "name": "Rear garden — lawn",
+      "type": "artificial_grass",
+      "area_m2": 55.62
+    },
+    {
+      "name": "Porcelain path — garden gate to side garden",
+      "type": "path",
+      "area_m2": 20.6
+    },
+    {
+      "name": "Pergola court — porcelain paving",
+      "type": "paving",
+      "area_m2": 13.98
+    },
+    {
+      "name": "Louvred pergola (replaces existing gazebo)",
+      "type": "structure",
+      "area_m2": 12.25
+    },
+    {
+      "name": "Side garden — porcelain paving terrace",
+      "type": "paving",
+      "area_m2": 16.12
+    },
+    {
+      "name": "Side garden — lawn",
+      "type": "artificial_grass",
+      "area_m2": 14.88
+    },
+    {
+      "name": "Side garden — planting bed",
+      "type": "planting_bed",
+      "area_m2": 3.72
+    },
+    {
+      "name": "Front garden — lawn",
+      "type": "artificial_grass",
+      "area_m2": 6.4
+    },
+    {
+      "name": "Front garden — planting bed",
+      "type": "planting_bed",
+      "area_m2": 2.4
+    }
+  ],
+  "boq_total_aed": 116942.01,
+  "friction": [
+    {
+      "area": "renders",
+      "note": "No style direction was locked, and renders cannot run without one — Desert Modern set as the proposed default (it matches the photos' modern boundary walls); the client confirms or changes it at the review."
+    },
+    {
+      "area": "plan",
+      "note": "The type-plan dimension set has no front-garden footprint; the front lawn + bed beside the drive are an assumed 2.2 × 4.0 m, and the garage/drive block had to be reshaped around them through /api/plan-context — context footprints have no editor in the UI."
+    },
+    {
+      "area": "plan",
+      "note": "The garden gate is not on the plan (a boundary wall has no gate/opening element); the 1.0 m path assumes the gate at the rear strip's west end."
+    },
+    {
+      "area": "plan",
+      "note": "A pergola's variant (louvred, fixed, timber) has no field: every structure zone prices at the one motorised louvred pergola rate, and the variant lives in spec only."
+    },
+    {
+      "area": "elements",
+      "note": "Replace meant like-for-like; a replacement by a DIFFERENT element (stepping path → porcelain path zone, sink counter → BBQ counter elsewhere, string lights → designed lighting) had no representation and would have priced both. Added spec.replaced_by (old item = demolition only, the new element carries the work) — API only, no editor control yet."
+    },
+    {
+      "area": "elements",
+      "note": "PATCH /api/plan-elements and /api/plan-zones replace spec wholesale: adding one key means re-sending the stored spec."
+    },
+    {
+      "area": "elements",
+      "note": "The counter run's default section (600 wide) is not a BBQ counter's; the 900 × 900 section had to be entered explicitly."
+    },
+    {
+      "area": "drainage",
+      "note": "Irrigation zones are not drawn: the allowance derives from the planting beds as built (rear, side and front beds)."
+    }
+  ],
+  "results": [
+    "PASS  the proposal's 10 zones save with no overlaps — []",
+    "PASS  the BoQ generates on the proposal — AED 116942.01",
+    "PASS  the export gate passes: no untyped counter, nothing undecided, no needs_selection — {\"ready\":true,\"untyped_counters\":[],\"undecided\":[],\"stale_boq_needs_selection\":[],\"has_boq\":true}",
+    "PASS  every pilot event from the seeding is tagged script-generated — 59 events tagged design_seed",
+    "PASS  every zone, run and context footprint is still derived",
+    "PASS  all 11 existing zones/runs/walls keep their site_reference tag — 11",
+    "PASS  the plan is still a DRAFT"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "project_id": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
+  "mirrored_at": "2026-09-17T14:28:31.933Z",
+  "counts": {
+    "zones": 10,
+    "runs": 8,
+    "fixtures": 26,
+    "context": 6,
+    "openings": 0
+  },
+  "boq_before": "83e7ca28-9dc9-4276-8c23-c1e40fb58a62",
+  "boq_after": "531ea26d-104b-4772-a70b-9b08c72fdb03",
+  "grand_total_aed": 116942.01,
+  "lines": 15,
+  "takeoff_rows": 28,
+  "events_tagged": 43,
+  "results": [
+    "PASS  every zone polygon was stored exactly as its reflection (no overlap repair reshaped anything)",
+    "PASS  the BoQ grand total is identical — AED 116942.01 → 116942.01",
+    "PASS  every BoQ line (quantity, rate, total, element_refs, note) is byte-identical — 15 lines",
+    "PASS  every take-off row (work item × element × qty) is byte-identical — 28 rows",
+    "PASS  the villa now sits in the site frame (side garden on the left facing the villa) — centroid x 0.513 → 0.487"
+  ]
+}

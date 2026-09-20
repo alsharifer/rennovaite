@@ -11,6 +11,12 @@ import {
   KIND_LABEL,
   type AssetKind,
 } from "@/lib/assets/types";
+import {
+  EMPTY_PLOT,
+  parsePlot,
+  PlotSizeFields,
+  type PlotDraft,
+} from "@/components/plan/plot-size-fields";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
 import { cn } from "@/lib/utils";
 
@@ -114,9 +120,12 @@ function formatAed(n: number): string {
 
 const isImageType = (t: string) => /^image\/(png|jpeg)$/.test(t);
 
-export function VillaIntake() {
+export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) {
   const router = useRouter();
   const [plan, setPlan] = useState<PlanState>({ kind: "idle" });
+  const [plot, setPlot] = useState<PlotDraft>(EMPTY_PLOT);
+  const [drawingPlan, setDrawingPlan] = useState(false);
+  const [drawError, setDrawError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<AssetItem[]>([]);
   const [drawings, setDrawings] = useState<AssetItem[]>([]);
   const [discipline, setDiscipline] = useState<AssetKind>("drawing_mep");
@@ -310,6 +319,40 @@ export function VillaIntake() {
     }
   }
 
+  /**
+   * Start a project with nothing to parse (G1). The project is created by the
+   * plan upload everywhere else in this app, which is exactly why a project
+   * could not exist without a drawing; this is the other door, and it needs the
+   * plot because a drawn plan has no other source of scale.
+   */
+  async function startDrawnPlan() {
+    const size = parsePlot(plot);
+    if (!size || drawingPlan) return;
+    setDrawingPlan(true);
+    setDrawError(null);
+    try {
+      const res = await fetch("/api/draw-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...size,
+          name: projectName.trim() || undefined,
+          city,
+        }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { project_id?: string; error?: string }
+        | null;
+      if (!res.ok || !body?.project_id) {
+        throw new Error(body?.error ?? `Could not start a drawn plan (${res.status}).`);
+      }
+      router.push(`/project/${body.project_id}/plan`);
+    } catch (err) {
+      setDrawingPlan(false);
+      setDrawError(err instanceof Error ? err.message : "Could not start a drawn plan.");
+    }
+  }
+
   const planReady = plan.kind === "ready";
   const queuedNote =
     !projectId && (photos.length > 0 || drawings.length > 0)
@@ -409,6 +452,40 @@ export function VillaIntake() {
                 className="focus-ring font-body-sm text-body-sm font-semibold text-brass-600 hover:underline"
               >
                 Replace
+              </button>
+            </div>
+          )}
+
+          {/* G1: the other way in. A garden, an extension, a villa whose only
+              drawing is a photograph of a drawing — none of those have a
+              floorplan to parse, and until now none of them could become a
+              project at all. */}
+          {gardenPilot && !planReady && plan.kind !== "uploading" && (
+            <div className="mt-lg border-t border-ink-100 pt-lg">
+              <p className="label-caps mb-md text-ink-500">Or draw your plan</p>
+              <p className="mb-md font-body-sm text-body-sm text-on-surface-variant">
+                No drawing to upload? Start from a blank canvas and outline the
+                rooms or garden zones yourself.
+              </p>
+              <PlotSizeFields
+                value={plot}
+                onChange={setPlot}
+                idPrefix="intake"
+                disabled={drawingPlan}
+              />
+              {drawError && (
+                <p className="mt-md font-body-sm text-body-sm text-error">{drawError}</p>
+              )}
+              <button
+                type="button"
+                onClick={startDrawnPlan}
+                disabled={!parsePlot(plot) || drawingPlan}
+                className="focus-ring mt-lg flex h-12 items-center gap-sm rounded-lg border border-brass-600 px-lg font-body-sm text-body-sm font-semibold text-brass-600 transition-colors hover:bg-primary-fixed/40 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  draw
+                </span>
+                {drawingPlan ? "Opening the canvas…" : "Draw your plan"}
               </button>
             </div>
           )}

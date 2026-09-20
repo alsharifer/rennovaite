@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { repairOverlaps } from "@/lib/parse/repair";
+import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
 import { findOverlaps } from "@/lib/plan/overlaps";
+import { repairForSave } from "@/lib/plan/save-repair";
 import { ensureAsBuiltSnapshot } from "@/lib/plan/snapshots";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -17,6 +18,15 @@ const RoomPayloadSchema = z.object({
   room_type: z.string().nullable(),
   area_m2: z.number().nonnegative(),
   polygon: z.array(z.array(z.number())).min(3),
+  /** G1 enclosure model. Absent → the room keeps whatever it has (and a new
+   *  room falls back to its type's default in the graph builder). */
+  unroofed: z.boolean().optional(),
+  /** G5 (migration 037). Absent → the zone keeps what it has; the editor's
+   *  ordinary save never sends them, so it can never clear a flag. */
+  dims_derived: z.boolean().optional(),
+  derived_note: z.string().max(1000).nullable().optional(),
+  site_reference: z.boolean().optional(),
+  disposition: z.enum(["keep", "remove", "replace"]).nullable().optional(),
 });
 
 const BodySchema = z.object({
@@ -35,34 +45,40 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { plan_id, rooms: posted, deleted_ids } = parsed.data;
+    const { plan_id, rooms: postedAll, deleted_ids } = parsed.data;
+    const supabase = getSupabaseAdmin();
+
+    // G5: a site-reference zone the design REMOVES is not in the garden any more,
+    // so a new zone drawn over its footprint is not an overlap. Its flags come
+    // from the payload when sent, otherwise from what is stored.
+    const removedIds = new Set<string>();
+    try {
+      const { data: stored } = await (supabase as unknown as SupabaseClient)
+        .from("rooms")
+        .select("id, site_reference, disposition")
+        .in("id", postedAll.map((r) => r.id))
+        .returns<{ id: string; site_reference: boolean | null; disposition: string | null }[]>();
+      const byId = new Map((stored ?? []).map((s) => [s.id, s]));
+      for (const r of postedAll) {
+        const s = byId.get(r.id);
+        const siteRef = r.site_reference ?? s?.site_reference ?? false;
+        const disposition = r.disposition !== undefined ? r.disposition : s?.disposition ?? null;
+        if (siteRef && disposition === "remove") removedIds.add(r.id);
+      }
+    } catch {
+      /* pre-037: nothing is removed */
+    }
+    const posted = postedAll.filter((r) => !removedIds.has(r.id));
 
     // Re-run overlap repair on what the editor sent. The parse guarantees rooms
     // do not overlap; editing could quietly undo that and nothing downstream
-    // would ever put it back, leaving a plan permanently uncostable. Repair is
-    // a no-op for rooms that do not overlap — only the offending pair is
-    // carved, and the response names what changed so the editor can say so
-    // rather than silently reshaping someone's work.
-    const totalPosted = posted.reduce((sum, r) => sum + r.area_m2, 0);
-    const { rooms: repaired } = repairOverlaps(
-      posted.map((r) => ({
-        id: r.id,
-        polygon: r.polygon as [number, number][],
-        area_m2: r.area_m2,
-      })),
-      { totalAreaM2: totalPosted },
-    );
-    const repairedById = new Map(repaired.map((r) => [r.id, r]));
-    const trimmed = posted.filter((r) => {
-      const fixed = repairedById.get(r.id);
-      return fixed !== undefined && JSON.stringify(fixed.polygon) !== JSON.stringify(r.polygon);
-    });
-    const rooms = posted.map((r) => {
-      const fixed = repairedById.get(r.id);
-      return fixed ? { ...r, polygon: fixed.polygon as number[][], area_m2: fixed.area_m2 } : r;
-    });
-
-    const supabase = getSupabaseAdmin();
+    // would ever put it back, leaving a plan permanently uncostable. Only rooms
+    // that actually overlap are reshaped (see lib/plan/save-repair) — and the
+    // response names what changed so the editor can say so rather than
+    // silently reshaping someone's work.
+    const { rooms: repairedRooms, repairedIds } = repairForSave(posted);
+    const repairedSet = new Set(repairedIds);
+    const rooms = [...repairedRooms, ...postedAll.filter((r) => removedIds.has(r.id))];
 
     if (deleted_ids.length > 0) {
       const { error: delErr } = await supabase
@@ -74,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (rooms.length > 0) {
-      const upsertRows = rooms.map((r) => ({
+      const baseRows = rooms.map((r) => ({
         id: r.id,
         plan_id,
         name_en: r.name_en,
@@ -83,13 +99,40 @@ export async function POST(request: NextRequest) {
         area_m2: r.area_m2,
         polygon: r.polygon,
       }));
+      const anyUnroofed = rooms.some((r) => r.unroofed !== undefined);
+      const upsertRows = anyUnroofed
+        ? baseRows.map((row, i) => ({ ...row, unroofed: rooms[i]!.unroofed ?? false }))
+        : baseRows;
+
       const { error: upErr } = await supabase
         .from("rooms")
         .upsert(upsertRows, { onConflict: "id" });
-      if (upErr) throw upErr;
+      if (upErr) {
+        // `unroofed` arrives from migration 031. Before it is applied the save
+        // must still succeed rather than losing the user's geometry over a
+        // column that only outdoor zones use — so retry without it, once.
+        if (!anyUnroofed) throw upErr;
+        console.warn("[api/update-plan] unroofed column absent, retrying:", upErr.message);
+        const { error: retryErr } = await supabase
+          .from("rooms")
+          .upsert(baseRows, { onConflict: "id" });
+        if (retryErr) throw retryErr;
+      }
     }
 
-    const total = rooms.reduce((sum, r) => sum + r.area_m2, 0);
+    // G5 flags, written only where the payload carries them.
+    for (const r of rooms) {
+      const patch: Record<string, unknown> = {};
+      if (r.dims_derived !== undefined) patch.dims_derived = r.dims_derived;
+      if (r.derived_note !== undefined) patch.derived_note = r.derived_note;
+      if (r.site_reference !== undefined) patch.site_reference = r.site_reference;
+      if (r.disposition !== undefined) patch.disposition = r.disposition;
+      if (Object.keys(patch).length === 0) continue;
+      const { error } = await (supabase as unknown as SupabaseClient).from("rooms").update(patch).eq("id", r.id);
+      if (error) throw error;
+    }
+
+    const total = repairedRooms.reduce((sum, r) => sum + r.area_m2, 0);
     const totalRounded = Math.round(total * 10) / 10;
 
     // D3: the save ALWAYS succeeds. Overlapping rooms are a legitimate
@@ -98,7 +141,7 @@ export async function POST(request: NextRequest) {
     // failure with extra steps. Repair above resolves them rather than
     // refusing, and this records the state of what was actually written.
     const overlaps = findOverlaps(
-      rooms.map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
+      repairedRooms.map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
     );
 
     const { error: planErr } = await supabase
@@ -140,6 +183,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const projectId = await projectOfPlan(supabase as unknown as SupabaseClient, plan_id);
+    if (projectId) {
+      await recordPilotEvent(supabase as unknown as SupabaseClient, projectId, "plan_saved", { rooms: rooms.length, deleted: deleted_ids.length });
+    }
+
     return NextResponse.json({
       success: true,
       total_area_m2: totalRounded,
@@ -150,15 +198,9 @@ export async function POST(request: NextRequest) {
       // Rooms whose geometry repair changed on the way in, with the shape that
       // was actually stored — so the editor shows what is in the database
       // rather than what the user last dragged.
-      repaired_rooms: trimmed.map((r) => {
-        const fixed = repairedById.get(r.id)!;
-        return {
-          id: r.id,
-          name_en: r.name_en,
-          polygon: fixed.polygon,
-          area_m2: fixed.area_m2,
-        };
-      }),
+      repaired_rooms: rooms
+        .filter((r) => repairedSet.has(r.id))
+        .map((r) => ({ id: r.id, name_en: r.name_en, polygon: r.polygon, area_m2: r.area_m2 })),
     });
   } catch (err) {
     console.error("[api/update-plan] error", err);

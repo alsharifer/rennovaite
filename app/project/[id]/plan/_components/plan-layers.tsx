@@ -12,17 +12,25 @@ import {
   type RoomMeta,
 } from "@/lib/viewer/inspect";
 
-import { EditablePlanViewer } from "./editable-plan-viewer";
+import { EditablePlanViewer, type ContextOutline, type PlotSize } from "./editable-plan-viewer";
+import { ElementsEditor } from "./elements-editor";
 import { OpeningsEditor } from "./openings-editor";
 import { OverlayEditor } from "./overlay-editor";
 import type { PlanViewerMode } from "./plan-interaction";
 
-type Layer = "plan" | "openings" | "electrical" | "plumbing";
+type Layer = "plan" | "openings" | "elements" | "landscape" | "electrical" | "plumbing";
 
 const PLAN_LAYER = { key: "plan" as const, label: "Plan", glyph: "grid_on" };
 // A5 openings are NOT gated by OVERLAYS_ENABLED — doors/windows are part of the
 // plan itself (they change wall quantities), not an MEP overlay.
 const OPENINGS_LAYER = { key: "openings" as const, label: "Openings", glyph: "door_front" };
+// G1 linear elements. Like openings, these are part of the plan rather than an
+// MEP overlay — a boundary wall IS a wall — so they follow the garden-pilot
+// flag, not OVERLAYS_ENABLED.
+const ELEMENTS_LAYER = { key: "elements" as const, label: "Elements", glyph: "fence" };
+// G5: planter boxes, wall features, grills and trees — priced (or flagged) per
+// unit. Part of the garden design, so it follows the pilot flag like Elements.
+const LANDSCAPE_LAYER = { key: "landscape" as const, label: "Landscape", glyph: "park" };
 const OVERLAY_LAYERS = [
   { key: "electrical" as const, label: "Electrical", glyph: "bolt" },
   { key: "plumbing" as const, label: "Plumbing", glyph: "water_drop" },
@@ -50,6 +58,10 @@ export function PlanLayers({
   mode,
   inspect,
   areaDisputes,
+  gardenPilot = false,
+  plot = null,
+  context = [],
+  siteRefs,
 }: {
   projectId: string;
   planId: string;
@@ -60,6 +72,14 @@ export function PlanLayers({
   inspect?: PlanInspectData;
   /** Rooms whose printed dimension and whose outline disagree materially. */
   areaDisputes?: RoomAreaDispute[];
+  /** G1: garden pilot on — offer outdoor zone types and the elements layer. */
+  gardenPilot?: boolean;
+  /** G1: authored plan's measured plot. */
+  plot?: PlotSize | null;
+  /** G5: existing footprints drawn under every layer. */
+  context?: ContextOutline[];
+  /** G5: zone id → site-reference state, read fresh on every server render. */
+  siteRefs?: Record<string, { site_reference: boolean; disposition: string | null; dims_derived: boolean }>;
 }) {
   const [layer, setLayer] = useState<Layer>("plan");
   const [target, setTarget] = useState<InspectTarget | null>(null);
@@ -77,6 +97,10 @@ export function PlanLayers({
       areaDisputes={areaDisputes}
       mode={mode}
       onInspectRoom={onInspectRoom}
+      plot={plot}
+      outdoorEnabled={gardenPilot}
+      context={context}
+      siteRefs={siteRefs}
     />
   );
 
@@ -102,6 +126,7 @@ export function PlanLayers({
   const layers = [
     PLAN_LAYER,
     OPENINGS_LAYER,
+    ...(gardenPilot ? [ELEMENTS_LAYER, LANDSCAPE_LAYER] : []),
     ...(overlaysEnabled ? OVERLAY_LAYERS : []),
   ];
 
@@ -136,12 +161,24 @@ export function PlanLayers({
         planViewer
       ) : layer === "openings" ? (
         openingsEditor
+      ) : layer === "elements" ? (
+        <ElementsEditor
+          planId={planId}
+          rooms={initialRooms}
+          plot={plot}
+          context={context}
+          readOnly={mode === "read"}
+        />
       ) : (
         <OverlayEditor
+          key={layer}
           projectId={projectId}
           rooms={initialRooms}
           layer={layer}
           readOnly={mode === "read"}
+          gardenPilot={gardenPilot}
+          plot={plot}
+          context={context}
         />
       )}
 

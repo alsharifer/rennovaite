@@ -483,8 +483,32 @@ export const BEDROOM_TYPES = new Set(["master_bedroom", "bedroom"]);
 // powder) with WC + basin + shower + accessories. Aligns the engine with the P4
 // quantify wet-room set (which already tiled powder).
 export const BATHROOM_TYPES = new Set(["bathroom", "ensuite", "powder"]);
-/** External rooms — tiled + skirted but no paint/ceiling/electrical counts. */
+/** External rooms — tiled + skirted but no paint/ceiling/electrical counts.
+ *  Enclosed and roofed-adjacent: a terrace is a room of the villa. Outdoor
+ *  garden zones are NOT here — see LANDSCAPE_TYPES. */
 export const EXTERNAL_TYPES = new Set(["terrace", "balcony"]);
+
+/**
+ * Garden-pilot outdoor zones (G1). Mirrors OUTDOOR_ROOM_TYPES in
+ * lib/plan/zones.ts; duplicated as a plain Set here so the pricing engine keeps
+ * zero imports from the plan layer, matching every other classification above.
+ *
+ * These are excluded from BOTH the interior buckets and the external/terrace
+ * ones. Folding a lawn into EXTERNAL_TYPES would have priced it as waterproofed
+ * porcelain — the tidy-looking change and the wrong one. Landscape quantities
+ * are their own rule set, arriving with the Villa 94 rate calibration (G2);
+ * until then a drawn garden reports its area and prices nothing, which is a
+ * visible gap rather than a silent wrong number.
+ */
+export const LANDSCAPE_TYPES = new Set([
+  "paving",
+  "artificial_grass",
+  "planting_bed",
+  "deck",
+  "path",
+  "structure",
+  "pool",
+]);
 /** Rooms keeping an existing FCU that gets a deep service (F-15: secondary
  *  bedrooms get full ducted replacements instead — see hvac.ducted_replace). */
 export const HVAC_SERVICE_TYPES = new Set([
@@ -511,4 +535,11 @@ export const SECTION_ORDER: readonly PomiSection[] = [
   "MEP / HVAC",
   "Lighting",
   "Preliminaries",
+  // G2/G3 landscape sections, ordered after the interior trades. A section with
+  // no lines is filtered out before rendering, so adding them changes nothing
+  // for an interior project.
+  "Hardscape & Structures",
+  "Soft Landscaping",
+  "Irrigation",
+  "Electrical & Lighting",
 ];

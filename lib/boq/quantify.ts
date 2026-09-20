@@ -42,6 +42,21 @@ export interface TakeoffItem {
 
 const WET_ROOM_TYPES = new Set(["bathroom", "ensuite", "powder", "kitchen"]);
 
+/** Outdoor zone tokens — priced by the landscape take-off, never here. */
+const OUTDOOR_ZONE_TYPES = new Set([
+  "paving",
+  "artificial_grass",
+  "planting_bed",
+  "deck",
+  "path",
+  "structure",
+  "pool",
+]);
+
+function isOutdoorType(t: string | null): boolean {
+  return OUTDOOR_ZONE_TYPES.has(t ?? "");
+}
+
 function isWet(roomType: string | null): boolean {
   return WET_ROOM_TYPES.has(roomType ?? "");
 }
@@ -131,6 +146,12 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
 
   // --- Rooms: floor + ceiling (+ wet tiling) ---
   for (const room of graph.rooms) {
+    // G3: an outdoor zone has no interior floor to finish. Its surface is priced
+    // by the landscape take-off (PCC + paving install + tile supply, or grass),
+    // and emitting an interior floor_finish line here charged for the same
+    // ground twice. `terrace` and `balcony` are NOT outdoor zones and keep the
+    // interior treatment they have always had.
+    if (isOutdoorType(room.type)) continue;
     const wet = isWet(room.type);
     const h = ceilingByRoom.get(room.id) ?? globalCeiling;
     // Stairs are priced as a developed tile surface in the engine take-off (not
@@ -139,7 +160,12 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
     if (room.type !== "stairs") {
       items.push({ work_item_key: "floor_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
     }
-    items.push({ work_item_key: "ceiling_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
+    // G1: an unroofed zone has no ceiling to finish. Its ceiling_h_m is 0, so
+    // the line would have priced a real area against a surface that does not
+    // exist — skip it outright rather than emit a zero.
+    if (!room.unroofed) {
+      items.push({ work_item_key: "ceiling_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
+    }
     if (wet) {
       // Full-height wet-wall tiling: room perimeter × ceiling height, NET of
       // any door/window opening onto this room (A5). Floored at 0.

@@ -16,7 +16,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { StyleKey } from "@/lib/render-prompts";
+// Interior keys only: staging dresses movable FURNITURE in rooms, and the G1b
+// exterior directions have none to dress.
+import type { InteriorStyleKey } from "@/lib/render-prompts";
 import type { FurnitureKey } from "./sets";
 
 export type FurnitureTier = "value" | "mid" | "premium";
@@ -30,7 +32,7 @@ export const TIER_VENDOR: Record<FurnitureTier, string> = {
 
 // Each style's furnishing tier. Mirrors the material rate-band grouping used in
 // generate-boq: value-leaning directions vs premium directions.
-export const STYLE_TIER: Record<StyleKey, FurnitureTier> = {
+export const STYLE_TIER: Record<InteriorStyleKey, FurnitureTier> = {
   "scandi-arabic": "value",
   "coastal-emirati": "value",
   "contemporary-majlis": "mid",
@@ -84,7 +86,7 @@ export const FURNITURE_PRICES: Record<
 };
 
 export function tierForStyle(styleKey: string): FurnitureTier {
-  return STYLE_TIER[styleKey as StyleKey] ?? "mid";
+  return STYLE_TIER[styleKey as InteriorStyleKey] ?? "mid";
 }
 
 export type FurniturePriceBook = Record<FurnitureKey, Record<FurnitureTier, number>>;

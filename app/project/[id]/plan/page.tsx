@@ -6,11 +6,25 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
+import { loadGardenSiteData, type GardenSiteData } from "@/lib/plan/garden-site-data";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { ParseLoading } from "./_components/parse-loading";
+import { GardenSitePanel } from "./_components/garden-site-panel";
 import { PlanLayers } from "./_components/plan-layers";
+import { PlanNotAnalysed } from "./_components/plan-not-analysed";
+
+/** Plan columns this page reads. `source` and the plot dimensions arrive with
+ *  migration 031 and are absent (undefined) before it. */
+interface PlanRow {
+  id: string;
+  total_area_m2: number | null;
+  parsed_json: unknown;
+  pdf_url: string | null;
+  source?: string | null;
+  plot_width_m?: number | null;
+  plot_depth_m?: number | null;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -85,13 +99,29 @@ export default async function PlanPage({
     notFound();
   }
 
-  const { data: plan, error: planErr } = await supabase
+  // `source` / plot columns arrive with migration 031; fall back to the base
+  // select so the plan step still renders against a pre-031 database.
+  const planSb = supabase as unknown as SupabaseClient;
+  const withSource = await planSb
     .from("plans")
-    .select("id, total_area_m2, parsed_json, pdf_url")
+    .select("id, total_area_m2, parsed_json, pdf_url, source, plot_width_m, plot_depth_m")
     .eq("project_id", projectId)
     .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle();
+    .maybeSingle<PlanRow>();
+  const planRes = withSource.error
+    ? await supabase
+        .from("plans")
+        .select("id, total_area_m2, parsed_json, pdf_url")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : withSource;
+  const { data: plan, error: planErr } = planRes as {
+    data: PlanRow | null;
+    error: { message: string } | null;
+  };
 
   if (planErr) {
     return (
@@ -114,7 +144,7 @@ export default async function PlanPage({
   const sb = supabase as unknown as SupabaseClient;
   const withConf = await sb
     .from("rooms")
-    .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence")
+    .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence, unroofed")
     .eq("plan_id", plan.id)
     .order("name_en")
     .returns<RawRoomInput[]>();
@@ -150,7 +180,30 @@ export default async function PlanPage({
     roomList,
   );
 
-  const parsedComplete = plan.parsed_json !== null && roomList.length > 0;
+  // G1. `parsedComplete` used to gate the WHOLE editor, so a plan with no
+  // parsed_json rendered a parsing spinner that nothing would ever finish —
+  // including an authored plan, which has no parsed_json by definition and
+  // never will. An authored plan is ready the moment it exists; a parsed one
+  // that produced nothing gets an actionable card, never a spinner.
+  const authored = plan.source === "user_drawn";
+  const plot =
+    authored && plan.plot_width_m && plan.plot_depth_m
+      ? { width_m: Number(plan.plot_width_m), depth_m: Number(plan.plot_depth_m) }
+      : null;
+  const planReady = authored || (plan.parsed_json !== null && roomList.length > 0);
+  const parsedComplete = planReady;
+  const gardenPilot = process.env.GARDEN_PILOT_ENABLED === "true";
+
+  // G5: an authored garden's standing questions — draft status, what already
+  // stands on site and the call on each, levels, pack readiness.
+  let gardenSite: GardenSiteData | null = null;
+  if (authored && gardenPilot) {
+    try {
+      gardenSite = await loadGardenSiteData(sb, projectId, plan.id);
+    } catch (e) {
+      console.warn("[plan] garden site panel skipped:", e instanceof Error ? e.message : e);
+    }
+  }
 
   // Real parse-quality KPI: mean room confidence + this plan's correction count
   // (replaces the old hard-coded "99.2% confidence"). Both best-effort.
@@ -192,11 +245,21 @@ export default async function PlanPage({
         <header className="mb-2xl">
           <JourneyProgress stepKey="layout" projectId={projectId} />
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
-            Your villa, understood.
+            {authored ? "Your plan, as you draw it." : "Your villa, understood."}
           </h1>
           <p className="max-w-[720px] font-body text-body-lg text-on-surface-variant">
-            We parsed your plan and labeled every room. Hover any room to see
-            its area; click to rename or merge.
+            {authored ? (
+              <>
+                Nothing was parsed here — every outline is yours. The canvas is
+                your {plot ? `${plot.width_m} × ${plot.depth_m} m ` : ""}plot, so
+                what you draw comes out in real metres.
+              </>
+            ) : (
+              <>
+                We parsed your plan and labeled every room. Hover any room to see
+                its area; click to rename or merge.
+              </>
+            )}
           </p>
         </header>
 
@@ -210,7 +273,8 @@ export default async function PlanPage({
                     Parsed plan viewer
                   </p>
                   <p className="font-mono text-[12px] uppercase text-ink-500">
-                    {roomList.length} rooms · {formatM2(totalArea)}
+                    {roomList.length} {authored ? "zones" : "rooms"} ·{" "}
+                    {formatM2(totalArea)}
                   </p>
                 </div>
                 <PlanLayers
@@ -220,6 +284,10 @@ export default async function PlanPage({
                   initialTotalAreaM2={totalArea}
                   areaDisputes={areaDisputes}
                   overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
+                  gardenPilot={gardenPilot}
+                  plot={plot}
+                  context={gardenSite?.context ?? []}
+                  siteRefs={gardenSite?.siteRefs}
                   mode="edit"
                 />
                 <div className="mt-md flex items-center justify-end gap-md text-ink-500">
@@ -234,6 +302,16 @@ export default async function PlanPage({
                   <span className="font-mono text-[12px]">5 m</span>
                 </div>
               </div>
+              {gardenSite && (
+                <GardenSitePanel
+                  projectId={projectId}
+                  planId={plan.id}
+                  draft={gardenSite.draft}
+                  items={gardenSite.items}
+                  zones={gardenSite.zones}
+                  untypedCounters={gardenSite.untypedCounters}
+                />
+              )}
             </section>
 
             {/* Right: 3 stacked cards -------------------------------- */}
@@ -263,7 +341,7 @@ export default async function PlanPage({
               {/* Detected rooms */}
               <article className="rounded-xl border border-ink-100 bg-paper p-lg">
                 <p className="label-caps mb-md text-ink-500">
-                  {roomList.length} Rooms detected
+                  {roomList.length} {authored ? "Zones drawn" : "Rooms detected"}
                 </p>
                 <ul className="flex max-h-[360px] flex-col gap-xs overflow-y-auto">
                   {roomList.map((r) => {
@@ -300,7 +378,9 @@ export default async function PlanPage({
                 </ul>
               </article>
 
-              {/* Verification */}
+              {/* Verification — placeholder copy about a parsed interior; an
+                  authored garden has nothing parsed to second-guess (G5). */}
+              {!authored && (
               <article className="rounded-xl border border-ink-100 bg-paper p-lg">
                 <p className="label-caps mb-md text-ink-500">
                   Worth a second look
@@ -323,6 +403,7 @@ export default async function PlanPage({
                   </button>
                 </div>
               </article>
+              )}
 
               {/* Drawings entry — gated by DRAWINGS_ENABLED so this page is
                   pixel-identical to today when the flag is off (P1). */}
@@ -364,7 +445,12 @@ export default async function PlanPage({
             </aside>
           </div>
         ) : (
-          <ParseLoading />
+          <PlanNotAnalysed
+            planId={plan.id}
+            hasDrawing={Boolean(plan.pdf_url)}
+            parseRan={plan.parsed_json !== null}
+            canDraw={gardenPilot}
+          />
         )}
       </div>
 
@@ -373,14 +459,18 @@ export default async function PlanPage({
         <div className="fixed inset-x-0 bottom-0 z-20 h-[88px] border-t border-ink-100 bg-paper">
           <div className="ml-60 flex h-full items-center justify-between px-margin">
             <Link
-              href="/project/new"
+              href={authored ? "/my-projects" : "/project/new"}
               className="focus-ring flex h-12 items-center rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
             >
-              Back to upload
+              {authored ? "Back to projects" : "Back to upload"}
             </Link>
             <p className="font-body text-body-sm italic text-on-surface-variant">
-              Parsed by RennovAIte · {roomList.length} rooms ·{" "}
+              {authored ? "Drawn by you" : "Parsed by RennovAIte"} ·{" "}
+              {roomList.length} {authored ? "zones" : "rooms"} ·{" "}
               {formatM2(totalArea)}
+              {authored && plot
+                ? ` of a ${(plot.width_m * plot.depth_m).toFixed(0)} m² plot`
+                : ""}
               {meanConfidencePct != null ? ` · ${meanConfidencePct}% avg confidence` : ""}
               {correctionsTotal != null && correctionsTotal > 0
                 ? ` · ${correctionsTotal} correction${correctionsTotal === 1 ? "" : "s"}`

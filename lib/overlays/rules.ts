@@ -31,6 +31,10 @@ export type RoomCategory =
   | "circulation"
   | "stairs"
   | "outdoor"
+  /** G1: a drawn garden zone. Deliberately separate from `outdoor` — folding
+   *  the two together would have changed the seeded fixtures of every villa
+   *  already parsed with a terrace, Mudon included. */
+  | "garden"
   | "other";
 
 export function roomCategory(roomType: string | null): RoomCategory {
@@ -64,6 +68,16 @@ export function roomCategory(roomType: string | null): RoomCategory {
     case "balcony":
     case "terrace":
       return "outdoor";
+    // G1 garden zones — their own category, with garden lighting and surface
+    // drainage rather than a terrace's socket-and-ceiling-light.
+    case "paving":
+    case "artificial_grass":
+    case "planting_bed":
+    case "deck":
+    case "path":
+    case "structure":
+    case "pool":
+      return "garden";
     default:
       return "other";
   }
@@ -136,6 +150,14 @@ export const ROOM_RULES: Record<RoomCategory, FixtureRule[]> = {
     { type: "socket_13a", count: 1, why: "1 weatherproof (IP) socket." },
     { type: "light_point", count: 1, why: "1 external light point." },
     { type: "switch_1g", count: 1, why: "1 lighting switch." },
+  ],
+  // G1 garden zone: spike/bollard lighting spread by area, one weatherproof
+  // socket, and surface drainage. DEFAULTS the user edits on the plan — a
+  // lighting design is not something a rule table can produce.
+  garden: [
+    { type: "garden_light", per_m2: 25, why: "1 garden light point per 25 m² of zone." },
+    { type: "socket_13a", count: 1, why: "1 weatherproof (IP) socket per zone." },
+    { type: "drainage_point", per_m2: 40, why: "1 surface drainage point per 40 m² of zone." },
   ],
   // Anything unclassified: minimal light + socket so nothing is left dark.
   other: [

@@ -5,10 +5,12 @@ import { z } from "zod";
 
 import { generateDeterministicBoq } from "@/lib/boq/engine";
 import { loadAccessoryOverrides } from "@/lib/accessories/load";
+import { recordPilotEvent } from "@/lib/pilot/events";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
+import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
 import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { getProposedGraph } from "@/lib/plan/snapshots";
@@ -651,12 +653,29 @@ export async function POST(request: NextRequest) {
     // Assessed live from the rooms just loaded, not read from plans.has_overlaps
     // — that column is a cache for the UI, and a stale cache must never be the
     // thing that decides whether a quantity is trustworthy.
+    // G5: a site-reference zone the design removes is not in the garden, so a
+    // zone drawn over its footprint does not overlap it.
+    let removedZoneIds = new Set<string>();
+    try {
+      const { data: removed } = await (supabase as unknown as SupabaseClient)
+        .from("rooms")
+        .select("id")
+        .eq("plan_id", plan.id)
+        .eq("site_reference", true)
+        .eq("disposition", "remove")
+        .returns<{ id: string }[]>();
+      removedZoneIds = new Set((removed ?? []).map((r) => r.id));
+    } catch {
+      /* pre-037 */
+    }
     const overlaps = findOverlaps(
-      rooms.map((r) => ({
-        id: r.id,
-        name: r.name_en ?? "Room",
-        polygon: r.polygon,
-      })),
+      rooms
+        .filter((r) => !removedZoneIds.has(r.id))
+        .map((r) => ({
+          id: r.id,
+          name: r.name_en ?? "Room",
+          polygon: r.polygon,
+        })),
     );
     if (overlaps.has_overlaps) {
       return NextResponse.json(
@@ -780,7 +799,11 @@ export async function POST(request: NextRequest) {
       );
       // Ground-truth: append Joinery + Aluminum & Glass sections (Atrium/Global
       // Creation actuals; aluminum = site_assessment allowances). Core, additive.
-      const boq = appendJoineryAluminumSections(overlaid, rooms);
+      const withJoinery = appendJoineryAluminumSections(overlaid, rooms);
+      // G3: append the landscape sections from the drawn garden (zones, runs,
+      // units, points) priced at the calibrated landscape rates. No-op for a
+      // project with no outdoor zones, which is every interior project.
+      const boq = await appendGardenSections(withJoinery, projectId, supabaseUntyped);
 
       const { data: inserted, error: insertErr } = await supabase
         .from("boqs")
@@ -798,6 +821,7 @@ export async function POST(request: NextRequest) {
       console.log(
         `[api/generate-boq] deterministic engine project=${projectId} grand_total=AED ${boq.grand_total_aed}`,
       );
+      await recordBoqEvent(supabaseUntyped, projectId, inserted.id, boq);
       return NextResponse.json({
         success: true,
         boq_id: inserted.id,
@@ -892,7 +916,8 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
     // ground-truth Joinery + Aluminum & Glass sections.
     const mappedLlm = applyElementMapping(llmBoq, takeoffItems);
     const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
-    const boq = appendJoineryAluminumSections(overlaidLlm, rooms);
+    const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabaseUntyped);
+    const boq = appendJoineryAluminumSections(gardenedLlm, rooms);
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase
@@ -938,4 +963,28 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
     const message = err instanceof Error ? err.message : "BoQ generation failed.";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
+}
+
+/**
+ * G5 instrumentation: a BoQ is FULL when no counter is left untyped and no
+ * site-reference item is left undecided — the first one is "time to first full
+ * BoQ". Authored plans only (recordPilotEvent checks), never throws.
+ */
+async function recordBoqEvent(
+  supabase: SupabaseClient,
+  projectId: string,
+  boqId: string,
+  boq: { grand_total_aed: number; garden?: { needs_selection: string[]; undecided: unknown[]; draft: { draft: boolean }; derived_lines: number } },
+): Promise<void> {
+  const g = boq.garden;
+  if (!g) return;
+  await recordPilotEvent(supabase, projectId, "boq_generated", {
+    boq_id: boqId,
+    grand_total_aed: boq.grand_total_aed,
+    full: g.needs_selection.length === 0 && g.undecided.length === 0,
+    needs_selection: g.needs_selection.length,
+    undecided: g.undecided.length,
+    draft: g.draft.draft,
+    derived_lines: g.derived_lines,
+  });
 }

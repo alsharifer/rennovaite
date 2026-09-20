@@ -69,6 +69,10 @@ inline form makes the backup-and-restore dance unnecessary.
 ## 0. Repo state at pre-flight
 
 - Base is **`master` @ `da0394d`** (merge of `feat/property-os-landing`).
+  **As of 2026-09-11 the base is `master` @ `5033c9d`** (merge of
+  `fix/area-provenance-and-dispute-review`, PR #56): the parse overhaul
+  (#54/#55/#56) and the I7–I10 ops-hardening series are merged, working tree
+  clean apart from an untracked `QS Package/`.
   Working tree clean except `.claude/settings.local.json`. The full Sprint-1
   series is merged: `8039daf` 413/compression fix · `790cc24` project asset
   library (A3/A4/C2) · `e0f70ba`/`a658a76`/`9f1598f`/`fedbc88`/`25d4ec1`/
@@ -91,6 +95,11 @@ inline form makes the backup-and-restore dance unnecessary.
 
 Files `scripts/migrations/001…030`. Re-verified 2026-09-09 by probing one
 artefact per migration against the live database.
+
+**Re-checked 2026-09-11 (garden-pilot pre-flight): nothing moved.** The
+high-water mark is still **030**. `scripts/migrations/` and
+`supabase/migrations/` both end at `030_project_archive` /
+`20260101003000_project_archive.sql`; no migration has been added since.
 
 **029 was applied on 2026-09-09** via `supabase db push` — the first migration
 in this project applied by the runner rather than by hand. Production now
@@ -147,9 +156,15 @@ behaviour.
 | `BOQ_ENGINE` | **unset** | unset = deterministic `lib/boq` engine; `"llm"` = legacy Claude path |
 | `RENDER_MODEL` | **unset** | default `google/nano-banana` |
 | `PARSE_PROVIDER` | **unset** | defaults to `"inhouse"` — see §5 |
+| `TASTE_SEED_ENABLED` | **false** | B3 — the project moodboard conditions renders |
+| `TEXTURED_WALKTHROUGH` | **true** | F1 — 3D walkthrough reads StyleBoard finishes |
 
-**`PARSE_PROVIDER` is undocumented**: it appears in neither
-`.env.local.example` nor the CLAUDE.md env table. Sprint-2 should add it.
+The last two rows were missing from this table until the 2026-09-11 re-check;
+both were present in `.env.local` all along. **No flag value has changed since
+the Sprint-2 pre-flight.**
+
+~~**`PARSE_PROVIDER` is undocumented**~~ — **fixed.** It now appears in
+`.env.local.example` (line 58, commented) and in the CLAUDE.md env table.
 
 ## 3. BoQ · takeoff · rate_book · boq_outcomes shapes
 
@@ -547,7 +562,17 @@ wall_plaster`) × 3 grades, each a concrete spec + AED rate + source +
 the ground-truth work) modelling exposed-vs-concealed as *distinct spec
 classes, not one item at two prices*.
 
-### (d) Mudon phase / timeline data — **none exists**
+### (d) Mudon phase / timeline data — **none exists** — SUPERSEDED
+
+> **Correction (2026-09-11).** T4 shipped on 2026-09-03 as `17be0c0`
+> *feat(timeline): phase plan + duration ranges seeded from Mudon actuals (D2)*.
+> `/project/[id]/timeline` is a real route (`page.tsx` +
+> `_components/phase-plan.tsx`) and `lib/journey.ts` now marks
+> `scope_timeline` `available: () => true`, so **the journey is 9 navigable
+> steps, not 8**. CLAUDE.md still says 8 — treat that line as stale. Durations
+> are seeded from the Mudon delta-log actuals; **no `phases` / `milestones`
+> table was added**, so the schema half of the bullets below still holds.
+
 
 - No `milestones`, `phases`, or `schedule` table; no such column on `projects`.
   No dates in `data/ground-truth/` beyond the delta-log workbook, and none in

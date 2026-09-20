@@ -1,0 +1,2475 @@
+{
+  "project_id": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
+  "generated_at": "2026-09-19T07:12:31.877Z",
+  "boq": {
+    "id": "449e25b7-5333-42d0-aaad-9d05b1c4bc5b",
+    "grand_total_aed": 116216.57,
+    "printed_total": "≈ AED 116,200*",
+    "derived_lines": 10,
+    "lines": 18,
+    "top5": [
+      {
+        "section": "Irrigation",
+        "description": "Irrigation system (drip, pump, valves)",
+        "quantity": 1,
+        "unit": "lump",
+        "rate_aed": 17600,
+        "total_aed": 17600,
+        "qty_derived": true,
+        "rate_status": "site_assessment"
+      },
+      {
+        "section": "Hardscape & Structures",
+        "description": "Motorized louvered pergola (alum, LED, coated)",
+        "quantity": 12.25,
+        "unit": "m2 plan",
+        "rate_aed": 1366.6928,
+        "total_aed": 16741.99,
+        "qty_derived": true,
+        "rate_status": "actual_transaction"
+      },
+      {
+        "section": "Hardscape & Structures",
+        "description": "BBQ counter (blockwork, clad, sink+MEP+sockets)",
+        "quantity": 3,
+        "unit": "lm",
+        "rate_aed": 5280,
+        "total_aed": 15840,
+        "qty_derived": true,
+        "rate_status": "actual_transaction"
+      },
+      {
+        "section": "Hardscape & Structures",
+        "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+        "quantity": 69.41,
+        "unit": "m2",
+        "rate_aed": 128.1,
+        "total_aed": 8891.42,
+        "qty_derived": true,
+        "rate_status": "site_assessment"
+      },
+      {
+        "section": "Hardscape & Structures",
+        "description": "PCC base under paving",
+        "quantity": 69.41,
+        "unit": "m2",
+        "rate_aed": 105.6,
+        "total_aed": 7329.7,
+        "qty_derived": true,
+        "rate_status": "actual_transaction"
+      }
+    ]
+  },
+  "decisions": [
+    {
+      "item": "Existing hardtop gazebo with dark glazed panels",
+      "kind": "structure",
+      "decision": "REPLACE",
+      "becomes": "Louvred pergola (replaces existing gazebo)",
+      "note": "a motorised louvred pergola in the gazebo's footprint — open or closed louvres for shade and rain"
+    },
+    {
+      "item": "Outdoor sink counter",
+      "kind": "counter run",
+      "decision": "REPLACE",
+      "becomes": "BBQ counter under the new pergola",
+      "note": "sink counter unit becomes a 3.0 lm BBQ counter"
+    },
+    {
+      "item": "Stepping-stone path",
+      "kind": "stepping-stone path",
+      "decision": "REPLACE",
+      "becomes": "porcelain paving — the side-garden terrace along the house and the 1.0 m path along the rear strip",
+      "note": "stepping slabs in lawn become continuous porcelain paving"
+    },
+    {
+      "item": "String lights — across side garden",
+      "kind": "string lights",
+      "decision": "REPLACE",
+      "becomes": "designed garden lighting (spike, inground and boundary-wall lights)",
+      "note": null
+    },
+    {
+      "item": "String lights — corner wall",
+      "kind": "string lights",
+      "decision": "REPLACE",
+      "becomes": "designed garden lighting (spike, inground and boundary-wall lights)",
+      "note": null
+    },
+    {
+      "item": "Planter border with stone edging — rear",
+      "kind": "planter run",
+      "decision": "REMOVE",
+      "becomes": null,
+      "note": "superseded by the new rear planting bed"
+    },
+    {
+      "item": "Planter border with stone edging — side",
+      "kind": "planter run",
+      "decision": "REMOVE",
+      "becomes": null,
+      "note": "superseded by the new side planting bed"
+    },
+    {
+      "item": "Corner boundary wall (side garden)",
+      "kind": "boundary",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Frangipani — rear 1",
+      "kind": "tree",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Frangipani — rear 2",
+      "kind": "tree",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Frangipani — rear 3",
+      "kind": "tree",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Frangipani — rear 4",
+      "kind": "tree",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Frangipani — side garden",
+      "kind": "tree",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Garden entrance gate",
+      "kind": "gate",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Garden shed",
+      "kind": "shed",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": "KEEP — Carried from draft pack (not raised in session) — client to confirm on return"
+    },
+    {
+      "item": "Palm — rear lawn",
+      "kind": "tree",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Rear boundary wall",
+      "kind": "boundary",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Rear strip end wall",
+      "kind": "boundary",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Separator wall (rear strip | side garden)",
+      "kind": "boundary",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    },
+    {
+      "item": "Side garden street wall",
+      "kind": "boundary",
+      "decision": "KEEP",
+      "becomes": null,
+      "note": null
+    }
+  ],
+  "layout_assumptions": [
+    "Front garden — lawn: front border width 5.3 m measured (Newspace site measurement, design session Sep 2026); depth 4.0 m assumed — verify on site",
+    "Front garden — planting bed: front border width 5.3 m measured (Newspace site measurement, design session Sep 2026); depth 4.0 m assumed — verify on site"
+  ],
+  "drawings": [
+    "L-000 Cover & Sheet Index",
+    "L-100 Site Plan — Garden",
+    "L-101 Z01 Louvred pergola (replaces existing gazebo)",
+    "L-102 Z02 Pergola court — porcelain paving",
+    "L-103 Z03 Rear planting bed",
+    "L-104 Z04 Rear garden — lawn",
+    "L-105 Z05 Garden entrance area — porcelain paving",
+    "L-106 Z06 Door landing — villa door",
+    "L-107 Z07 Porcelain path — garden gate to side garden",
+    "L-108 Z08 Side garden — planting bed",
+    "L-109 Z09 Side garden — lawn",
+    "L-110 Z10 Side garden — porcelain paving terrace",
+    "L-111 Z11 Front garden — planting bed",
+    "L-112 Z12 Front garden — lawn",
+    "L-201 Finish Schedule",
+    "L-301 Sectional Elevation — Louvred pergola (replaces existing gazebo)",
+    "L-302 Sectional Elevation — BBQ counter",
+    "L-303 Sectional Elevation — Bench run",
+    "L-401 Lighting & Electrical Overlay",
+    "L-402 Irrigation & Drainage Overlay",
+    "L-501 Garden Elevations — Boundary Lines"
+  ],
+  "pack": {
+    "pages": [
+      {
+        "kind": "cover",
+        "title": "Cover",
+        "images": 1
+      },
+      {
+        "kind": "plan_overview",
+        "title": "Plan overview",
+        "images": 0
+      },
+      {
+        "kind": "assumptions",
+        "title": "Design assumptions",
+        "images": 0
+      },
+      {
+        "kind": "photo_pair",
+        "title": "Before & after — Side garden — porcelain paving terrace",
+        "images": 2
+      },
+      {
+        "kind": "photo_pair",
+        "title": "Before & after — Rear garden — lawn",
+        "images": 2
+      },
+      {
+        "kind": "garden_view",
+        "title": "Whole garden — aerial",
+        "images": 3
+      },
+      {
+        "kind": "garden_view",
+        "title": "Whole garden — view 1",
+        "images": 1
+      },
+      {
+        "kind": "garden_view",
+        "title": "Whole garden — view 2",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z01 Louvred pergola (replaces existing gazebo)",
+        "images": 1
+      },
+      {
+        "kind": "zone",
+        "title": "Z02 Pergola court — porcelain paving",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z03 Rear planting bed",
+        "images": 1
+      },
+      {
+        "kind": "zone",
+        "title": "Z04 Rear garden — lawn",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z05 Garden entrance area — porcelain paving",
+        "images": 1
+      },
+      {
+        "kind": "zone",
+        "title": "Z06 Door landing — villa door",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z07 Porcelain path — garden gate to side garden",
+        "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z08 Side garden — planting bed",
+        "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z09 Side garden — lawn",
+        "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z10 Side garden — porcelain paving terrace",
+        "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z11 Front garden — planting bed",
+        "images": 2
+      },
+      {
+        "kind": "zone",
+        "title": "Z12 Front garden — lawn",
+        "images": 2
+      },
+      {
+        "kind": "materials",
+        "title": "Materials & finishes",
+        "images": 0
+      }
+    ],
+    "missing_images": []
+  },
+  "gate": [
+    {
+      "camera": "photo:539ad1ba-4a72-4b51-a0bd-97dd2fbdfb67",
+      "label": "Side garden — porcelain paving terrace",
+      "view": "photo_pair",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "photo:6f1c45be-05b2-48c9-954a-39bf23cec001",
+      "label": "Side garden — lawn",
+      "view": "photo_pair",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "the hardtop gazebo with dark glazed panels: moved or resized (A motorised louvred aluminium pergola is clearly shown, but it sits over the central dining area rather than on the far-left footprint of the old hardtop gazebo, and it is larger/more open.)",
+            "house or boundary changed",
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "house or boundary changed",
+            "viewpoint changed"
+          ]
+        }
+      ]
+    },
+    {
+      "camera": "photo:7393e6b5-01e2-45b9-bdf8-39baa5e0e1c5",
+      "label": "Side garden — lawn",
+      "view": "photo_pair",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "the hardtop gazebo with dark glazed panels: moved or resized (A motorised louvred aluminium pergola is present, but it is much larger and positioned over the centre/back of the yard rather than at the far-left edge where the old hardtop gazebo stood.)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "the hardtop gazebo with dark glazed panels: moved or resized (A motorised louvred aluminium pergola is visible, but it sits along the back/centre-left wall rather than at the far-left position of the old dark gazebo.)"
+          ]
+        }
+      ]
+    },
+    {
+      "camera": "photo:275b9d20-5239-4541-b048-cabcd87f5fab",
+      "label": "Rear garden — lawn",
+      "view": "photo_pair",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "photo:04364c15-11de-4c5c-a7ae-4f2d103e9838",
+      "label": "Rear garden — lawn",
+      "view": "photo_pair",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "gate unavailable: unparseable reply ({\"observations\":[{\"ref\":\"E1\",\"present\":true,\"roughly_in_place\":false,\"out_of_crop\":false,\"note\":\"Porcelain paving is there, but it runs along the right-hand sid)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "invented structure: louvered pergola over the BBQ/terrace area",
+            "invented structure: built-in outdoor kitchen counter with grill",
+            "invented structure: rendered seat wall / planter with timber bench"
+          ]
+        }
+      ]
+    },
+    {
+      "camera": "photo:7a37e2af-60ae-41cd-8c71-6b0395f7090c",
+      "label": "Side garden — porcelain paving terrace",
+      "view": "photo_pair",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "camera": "zone:65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+      "label": "Louvred pergola (replaces existing gazebo)",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "S1 louvred pergola: moved or resized (Louvred flat-roof pergola on square posts is depicted, but it sits much smaller and higher in the frame (roughly upper-left quadrant) than the near-filling structure of the model, because the view is pulled back.)",
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "S3 BBQ counter with built-in grill and sink: missing (No BBQ counter visible under the pergola; the modelled counter with grill and sink is absent.)",
+            "S3 BBQ counter with built-in grill and sink: placement not located in the render"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
+    },
+    {
+      "camera": "zone:65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+      "label": "Louvred pergola (replaces existing gazebo)",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [],
+      "consistency": null,
+      "reason": "no_passed_day"
+    },
+    {
+      "camera": "zone:94a612f3-9a07-4466-b6fc-53e48c550ed1",
+      "label": "Pergola court — porcelain paving",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "T2 existing frangipani tree (kept): missing (No second tree canopy at upper right; that area shows only pergola louvres and sky.)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": true
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:f3d76980-13a9-4830-86e2-0c8127bfee42",
+      "label": "Rear planting bed",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "invented structure: Built-in BBQ counter with stainless grill against the right-hand wall",
+            "invented structure: Wall-mounted timber bench on a rendered plinth along the right wall"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "C3 garage: missing (The low garage volume at bottom-left of the model is not readable; that area is taken up by the enlarged steel shed and paving.)",
+            "T1 existing frangipani tree (kept): moved or resized (Large foreground frangipani canopy is replaced by low shrub/olive planting; no tall canopy occupies the bottom of the frame.)",
+            "S1 existing grey steel garden shed (kept): moved or resized (Grey steel shed is shown but pulled far forward and enlarged into the left foreground instead of sitting small in the mid-distance beside the lawn.)",
+            "S1 existing grey steel garden shed (kept): placement moved — at 15% across, 61% down in the render; 42%, 59% in the design"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
+    },
+    {
+      "camera": "zone:f3d76980-13a9-4830-86e2-0c8127bfee42",
+      "label": "Rear planting bed",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [],
+      "consistency": null,
+      "reason": "no_passed_day"
+    },
+    {
+      "camera": "zone:ec59cb9e-41bc-4dbc-819a-649859c672cd",
+      "label": "Rear garden — lawn",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "T2 existing frangipani tree (kept): missing (The second kept frangipani in the bottom-left is not depicted; that area is shown as mulch bed with low shrubs, with only the trunk of T1 passing through.)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
+      "label": "Garden entrance area — porcelain paving",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "invented structure: Large overhead louvred pergola with post spanning the foreground/top of frame (only a distant pergola frame exists in the model)"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "S1 existing grey steel garden shed (kept): placement moved — at 3% across, 9% down in the render; 39%, 31% in the design"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
+    },
+    {
+      "camera": "zone:08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
+      "label": "Garden entrance area — porcelain paving",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [],
+      "consistency": null,
+      "reason": "no_passed_day"
+    },
+    {
+      "camera": "zone:dffac8a5-5c8a-4be7-85de-917ea6becb62",
+      "label": "Door landing — villa door",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "F1 paving: moved or resized (Large-format paving is present along the wall, but because IMAGE 2 is much wider/pulled back it occupies a lower, smaller band (roughly x 20-70%, y 45-100%) than the design's foreground paving.)",
+            "F2 paving: moved or resized (The right-hand paved area exists but sits lower and further right (approx x 70-100%, y 58-100%) rather than filling the whole right half from y 40%.)",
+            "F3 paved path: moved or resized (The paved path continuing away from the camera is visible but compressed into the upper-middle distance (approx x 33-55%, y 20-45%) instead of the designed upper-left band.)",
+            "F4 lawn: moved or resized (Artificial lawn is present to the right but sits mid-frame (approx x 55-100%, y 20-62%) rather than at the very top of the frame.)",
+            "invented structure: Large dark steel louvred pergola with posts running along the wall over the paving - no such structure exists in the design model",
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:dffac8a5-5c8a-4be7-85de-917ea6becb62",
+      "label": "Door landing — villa door",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "F1 paving: moved or resized (Paving is present and fills the lower-centre of the frame, but the much wider view makes it read smaller and further away than in the model.)",
+            "S1 existing grey steel garden shed (kept): moved or resized (Grey steel shed is present on the right, but appears much smaller and lower in frame because the viewpoint is pulled back to a wide view.)",
+            "viewpoint changed",
+            "S1 existing grey steel garden shed (kept): placement moved — at 73% across, 39% down in the render; 82%, 8% in the design"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "S1 existing grey steel garden shed (kept): placement moved — at 80% across, 26% down in the render; 82%, 8% in the design"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
+    },
+    {
+      "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "label": "Porcelain path — garden gate to side garden",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "label": "Porcelain path — garden gate to side garden",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    },
+    {
+      "camera": "zone:31cded47-9d42-476f-b60e-583bc532b18f",
+      "label": "Side garden — planting bed",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:31cded47-9d42-476f-b60e-583bc532b18f",
+      "label": "Side garden — planting bed",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    },
+    {
+      "camera": "zone:3fb94d19-3786-48d4-bb29-48514e8777ba",
+      "label": "Side garden — lawn",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "invented structure: An additional walled garden plot beyond the right boundary wall (extra parallel wall with lawn and beds) where the design model shows only open desert"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:3fb94d19-3786-48d4-bb29-48514e8777ba",
+      "label": "Side garden — lawn",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: Wall-mounted fitting on the left villa wall is lit in IMAGE 2, casting a glow up the wall, where IMAGE 3 shows that fixture dark",
+            "undesigned light: Recessed paving light in the middle of the terrace (between the two designed floor lights) is lit in IMAGE 2 but shows no glow in IMAGE 3"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    },
+    {
+      "camera": "zone:113e3a84-c292-476e-ae2b-cd3cad688d55",
+      "label": "Side garden — porcelain paving terrace",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:113e3a84-c292-476e-ae2b-cd3cad688d55",
+      "label": "Side garden — porcelain paving terrace",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    },
+    {
+      "camera": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+      "label": "Front garden — planting bed",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+      "label": "Front garden — planting bed",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: Warm uplight washes on the wall behind the grasses at left-of-centre and behind the fountain grass at centre, plus a visible in-bed spot glow at ground level — the night model shows no designed light points at bed or low-wall level, only faint glows at the very top of the frame.",
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "F1 planting bed: moved or resized (Mulched planting bed with agaves, grasses and shrubs is clearly depicted, but it sits smaller and lower in the frame than the model's near-fullscreen bed, and lawn is visible bottom-right that the model only hints at.)",
+            "viewpoint changed"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
+    },
+    {
+      "camera": "zone:dba7027d-519f-4eac-ba3c-f75c1b269b89",
+      "label": "Front garden — lawn",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "invented structure: Tall rendered white boundary wall across the upper right of the frame",
+            "invented structure: Large-format stone paving strip along the right/bottom edge replacing designed ground surface",
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "garden:aerial",
+      "label": "Whole garden — aerial",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "garden:aerial",
+      "label": "Whole garden — aerial",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: Row of planting uplights washing the shrubs and frangipani along the whole front planter band, where the night model shows no glows",
+            "undesigned light: Uplight at the base of the palm tree illuminating its trunk and crown"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    },
+    {
+      "camera": "garden:garden-1",
+      "label": "Whole garden — view 1",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "S1 existing grey steel garden shed (kept): placement moved — at 3% across, 41% down in the render; 41%, 86% in the design"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "T1 existing frangipani tree (kept): moved or resized (A frangipani is shown, but it is pushed to the left edge and is far smaller than the large foreground canopy that dominates the lower centre of the model.)",
+            "S1 existing grey steel garden shed (kept): moved or resized (Grey corrugated steel shed appears at the extreme left edge and much larger/nearer, not at the mid-left position shown in the model.)",
+            "invented structure: Large black louvred pergola/canopy with posts framing the entire foreground — no such structure exists in the design model",
+            "viewpoint changed",
+            "S1 existing grey steel garden shed (kept): placement moved — at 7% across, 67% down in the render; 41%, 86% in the design"
+          ]
+        }
+      ],
+      "consistency": null,
+      "reason": "gate_failed"
+    },
+    {
+      "camera": "garden:garden-1",
+      "label": "Whole garden — view 1",
+      "view": "evening",
+      "outcome": "substituted",
+      "attempts": [],
+      "consistency": null,
+      "reason": "no_passed_day"
+    },
+    {
+      "camera": "garden:garden-2",
+      "label": "Whole garden — view 2",
+      "view": "day",
+      "outcome": "substituted",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": false,
+        "failures": [
+          "inconsistent pergola design with the anchor view (Image 1 shows the dark bronze aluminium louvre-blade pergola with square posts; Image 2 shows a structure with wide timber slats on a metal frame, a different material and roof design.)"
+        ],
+        "anchor": false
+      },
+      "reason": "inconsistent"
+    },
+    {
+      "camera": "garden:garden-2",
+      "label": "Whole garden — view 2",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: Wall sconce on the villa's paving-side wall (~38%,58%) is lit and washes the wall, where the night model shows no glow at that fixture"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    }
+  ],
+  "mix": {
+    "photo_pairs": 2,
+    "design_views_by_choice": 0,
+    "design_views_after_gate": 11,
+    "styled_renders": 16,
+    "missing": 0
+  },
+  "parity": {
+    "clean": true,
+    "lines": [
+      {
+        "rule_id": "GL-03",
+        "description": "Garden demolition & strip-out",
+        "elements": 7,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Louvred pergola (replaces existing gazebo)",
+          "Pergola court — porcelain paving",
+          "Whole garden — aerial",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-26",
+        "description": "Outdoor water tap (hose bib) with isolation valve (no reference rate — QS to price)",
+        "elements": 2,
+        "sheets": [
+          "L-402"
+        ],
+        "views": [
+          "Garden entrance area — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear garden — lawn",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-28",
+        "description": "Drainage point / gully in paving (absorbed at no charge in the reference project — QS to confirm)",
+        "elements": 2,
+        "sheets": [
+          "L-402"
+        ],
+        "views": [
+          "Garden entrance area — porcelain paving",
+          "Louvred pergola (replaces existing gazebo)",
+          "Pergola court — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-01",
+        "description": "Garden preliminaries & approvals",
+        "elements": 0,
+        "sheets": [],
+        "views": [],
+        "status": "exempt",
+        "reason": "project-level lump (preliminaries, approvals) — no drawn element"
+      },
+      {
+        "rule_id": "GL-02",
+        "description": "Garden mobilization & site management",
+        "elements": 0,
+        "sheets": [],
+        "views": [],
+        "status": "exempt",
+        "reason": "project-level lump (mobilisation, site management) — no drawn element"
+      },
+      {
+        "rule_id": "GL-04",
+        "description": "PCC base under paving",
+        "elements": 6,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Door landing — villa door",
+          "Garden entrance area — porcelain paving",
+          "Louvred pergola (replaces existing gazebo)",
+          "Pergola court — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear garden — lawn",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-05",
+        "description": "Porcelain paving installation",
+        "elements": 6,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Door landing — villa door",
+          "Garden entrance area — porcelain paving",
+          "Louvred pergola (replaces existing gazebo)",
+          "Pergola court — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear garden — lawn",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-06",
+        "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+        "elements": 6,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Door landing — villa door",
+          "Garden entrance area — porcelain paving",
+          "Louvred pergola (replaces existing gazebo)",
+          "Pergola court — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear garden — lawn",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-09",
+        "description": "Seating bench, L-shape (0.7x0.6 section)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-102"
+        ],
+        "views": [
+          "Louvred pergola (replaces existing gazebo)",
+          "Pergola court — porcelain paving",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-11a",
+        "description": "BBQ counter (blockwork, clad, sink+MEP+sockets)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-101"
+        ],
+        "views": [
+          "Louvred pergola (replaces existing gazebo)",
+          "Pergola court — porcelain paving"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-14",
+        "description": "Motorized louvered pergola (alum, LED, coated)",
+        "elements": 1,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Louvred pergola (replaces existing gazebo)",
+          "Pergola court — porcelain paving",
+          "Whole garden — aerial",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-07",
+        "description": "Artificial grass supply",
+        "elements": 3,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Door landing — villa door",
+          "Front garden — lawn",
+          "Front garden — planting bed",
+          "Garden entrance area — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear garden — lawn",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-08",
+        "description": "Artificial grass installation (base+sand+borders)",
+        "elements": 3,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Door landing — villa door",
+          "Front garden — lawn",
+          "Front garden — planting bed",
+          "Garden entrance area — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear garden — lawn",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-25",
+        "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+        "elements": 3,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Front garden — lawn",
+          "Front garden — planting bed",
+          "Garden entrance area — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-15",
+        "description": "Irrigation system (drip, pump, valves)",
+        "elements": 3,
+        "sheets": [
+          "L-100",
+          "L-101",
+          "L-102",
+          "L-103",
+          "L-104",
+          "L-105",
+          "L-106",
+          "L-107",
+          "L-108",
+          "L-109",
+          "L-110",
+          "L-111",
+          "L-112",
+          "L-401",
+          "L-402"
+        ],
+        "views": [
+          "Front garden — lawn",
+          "Front garden — planting bed",
+          "Garden entrance area — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-16",
+        "description": "Garden lighting cabling",
+        "elements": 12,
+        "sheets": [
+          "L-401"
+        ],
+        "views": [
+          "Door landing — villa door",
+          "Front garden — lawn",
+          "Garden entrance area — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear garden — lawn",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-17",
+        "description": "Garden light fittings (blended LUMO class)",
+        "elements": 12,
+        "sheets": [
+          "L-401"
+        ],
+        "views": [
+          "Door landing — villa door",
+          "Front garden — lawn",
+          "Garden entrance area — porcelain paving",
+          "Porcelain path — garden gate to side garden",
+          "Rear garden — lawn",
+          "Rear planting bed",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "rule_id": "GL-18",
+        "description": "Boundary wall lights (supply+install)",
+        "elements": 6,
+        "sheets": [
+          "L-401"
+        ],
+        "views": [
+          "Garden entrance area — porcelain paving",
+          "Rear garden — lawn",
+          "Side garden — lawn",
+          "Side garden — planting bed",
+          "Side garden — porcelain paving terrace",
+          "Whole garden — aerial",
+          "Whole garden — view 1",
+          "Whole garden — view 2"
+        ],
+        "status": "ok",
+        "reason": null
+      }
+    ],
+    "elements": [
+      {
+        "id": "dffac8a5-5c8a-4be7-85de-917ea6becb62",
+        "name": "Door landing — villa door",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "dba7027d-519f-4eac-ba3c-f75c1b269b89",
+        "name": "Front garden — lawn",
+        "kind": "artificial_grass",
+        "lines": [
+          "GL-07",
+          "GL-08"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+        "name": "Front garden — planting bed",
+        "kind": "planting_bed",
+        "lines": [
+          "GL-25",
+          "GL-15"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
+        "name": "Garden entrance area — porcelain paving",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+        "name": "Louvred pergola (replaces existing gazebo)",
+        "kind": "structure",
+        "lines": [
+          "GL-03",
+          "GL-04",
+          "GL-05",
+          "GL-06",
+          "GL-14"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "94a612f3-9a07-4466-b6fc-53e48c550ed1",
+        "name": "Pergola court — porcelain paving",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "05430548-c9bf-4e5a-9735-25abcfc62caa",
+        "name": "Porcelain path — garden gate to side garden",
+        "kind": "path",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "ec59cb9e-41bc-4dbc-819a-649859c672cd",
+        "name": "Rear garden — lawn",
+        "kind": "artificial_grass",
+        "lines": [
+          "GL-07",
+          "GL-08"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "f3d76980-13a9-4830-86e2-0c8127bfee42",
+        "name": "Rear planting bed",
+        "kind": "planting_bed",
+        "lines": [
+          "GL-25",
+          "GL-15"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "3fb94d19-3786-48d4-bb29-48514e8777ba",
+        "name": "Side garden — lawn",
+        "kind": "artificial_grass",
+        "lines": [
+          "GL-07",
+          "GL-08"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "31cded47-9d42-476f-b60e-583bc532b18f",
+        "name": "Side garden — planting bed",
+        "kind": "planting_bed",
+        "lines": [
+          "GL-25",
+          "GL-15"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "113e3a84-c292-476e-ae2b-cd3cad688d55",
+        "name": "Side garden — porcelain paving terrace",
+        "kind": "paving",
+        "lines": [
+          "GL-04",
+          "GL-05",
+          "GL-06"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "d813d938-1041-4d20-812a-b45607276be9",
+        "name": "Stepping-stone path (existing)",
+        "kind": "stepping_path",
+        "lines": [
+          "GL-03"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "0069c434-52fb-401c-b762-d3f54a08b9df",
+        "name": "Outdoor sink counter (existing)",
+        "kind": "counter_run",
+        "lines": [
+          "GL-03"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "d12aee55-f78a-4379-8668-f2faa5e7b170",
+        "name": "Planter border with stone edging (existing) — rear",
+        "kind": "planter_run",
+        "lines": [
+          "GL-03"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "615ae275-dd94-4631-bc66-1e88b7b12ea8",
+        "name": "Planter border with stone edging (existing) — side",
+        "kind": "planter_run",
+        "lines": [
+          "GL-03"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "e6cd0add-0d94-4db7-90a8-3cb9568eb9b4",
+        "name": "String lights (existing) — corner wall",
+        "kind": "string_light_run",
+        "lines": [
+          "GL-03"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "d50b48f5-639a-4f7a-b755-3064412a501b",
+        "name": "String lights (existing) — across side garden",
+        "kind": "string_light_run",
+        "lines": [
+          "GL-03"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "81e1057a-fc85-4a2a-9ae0-a70a9431aac7",
+        "name": "BBQ counter (under the pergola)",
+        "kind": "counter_run",
+        "lines": [
+          "GL-11a"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "b1b17438-29ce-45c2-866a-cf03c20dd093",
+        "name": "L-seating bench (pergola court)",
+        "kind": "bench_run",
+        "lines": [
+          "GL-09"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "f6475a51-8082-4b48-811b-614523d11a06",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "25451338-ee39-4dfe-b728-ea96de7d779b",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "e034be70-5437-48bb-8f50-790305d64eb0",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "02fd8bfb-dad8-4763-ba63-4045bdd99a46",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "bc1c2b9d-51fb-401d-b391-7e91cceab7bf",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "9278ea15-56c4-43a8-a5aa-2f7a40ffef5f",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "58d2736e-b744-4042-8c58-c6e70f37b25d",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "974c28bd-5ace-4a7a-83d0-009bd11062a6",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "8d86536c-142d-4695-ae81-d133a1c645e5",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "0866e802-f994-485b-8a50-e905d45a7ea8",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "65843b4b-4b7d-4084-9a3c-f4c1ad3fc7ea",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "b0494c4c-0530-4c4f-a757-d07aeb1dc9ce",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "2597cc93-926e-42bf-8385-c35167228ef0",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "77b3315b-53ef-400a-a637-589d317eacc8",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "c29f3031-fb7a-41b8-963c-054c638ee317",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "81342208-2e40-4f25-ae60-a2be6dafb4d6",
+        "name": "boundary light",
+        "kind": "boundary_light",
+        "lines": [
+          "GL-18"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "3f14481c-9fd6-4c51-9b01-4f358bdc4974",
+        "name": "drainage point",
+        "kind": "drainage_point",
+        "lines": [
+          "GL-28"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "ec245b47-4c61-4333-98b8-99882066605a",
+        "name": "drainage point",
+        "kind": "drainage_point",
+        "lines": [
+          "GL-28"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "9b931383-6a3d-4228-9bf5-049a41571d89",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "2bc83878-3448-416a-9801-e5cf7dae02fd",
+        "name": "garden light",
+        "kind": "garden_light",
+        "lines": [
+          "GL-16",
+          "GL-17"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "d31398ae-ded8-4b69-bcf1-0fb67f08c06e",
+        "name": "Outdoor water tap — rear strip",
+        "kind": "water_tap",
+        "lines": [
+          "GL-26"
+        ],
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "id": "1d49ff77-3771-4cd1-b5c4-45bb27e72931",
+        "name": "Outdoor water tap — side garden",
+        "kind": "water_tap",
+        "lines": [
+          "GL-26"
+        ],
+        "status": "ok",
+        "reason": null
+      }
+    ],
+    "overlays": [
+      {
+        "type": "garden_light",
+        "symbols": 12,
+        "sheets": [
+          "L-401"
+        ],
+        "rule_id": "GL-16",
+        "line_qty": 12,
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "type": "boundary_light",
+        "symbols": 6,
+        "sheets": [
+          "L-401"
+        ],
+        "rule_id": "GL-18",
+        "line_qty": 6,
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "type": "water_tap",
+        "symbols": 2,
+        "sheets": [
+          "L-402"
+        ],
+        "rule_id": "GL-26",
+        "line_qty": 2,
+        "status": "ok",
+        "reason": null
+      },
+      {
+        "type": "drainage_point",
+        "symbols": 2,
+        "sheets": [
+          "L-402"
+        ],
+        "rule_id": "GL-28",
+        "line_qty": 2,
+        "status": "ok",
+        "reason": null
+      }
+    ]
+  },
+  "consistency": [
+    {
+      "render_id": "a7ee8683-960d-4295-b332-2dce147d58ec",
+      "camera": "zone:94a612f3-9a07-4466-b6fc-53e48c550ed1",
+      "passed": true,
+      "failures": [],
+      "status": "anchor"
+    },
+    {
+      "render_id": "82a735f6-3aae-434b-bf94-aa1938f75c46",
+      "camera": "zone:ec59cb9e-41bc-4dbc-819a-649859c672cd",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "85654e3a-f576-4049-9ef7-c670768dbf2e",
+      "camera": "zone:dffac8a5-5c8a-4be7-85de-917ea6becb62",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "1271fde0-44c6-4327-8332-604f1a8e6dfa",
+      "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "dfbfde35-c6c0-47ae-a76b-4c9e80d69f3d",
+      "camera": "zone:31cded47-9d42-476f-b60e-583bc532b18f",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "28155503-3111-4297-82b2-1f39db406061",
+      "camera": "zone:3fb94d19-3786-48d4-bb29-48514e8777ba",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "97cb46a1-33f1-428c-aa2d-e10e8a75d8c7",
+      "camera": "zone:113e3a84-c292-476e-ae2b-cd3cad688d55",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "e3818b84-73b1-4596-926e-f9d724dce8f3",
+      "camera": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "6e7be517-b1c8-4679-8923-18ad96840932",
+      "camera": "zone:dba7027d-519f-4eac-ba3c-f75c1b269b89",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "64a9b1bc-0b9d-4437-b2ae-0ed4f374b6f5",
+      "camera": "garden:aerial",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "8a81621b-7641-4e40-9590-9ba592360652",
+      "camera": "garden:garden-2",
+      "passed": false,
+      "failures": [
+        "inconsistent pergola design with the anchor view (Image 1 shows the dark bronze aluminium louvre-blade pergola with square posts; Image 2 shows a structure with wide timber slats on a metal frame, a different material and roof design.)"
+      ],
+      "status": "ran"
+    }
+  ],
+  "cameras": [
+    {
+      "id": "zone:65c36ce8-c5f3-4633-bca8-4fe8d451c64f",
+      "label": "Louvred pergola (replaces existing gazebo)",
+      "mode": "elevated",
+      "clean": true,
+      "clean_reasons": []
+    },
+    {
+      "id": "zone:94a612f3-9a07-4466-b6fc-53e48c550ed1",
+      "label": "Pergola court — porcelain paving",
+      "mode": "eye",
+      "clean": true,
+      "clean_reasons": []
+    },
+    {
+      "id": "zone:f3d76980-13a9-4830-86e2-0c8127bfee42",
+      "label": "Rear planting bed",
+      "mode": "elevated",
+      "clean": true,
+      "clean_reasons": []
+    },
+    {
+      "id": "zone:ec59cb9e-41bc-4dbc-819a-649859c672cd",
+      "label": "Rear garden — lawn",
+      "mode": "elevated",
+      "clean": true,
+      "clean_reasons": []
+    },
+    {
+      "id": "zone:08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
+      "label": "Garden entrance area — porcelain paving",
+      "mode": "eye",
+      "clean": false,
+      "clean_reasons": [
+        "cramped standpoint (under 6 m of clear width)",
+        "solid mass within 2.2 m of the lens (19% of frame)"
+      ]
+    },
+    {
+      "id": "zone:dffac8a5-5c8a-4be7-85de-917ea6becb62",
+      "label": "Door landing — villa door",
+      "mode": "eye",
+      "clean": false,
+      "clean_reasons": [
+        "cramped standpoint (under 6 m of clear width)",
+        "solid mass within 2.2 m of the lens (33% of frame)",
+        "no horizon in frame"
+      ]
+    },
+    {
+      "id": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "label": "Porcelain path — garden gate to side garden",
+      "mode": "eye",
+      "clean": false,
+      "clean_reasons": [
+        "cramped standpoint (under 6 m of clear width)",
+        "solid mass within 2.2 m of the lens (36% of frame)",
+        "house or walls fill 51% of frame"
+      ]
+    },
+    {
+      "id": "zone:31cded47-9d42-476f-b60e-583bc532b18f",
+      "label": "Side garden — planting bed",
+      "mode": "elevated",
+      "clean": true,
+      "clean_reasons": []
+    },
+    {
+      "id": "zone:3fb94d19-3786-48d4-bb29-48514e8777ba",
+      "label": "Side garden — lawn",
+      "mode": "elevated",
+      "clean": true,
+      "clean_reasons": []
+    },
+    {
+      "id": "zone:113e3a84-c292-476e-ae2b-cd3cad688d55",
+      "label": "Side garden — porcelain paving terrace",
+      "mode": "eye",
+      "clean": false,
+      "clean_reasons": [
+        "cramped standpoint (under 6 m of clear width)",
+        "solid mass within 2.2 m of the lens (14% of frame)",
+        "house or walls fill 48% of frame"
+      ]
+    },
+    {
+      "id": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+      "label": "Front garden — planting bed",
+      "mode": "eye",
+      "clean": false,
+      "clean_reasons": [
+        "cramped standpoint (under 6 m of clear width)",
+        "solid mass within 2.2 m of the lens (6% of frame)",
+        "no horizon in frame"
+      ]
+    },
+    {
+      "id": "zone:dba7027d-519f-4eac-ba3c-f75c1b269b89",
+      "label": "Front garden — lawn",
+      "mode": "eye",
+      "clean": false,
+      "clean_reasons": [
+        "cramped standpoint (under 6 m of clear width)",
+        "solid mass within 2.2 m of the lens (32% of frame)",
+        "no horizon in frame"
+      ]
+    },
+    {
+      "id": "garden:aerial",
+      "label": "Whole garden — aerial",
+      "mode": "aerial",
+      "clean": true,
+      "clean_reasons": []
+    },
+    {
+      "id": "garden:garden-1",
+      "label": "Whole garden — view 1",
+      "mode": "elevated",
+      "clean": true,
+      "clean_reasons": []
+    },
+    {
+      "id": "garden:garden-2",
+      "label": "Whole garden — view 2",
+      "mode": "elevated",
+      "clean": true,
+      "clean_reasons": []
+    }
+  ],
+  "gate_summary": {
+    "scene_views": 27,
+    "passed": 16,
+    "substituted_by_3d_view": 11,
+    "missing": 0,
+    "photo_pairs": [
+      {
+        "file": "IMG-20260911-WA0079.jpg",
+        "zone": "rear-lawn",
+        "outcome": "withheld",
+        "attempts": [
+          {
+            "passed": false,
+            "attempt": 1,
+            "summary": "",
+            "failures": [
+              "gate unavailable: unparseable reply ({\"observations\":[{\"ref\":\"E1\",\"present\":true,\"roughly_in_place\":false,\"out_of_crop\":false,\"note\":\"Porcelain paving is there, but it runs along the right-hand sid)"
+            ],
+            "image_url": "https://askzyqgcnjmbqegfifxq.supabase.co/storage/v1/object/public/renders/projects/ec4497c7-71a7-44f5-9f4b-f5a731002d0d/photo-pairs/04364c15-11de-4c5c-a7ae-4f2d103e9838-1338707324ff-attempt1.jpg"
+          },
+          {
+            "passed": false,
+            "attempt": 2,
+            "summary": "Same viewpoint and retained trees, with the stepping stones replaced by porcelain paving and the stone border removed, but IMAGE 2 adds major unlisted built elements — a louvered pergola, an outdoor kitchen counter and a bench/planter wall (the metal shed also disappears).",
+            "failures": [
+              "invented structure: louvered pergola over the BBQ/terrace area",
+              "invented structure: built-in outdoor kitchen counter with grill",
+              "invented structure: rendered seat wall / planter with timber bench"
+            ],
+            "image_url": "https://askzyqgcnjmbqegfifxq.supabase.co/storage/v1/object/public/renders/projects/ec4497c7-71a7-44f5-9f4b-f5a731002d0d/photo-pairs/04364c15-11de-4c5c-a7ae-4f2d103e9838-1338707324ff-attempt2.jpg"
+          }
+        ]
+      },
+      {
+        "file": "IMG-20260911-WA0082.jpg",
+        "zone": "rear-lawn",
+        "outcome": "passed",
+        "attempts": [
+          {
+            "passed": true,
+            "attempt": 1,
+            "summary": "Same view and house orientation, with both frangipanis kept, the stone-edged planter removed, and the stepping stones replaced by full porcelain paving around a clean lawn with new mulched planting beds — a clearly transformed garden.",
+            "failures": [],
+            "image_url": "https://askzyqgcnjmbqegfifxq.supabase.co/storage/v1/object/public/renders/projects/ec4497c7-71a7-44f5-9f4b-f5a731002d0d/photo-pairs/275b9d20-5239-4541-b048-cabcd87f5fab-81f6ba7b9a1e-attempt1.jpg"
+          }
+        ]
+      },
+      {
+        "file": "IMG-20260911-WA0080.jpg",
+        "zone": "side-lawn",
+        "outcome": "withheld",
+        "attempts": [
+          {
+            "passed": false,
+            "attempt": 1,
+            "summary": "The garden is fully transformed with large-format stone paving, new planting beds, a louvred pergola and built-in BBQ counter, though the pergola is larger and shifted from the old gazebo's corner position.",
+            "failures": [
+              "the hardtop gazebo with dark glazed panels: moved or resized (A motorised louvred aluminium pergola is present, but it is much larger and positioned over the centre/back of the yard rather than at the far-left edge where the old hardtop gazebo stood.)"
+            ],
+            "image_url": "https://askzyqgcnjmbqegfifxq.supabase.co/storage/v1/object/public/renders/projects/ec4497c7-71a7-44f5-9f4b-f5a731002d0d/photo-pairs/7393e6b5-01e2-45b9-bdf8-39baa5e0e1c5-ffc4dd4beec0-attempt1.jpg"
+          },
+          {
+            "passed": false,
+            "attempt": 2,
+            "summary": "The yard is fully transformed: the old gazebo, sink counter and string lights are gone, replaced by a motorised louvred pergola with a built-in BBQ/sink counter, fresh turf and new planting beds, though the pergola sits along the back wall rather than at the old gazebo's far-left spot.",
+            "failures": [
+              "the hardtop gazebo with dark glazed panels: moved or resized (A motorised louvred aluminium pergola is visible, but it sits along the back/centre-left wall rather than at the far-left position of the old dark gazebo.)"
+            ],
+            "image_url": "https://askzyqgcnjmbqegfifxq.supabase.co/storage/v1/object/public/renders/projects/ec4497c7-71a7-44f5-9f4b-f5a731002d0d/photo-pairs/7393e6b5-01e2-45b9-bdf8-39baa5e0e1c5-ffc4dd4beec0-attempt2.jpg"
+          }
+        ]
+      },
+      {
+        "file": "IMG-20260911-WA0083.jpg",
+        "zone": "side-lawn",
+        "outcome": "withheld",
+        "attempts": [
+          {
+            "passed": false,
+            "attempt": 1,
+            "summary": "IMAGE 2 shows a convincingly transformed garden with the louvred pergola, new BBQ counter and fresh planting, but the camera position, boundary walls and background (palm, neighbouring villa) differ from IMAGE 1 and the pergola sits over the dining area rather than the old gazebo footprint.",
+            "failures": [
+              "the hardtop gazebo with dark glazed panels: moved or resized (A motorised louvred aluminium pergola is clearly shown, but it sits over the central dining area rather than on the far-left footprint of the old hardtop gazebo, and it is larger/more open.)",
+              "house or boundary changed",
+              "viewpoint changed"
+            ],
+            "image_url": "https://askzyqgcnjmbqegfifxq.supabase.co/storage/v1/object/public/renders/projects/ec4497c7-71a7-44f5-9f4b-f5a731002d0d/photo-pairs/6f1c45be-05b2-48c9-954a-39bf23cec001-6f6ffdab201f-attempt1.jpg"
+          },
+          {
+            "passed": false,
+            "attempt": 2,
+            "summary": "IMAGE 2 shows the garden clearly transformed with a louvred pergola and built-in BBQ counter replacing the gazebo and old sink unit, but it is shot from a noticeably different position that reveals a two-storey villa facade not seen in IMAGE 1.",
+            "failures": [
+              "house or boundary changed",
+              "viewpoint changed"
+            ],
+            "image_url": "https://askzyqgcnjmbqegfifxq.supabase.co/storage/v1/object/public/renders/projects/ec4497c7-71a7-44f5-9f4b-f5a731002d0d/photo-pairs/6f1c45be-05b2-48c9-954a-39bf23cec001-6f6ffdab201f-attempt2.jpg"
+          }
+        ]
+      },
+      {
+        "file": "IMG-20260911-WA0074.jpg",
+        "zone": "side-deck",
+        "outcome": "passed",
+        "attempts": [
+          {
+            "passed": true,
+            "attempt": 1,
+            "summary": "IMAGE 2 shows the same garden convincingly transformed: porcelain paving with turf strips and new planting beds, the old gazebo replaced by a louvred pergola with a built-in BBQ counter, and the string lights removed.",
+            "failures": [],
+            "image_url": "https://askzyqgcnjmbqegfifxq.supabase.co/storage/v1/object/public/renders/projects/ec4497c7-71a7-44f5-9f4b-f5a731002d0d/photo-pairs/539ad1ba-4a72-4b51-a0bd-97dd2fbdfb67-c4f5c41aeea5-attempt1.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  "metrics": {
+    "time_to_draw_plan_min": null,
+    "active_design_min": null,
+    "time_to_first_full_boq_min": 1517.7,
+    "first_full_boq_at": "2026-09-15T17:58:42.314283+00:00",
+    "boq_generations": 31,
+    "render_gate": {
+      "renders": 200,
+      "passed": 75,
+      "substituted": 125,
+      "pass_rate": 0.375,
+      "attempt_pass_rate": 0.385
+    },
+    "friction": [
+      {
+        "at": "2026-09-15T17:58:36.86132+00:00",
+        "note": "No style direction was locked, and renders cannot run without one — Desert Modern set as the proposed default (it matches the photos' modern boundary walls); the client confirms or changes it at the review.",
+        "area": "renders"
+      },
+      {
+        "at": "2026-09-15T17:58:37.019273+00:00",
+        "note": "The type-plan dimension set has no front-garden footprint; the front lawn + bed beside the drive are an assumed 2.2 × 4.0 m, and the garage/drive block had to be reshaped around them through /api/plan-context — context footprints have no editor in the UI.",
+        "area": "plan"
+      },
+      {
+        "at": "2026-09-15T17:58:37.157779+00:00",
+        "note": "The garden gate is not on the plan (a boundary wall has no gate/opening element); the 1.0 m path assumes the gate at the rear strip's west end.",
+        "area": "plan"
+      },
+      {
+        "at": "2026-09-15T17:58:37.276207+00:00",
+        "note": "A pergola's variant (louvred, fixed, timber) has no field: every structure zone prices at the one motorised louvred pergola rate, and the variant lives in spec only.",
+        "area": "plan"
+      },
+      {
+        "at": "2026-09-15T17:58:37.407437+00:00",
+        "note": "Replace meant like-for-like; a replacement by a DIFFERENT element (stepping path → porcelain path zone, sink counter → BBQ counter elsewhere, string lights → designed lighting) had no representation and would have priced both. Added spec.replaced_by (old item = demolition only, the new element carries the work) — API only, no editor control yet.",
+        "area": "elements"
+      },
+      {
+        "at": "2026-09-15T17:58:37.531712+00:00",
+        "note": "PATCH /api/plan-elements and /api/plan-zones replace spec wholesale: adding one key means re-sending the stored spec.",
+        "area": "elements"
+      },
+      {
+        "at": "2026-09-15T17:58:37.653697+00:00",
+        "note": "The counter run's default section (600 wide) is not a BBQ counter's; the 900 × 900 section had to be entered explicitly.",
+        "area": "elements"
+      },
+      {
+        "at": "2026-09-15T17:58:37.781959+00:00",
+        "note": "Irrigation zones are not drawn: the allowance derives from the planting beds as built (rear, side and front beds).",
+        "area": "drainage"
+      },
+      {
+        "at": "2026-09-15T18:18:35.968435+00:00",
+        "note": "One existing run replaced by TWO design elements (the stepping-stone path became the side-garden terrace along the house and the 1.0 m rear path) has a single replaced_by text; the first wording named only the path, and the before/after gate on a side-garden photo rightly rejected a wide terrace as not a 1.0 m path. Split runs, or per-segment replacements, would model it.",
+        "area": "elements"
+      },
+      {
+        "at": "2026-09-17T15:00:20.196175+00:00",
+        "note": "The garden gate and the wall it sits in had no place in the plan vocabulary: an opening could only snap to a wall derived from room edges, and garden walls are context footprints. Added gates as openings that name their context wall (migration 039).",
+        "area": "plan"
+      },
+      {
+        "at": "2026-09-17T15:00:20.336382+00:00",
+        "note": "A garden BoQ had no line for outdoor water taps or for planting-bed soil preparation: both are real work a client expects priced; added as QS-to-price lines (GL-25, GL-26).",
+        "area": "boq"
+      }
+    ],
+    "corrections": {
+      "total": 3,
+      "by_type": {
+        "rate": 0,
+        "quantity": 0,
+        "scope": 1,
+        "design": 1,
+        "confirm": 1
+      }
+    },
+    "sessions": [
+      {
+        "record": "three-firms #1 — Arabella design session, Sep 2026",
+        "decisions": 4,
+        "corrections": {
+          "confirm": 1,
+          "scope": 1,
+          "design": 1
+        }
+      }
+    ]
+  },
+  "results": [
+    "PASS  BoQ generates — AED 116216.57",
+    "PASS  pack readiness: no untyped counter, nothing undecided, needs_selection empty — {\"untyped\":[],\"undecided\":0,\"stale\":[]}",
+    "PASS  needs_selection is empty on the BoQ",
+    "PASS  the BoQ knows it is a draft",
+    "PASS  boundary-dependent quantities carry the derived flag — 10 derived lines",
+    "PASS  every priced landscape line carries the market-reference source label — 15 priced lines",
+    "PASS  drawing set, render pack and BoQ export as PDFs — {\"drawingsPdf\":{\"status\":200,\"bytes\":4176942},\"packPdf\":{\"status\":200,\"bytes\":8269835},\"boqPdf\":{\"status\":200,\"bytes\":504552}}",
+    "PASS  drawings: cover, site plan, a sheet per zone, finish schedule — L-000 L-100 L-101 L-102 L-103 L-104 L-105 L-106 L-107 L-108 L-109 L-110 L-111 L-112 L-201 L-301 L-302 L-303 L-401 L-402 L-501",
+    "PASS  drawings: sectional elevations for the designed structures — 3 elevation sheets",
+    "PASS  drawings: electrical + irrigation/drainage overlays",
+    "PASS  watermark: every drawing sheet carries the draft stamp with the statement — 21 sheets",
+    "PASS  watermark: the drawing-set cover carries the statement",
+    "PASS  watermark: the render-pack cover carries the statement",
+    "PASS  the pack carries the Design assumptions page",
+    "PASS  watermark: every BoQ PDF page header carries the statement — 3 pages",
+    "PASS  the BoQ total renders with the derived convention, never a bare number — ≈ AED 116,200*",
+    "PASS  BoQ page: draft header, derived total and derived line flags visible",
+    "PASS  plan page: the draft banner and derived markers are visible",
+    "PASS  zero contractor-identity leakage across drawings, pack, BoQ PDF, BoQ data and BoQ page — 2 identity tokens × 47 documents",
+    "PASS  client-safe captions: no QA text in the pack",
+    "PASS  legibility: no text in the render pack under 3.1 mm — min 3.1 mm over 476 runs",
+    "PASS  legibility: no text in the BoQ PDF under 2.6 mm (A4) — min 2.6 mm",
+    "PASS  the BoQ PDF carries the indicative delivery programme",
+    "PASS  L-201 title block says ground (external works), not an interior level",
+    "PASS  L-301 pergola: four posts on the graph and drawn — 2 post dimensions",
+    "PASS  extended gate: every passed render checked built-feature placement against the scene — 17 passed render(s)",
+    "PASS  before/after: the counter under the pergola is visible, or the caption says it is out of crop — 1 passed pair(s) with a built feature added under the pergola",
+    "PASS  parity counts overlay symbols against their lines (drainage, taps, lighting) — garden_light 12/12, boundary_light 6/6, water_tap 2/2, drainage_point 2/2",
+    "PASS  no internal sales or commercial language on any client-facing page",
+    "PASS  no render that disagrees with the anchor view enters the pack (cross-view consistency) — 11 views checked against zone:94a612f3-9a07-4466-b6fc-53e48c550ed1; 1 demoted to design views: inconsistent pergola design with the anchor view (Image 1 shows the dark bronze aluminium louvre-blade pergola with square posts; Image 2 shows a structure with wide timber slats on a metal frame, a different material and roof design.)",
+    "PASS  parity: every BoQ line is drawn and shown, every drawn cost is priced"
+  ]
+}

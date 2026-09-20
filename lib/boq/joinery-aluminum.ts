@@ -53,6 +53,16 @@ export interface GtSection {
 }
 
 const BEDROOM = new Set(["master_bedroom", "bedroom"]);
+/** Outdoor zones — see lib/boq/rules.ts LANDSCAPE_TYPES. */
+const LANDSCAPE = new Set([
+  "paving",
+  "artificial_grass",
+  "planting_bed",
+  "deck",
+  "path",
+  "structure",
+  "pool",
+]);
 const MASTER = "master_bedroom";
 const BATHROOM = new Set(["bathroom", "ensuite", "powder"]);
 
@@ -171,6 +181,10 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
  */
 export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | null {
   if (ALUMINUM.length === 0) return null;
+  // The allowance is an INTERIOR one — windows, doors and balustrades of a
+  // villa fit-out. A plan with no interior rooms has none of them, and a garden
+  // project was picking up the whole AED 92k allowance for nothing.
+  if (rooms.length > 0 && rooms.every((r) => LANDSCAPE.has(r.room_type ?? ""))) return null;
   const src = "Global Creation Services ref 3936/R1 (allowance)";
   const slug = (v: string) =>
     v.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);

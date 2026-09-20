@@ -6,6 +6,11 @@ import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { loadProjectPhotoAssets } from "@/lib/assets/load";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
+import { resolveAnyStyle } from "@/lib/garden-styles";
+import { loadRenders } from "@/lib/render-batch/load";
+import { currentDayRender, planBatch, planSceneBatch, type BatchFixture, type SceneRenderRow } from "@/lib/render-batch/plan";
+import { isExteriorRoomType, roomTypeFromDb } from "@/lib/render-prompts";
+import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -125,9 +130,9 @@ export default async function RenderPage({
     .limit(1);
 
   const styleChoice = styleChoiceRows?.[0] ?? null;
-  const style = styleChoice?.style_key
-    ? (getStyleByKey(styleChoice.style_key) ?? null)
-    : null;
+  // G1b: a project may have locked either family, so resolve both rather than
+  // showing nothing for a garden direction.
+  const style = resolveAnyStyle(styleChoice?.style_key ?? null, getStyleByKey);
 
   // A missing PROJECT is a 404 and uses the shared boundary. A missing PLAN is
   // not: the project exists and the user simply has not confirmed a layout yet,
@@ -182,7 +187,56 @@ export default async function RenderPage({
     .eq("project_id", projectId)
     .order("created_at", { ascending: true });
 
-  const initialChains = buildInitialChains(renderRows ?? []);
+  // G4: an evening view is an edit of a day render, not the next step in the
+  // zone's iteration chain — keep it out of the chain, or it would become the
+  // "latest" render and every tweak would edit the night scene.
+  const sbAny = supabase as unknown as SupabaseClient;
+  const viewRows = await loadRenders(sbAny, projectId);
+  const eveningIds = new Set(viewRows.filter((r) => r.view === "evening").map((r) => r.id));
+  const initialChains = buildInitialChains(
+    (renderRows ?? []).filter((r) => !eveningIds.has(r.id)),
+  );
+
+  // The evening view shown beside a zone is the one made from its CURRENT day.
+  const initialEvenings: Record<string, { id: string; imageUrl: string }> = {};
+  for (const room of roomList) {
+    const day = currentDayRender(viewRows, room.id);
+    if (!day) continue;
+    const evening = viewRows
+      .filter((r) => r.view === "evening" && r.parent_render_id === day.id && r.status === "succeeded" && r.image_url)
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0];
+    if (evening) initialEvenings[room.id] = { id: evening.id, imageUrl: evening.image_url! };
+  }
+
+  // G4 "Generate all": every zone and view still to render.
+  const { data: fixtureRows } = await sbAny
+    .from("plan_fixtures")
+    .select("type, room_id, position, spec")
+    .eq("project_id", projectId);
+  // G4b: a garden plans by camera (plan-faithful pipeline); anything else by room.
+  const renderableTypes = roomList.map((r) => roomTypeFromDb(r.room_type)).filter((t) => t !== null);
+  const gardenOnly = renderableTypes.length > 0 && renderableTypes.every((t) => isExteriorRoomType(t));
+  let batchJobs = planBatch({
+    rooms: roomList,
+    renders: viewRows,
+    fixtures: (fixtureRows ?? []) as BatchFixture[],
+  });
+  if (gardenOnly) {
+    try {
+      const ctx = await loadGardenSceneContext(projectId);
+      const { data: sceneRows } = await sbAny
+        .from("renders")
+        .select("id, camera, view, status, gate")
+        .eq("project_id", projectId)
+        .eq("mode", "scene");
+      batchJobs = planSceneBatch(
+        ctx.cameras.map((c) => ({ id: c.id, label: c.label, zone_id: c.zoneId, lit: c.lit })),
+        (sceneRows ?? []) as SceneRenderRow[],
+      );
+    } catch {
+      /* no style yet, or no plan: the room plan stands */
+    }
+  }
 
   // Rooms that already have an approved/locked design — these gate the
   // floating Cost-it CTA on the right.
@@ -272,6 +326,8 @@ export default async function RenderPage({
         roomBoqTotals={roomBoqTotals}
         stagingEnabled={stagingEnabled}
         initialFurnitureOptIns={initialFurnitureOptIns}
+        batchJobs={batchJobs}
+        initialEvenings={initialEvenings}
         journeySlot={<JourneyProgress stepKey="render" projectId={project.id} />}
       />
     </AppShell>

@@ -30,6 +30,14 @@ export const POMI_SECTIONS = [
   "Plumbing & Sanitary",
   "Decoration & Painting",
   "Preliminaries",
+  // G2/G3 landscape sections. Additive: the engine emits a section only when a
+  // take-off item lands in it (SECTION_ORDER.filter(bySection.has)), so an
+  // interior BoQ is unchanged by their existence. Garden work reuses
+  // Preliminaries and Demolition rather than duplicating them.
+  "Hardscape & Structures",
+  "Soft Landscaping",
+  "Irrigation",
+  "Electrical & Lighting",
 ] as const;
 
 export type PomiSection = (typeof POMI_SECTIONS)[number];
@@ -100,7 +108,29 @@ export type ScopeItem = {
    * transactions: they must reach the BoQ visibly pending review, never
    * indistinguishable from a rate somebody actually paid.
    */
-  rate_status?: "indicative" | "site_assessment" | "needs_qs";
+  /**
+   * `needs_selection` (G3) is its own state, not a flavour of needs_qs: the rate
+   * is real and transacted, but it is the DEFAULT of a choice nobody has made
+   * yet. A bar counter and a BBQ counter differ by AED 968/lm, and the cheaper
+   * one must never reach a client's BoQ looking settled.
+   */
+  rate_status?: "indicative" | "site_assessment" | "needs_qs" | "needs_selection";
+  /**
+   * G2: the QUANTITY was inferred rather than measured off the drawing.
+   *
+   * Distinct from `rate_status`, which is about the price. A scaled lump — the
+   * garden irrigation line — has a rate somebody actually paid and a quantity
+   * extrapolated from a single reference project. Those are different claims
+   * and a QS needs to see both.
+   */
+  qty_derived?: boolean;
+  /**
+   * G5c: an ALLOWANCE banded as a multiple of a reference rate. The line is one
+   * lump (quantity 1) priced at rate × factor, so the BoQ reads "1 lump, AED
+   * 17,600" rather than "1.6 lump" — a fractional lump is not a thing a client
+   * can picture. The band and its factor are stated in the measurement.
+   */
+  rate_factor?: number;
 };
 
 // --- Output --------------------------------------------------------------------
@@ -128,9 +158,10 @@ export const BoqLineSchema = z.object({
    *   indicative         a defensible judgement call, not a transaction (S6-pre)
    *   site_assessment    allowance only; needs site measurement
    *   actual_transaction priced from a real contract or quotation
+   *   needs_selection    a real rate, but the DEFAULT of an unmade choice (G3)
    */
   rate_status: z
-    .enum(["priced", "needs_qs", "indicative", "site_assessment", "actual_transaction"])
+    .enum(["priced", "needs_qs", "indicative", "site_assessment", "actual_transaction", "needs_selection"])
     .optional(),
 });
 

@@ -1,0 +1,82 @@
+{
+  "project_id": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
+  "plan_id": "473900e2-5bed-437f-a663-5e69c9a42898",
+  "project_name": "Arabella Garden — Draft for Review",
+  "step1_draw_seconds": 20.8,
+  "zones": [
+    {
+      "name": "Rear garden strip — lawn",
+      "kind": "artificial_grass",
+      "area_m2": 90.73,
+      "site_reference": false
+    },
+    {
+      "name": "Side garden — deck strip",
+      "kind": "deck",
+      "area_m2": 22.05,
+      "site_reference": false
+    },
+    {
+      "name": "Side garden — lawn",
+      "kind": "artificial_grass",
+      "area_m2": 24.5,
+      "site_reference": false
+    },
+    {
+      "name": "Gazebo (existing)",
+      "kind": "structure",
+      "area_m2": 12.25,
+      "site_reference": true
+    }
+  ],
+  "context": [
+    "Existing villa",
+    "Garage / drive block",
+    "Rear boundary wall",
+    "Corner boundary wall (side garden)",
+    "Side garden street wall",
+    "Rear strip end wall"
+  ],
+  "coverage": {
+    "plot_m2": 280.34999999999997,
+    "zones_m2": 149.53,
+    "buildings_m2": 129.34
+  },
+  "draft": {
+    "draft": true,
+    "derived": [
+      "plot boundary",
+      "zone: Gazebo (existing)",
+      "zone: Rear garden strip — lawn",
+      "zone: Side garden — deck strip",
+      "zone: Side garden — lawn",
+      "run: Stepping-stone path (existing)",
+      "run: Outdoor sink counter (existing)",
+      "run: Planter border with stone edging (existing) — rear",
+      "run: Planter border with stone edging (existing) — side",
+      "run: String lights (existing) — corner wall",
+      "run: String lights (existing) — across side garden",
+      "context: Existing villa",
+      "context: Garage / drive block",
+      "context: Rear boundary wall",
+      "context: Corner boundary wall (side garden)",
+      "context: Side garden street wall",
+      "context: Rear strip end wall"
+    ],
+    "note": "calibrated from developer type plan (42 px/m, room-dims cross-checked); corner plot — side garden likely wider; pending affection plan / site measurement",
+    "statement": "DRAFT FOR REVIEW — quantities derived from reference layout; firm after site verification."
+  },
+  "results": [
+    "PASS  project created through /api/draw-plan — ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
+    "PASS  zones save with no overlaps — []",
+    "PASS  all 14 client photos are in the project's asset library — 14/14",
+    "PASS  4 zones, 6 context volumes, 6 runs on the graph — 4/6/6",
+    "PASS  every zone area round-trips — Rear garden strip — lawn 90.73; Side garden — deck strip 22.05; Side garden — lawn 24.5; Gazebo (existing) 12.25",
+    "PASS  plot is derived, with its source note",
+    "PASS  every zone, run and context footprint is derived",
+    "PASS  site reference: gazebo, 6 runs, 4 boundary walls — none decided — 11",
+    "PASS  6 existing trees placed as site reference",
+    "PASS  the plan is a DRAFT — 17 derived boundary-critical items",
+    "PASS  zones + buildings account for the plot to within the stated 0.1 m residual — {\"plot_m2\":280.34999999999997,\"zones_m2\":149.53,\"buildings_m2\":129.34}"
+  ]
+}

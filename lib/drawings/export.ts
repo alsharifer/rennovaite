@@ -13,8 +13,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { loadDocumentProject } from "@/lib/documents/project-name";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import type { PlanGraph, Room } from "@/lib/plan/geometry";
+import { zoneSurface } from "@/lib/plan/zones";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -26,6 +28,9 @@ import {
   renderOpeningSchedule,
   type ScheduleSourceOpening,
 } from "./opening-schedule";
+import { buildElevationSheets } from "./garden-elevations";
+import { buildGardenSheets, designFixtures, designGraph, renderCoverSheet, type GardenFixture } from "./garden-sheets";
+import { graphDraftStatus } from "@/lib/plan/geometry";
 import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
 import { renderPlumbingSheet } from "./plumbing-sheet";
@@ -38,12 +43,24 @@ export type SheetKind =
   | "finish_schedule"
   | "opening_schedule"
   | "electrical"
-  | "plumbing";
+  | "plumbing"
+  // G4 garden set.
+  | "site_plan"
+  | "zone_plan"
+  | "lighting_overlay"
+  | "irrigation_overlay"
+  // G4b eye-level drawings.
+  | "structure_elevation"
+  | "garden_elevation"
+  // G5: the garden set's first page.
+  | "cover";
 
 export interface DrawingSheet {
   kind: SheetKind;
   title: string;
   sheetNumber: string;
+  /** G4: zone sheets share a kind, so they are addressed by sheet number. */
+  zoneId?: string;
   svg: string;
 }
 
@@ -80,12 +97,27 @@ function perimeterM(room: Room): number {
   return p;
 }
 
+
 function buildFinishRows(graph: PlanGraph, styleKey: string | null): FinishRow[] {
   const finishes = (styleKey && STYLE_FINISHES[styleKey]) || DEFAULT_FINISHES;
   const styleNote = styleKey ? `Style: ${styleKey}` : "No locked style — defaults";
   const rows: FinishRow[] = [];
   for (const r of graph.rooms) {
     const floorArea = r.area_m2;
+    // G1: an unroofed zone keeps its surface row and loses the other two. It has
+    // no ceiling, and its walls exist only where somebody drew one — those are
+    // boundary-wall elements with their own lengths, not a room perimeter.
+    if (r.unroofed) {
+      rows.push({
+        room: r.name_en,
+        surface: "Floor",
+        material: zoneSurface(r.type),
+        area_m2: floorArea,
+        notes: "Open to sky — no wall or ceiling finish",
+        groupStart: true,
+      });
+      continue;
+    }
     const wallArea = Math.round(perimeterM(r) * r.ceiling_h_m * 10) / 10;
     rows.push({ room: r.name_en, surface: "Floor", material: finishes.floor, area_m2: floorArea, notes: styleNote, groupStart: true });
     rows.push({ room: r.name_en, surface: "Wall", material: finishes.wall, area_m2: wallArea, notes: `Perimeter × ${r.ceiling_h_m} m (derived h)` });
@@ -114,13 +146,9 @@ interface ProjectMetaRow {
 }
 
 async function loadProjectMeta(projectId: string): Promise<ProjectMetaRow> {
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from("projects")
-    .select("name, city")
-    .eq("id", projectId)
-    .maybeSingle();
-  return { name: data?.name ?? "Untitled villa", city: data?.city ?? "Dubai" };
+  // G5: a document prints the project's display name when it has one (038).
+  const p = await loadDocumentProject(getSupabaseAdmin() as unknown as SupabaseClient, projectId, "Untitled villa");
+  return { name: p.name, city: p.city };
 }
 
 function sheetMeta(
@@ -185,6 +213,37 @@ async function loadOverlayFixtures(projectId: string): Promise<OverlayFixtureFor
   }
 }
 
+/** G4b: counter variants by element id, so an elevation can say "BBQ counter". */
+async function loadElementVariants(planId: string | null): Promise<Record<string, string | null>> {
+  if (!planId) return {};
+  try {
+    const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
+    const { data, error } = await supabase.from("plan_elements").select("id, variant").eq("plan_id", planId);
+    if (error || !data) return {};
+    return Object.fromEntries((data as { id: string; variant: string | null }[]).map((r) => [r.id, r.variant]));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * G4: every fixture on the plan, all layers, for the garden sheets. Not gated by
+ * OVERLAYS_ENABLED: a planter box or a garden light on an authored garden is
+ * part of the design, not an MEP overlay. `[]` when the table is absent.
+ */
+async function loadGardenFixtures(projectId: string): Promise<GardenFixture[]> {
+  try {
+    const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
+    for (const cols of ["id, layer, type, room_id, position, spec, site_reference, disposition, dims_derived, derived_note", "id, layer, type, room_id, position, spec"]) {
+      const { data, error } = await supabase.from("plan_fixtures").select(cols).eq("project_id", projectId);
+      if (!error && data) return data as unknown as GardenFixture[];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 export async function generateDrawingSet(projectId: string): Promise<DrawingSet> {
   // Read-only: derive the as-built graph live. The as-built plan_snapshot is
   // written at parse-confirm (update-plan), not here, so viewing drawings never
@@ -197,6 +256,51 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
   ]);
 
   const meta = sheetMeta(project, asBuilt, styleKey);
+
+  // G4: a plan made only of outdoor zones gets the garden set INSTEAD of the
+  // interior one. An as-built/demolition pair at a fixed 1:100 would run a 26 m
+  // garden off the sheet and diff two identical graphs; neither says anything a
+  // landscape contractor can build from. Mixed plans get both.
+  const outdoor = asBuilt.rooms.filter((r) => r.unroofed);
+  const interiorRooms = asBuilt.rooms.filter((r) => !r.unroofed);
+  if (outdoor.length > 0 && interiorRooms.length === 0) {
+    const fixturesAll = await loadGardenFixtures(projectId);
+    // G5: a plan on derived dimensions stamps EVERY sheet as a draft.
+    const draft = graphDraftStatus(asBuilt);
+    const gardenMeta = { ...meta, projectId, ...(draft.statement ? { draft: draft.statement } : {}) };
+    const garden = buildGardenSheets(asBuilt, fixturesAll, gardenMeta);
+    const finish: DrawingSheet = {
+      kind: "finish_schedule",
+      title: "Finish Schedule",
+      sheetNumber: "L-201",
+      // G5d: a garden schedule is external works at ground level, never the
+      // interior level the plan meta defaults to ("first floor").
+      svg: renderFinishSchedule(buildFinishRows(asBuilt, styleKey), { ...gardenMeta, level: "Ground (external works)" }, {
+        sheetNumber: "L-201",
+        title: "Finish Schedule",
+      }),
+    };
+    const zoneSheets = garden.filter((s) => s.kind === "site_plan" || s.kind === "zone_plan");
+    const overlays = garden.filter((s) => s.kind === "lighting_overlay" || s.kind === "irrigation_overlay");
+    // G4b: sectional elevations (L-3nn) after the finish schedule, the garden
+    // elevation strips (L-501) last — sheet-number order.
+    const elevations = buildElevationSheets(designGraph(asBuilt), designFixtures(fixturesAll), gardenMeta, await loadElementVariants(asBuilt.planId));
+    const structures = elevations.filter((s) => s.kind === "structure_elevation");
+    const strips = elevations.filter((s) => s.kind === "garden_elevation");
+    const ordered: DrawingSheet[] = [...zoneSheets, finish, ...structures, ...overlays, ...strips];
+    const cover: DrawingSheet = {
+      kind: "cover",
+      title: "Cover & Sheet Index",
+      sheetNumber: "L-000",
+      svg: renderCoverSheet(asBuilt, fixturesAll, gardenMeta, [{ sheetNumber: "L-000", title: "Cover & Sheet Index" }, ...ordered], draft.draft ? draft : null),
+    };
+    return {
+      projectId,
+      planId: asBuilt.planId,
+      sheets: [cover, ...ordered],
+      derivedNotes: asBuilt.notes,
+    };
+  }
 
   const sheets: DrawingSheet[] = [
     {
@@ -278,7 +382,37 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
     });
   }
 
+  // G4: a mixed plan (villa rooms AND garden zones) keeps its interior sheets
+  // and gains the garden set after them.
+  if (outdoor.length > 0) {
+    const gardenFixtures = await loadGardenFixtures(projectId);
+    const gardenMeta = { ...meta, projectId };
+    const garden = buildGardenSheets(asBuilt, gardenFixtures, gardenMeta);
+    sheets.push(...garden);
+    sheets.push(...buildElevationSheets(asBuilt, gardenFixtures, gardenMeta, await loadElementVariants(asBuilt.planId)));
+  }
+
   return { projectId, planId: asBuilt.planId, sheets, derivedNotes: asBuilt.notes };
+}
+
+/**
+ * G4: a whole drawing set (or any subset) as ONE multi-page A3 PDF, in sheet
+ * order. Same rasterisation as a single sheet, so a page prints at its stated
+ * scale.
+ */
+export async function renderSetPdf(svgs: readonly string[]): Promise<Uint8Array> {
+  const { Resvg } = await import("@resvg/resvg-js");
+  const { PDFDocument } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  for (const svg of svgs) {
+    // 250 dpi keeps a 20-sheet set openable while text stays crisp.
+    const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4134 } });
+    const png = resvg.render().asPng();
+    const page = pdf.addPage([420 * MM_TO_PT, 297 * MM_TO_PT]);
+    const img = await pdf.embedPng(png);
+    page.drawImage(img, { x: 0, y: 0, width: 420 * MM_TO_PT, height: 297 * MM_TO_PT });
+  }
+  return pdf.save();
 }
 
 const MM_TO_PT = 72 / 25.4;

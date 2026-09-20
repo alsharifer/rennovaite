@@ -48,16 +48,27 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/** G5c (039): a garden gate names its context wall; an existing one carries the site-reference vocabulary. */
+const GateFields = {
+  context_id: z.string().uuid().nullish(),
+  spec: z.record(z.string(), z.unknown()).nullish(),
+  site_reference: z.boolean().optional(),
+  disposition: z.enum(["keep", "remove", "replace"]).nullish(),
+  dims_derived: z.boolean().optional(),
+  derived_note: z.string().max(1000).nullish(),
+};
+
 const CreateSchema = z.object({
   plan_id: z.string().uuid(),
   room_id: z.string().uuid().nullish(),
   wall_ref: z.string().nullish(),
-  kind: z.enum(["door", "window", "archway"]),
+  kind: z.enum(["door", "window", "archway", "gate"]),
   width_mm: z.number().positive().nullish(),
   height_mm: z.number().positive().nullish(),
   sill_mm: z.number().nonnegative().nullish(),
   position: z.tuple([z.number(), z.number()]),
   along_offset: z.number().min(0).max(1).nullish(),
+  ...GateFields,
 });
 
 export async function POST(request: NextRequest) {
@@ -84,6 +95,8 @@ export async function POST(request: NextRequest) {
         along_offset: b.along_offset ?? null,
         source: "user_drawn",
         derived: dimsDefaulted,
+        // Only sent fields are written, so a pre-039 database still takes a door.
+        ...Object.fromEntries(Object.entries({ context_id: b.context_id, spec: b.spec, site_reference: b.site_reference, disposition: b.disposition, dims_derived: b.dims_derived, derived_note: b.derived_note }).filter(([, v]) => v !== undefined)),
       })
       .select(SELECT_COLS)
       .single();
@@ -100,7 +113,7 @@ const UpdateSchema = z.object({
   id: z.string().uuid(),
   room_id: z.string().uuid().nullish(),
   wall_ref: z.string().nullish(),
-  kind: z.enum(["door", "window", "archway"]).optional(),
+  kind: z.enum(["door", "window", "archway", "gate"]).optional(),
   width_mm: z.number().positive().nullish(),
   height_mm: z.number().positive().nullish(),
   sill_mm: z.number().nonnegative().nullish(),
@@ -111,6 +124,7 @@ const UpdateSchema = z.object({
    *  opening to a defaulted one (used by "revert to standard size" and by the
    *  editor's undo of a dimension edit). */
   reset_dims: z.boolean().optional(),
+  ...GateFields,
 });
 
 /**
@@ -144,7 +158,7 @@ export async function PATCH(request: NextRequest) {
           .from("plan_openings")
           .select("kind")
           .eq("id", id)
-          .single<{ kind: "door" | "window" | "archway" }>();
+          .single<{ kind: "door" | "window" | "archway" | "gate" }>();
         kind = row?.kind ?? "door";
       }
       const def = DEFAULT_OPENING_DIMS[kind];

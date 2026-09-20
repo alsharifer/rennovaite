@@ -2,10 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { recordPilotEvent } from "@/lib/pilot/events";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { seedOverlays } from "@/lib/overlays/seed";
 import {
   ELECTRICAL_TYPES,
+  LANDSCAPE_TYPES,
   PLUMBING_TYPES,
   layerOf,
   type FixtureType,
@@ -15,7 +17,12 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALL_TYPES = [...ELECTRICAL_TYPES, ...PLUMBING_TYPES] as const;
+// G5: landscape units (planter box, wall feature, grill, tree) are placeable
+// too. The BoQ already read them; until now nothing could write one.
+const ALL_TYPES = [...ELECTRICAL_TYPES, ...PLUMBING_TYPES, ...LANDSCAPE_TYPES] as const;
+
+const COLS = "id, layer, type, room_id, position, wall_id, spec, source, dims_derived, derived_note, site_reference, disposition";
+const COLS_PRE037 = "id, layer, type, room_id, position, wall_id, spec, source";
 
 function flagOn(): boolean {
   return process.env.OVERLAYS_ENABLED === "true";
@@ -38,11 +45,16 @@ export async function GET(request: NextRequest) {
   }
   const supabase = db();
   try {
-    const { data: existing, error } = await supabase
+    let { data: existing, error } = await supabase
       .from("plan_fixtures")
-      .select("id, layer, type, room_id, position, wall_id, spec, source")
+      .select(COLS)
       .eq("project_id", projectId)
       .order("layer");
+    if (error) {
+      const pre = await supabase.from("plan_fixtures").select(COLS_PRE037).eq("project_id", projectId).order("layer");
+      existing = pre.data as typeof existing;
+      error = pre.error;
+    }
     if (error) throw error;
 
     if (existing && existing.length > 0) {
@@ -51,6 +63,10 @@ export async function GET(request: NextRequest) {
 
     // First access → seed rule defaults from the plan graph.
     const graph = await derivePlanGraph(projectId);
+    // G5: an AUTHORED garden is lit AS DESIGNED. Seeding rule lights on first
+    // open would put fittings on the plan that nobody designed, and every
+    // document downstream would present them as the design.
+    if (graph.meta.source === "user_drawn") return NextResponse.json({ fixtures: [], seeded: false });
     const seeded = seedOverlays(graph, { styleKey: null });
     if (seeded.length === 0) return NextResponse.json({ fixtures: [], seeded: false });
 
@@ -87,6 +103,11 @@ const UpsertSchema = z.object({
   position: z.tuple([z.number(), z.number()]),
   wall_id: z.string().nullable().optional(),
   spec: z.record(z.string(), z.unknown()).nullable().optional(),
+  /** G5 (migration 037). */
+  dims_derived: z.boolean().optional(),
+  derived_note: z.string().max(1000).nullable().optional(),
+  site_reference: z.boolean().optional(),
+  disposition: z.enum(["keep", "remove", "replace"]).nullable().optional(),
 });
 
 /**
@@ -102,16 +123,21 @@ export async function POST(request: NextRequest) {
   }
   const f = parsed.data;
   const supabase = db();
-  const row = {
+  const row: Record<string, unknown> = {
     project_id: f.project_id,
     layer: layerOf(f.type as FixtureType),
     type: f.type,
     room_id: f.room_id ?? null,
     position: f.position,
     wall_id: f.wall_id ?? null,
-    spec: f.spec ?? null,
     source: "user" as const,
   };
+  // Optional fields are written only when sent: moving a fixture must never
+  // wipe its spec, or its site-reference tag.
+  for (const k of ["spec", "dims_derived", "derived_note", "site_reference", "disposition"] as const) {
+    if (f[k] !== undefined) row[k] = f[k];
+  }
+  if (!f.id && row.spec === undefined) row.spec = null;
   try {
     if (f.id) {
       const { data, error } = await supabase
@@ -119,17 +145,19 @@ export async function POST(request: NextRequest) {
         .update(row)
         .eq("id", f.id)
         .eq("project_id", f.project_id)
-        .select("id, layer, type, room_id, position, wall_id, spec, source")
+        .select(COLS)
         .single();
       if (error) throw error;
+      await recordPilotEvent(supabase, f.project_id, "design_edit", { layer: "fixtures", action: "update", type: f.type });
       return NextResponse.json({ fixture: data });
     }
     const { data, error } = await supabase
       .from("plan_fixtures")
       .insert(row)
-      .select("id, layer, type, room_id, position, wall_id, spec, source")
+      .select(COLS)
       .single();
     if (error) throw error;
+    await recordPilotEvent(supabase, f.project_id, "design_edit", { layer: "fixtures", action: "create", type: f.type });
     return NextResponse.json({ fixture: data });
   } catch (err) {
     console.error("[api/plan-fixtures POST]", err);

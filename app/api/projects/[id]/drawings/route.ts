@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { generateDrawingSet, renderSheetPdf, type SheetKind } from "@/lib/drawings/export";
+import { generateDrawingSet, renderSetPdf, renderSheetPdf, type SheetKind } from "@/lib/drawings/export";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +15,13 @@ const KINDS: SheetKind[] = [
   "opening_schedule",
   "electrical",
   "plumbing",
+  "site_plan",
+  "zone_plan",
+  "lighting_overlay",
+  "irrigation_overlay",
+  "structure_elevation",
+  "garden_elevation",
+  "cover",
 ];
 
 function flagOn(): boolean {
@@ -47,9 +54,25 @@ export async function GET(
     const set = await generateDrawingSet(projectId);
 
     if (format === "pdf") {
-      const kindParam = (searchParams.get("sheet") as SheetKind) ?? "as_built";
-      const kind = KINDS.includes(kindParam) ? kindParam : "as_built";
-      const sheet = set.sheets.find((s) => s.kind === kind);
+      const sheetParam = searchParams.get("sheet");
+      // G4: the whole set as one PDF — the deliverable a contractor is sent.
+      if (sheetParam === "all") {
+        const pdf = await renderSetPdf(set.sheets.map((s) => s.svg));
+        return new NextResponse(new Uint8Array(pdf), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="drawing-set-${projectId.slice(0, 8)}.pdf"`,
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+      // A sheet number addresses one sheet exactly (zone sheets share a kind);
+      // a kind still works for every sheet that is the only one of its kind.
+      const byNumber = sheetParam ? set.sheets.find((s) => s.sheetNumber === sheetParam) : undefined;
+      const kindParam = (sheetParam as SheetKind) ?? "as_built";
+      const kind = KINDS.includes(kindParam) ? kindParam : set.sheets[0]?.kind ?? "as_built";
+      const sheet = byNumber ?? set.sheets.find((s) => s.kind === kind);
       if (!sheet) {
         return NextResponse.json({ error: "Sheet not found." }, { status: 404 });
       }

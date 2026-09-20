@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { boqDerivedInfo, derivedLineNote, derivedTotal } from "@/lib/documents/boq-derived";
 import { cn } from "@/lib/utils";
 import {
   recalc,
@@ -34,7 +35,15 @@ export type BoqLine = {
   // P7 adds "indicative" for furniture; ground-truth adds "actual_transaction"
   // (priced from a real contract/quote) and "site_assessment" (allowance only).
   element_refs?: string[] | null;
-  rate_status?: "priced" | "needs_qs" | "indicative" | "actual_transaction" | "site_assessment";
+  rate_status?:
+    | "priced"
+    | "needs_qs"
+    | "indicative"
+    | "actual_transaction"
+    | "site_assessment"
+    | "needs_selection";
+  /** G3: the quantity was inferred, not measured off the drawing. */
+  qty_derived?: boolean;
   // P4/P5: engine rule id (P4/quantify/<key> marks a gradeable line).
   rule_id?: string;
 };
@@ -53,6 +62,17 @@ export type BoqPayload = {
   vat_pct: number;
   vat_aed: number;
   grand_total_aed: number;
+  /** G5: a garden BoQ's verdict on itself (draft, derived lines, site-reference decisions). */
+  garden?: {
+    draft: { draft: boolean; derived: string[]; note: string | null; statement: string | null };
+    derived_lines: number;
+    removals: { element_id: string; name: string; qty: number; unit: string; disposition: string }[];
+    kept: { element_id: string; name: string }[];
+    undecided: { element_id: string; name: string }[];
+    needs_selection: string[];
+  };
+  /** G5d: an indicative delivery programme — never a line, never a commitment. */
+  programme?: { total_days: number; phases: { name: string; start_day: number; days: number }[]; basis: string } | null;
 };
 
 export type VendorOption = {
@@ -321,6 +341,9 @@ export function BoqView({
   const scopeTotal = whatifOn && scenario ? scenario.total : adjustedTotal;
   const furnitureIncluded = furnitureOn ? furnitureTotal : 0;
   const displayTotal = scopeTotal + furnitureIncluded;
+  // G5: a total resting on derived quantities never prints as a bare number.
+  const derivedInfo = boqDerivedInfo(boq);
+  const totalFootnote = derivedTotal(displayTotal, derivedInfo).footnote;
   const headroom = budgetAed - displayTotal;
 
   // Top 5 sections by total for the stacked bar, with everything else
@@ -446,8 +469,13 @@ export function BoqView({
             transition={{ duration: 0.24, ease: "easeOut" }}
             className="font-display text-headline-lg tabular-nums text-ink-900"
           >
-            {formatAed(displayTotal)}
+            {derivedTotal(displayTotal, derivedInfo).text}
           </motion.h2>
+          {totalFootnote && (
+            <p className="font-body-sm text-[12px] leading-4 text-[#9A3412]" data-derived-total="true">
+              {totalFootnote}
+            </p>
+          )}
           <p className="font-body-sm text-body-sm text-on-surface-variant">
             against your {formatAed(budgetAed)} budget —{" "}
             <span
@@ -513,6 +541,21 @@ export function BoqView({
               vendors" both with text was 390px in a 336px column. The
               icon is universally read; title attribute carries the
               label for screen readers and tooltips. */}
+          {/* G5: a garden BoQ exports as a PDF (draft header, derived total). */}
+          {boq.garden ? (
+            <a
+              href={`/api/projects/${projectId}/boq-pdf`}
+              target="_blank"
+              rel="noopener"
+              title="Export PDF"
+              aria-label="Export PDF"
+              className="focus-ring flex size-12 items-center justify-center rounded-lg border border-ink-100 text-ink-900 transition-colors hover:bg-surface-container-low"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                picture_as_pdf
+              </span>
+            </a>
+          ) : (
           <button
             type="button"
             title="Export PDF"
@@ -523,6 +566,7 @@ export function BoqView({
               picture_as_pdf
             </span>
           </button>
+          )}
           <Link
             href={`/project/${projectId}/vendors`}
             className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
@@ -555,6 +599,7 @@ export function BoqView({
         </div>
       )}
 
+      {boq.programme ? <ProgrammePanel programme={boq.programme} /> : null}
       {view === "byroom" ? (
         <ByRoomView byRoom={byRoom} highlightRoom={highlightRoom} />
       ) : (
@@ -630,7 +675,7 @@ export function BoqView({
                       fontFamily: "var(--font-jetbrains-mono), monospace",
                     }}
                   >
-                    {formatAed(displayTotal)}
+                    {derivedTotal(displayTotal, derivedInfo).text}
                   </motion.span>
                 </td>
                 <td colSpan={2} />
@@ -1122,8 +1167,24 @@ function LineRow({
                 className="inline-block size-1.5 shrink-0 rounded-full bg-brass-600"
               />
             )}
+            {/* G3. A real rate, but the DEFAULT of a choice nobody has made —
+                and the cheaper of the two. It carries the same terracotta dot
+                as the other unsettled states precisely so it cannot read as
+                finished. */}
+            {line.rate_status === "needs_selection" && (
+              <span
+                title="Priced at the cheaper default — someone still has to choose which it is"
+                aria-label="Awaiting a selection"
+                className="inline-block size-1.5 shrink-0 rounded-full bg-error"
+              />
+            )}
             {line.description}
           </p>
+          {line.qty_derived && (
+            <p className="mt-1 font-body-sm text-[12px] text-error" data-derived-line="true">
+              {derivedLineNote(line)}
+            </p>
+          )}
           {line.notes && (
             <p className="mt-1 font-body-sm text-[12px] text-on-surface-variant">
               {line.notes}
@@ -1249,5 +1310,32 @@ function VendorMini({
         <span className="text-ink-500"> / {unit}</span>
       </p>
     </div>
+  );
+}
+
+/** G5d (Newspace session ask #5): the indicative programme, scaled from one comparable garden. */
+function ProgrammePanel({ programme }: { programme: NonNullable<BoqPayload["programme"]> }) {
+  return (
+    <section className="mt-xl rounded-xl border border-ink-100 bg-paper p-lg">
+      <div className="flex items-baseline justify-between gap-md">
+        <span className="label-caps text-brass-600">Indicative delivery programme</span>
+        <span className="font-mono text-body-sm tabular-nums text-[#9d3e1d]">≈ {programme.total_days} days · indicative · derived</span>
+      </div>
+      <ul className="mt-md space-y-sm">
+        {programme.phases.map((p) => (
+          <li key={p.name} className="grid grid-cols-[220px_56px_1fr] items-center gap-md">
+            <span className="text-body-sm text-ink-900">{p.name}</span>
+            <span className="text-right font-mono text-body-sm tabular-nums text-ink-700">{p.days} d</span>
+            <span className="relative h-3 rounded bg-canvas">
+              <span
+                className="absolute inset-y-0 rounded bg-brass-600/75"
+                style={{ left: `${((p.start_day - 1) / programme.total_days) * 100}%`, width: `${Math.max(1, (p.days / programme.total_days) * 100)}%` }}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-md text-body-sm text-ink-500">{programme.basis}</p>
+    </section>
   );
 }

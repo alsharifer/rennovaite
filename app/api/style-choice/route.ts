@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { recordFeedback } from "@/lib/analytics";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { isGardenStyleKey } from "@/lib/garden-styles";
 import { getStyleByKey } from "@/lib/styles";
 
 export const runtime = "nodejs";
@@ -25,7 +26,10 @@ export async function POST(request: NextRequest) {
     }
     const { project_id, style_key } = parsed.data;
 
-    if (!getStyleByKey(style_key)) {
+    // G1b: the two exterior directions are lockable too. The render route maps
+    // between families per room, so a project led by a garden direction still
+    // renders its interiors, and vice versa.
+    if (!getStyleByKey(style_key) && !isGardenStyleKey(style_key)) {
       return NextResponse.json(
         { success: false, error: `Unknown style: ${style_key}` },
         { status: 400 },

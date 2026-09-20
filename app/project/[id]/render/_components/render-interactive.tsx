@@ -20,6 +20,10 @@ import { roomTypeFromDb } from "@/lib/render-prompts";
 import { getStagingSet, stagingRoomTypeFromDb } from "@/lib/staging/sets";
 import type { Style } from "@/lib/styles";
 import { FurnitureOptIn } from "@/components/staging/FurnitureOptIn";
+import { resolveRender, type GenerateResponse } from "@/lib/render-batch/client";
+import type { BatchJob, RenderView } from "@/lib/render-batch/plan";
+
+import { GenerateAllPanel } from "./generate-all";
 
 // Rendering only covers the pilot's four room types (bedroom, bathroom,
 // living). Dressing rooms, balconies, stairs, terraces, foyers etc. map to
@@ -74,81 +78,11 @@ type Props = {
    * off-screen.
    */
   journeySlot?: React.ReactNode;
+  /** G4: the "Generate all" plan for this project (null hides the panel). */
+  batchJobs?: BatchJob[] | null;
+  /** G4: roomId → the evening view of its current day render. */
+  initialEvenings?: Record<string, { id: string; imageUrl: string }>;
 };
-
-type GenerateResponse = {
-  render_id: string;
-  image_url: string;
-  prompt: string;
-  qa?: "passed" | "failed" | null;
-  qaReason?: string | null;
-};
-
-// The render + iterate routes now run async: they return a prediction_id and
-// the client polls /api/render/status until the image is ready. A cache hit
-// still returns image_url directly, so both shapes are handled.
-async function pollRenderStatus(
-  predictionId: string,
-): Promise<GenerateResponse> {
-  const deadline = Date.now() + 150_000;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 2000));
-    const res = await fetch(
-      `/api/render/status?prediction_id=${encodeURIComponent(predictionId)}`,
-    );
-    const body = (await res.json().catch(() => null)) as
-      | {
-          status?: string;
-          image_url?: string;
-          render_id?: string;
-          prompt?: string;
-          qa?: "passed" | "failed" | null;
-          qa_reason?: string | null;
-          error?: string;
-        }
-      | null;
-    if (!res.ok || !body) {
-      throw new Error(body?.error || `Status check failed (${res.status}).`);
-    }
-    if (body.status === "succeeded" && body.image_url && body.render_id) {
-      return {
-        render_id: body.render_id,
-        image_url: body.image_url,
-        prompt: body.prompt ?? "",
-        qa: body.qa ?? null,
-        qaReason: body.qa_reason ?? null,
-      };
-    }
-    if (body.status === "failed") {
-      throw new Error(body.error || "Render failed.");
-    }
-    // status === "processing" → keep polling.
-  }
-  throw new Error("Render timed out.");
-}
-
-// Normalise a POST /api/render(-iterate) response: a cache hit carries
-// image_url; otherwise poll the returned prediction_id to completion.
-async function resolveRender(
-  body: Record<string, unknown> | null,
-  status: number,
-): Promise<GenerateResponse> {
-  if (!body) throw new Error(`Render failed (${status}).`);
-  if (typeof body.image_url === "string" && body.image_url) {
-    return {
-      render_id: String(body.render_id),
-      image_url: body.image_url,
-      prompt: typeof body.prompt === "string" ? body.prompt : "",
-    };
-  }
-  if (typeof body.prediction_id === "string" && body.prediction_id) {
-    return pollRenderStatus(body.prediction_id);
-  }
-  throw new Error(
-    (typeof body.error === "string" && body.error) ||
-      "Unexpected render response.",
-  );
-}
 
 const MAX_TWEAKS = 4;
 const SUBSTEPS = [
@@ -194,6 +128,8 @@ export function RenderInteractive({
   stagingEnabled = false,
   initialFurnitureOptIns = [],
   journeySlot = null,
+  batchJobs = null,
+  initialEvenings = {},
 }: Props) {
   const seededState = useMemo<Record<string, RoomState>>(() => {
     const result: Record<string, RoomState> = {};
@@ -227,6 +163,8 @@ export function RenderInteractive({
   const [keepIterating, setKeepIterating] = useState<Set<string>>(() => new Set());
   const [lastRenderMs, setLastRenderMs] = useState<number | null>(null);
   const [locking, setLocking] = useState(false);
+  const [eveningByRoom, setEveningByRoom] =
+    useState<Record<string, { id: string; imageUrl: string }>>(initialEvenings);
 
   // Controlled-only studio knobs (no backend effect for v1).
   const [lighting, setLighting] = useState(50);
@@ -335,6 +273,26 @@ export function RenderInteractive({
     const out = await fn();
     setLastRenderMs(Date.now() - t0);
     return out;
+  }
+
+  // G4: a batch result lands exactly where a single render would.
+  function handleBatchResult(roomId: string, view: RenderView, result: GenerateResponse) {
+    if (view === "evening") {
+      setEveningByRoom((prev) => ({ ...prev, [roomId]: { id: result.render_id, imageUrl: result.image_url } }));
+      return;
+    }
+    const item: RenderItem = {
+      id: result.render_id,
+      imageUrl: result.image_url,
+      prompt: result.prompt,
+      qa: result.qa ?? null,
+      qaReason: result.qaReason ?? null,
+    };
+    setStateByRoom((prev) =>
+      prev[roomId]?.list.some((x) => x.id === item.id)
+        ? prev
+        : { ...prev, [roomId]: { list: [item], currentIndex: 0 } },
+    );
   }
 
   async function handleRegenerate() {
@@ -459,6 +417,13 @@ export function RenderInteractive({
       {/* LEFT COL — rooms & style picker -------------------------------- */}
       <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-r border-ink-100 bg-paper px-lg py-lg">
         {journeySlot}
+        {batchJobs && batchJobs.length > 1 && (
+          <GenerateAllPanel
+            projectId={projectId}
+            initialJobs={batchJobs}
+            onResult={handleBatchResult}
+          />
+        )}
         <p className="label-caps mb-md text-ink-500">Rooms</p>
         <ul className="flex flex-col gap-xs">
           {rooms.map((room) => (
@@ -585,6 +550,23 @@ export function RenderInteractive({
               !!(selectedRoom && isLocked && upscaledByRoom[selectedRoom.id])
             }
           />
+
+          {/* G4: the evening view, when this zone has lighting and one exists. */}
+          {selectedRoom && eveningByRoom[selectedRoom.id] && (
+            <figure className="w-full max-w-[420px]">
+              <div className="matte-image">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={eveningByRoom[selectedRoom.id]!.imageUrl}
+                  alt={`${selectedRoom.name_en ?? "Zone"} — evening view`}
+                  className="w-full rounded"
+                />
+              </div>
+              <figcaption className="label-caps mt-xs text-center text-ink-500">
+                Evening view · lighting as designed
+              </figcaption>
+            </figure>
+          )}
 
           {selectedRoom && !selectedRenderable && (
             <p className="max-w-[560px] text-center font-body-sm text-body-sm text-on-surface-variant">

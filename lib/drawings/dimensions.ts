@@ -38,8 +38,26 @@ export function bboxOfPoints(pts: Point[]): Bbox {
   return { minX, minY, maxX, maxY };
 }
 
+/**
+ * G1: the points a drawing is dimensioned against.
+ *
+ * Rooms alone were enough while every plan was an interior: a room bbox edge IS
+ * a wall face. A garden breaks that — an unroofed zone has no wall at its edge,
+ * and a drawn boundary wall can run well outside any zone. So the envelope is
+ * taken from zone outlines AND drawn boundary walls, which keeps the chain
+ * anchored on real edges in both cases and keeps it closing on the envelope.
+ */
+function dimensionPoints(graph: PlanGraph): Point[] {
+  const pts: Point[] = graph.rooms.flatMap((r) => r.polygon);
+  for (const w of graph.walls) {
+    if (w.source !== "drawn") continue;
+    pts.push(...w.polyline);
+  }
+  return pts;
+}
+
 export function graphBbox(graph: PlanGraph): Bbox {
-  const all = graph.rooms.flatMap((r) => r.polygon);
+  const all = dimensionPoints(graph);
   if (all.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   return bboxOfPoints(all);
 }
@@ -68,6 +86,12 @@ export function gridLines(graph: PlanGraph, axis: Axis, tolM = 0.001): number[] 
   for (const r of graph.rooms) {
     const b = roomBbox(r);
     raw.push(i === 0 ? b.minX : b.minY, i === 0 ? b.maxX : b.maxY);
+  }
+  // Drawn boundary walls are grid lines too — a garden's site edge is a wall
+  // somebody measured, and a chain that stopped at the lawn would not close.
+  for (const w of graph.walls) {
+    if (w.source !== "drawn") continue;
+    for (const p of w.polyline) raw.push(p[i]!);
   }
   raw.sort((a, b) => a - b);
   const out: number[] = [];

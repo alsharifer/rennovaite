@@ -22,7 +22,15 @@
 //     so the UI (and the P1 verification gate) can be honest about confidence.
 // =============================================================================
 
+import {
+  buildLinearElements,
+  polylineLength,
+  type LinearElement,
+  type RawLinearElement,
+} from "./elements";
 import { pointToSegment } from "./polygon";
+import { dispositionOf, draftStatus, isInDesign, type Disposition, type DraftStatus } from "./site-reference";
+import { defaultUnroofed } from "./zones";
 
 export type Point = [number, number]; // metres. Origin = plan bbox top-left; +x right, +y DOWN (drawing convention).
 
@@ -41,6 +49,39 @@ export interface Room {
   /** Authoritative area from the DB — NOT recomputed from the scaled polygon. */
   area_m2: number;
   ceiling_h_m: number;
+  /**
+   * G1 enclosure model: this zone is open to the sky. An unroofed zone has no
+   * ceiling, and its polygon edges emit NO wall — a garden is bounded by what
+   * somebody drew, not by where two lawns happen to meet. Defaults false, so
+   * every interior room behaves exactly as it did before the garden pilot.
+   */
+  unroofed: boolean;
+  /**
+   * G4: how much of `area_m2` was APPROXIMATED rather than read off the drawing
+   * (e.g. a curved edge traced as a quadrant), and why. null when nothing was.
+   * A drawing that prints the area has to be able to say this, so it lives on
+   * the zone rather than in a report that can be lost.
+   */
+  area_derived_m2: number | null;
+  derived_note: string | null;
+  /**
+   * G4b: finished level relative to the plan datum (±0 FFL), in mm. null = the
+   * drawing states no level for this zone — never read as ±0.
+   */
+  level_mm: number | null;
+  /** G4b: top of a structure zone above its level, in mm (a pergola's TRL). */
+  height_mm: number | null;
+  /** G4b: build-up (member sizes, post positions) and where each number came from. */
+  spec: Record<string, unknown> | null;
+  /**
+   * G5: the zone's outline is DERIVED (calibrated from a reference layout), not
+   * measured. derived_note says from what. Boundary-critical: a plan with any
+   * such zone is a draft (lib/plan/site-reference.ts).
+   */
+  dims_derived: boolean;
+  /** G5: an existing feature placed from site photos, and the designer's call on it. */
+  site_reference: boolean;
+  disposition: Disposition | null;
   /** Names of fields on this room whose value is derived, not sourced. */
   derived_fields: string[];
 }
@@ -52,10 +93,17 @@ export interface Wall {
   thickness_mm: number;
   /** null = unknown (we cannot tell structural from the parse). */
   is_structural: boolean | null;
-  /** 1 id = exterior/boundary wall; 2 ids = party wall between two rooms. */
+  /** 1 id = exterior/boundary wall; 2 ids = party wall between two rooms.
+   *  Empty for a wall drawn as a `boundary_wall` linear element. */
   room_ids: string[];
-  /** Walls are entirely derived today — always true. */
-  derived: true;
+  /**
+   * false ONLY for a wall the user drew as a boundary_wall element — that one
+   * is a measured line, not an inference from polygon edges. Every wall the
+   * builder infers stays true.
+   */
+  derived: boolean;
+  /** Where this wall came from. */
+  source: "derived" | "drawn";
 }
 
 // A3/A5: openings are first-class children of walls. Assigned to the nearest
@@ -66,7 +114,7 @@ export interface Opening {
   /** Assigned to the nearest derived wall at build time (null if none). */
   wall_id: string | null;
   room_id: string | null;
-  type: "door" | "window" | "archway";
+  type: "door" | "window" | "archway" | "gate";
   width_mm: number;
   height_mm: number;
   sill_mm: number;
@@ -78,6 +126,14 @@ export interface Opening {
   /** true = dimensions were DEFAULTED (standard door/window), not measured. A
    *  defaulted opening must never silently read as a measured quantity. */
   derived: boolean;
+  /** G5c (039): a garden gate names the context wall it is in — garden walls are
+   *  not room edges, so it is never re-snapped to a derived wall. */
+  context_id?: string | null;
+  spec?: Record<string, unknown> | null;
+  site_reference?: boolean;
+  disposition?: string | null;
+  dims_derived?: boolean;
+  derived_note?: string | null;
 }
 
 /** Standard fallback dimensions (mm) when the source can't measure. */
@@ -88,6 +144,7 @@ export const DEFAULT_OPENING_DIMS: Record<
   door: { width_mm: 900, height_mm: 2100, sill_mm: 0 },
   window: { width_mm: 1200, height_mm: 1200, sill_mm: 900 },
   archway: { width_mm: 1200, height_mm: 2400, sill_mm: 0 },
+  gate: { width_mm: 1000, height_mm: 2000, sill_mm: 0 },
 };
 
 /** Raw persisted/provider opening (normalised space, like rooms.polygon). */
@@ -103,10 +160,23 @@ export interface RawOpening {
   along_offset?: number | null;
   source?: string | null;
   derived?: boolean | null;
+  context_id?: string | null;
+  spec?: Record<string, unknown> | null;
+  site_reference?: boolean | null;
+  disposition?: string | null;
+  dims_derived?: boolean | null;
+  derived_note?: string | null;
 }
+
+/** Where a plan's geometry came from. `user_drawn` = authored on a blank
+ *  canvas with a plot dimension the user typed, never parsed from a drawing. */
+export type PlanSource = "parsed" | "user_drawn";
 
 export interface PlanGraphMeta {
   scale: string; // "1:100"
+  /** G1: provenance of the whole plan. Snapshots carry this, so an authored
+   *  plan is marked as authored wherever its graph is stored or read. */
+  source: PlanSource;
   north_deg: number; // 0 = plan-up is north
   level: string; // e.g. "first_floor"
   units: "metric";
@@ -120,10 +190,25 @@ export interface PlanGraphMeta {
    *  Overlay fixtures are stored in this normalised space (like rooms.polygon);
    *  this lets the drawing sheets place them in metres. */
   norm_origin: [number, number];
+  /**
+   * G4: the measured plot (authored plans only), placed in the same metric frame
+   * as the rooms: its top-left corner is `origin_m` (normally slightly negative,
+   * because metres are measured from the rooms' bounding box, not the plot).
+   */
+  plot?: {
+    width_m: number;
+    depth_m: number;
+    origin_m: Point;
+    /** G5: the plot size is derived from a reference layout, not measured. */
+    dims_derived?: boolean;
+    dims_note?: string | null;
+  } | null;
 }
 
 export interface DerivedRecord {
   walls: boolean; // wall segments derived (not persisted)
+  /** G1: true when no linear elements are persisted (nothing invented). */
+  elements_empty: boolean;
   wall_thickness: boolean; // 200 mm default
   is_structural: boolean; // always unknown → null
   openings_empty: boolean; // true = we produced none because none are persisted
@@ -133,12 +218,58 @@ export interface DerivedRecord {
   metric_scale: boolean; // metres derived from total_area_m2, not a real scale bar
 }
 
+/**
+ * G4b: something on the plot that is not in scope — the existing villa and
+ * garage, an existing pergola, steps, a boundary wall. Never a zone and never
+ * priced; it exists so a 3D scene, a camera and an elevation know what stands
+ * there.
+ */
+export type ContextKind = "existing_building" | "existing_structure" | "steps" | "boundary_wall";
+
+export interface ContextVolume {
+  id: string;
+  kind: ContextKind;
+  name: string;
+  /** Metric footprint, same frame as rooms. */
+  polygon: Point[];
+  base_mm: number;
+  height_mm: number | null;
+  /** true = assumed or scaled from the drawing, not dimensioned. */
+  derived: boolean;
+  note: string | null;
+  /** G5: the FOOTPRINT is derived from a reference layout (boundary-critical). */
+  dims_derived: boolean;
+  site_reference: boolean;
+  disposition: Disposition | null;
+  /** G5d (040): e.g. `beyond` — what stands past a boundary wall (neighbour | street | open). */
+  spec?: Record<string, unknown> | null;
+}
+
+export interface RawContext {
+  id: string;
+  kind: string;
+  name?: string | null;
+  polygon: unknown;
+  base_mm?: number | null;
+  height_mm?: number | null;
+  derived?: boolean | null;
+  note?: string | null;
+  dims_derived?: boolean | null;
+  site_reference?: boolean | null;
+  disposition?: string | null;
+  spec?: Record<string, unknown> | null;
+}
+
 export interface PlanGraph {
   projectId: string;
   planId: string | null;
   rooms: Room[];
   walls: Wall[];
   openings: Opening[];
+  /** G1: boundary walls, bench/planter/counter runs — priced per linear metre. */
+  elements: LinearElement[];
+  /** G4b: existing, out-of-scope volumes on the plot (migration 036). */
+  context: ContextVolume[];
   meta: PlanGraphMeta;
   derived: DerivedRecord;
   notes: string[];
@@ -153,6 +284,19 @@ export interface RawRoom {
   room_type: string | null;
   area_m2: number | null;
   polygon: unknown; // expected number[][] in normalised space
+  /** G1: null/absent falls back to the type's default (outdoor ⇒ unroofed). */
+  unroofed?: boolean | null;
+  /** G4: approximated share of the area and its reason (migration 035). */
+  area_derived_m2?: number | null;
+  derived_note?: string | null;
+  /** G4b (migration 036). */
+  level_mm?: number | null;
+  height_mm?: number | null;
+  spec?: Record<string, unknown> | null;
+  /** G5 (migration 037). */
+  dims_derived?: boolean | null;
+  site_reference?: boolean | null;
+  disposition?: string | null;
 }
 
 export interface BuildPlanGraphInput {
@@ -163,6 +307,25 @@ export interface BuildPlanGraphInput {
   rooms: RawRoom[];
   /** A3/A5: persisted openings (doors/windows), if any. Absent → openings[] empty. */
   openings?: RawOpening[];
+  /** G1: persisted linear elements (boundary walls, bench/planter/counter runs). */
+  elements?: RawLinearElement[];
+  /** G4b: existing context volumes (villa, garage, steps, boundary walls). */
+  context?: RawContext[];
+  /**
+   * G1: metres per normalised unit, when the plan's scale was MEASURED rather
+   * than inferred. An authored plan has one (the plot width the user typed);
+   * a parsed plan does not, and the builder falls back to deriving it from
+   * total_area_m2. Supplying it also clears `derived.metric_scale`, because a
+   * typed dimension is a measurement and must not read as a guess.
+   */
+  unit_to_m?: number | null;
+  /** G4: the measured plot of an authored plan, so drawings can show the site. */
+  plot?: { width_m: number; depth_m: number } | null;
+  /** G5: the plot size is derived from a reference layout, and why. */
+  plot_dims_derived?: boolean | null;
+  dims_note?: string | null;
+  /** G1: how this plan's geometry came to exist. Defaults to "parsed". */
+  source?: PlanSource | null;
 }
 
 // --- helpers ------------------------------------------------------------------
@@ -256,7 +419,18 @@ interface RawWall {
   roomIds: string[];
 }
 
-function deriveRawWalls(edges: Edge[], eps: number): RawWall[] {
+/**
+ * G1 open-edge rule: a segment whose every covering room is unroofed emits no
+ * wall. A lawn meeting a paved area is a change of surface, not a wall, and a
+ * garden's outer edge is a property line unless somebody draws a wall on it.
+ * A segment shared by an unroofed zone and a roofed room still emits one — the
+ * house wall the terrace abuts is real.
+ */
+function deriveRawWalls(
+  edges: Edge[],
+  eps: number,
+  unroofedIds: ReadonlySet<string> = new Set(),
+): RawWall[] {
   const byLine = new Map<string, Edge[]>();
   for (const e of edges) {
     const g = byLine.get(e.key);
@@ -283,6 +457,7 @@ function deriveRawWalls(edges: Edge[], eps: number): RawWall[] {
         new Set(group.filter((e) => e.t0 <= mid && e.t1 >= mid).map((e) => e.roomId)),
       ).sort();
       if (rooms.length === 0) continue;
+      if (rooms.every((id) => unroofedIds.has(id))) continue; // open edge
       const last = segs[segs.length - 1];
       if (
         last &&
@@ -315,6 +490,22 @@ function deriveRawWalls(edges: Edge[], eps: number): RawWall[] {
 
 export const WALL_DERIVE_EPS = 0.0025; // parse coords are 2-decimal
 
+/** Rooms open to the sky — an explicit `unroofed` wins, otherwise the type's
+ *  default. Shared by the builder and the editor so both suppress the same
+ *  edges and wall ids stay in step. */
+export function unroofedIdSet(
+  rooms: readonly { id: string; unroofed?: boolean | null; room_type?: string | null; type?: string | null }[],
+): Set<string> {
+  const out = new Set<string>();
+  for (const r of rooms) {
+    const explicit = r.unroofed;
+    const open =
+      explicit == null ? defaultUnroofed(r.room_type ?? r.type ?? null) : explicit === true;
+    if (open) out.add(r.id);
+  }
+  return out;
+}
+
 export interface RawWallSegment {
   /** Matches the `Wall.id` buildPlanGraph assigns to the same segment. */
   id: string;
@@ -343,14 +534,15 @@ function rawWallEndpoints(w: RawWall): { a: [number, number]; b: [number, number
  * `deriveRawWalls` core, so ids and ordering agree.
  */
 export function deriveWallSegments(
-  rooms: { id: string; polygon: unknown }[],
+  rooms: { id: string; polygon: unknown; unroofed?: boolean | null; room_type?: string | null }[],
   eps: number = WALL_DERIVE_EPS,
 ): RawWallSegment[] {
   const parsed = rooms
     .map((r) => ({ id: r.id, poly: toNormalisedPolygon(r.polygon) }))
     .filter((r): r is { id: string; poly: [number, number][] } => r.poly !== null);
+  const unroofedIds = unroofedIdSet(rooms);
   const edges = parsed.flatMap(({ id, poly }) => edgesOf(id, poly, eps));
-  return deriveRawWalls(edges, eps).map((w, i) => {
+  return deriveRawWalls(edges, eps, unroofedIds).map((w, i) => {
     const { a, b } = rawWallEndpoints(w);
     return { id: `wall-${i + 1}`, a, b, roomIds: w.roomIds };
   });
@@ -427,9 +619,23 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       : rawRooms.reduce((s, r) => s + (r.raw.area_m2 ?? 0), 0);
 
   // Single isotropic unit→metre factor: metres per normalised unit.
-  const unitToM = normArea > 0 && totalAreaM2 > 0 ? Math.sqrt(totalAreaM2 / normArea) : 1;
+  //
+  // An AUTHORED plan supplies this directly (the plot width the user typed), and
+  // that path matters for more than provenance: deriving the factor from
+  // total_area_m2 assumes the rooms TILE the plan, which interior floors do and
+  // a garden does not. Zones have gaps between them, so the derived factor would
+  // inflate every zone to fill the plot. A measured scale is the only correct
+  // one here, and it is also the honest one.
+  const measuredScale = typeof input.unit_to_m === "number" && input.unit_to_m > 0;
+  const unitToM = measuredScale
+    ? input.unit_to_m!
+    : normArea > 0 && totalAreaM2 > 0
+      ? Math.sqrt(totalAreaM2 / normArea)
+      : 1;
   notes.push(
-    `Metric geometry derived from total_area_m2 (${totalAreaM2} m²) via a single isotropic unit→metre factor (${unitToM.toFixed(4)} m/unit); the parse carries no real x/y scale.`,
+    measuredScale
+      ? `Metric geometry from a MEASURED scale (${unitToM.toFixed(4)} m per normalised unit) entered when the plan was drawn — not inferred from area.`
+      : `Metric geometry derived from total_area_m2 (${totalAreaM2} m²) via a single isotropic unit→metre factor (${unitToM.toFixed(4)} m/unit); the parse carries no real x/y scale.`,
   );
 
   const toM = (p: [number, number]): Point => [
@@ -437,27 +643,50 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
     (p[1] - minY) * unitToM,
   ];
 
-  const rooms: Room[] = rawRooms.map(({ raw, poly }) => ({
-    id: raw.id,
-    name_en: raw.name_en?.trim() || "Room",
-    name_ar: raw.name_ar ?? null,
-    type: raw.room_type ?? null,
-    polygon: poly.map(toM),
-    area_m2: raw.area_m2 ?? Math.round(polygonArea(poly) * unitToM * unitToM * 10) / 10,
-    ceiling_h_m: DEFAULT_CEILING_H_M,
-    derived_fields: [
-      "polygon", // metres are a global-scale derivation, not surveyed
-      "ceiling_h_m",
-      ...(raw.area_m2 == null ? ["area_m2"] : []),
-    ],
-  }));
+  const rooms: Room[] = rawRooms.map(({ raw, poly }) => {
+    const unroofed =
+      raw.unroofed == null ? defaultUnroofed(raw.room_type) : raw.unroofed === true;
+    return {
+      id: raw.id,
+      name_en: raw.name_en?.trim() || "Room",
+      name_ar: raw.name_ar ?? null,
+      type: raw.room_type ?? null,
+      polygon: poly.map(toM),
+      area_m2: raw.area_m2 ?? Math.round(polygonArea(poly) * unitToM * unitToM * 10) / 10,
+      // An unroofed zone has no ceiling. Reporting 2.9 m would put a ceiling
+      // finish and a wall height onto a lawn, and every consumer downstream
+      // would believe it.
+      ceiling_h_m: unroofed ? 0 : DEFAULT_CEILING_H_M,
+      unroofed,
+      area_derived_m2:
+        typeof raw.area_derived_m2 === "number" && raw.area_derived_m2 > 0
+          ? Number(raw.area_derived_m2)
+          : null,
+      derived_note: raw.derived_note?.trim() || null,
+      level_mm: raw.level_mm == null ? null : Number(raw.level_mm),
+      height_mm: raw.height_mm == null ? null : Number(raw.height_mm),
+      spec: raw.spec && typeof raw.spec === "object" ? raw.spec : null,
+      dims_derived: raw.dims_derived === true,
+      site_reference: raw.site_reference === true,
+      disposition: dispositionOf(raw),
+      derived_fields: [
+        ...(raw.dims_derived === true ? ["dims"] : []),
+        // A measured scale makes the metric polygon a measurement too.
+        ...(measuredScale ? [] : ["polygon"]),
+        ...(unroofed ? [] : ["ceiling_h_m"]),
+        // A stated area with an approximated share is still partly derived.
+        ...(raw.area_m2 == null || (Number(raw.area_derived_m2) || 0) > 0 ? ["area_m2"] : []),
+      ],
+    };
+  });
 
   // Wall derivation runs in normalised space, then converts to metres. Uses the
   // same eps + reconstruction as the exported `deriveWallSegments`, so the
   // editor's wall ids line up with the ones priced here.
   const eps = WALL_DERIVE_EPS;
+  const unroofedIds = unroofedIdSet(rooms.map((r) => ({ id: r.id, unroofed: r.unroofed })));
   const allEdges = rawRooms.flatMap(({ raw, poly }) => edgesOf(raw.id, poly, eps));
-  const rawWalls = deriveRawWalls(allEdges, eps);
+  const rawWalls = deriveRawWalls(allEdges, eps, unroofedIds);
 
   const walls: Wall[] = rawWalls.map((w, i) => {
     // Endpoints from line identity: refPoint (foot of the perpendicular, c·n)
@@ -470,6 +699,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       is_structural: null,
       room_ids: w.roomIds,
       derived: true,
+      source: "derived" as const,
     };
   });
 
@@ -477,12 +707,76 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
   notes.push(
     `${walls.length} walls derived from shared/boundary polygon edges (${partyWalls} party, ${walls.length - partyWalls} boundary); thickness ${DEFAULT_WALL_THICKNESS_MM} mm and structural status are placeholders.`,
   );
+  if (unroofedIds.size > 0) {
+    notes.push(
+      `${unroofedIds.size} unroofed zone(s): their boundaries emit no derived wall. A wall there exists only where one was drawn.`,
+    );
+  }
+
+  // --- Linear elements (G1) --------------------------------------------------
+  // A drawn boundary wall is a wall in its own right, so it joins walls[] after
+  // the derived ones — appended, never interleaved, so derived wall ids keep
+  // the numbering every other consumer already expects.
+  const elements = buildLinearElements(input.elements ?? [], toM);
+  let drawnIndex = 0;
+  for (const el of elements) {
+    if (el.kind !== "boundary_wall") continue;
+    for (let i = 0; i < el.polyline.length - 1; i++) {
+      const a = el.polyline[i]!;
+      const b = el.polyline[i + 1]!;
+      if (polylineLength([a, b]) < 1e-6) continue;
+      drawnIndex += 1;
+      walls.push({
+        id: `wall-drawn-${drawnIndex}`,
+        polyline: [a, b],
+        thickness_mm: el.width_mm,
+        is_structural: null,
+        room_ids: [],
+        derived: false,
+        source: "drawn",
+      });
+    }
+  }
+  if (drawnIndex > 0) {
+    notes.push(`${drawnIndex} wall segment(s) from drawn boundary-wall elements (measured, not derived).`);
+  }
+  if (elements.length > 0) {
+    notes.push(
+      `${elements.length} linear element(s) ingested (${elements.filter((e) => e.derived).length} with defaulted cross-sections).`,
+    );
+  }
+
+  // --- Context (G4b) ---------------------------------------------------------
+  const CONTEXT_KINDS: readonly ContextKind[] = ["existing_building", "existing_structure", "steps", "boundary_wall"];
+  const context: ContextVolume[] = (input.context ?? [])
+    .map((c): ContextVolume | null => {
+      const poly = toNormalisedPolygon(c.polygon);
+      if (!poly || !(CONTEXT_KINDS as readonly string[]).includes(c.kind)) return null;
+      return {
+        id: c.id,
+        kind: c.kind as ContextKind,
+        name: c.name?.trim() || c.kind.replace(/_/g, " "),
+        polygon: poly.map(toM),
+        base_mm: Number(c.base_mm ?? 0),
+        height_mm: c.height_mm == null ? null : Number(c.height_mm),
+        derived: c.derived === true || c.height_mm == null,
+        note: c.note?.trim() || null,
+        dims_derived: c.dims_derived === true,
+        site_reference: c.site_reference === true,
+        disposition: dispositionOf(c),
+        ...(c.spec && typeof c.spec === "object" ? { spec: c.spec } : {}),
+      };
+    })
+    .filter((c): c is ContextVolume => c !== null);
+  if (context.length > 0) {
+    notes.push(`${context.length} context volume(s) on the plot (existing, not in scope; ${context.filter((c) => c.derived).length} with an assumed or scaled dimension).`);
+  }
 
   // --- Openings (A3/A5) — assign each to its nearest derived wall -------------
   const openings: Opening[] = (input.openings ?? [])
     .map((ro): Opening | null => {
       const type: Opening["type"] =
-        ro.type === "window" || ro.type === "archway" ? ro.type : "door";
+        ro.type === "window" || ro.type === "archway" || ro.type === "gate" ? ro.type : "door";
       const def = DEFAULT_OPENING_DIMS[type];
       const dimsDefaulted = ro.width_mm == null || ro.height_mm == null;
       const posNorm = isNumberPair(ro.position) ? (ro.position as [number, number]) : null;
@@ -491,7 +785,8 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
         : null;
       let wall_id: string | null = null;
       let along: number | null = ro.along_offset ?? null;
-      if (posM && walls.length > 0) {
+      // A gate in a context wall keeps that wall; only room-wall openings re-snap.
+      if (posM && walls.length > 0 && !ro.context_id) {
         let best = Infinity;
         for (const w of walls) {
           const a = w.polyline[0];
@@ -514,6 +809,10 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
         source: ro.source === "parsed" ? "parsed" : "user_drawn",
         // Defaulted dimensions are always derived — never silently "measured".
         derived: ro.derived ?? dimsDefaulted,
+        ...(ro.context_id ? { context_id: ro.context_id } : {}),
+        ...(ro.spec ? { spec: ro.spec } : {}),
+        ...(ro.site_reference ? { site_reference: true, disposition: ro.disposition ?? null } : {}),
+        ...(ro.dims_derived ? { dims_derived: true, derived_note: ro.derived_note ?? null } : {}),
       };
     })
     .filter((o): o is Opening => o !== null);
@@ -538,8 +837,11 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
     rooms,
     walls,
     openings,
+    elements,
+    context,
     meta: {
       scale,
+      source: input.source === "user_drawn" ? "user_drawn" : "parsed",
       north_deg: DEFAULT_NORTH_DEG,
       level: DEFAULT_LEVEL,
       units: "metric",
@@ -547,16 +849,26 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       total_area_m2: totalAreaM2,
       unit_to_m: unitToM,
       norm_origin: [minX, minY],
+      plot:
+        input.plot && measuredScale
+          ? {
+              width_m: input.plot.width_m,
+              depth_m: input.plot.depth_m,
+              origin_m: [-minX * unitToM, -minY * unitToM] as Point,
+              ...(input.plot_dims_derived ? { dims_derived: true, dims_note: input.dims_note?.trim() || null } : {}),
+            }
+          : null,
     },
     derived: {
       walls: true,
+      elements_empty: elements.length === 0,
       wall_thickness: true,
       is_structural: true,
       openings_empty: openings.length === 0,
-      ceiling_h: true,
+      ceiling_h: rooms.some((r) => !r.unroofed),
       north: true,
       level: true,
-      metric_scale: true,
+      metric_scale: !measuredScale,
     },
     notes,
   };
@@ -570,6 +882,7 @@ export function derivedFieldSummary(graph: PlanGraph): string[] {
   const out: string[] = [];
   const d = graph.derived;
   if (d.walls) out.push("walls[] — all wall segments (not persisted; derived from shared polygon edges)");
+  if (d.elements_empty) out.push("elements[] — empty (no boundary walls or runs drawn)");
   if (d.wall_thickness) out.push(`walls[].thickness_mm — default ${DEFAULT_WALL_THICKNESS_MM} mm`);
   if (d.is_structural) out.push("walls[].is_structural — always null (unknown from parse)");
   if (d.openings_empty) out.push("openings[] — empty (no doors/windows persisted)");
@@ -578,4 +891,20 @@ export function derivedFieldSummary(graph: PlanGraph): string[] {
   if (d.north) out.push(`meta.north_deg — default ${DEFAULT_NORTH_DEG}°`);
   if (d.level) out.push(`meta.level — default "${DEFAULT_LEVEL}"`);
   return out;
+}
+
+/**
+ * G5: is this plan a DRAFT — does any boundary-critical dimension (the plot, a
+ * zone outline, a run, a context footprint) remain derived? Removed site-reference
+ * items do not count: they are not in the design.
+ */
+export function graphDraftStatus(graph: PlanGraph): DraftStatus {
+  const inDesign = <T extends { site_reference?: boolean; disposition?: Disposition | null; spec?: Record<string, unknown> | null }>(x: T) => isInDesign(x);
+  return draftStatus({
+    plot_dims_derived: graph.meta.plot?.dims_derived === true,
+    dims_note: graph.meta.plot?.dims_note ?? null,
+    zones: graph.rooms.filter(inDesign).map((r) => ({ id: r.id, name: r.name_en, dims_derived: r.dims_derived })),
+    runs: graph.elements.filter(inDesign).map((e) => ({ id: e.id, name: e.spec && typeof e.spec.name === "string" ? e.spec.name : e.kind.replace(/_/g, " "), dims_derived: e.dims_derived })),
+    context: graph.context.filter(inDesign).map((c) => ({ id: c.id, name: c.name, dims_derived: c.dims_derived })),
+  });
 }

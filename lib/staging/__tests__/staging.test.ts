@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { STYLE_KEYS } from "@/lib/render-prompts";
+// Staging is interior-only: INTERIOR_STYLE_KEYS, not STYLE_KEYS, which since
+// G1b also carries the two exterior directions.
+import { INTERIOR_STYLE_KEYS as STYLE_KEYS } from "@/lib/render-prompts";
 import {
   STAGING_SETS,
   STAGING_ROOM_TYPES,

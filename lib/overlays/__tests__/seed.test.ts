@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildOverlaySections, needsQsLines } from "@/lib/overlays/boq";
+import { roomCategory } from "@/lib/overlays/rules";
 import { countByType, seedOverlays } from "@/lib/overlays/seed";
 import { buildPlanGraph } from "@/lib/plan/geometry";
 
@@ -81,5 +82,64 @@ describe("buildOverlaySections — counts → BoQ quantities", () => {
     for (const s of sections)
       for (const l of s.lines)
         if (l.rate_status === "needs_qs") expect(l.rate_aed).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// G1 — garden zones seed their own category
+// ---------------------------------------------------------------------------
+
+const GARDEN_GRAPH = buildPlanGraph({
+  projectId: "p1",
+  planId: "pl1",
+  scale: null,
+  total_area_m2: 100,
+  unit_to_m: 20,
+  source: "user_drawn",
+  rooms: [
+    {
+      id: "lawn",
+      name_en: "Lawn",
+      name_ar: null,
+      room_type: "artificial_grass",
+      area_m2: 50,
+      polygon: [[0.1, 0.1], [0.5, 0.1], [0.5, 0.4], [0.1, 0.4]],
+    },
+    {
+      id: "patio",
+      name_en: "Patio",
+      name_ar: null,
+      room_type: "paving",
+      area_m2: 50,
+      polygon: [[0.5, 0.1], [0.9, 0.1], [0.9, 0.4], [0.5, 0.4]],
+    },
+  ],
+});
+
+describe("seedOverlays — G1 garden zones", () => {
+  const counts = countByType(seedOverlays(GARDEN_GRAPH));
+
+  it("seeds garden lighting and drainage by area, not a terrace's ceiling light", () => {
+    // 50 m² per zone: ceil(50/25) = 2 garden lights, ceil(50/40) = 2 drains.
+    expect(counts.garden_light).toBe(4);
+    expect(counts.drainage_point).toBe(4);
+    expect(counts.socket_13a).toBe(2); // one weatherproof socket per zone
+  });
+
+  it("uses no interior fixture types on a garden", () => {
+    expect(counts.light_point ?? 0).toBe(0);
+    expect(counts.switch_1g ?? 0).toBe(0);
+    expect(counts.ac_point ?? 0).toBe(0);
+    expect(counts.floor_drain ?? 0).toBe(0);
+  });
+
+  it("leaves balcony and terrace on the untouched `outdoor` rules", () => {
+    // The Mudon expectations above are the real guard: its two terraces and one
+    // balcony still seed socket + light_point + switch_1g, exactly as before.
+    // This pins the mapping that keeps them there.
+    expect(roomCategory("terrace")).toBe("outdoor");
+    expect(roomCategory("balcony")).toBe("outdoor");
+    expect(roomCategory("paving")).toBe("garden");
+    expect(roomCategory("artificial_grass")).toBe("garden");
   });
 });

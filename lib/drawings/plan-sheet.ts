@@ -8,6 +8,7 @@
 // principal axes, offset 600 mm outside the envelope with ticks at extents.
 // =============================================================================
 
+import { LINEAR_ELEMENT_META, type LinearElement } from "@/lib/plan/elements";
 import type { Opening, PlanGraph, Point, Wall } from "@/lib/plan/geometry";
 
 import { dimensionChain, envelopeDimensionMm, graphBbox, roomBbox } from "./dimensions";
@@ -101,6 +102,26 @@ function openingSvg(op: Opening, graph: PlanGraph, pl: Placement): string {
   }
   // door: a small quarter-circle swing marker
   return `<path d="M ${cx} ${cy} l ${wPaper} 0 a ${wPaper} ${wPaper} 0 0 1 ${-wPaper} ${wPaper} Z" fill="none" stroke="${INK_500}" stroke-width="0.3"/>`;
+}
+
+/**
+ * G1 runs — bench, planter, counter. A boundary wall is NOT drawn here: it is
+ * already a wall in the graph and `wallSvg` gives it the same double line as
+ * every other wall, which is what it is. These three are furniture-scale runs,
+ * so they draw as a single weighted line with their code and length, the way a
+ * landscape setting-out drawing marks them.
+ */
+function elementSvg(el: LinearElement, pl: Placement): string {
+  if (el.kind === "boundary_wall") return "";
+  const meta = LINEAR_ELEMENT_META[el.kind];
+  const pts = el.polyline.map((p) => `${pl.px(p[0]).toFixed(2)},${pl.py(p[1]).toFixed(2)}`).join(" ");
+  const mid = el.polyline[Math.floor(el.polyline.length / 2)] ?? el.polyline[0]!;
+  const lx = pl.px(mid[0]);
+  const ly = pl.py(mid[1]) - 1.6;
+  return (
+    `<polyline points="${pts}" fill="none" stroke="${meta.color}" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" text-anchor="middle" font-size="2.5" fill="${meta.color}" style="font-family:${FONT_MONO}">${meta.code} ${el.length_m.toFixed(2)} m</text>`
+  );
 }
 
 function roomLabelSvg(graph: PlanGraph, pl: Placement): string {
@@ -197,9 +218,10 @@ export function planBody(
     .join("");
   const walls = graph.walls.map((w) => wallSvg(w, pl, wallStroke)).join("");
   const openings = graph.openings.map((op) => openingSvg(op, graph, pl)).join("");
+  const elements = graph.elements.map((el) => elementSvg(el, pl)).join("");
   const labels = roomLabelSvg(graph, pl);
   const dims = showDims ? dimensionChainsSvg(graph, pl) : "";
-  return `<g>${rooms}${walls}${openings}${labels}${dims}${opts?.extra ?? ""}</g>`;
+  return `<g>${rooms}${walls}${openings}${elements}${labels}${dims}${opts?.extra ?? ""}</g>`;
 }
 
 export function renderPlanSheet(

@@ -31,7 +31,11 @@ export type Style = {
   one_line: string;
   cost_delta_aed: number;
   palette: [string, string, string, string];
-  reference_images: [string, string, string, string];
+  /** G1b: widened from a 4-tuple. The six interior directions still carry four
+   *  (one per room bucket); the two exterior ones carry two, because a garden
+   *  has two segments and padding the array would have been a lie about what
+   *  art exists. Every consumer reads [0] or maps over it. */
+  reference_images: string[];
   /**
    * Three short notes shown in the Budget panel under the chosen style.
    * Each is a single sentence — no leading bullets, no terminal period

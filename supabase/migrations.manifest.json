@@ -182,6 +182,66 @@
       "version": "20260101003000",
       "name": "project_archive",
       "sha256": "b98e2af109076b9f66f812916419a68b8cf812e62fb4566246a2ebe9e37f5674"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003100",
+      "name": "authored_plans_and_outdoor_zones",
+      "sha256": "613a7c843d7e1f8f591686b387eeaf996154cf4c7cd6354ab8a19bcd0aeaf098"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003200",
+      "name": "rate_book_internal_ref",
+      "sha256": "fc9e0c34d9d7b13ef62be39563d2c502b5bf56470890bcb07acfc9f58bab0c6b"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003300",
+      "name": "plan_element_variant",
+      "sha256": "521d4fac8b7301ae18c73291a942d7f86b39b80d8aec9e8b50ff4629e945d9e4"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003400",
+      "name": "landscape_fixtures",
+      "sha256": "ae5ab9907b4641bb24341ca0eb261d4d0bbbc3b3b81376bfc7aa2cf65062cc9c"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003500",
+      "name": "garden_documents",
+      "sha256": "8021b53a2d877254375d32abd4fa4c0a5c40db0b7fd37b2931238b1ce8314a21"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003600",
+      "name": "garden_scene",
+      "sha256": "f64c2907ce25bef0e5177f790bcf3a4efd9c1384b837c6f1c277fac5bb9efc99"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003700",
+      "name": "client_garden_draft",
+      "sha256": "ba69dc3fde92f515d156a7a90a8ee5816a971eb0305be79e6b7f6c6592ae7654"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003800",
+      "name": "project_display_name",
+      "sha256": "92ceefef9147a4885311c65d967aef350684e9ad2c31497ebc824e857b5c82c6"
+    },
+    {
+      "legacy": null,
+      "version": "20260101003900",
+      "name": "garden_gates",
+      "sha256": "fc78401167f7d42beef80786514cbe2ff9401d3a8a7fd16d620929f4c8d84557"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004000",
+      "name": "session_capture",
+      "sha256": "f0a46cb911feb87f7e17115b534e5b8797dba4e05cbf483a2910ca80fcaecc1a"
     }
   ]
 }

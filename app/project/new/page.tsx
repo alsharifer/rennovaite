@@ -10,6 +10,9 @@ export const metadata: Metadata = {
 };
 
 
+// The garden-pilot flag is read per request, so the page cannot be static.
+export const dynamic = "force-dynamic";
+
 export default function NewProjectPage() {
   return (
     <AppShell pageName="New Project">
@@ -26,7 +29,7 @@ export default function NewProjectPage() {
           </p>
         </header>
 
-        <VillaIntake />
+        <VillaIntake gardenPilot={process.env.GARDEN_PILOT_ENABLED === "true"} />
       </div>
     </AppShell>
   );
