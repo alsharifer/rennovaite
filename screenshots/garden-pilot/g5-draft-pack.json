@@ -1,10 +1,10 @@
 {
   "project_id": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
-  "generated_at": "2026-09-19T07:12:31.877Z",
+  "generated_at": "2026-09-20T19:18:20.909Z",
   "boq": {
-    "id": "449e25b7-5333-42d0-aaad-9d05b1c4bc5b",
-    "grand_total_aed": 116216.57,
-    "printed_total": "≈ AED 116,200*",
+    "id": "737e078f-d640-4eb6-83c2-9280314ee780",
+    "grand_total_aed": 116679.07,
+    "printed_total": "≈ AED 116,700*",
     "derived_lines": 10,
     "lines": 18,
     "top5": [
@@ -203,8 +203,8 @@
     }
   ],
   "layout_assumptions": [
-    "Front garden — lawn: front border width 5.3 m measured (Newspace site measurement, design session Sep 2026); depth 4.0 m assumed — verify on site",
-    "Front garden — planting bed: front border width 5.3 m measured (Newspace site measurement, design session Sep 2026); depth 4.0 m assumed — verify on site"
+    "Front garden — lawn: front garden on its type-plan derived footprint (2.2 × 4.0 m assumed); the session's 5.3 m front-border measure is captured but NOT mapped — applied to the front garden it leaves the drive ~1.0 m wide (garage/drive block 6.3 m per the type plan); which edge the 5.3 m runs between is not clear from the capture — pending clarification with the firm. The front garden stays on its type-plan derived footprint.",
+    "Front garden — planting bed: front garden on its type-plan derived footprint (2.2 × 4.0 m assumed); the session's 5.3 m front-border measure is captured but NOT mapped — applied to the front garden it leaves the drive ~1.0 m wide (garage/drive block 6.3 m per the type plan); which edge the 5.3 m runs between is not clear from the capture — pending clarification with the firm. The front garden stays on its type-plan derived footprint."
   ],
   "drawings": [
     "L-000 Cover & Sheet Index",
@@ -219,8 +219,8 @@
     "L-108 Z08 Side garden — planting bed",
     "L-109 Z09 Side garden — lawn",
     "L-110 Z10 Side garden — porcelain paving terrace",
-    "L-111 Z11 Front garden — planting bed",
-    "L-112 Z12 Front garden — lawn",
+    "L-111 Z11 Front garden — lawn",
+    "L-112 Z12 Front garden — planting bed",
     "L-201 Finish Schedule",
     "L-301 Sectional Elevation — Louvred pergola (replaces existing gazebo)",
     "L-302 Sectional Elevation — BBQ counter",
@@ -259,7 +259,7 @@
       {
         "kind": "garden_view",
         "title": "Whole garden — aerial",
-        "images": 3
+        "images": 2
       },
       {
         "kind": "garden_view",
@@ -269,7 +269,7 @@
       {
         "kind": "garden_view",
         "title": "Whole garden — view 2",
-        "images": 2
+        "images": 1
       },
       {
         "kind": "zone",
@@ -284,7 +284,7 @@
       {
         "kind": "zone",
         "title": "Z03 Rear planting bed",
-        "images": 1
+        "images": 2
       },
       {
         "kind": "zone",
@@ -294,17 +294,17 @@
       {
         "kind": "zone",
         "title": "Z05 Garden entrance area — porcelain paving",
-        "images": 1
-      },
-      {
-        "kind": "zone",
-        "title": "Z06 Door landing — villa door",
         "images": 2
       },
       {
         "kind": "zone",
-        "title": "Z07 Porcelain path — garden gate to side garden",
+        "title": "Z06 Door landing — villa door",
         "images": 3
+      },
+      {
+        "kind": "zone",
+        "title": "Z07 Porcelain path — garden gate to side garden",
+        "images": 2
       },
       {
         "kind": "zone",
@@ -323,12 +323,12 @@
       },
       {
         "kind": "zone",
-        "title": "Z11 Front garden — planting bed",
+        "title": "Z11 Front garden — lawn",
         "images": 2
       },
       {
         "kind": "zone",
-        "title": "Z12 Front garden — lawn",
+        "title": "Z12 Front garden — planting bed",
         "images": 2
       },
       {
@@ -460,7 +460,6 @@
           "attempt": 1,
           "passed": false,
           "failures": [
-            "S1 louvred pergola: moved or resized (Louvred flat-roof pergola on square posts is depicted, but it sits much smaller and higher in the frame (roughly upper-left quadrant) than the near-filling structure of the model, because the view is pulled back.)",
             "viewpoint changed"
           ]
         },
@@ -468,8 +467,12 @@
           "attempt": 2,
           "passed": false,
           "failures": [
-            "S3 BBQ counter with built-in grill and sink: missing (No BBQ counter visible under the pergola; the modelled counter with grill and sink is absent.)",
-            "S3 BBQ counter with built-in grill and sink: placement not located in the render"
+            "S1 louvred pergola: moved or resized (A louvred pergola with square posts and blade roof is shown, but it is much smaller and set higher/further back in the frame than the design model, which fills most of the upper view.)",
+            "S2 built-in bench: moved or resized (Built-in bench with timber top present, but shifted left of the designed position and slightly smaller.)",
+            "S3 BBQ counter with built-in grill and sink: moved or resized (Counter shows both a built-in grill and a sink, but it is located at the far left edge rather than centre-left as designed.)",
+            "viewpoint changed",
+            "S2 built-in bench: placement moved — at 57% across, 63% down in the render; 84%, 68% in the design",
+            "S3 BBQ counter with built-in grill and sink: placement moved — at 13% across, 54% down in the render; 50%, 57% in the design"
           ]
         }
       ],
@@ -493,13 +496,6 @@
       "attempts": [
         {
           "attempt": 1,
-          "passed": false,
-          "failures": [
-            "T2 existing frangipani tree (kept): missing (No second tree canopy at upper right; that area shows only pergola louvres and sky.)"
-          ]
-        },
-        {
-          "attempt": 2,
           "passed": true,
           "failures": []
         }
@@ -515,38 +511,59 @@
       "camera": "zone:f3d76980-13a9-4830-86e2-0c8127bfee42",
       "label": "Rear planting bed",
       "view": "day",
-      "outcome": "substituted",
+      "outcome": "passed",
       "attempts": [
         {
           "attempt": 1,
           "passed": false,
           "failures": [
-            "invented structure: Built-in BBQ counter with stainless grill against the right-hand wall",
-            "invented structure: Wall-mounted timber bench on a rendered plinth along the right wall"
+            "C3 garage: missing (The angled garage volume in the bottom-left of the model is not depicted; that area is a mulched planting bed with agaves against a plain wall.)",
+            "T1 existing frangipani tree (kept): moved or resized (Large foreground canopy filling the bottom of the model frame is gone; the nearest tree is an olive pushed to the far right edge, leaving the bottom centre as open paving.)",
+            "T2 existing frangipani tree (kept): moved or resized (A frangipani-type tree exists but sits higher and further right (approx. 63-85% x) than the modelled mid-frame position.)",
+            "S1 existing grey steel garden shed (kept): moved or resized (Grey steel shed is present against the left wall but is rendered much larger and much nearer the camera than the small distant shed in the model.)",
+            "invented structure: Low rendered boundary wall along the right side (and a gate/screen at the far end) in place of the modelled tall neighbouring villa mass",
+            "S1 existing grey steel garden shed (kept): placement moved — at 25% across, 58% down in the render; 42%, 59% in the design"
           ]
         },
         {
           "attempt": 2,
-          "passed": false,
-          "failures": [
-            "C3 garage: missing (The low garage volume at bottom-left of the model is not readable; that area is taken up by the enlarged steel shed and paving.)",
-            "T1 existing frangipani tree (kept): moved or resized (Large foreground frangipani canopy is replaced by low shrub/olive planting; no tall canopy occupies the bottom of the frame.)",
-            "S1 existing grey steel garden shed (kept): moved or resized (Grey steel shed is shown but pulled far forward and enlarged into the left foreground instead of sitting small in the mid-distance beside the lawn.)",
-            "S1 existing grey steel garden shed (kept): placement moved — at 15% across, 61% down in the render; 42%, 59% in the design"
-          ]
+          "passed": true,
+          "failures": []
         }
       ],
-      "consistency": null,
-      "reason": "gate_failed"
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
     },
     {
       "camera": "zone:f3d76980-13a9-4830-86e2-0c8127bfee42",
       "label": "Rear planting bed",
       "view": "evening",
       "outcome": "substituted",
-      "attempts": [],
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "undesigned light: Three wall-mounted downlights on the right-hand boundary wall casting bright scallops; IMAGE 3 shows no light points on that wall",
+            "undesigned light: Uplighting into the mid-ground frangipani/palm canopy with no corresponding designed glow"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "undesigned light: Two large wall-grazing uplight washes on the right boundary wall, where the night model shows no light points",
+            "undesigned light: Wall-wash glows on the left villa wall above the planting bed near the garage corner",
+            "undesigned light: Uplighting in the planting beds and on the tree canopies mid-yard with no corresponding designed glow"
+          ]
+        }
+      ],
       "consistency": null,
-      "reason": "no_passed_day"
+      "reason": "gate_failed"
     },
     {
       "camera": "zone:ec59cb9e-41bc-4dbc-819a-649859c672cd",
@@ -584,28 +601,38 @@
           "attempt": 1,
           "passed": false,
           "failures": [
-            "invented structure: Large overhead louvred pergola with post spanning the foreground/top of frame (only a distant pergola frame exists in the model)"
+            "S1 existing grey steel garden shed (kept): placement moved — at 3% across, 25% down in the render; 39%, 31% in the design"
           ]
         },
         {
           "attempt": 2,
-          "passed": false,
-          "failures": [
-            "S1 existing grey steel garden shed (kept): placement moved — at 3% across, 9% down in the render; 39%, 31% in the design"
-          ]
+          "passed": true,
+          "failures": []
         }
       ],
-      "consistency": null,
-      "reason": "gate_failed"
+      "consistency": {
+        "passed": false,
+        "failures": [
+          "inconsistent pergola design with the anchor view (Image 1 shows the dark bronze powder-coated louvred aluminium pergola with deep beams and square posts; the pergola visible in the background of Image 2 reads as a pale timber-look rafter/beam structure, not the dark louvred system.)"
+        ],
+        "anchor": false
+      },
+      "reason": "inconsistent"
     },
     {
       "camera": "zone:08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
       "label": "Garden entrance area — porcelain paving",
       "view": "evening",
-      "outcome": "substituted",
-      "attempts": [],
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
       "consistency": null,
-      "reason": "no_passed_day"
+      "reason": null
     },
     {
       "camera": "zone:dffac8a5-5c8a-4be7-85de-917ea6becb62",
@@ -615,14 +642,60 @@
       "attempts": [
         {
           "attempt": 1,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
+      "camera": "zone:dffac8a5-5c8a-4be7-85de-917ea6becb62",
+      "label": "Door landing — villa door",
+      "view": "evening",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
           "passed": false,
           "failures": [
-            "F1 paving: moved or resized (Large-format paving is present along the wall, but because IMAGE 2 is much wider/pulled back it occupies a lower, smaller band (roughly x 20-70%, y 45-100%) than the design's foreground paving.)",
-            "F2 paving: moved or resized (The right-hand paved area exists but sits lower and further right (approx x 70-100%, y 58-100%) rather than filling the whole right half from y 40%.)",
-            "F3 paved path: moved or resized (The paved path continuing away from the camera is visible but compressed into the upper-middle distance (approx x 33-55%, y 20-45%) instead of the designed upper-left band.)",
-            "F4 lawn: moved or resized (Artificial lawn is present to the right but sits mid-frame (approx x 55-100%, y 20-62%) rather than at the very top of the frame.)",
-            "invented structure: Large dark steel louvred pergola with posts running along the wall over the paving - no such structure exists in the design model",
-            "viewpoint changed"
+            "F3 paved path: moved or resized (Paving does continue toward the rear, but in IMAGE 2 that upper-centre area is occupied by wall and sky, not the paved path region of the model.)",
+            "F4 lawn: moved or resized (Lawn strip is present along the shed base but sits mid-right at ~40-50% height rather than filling the upper-right quadrant.)",
+            "S1 existing grey steel garden shed (kept): moved or resized (Grey corrugated steel shed is present on the right, but much larger and lower in frame because the camera is pulled far back.)",
+            "viewpoint changed",
+            "S1 existing grey steel garden shed (kept): placement moved — at 79% across, 32% down in the render; 82%, 8% in the design"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": null,
+      "reason": null
+    },
+    {
+      "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "label": "Porcelain path — garden gate to side garden",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "S1 existing grey steel garden shed (kept): moved or resized (Grey steel shed is shown but pushed to the far right edge and rendered much smaller/further back than the large foreground volume in the model.)",
+            "T1 existing frangipani tree (kept): moved or resized (Frangipani appears but at mid-height right of centre rather than filling the top-right corner.)",
+            "T2 existing frangipani tree (kept): moved or resized (Second frangipani/olive-type canopy present further right and lower than modelled.)",
+            "T3 existing palm tree (kept): moved or resized (Palm is present but shifted left and fully visible rather than cropped at the top edge.)",
+            "invented structure: Large pergola/louvred canopy with posts brought forward over the path (model shows only a small distant frame)",
+            "invented structure: Outdoor BBQ counter with sink against the villa wall",
+            "invented structure: Rendered raised planter wall with timber bench seat along the right side of the lawn"
           ]
         },
         {
@@ -639,8 +712,8 @@
       "reason": null
     },
     {
-      "camera": "zone:dffac8a5-5c8a-4be7-85de-917ea6becb62",
-      "label": "Door landing — villa door",
+      "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
+      "label": "Porcelain path — garden gate to side garden",
       "view": "evening",
       "outcome": "substituted",
       "attempts": [
@@ -648,56 +721,19 @@
           "attempt": 1,
           "passed": false,
           "failures": [
-            "F1 paving: moved or resized (Paving is present and fills the lower-centre of the frame, but the much wider view makes it read smaller and further away than in the model.)",
-            "S1 existing grey steel garden shed (kept): moved or resized (Grey steel shed is present on the right, but appears much smaller and lower in frame because the viewpoint is pulled back to a wide view.)",
-            "viewpoint changed",
-            "S1 existing grey steel garden shed (kept): placement moved — at 73% across, 39% down in the render; 82%, 8% in the design"
+            "undesigned light: Warm uplight washing the right-hand boundary wall and the planting in front of it, where the night model shows no glow"
           ]
         },
         {
           "attempt": 2,
           "passed": false,
           "failures": [
-            "S1 existing grey steel garden shed (kept): placement moved — at 80% across, 26% down in the render; 82%, 8% in the design"
+            "undesigned light: Warm uplight washing the right-hand boundary wall behind the shed and grazing the agaves in the bottom-right bed, where the night model shows no designed light point"
           ]
         }
       ],
       "consistency": null,
       "reason": "gate_failed"
-    },
-    {
-      "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
-      "label": "Porcelain path — garden gate to side garden",
-      "view": "day",
-      "outcome": "passed",
-      "attempts": [
-        {
-          "attempt": 1,
-          "passed": true,
-          "failures": []
-        }
-      ],
-      "consistency": {
-        "passed": true,
-        "failures": [],
-        "anchor": false
-      },
-      "reason": null
-    },
-    {
-      "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
-      "label": "Porcelain path — garden gate to side garden",
-      "view": "evening",
-      "outcome": "passed",
-      "attempts": [
-        {
-          "attempt": 1,
-          "passed": true,
-          "failures": []
-        }
-      ],
-      "consistency": null,
-      "reason": null
     },
     {
       "camera": "zone:31cded47-9d42-476f-b60e-583bc532b18f",
@@ -831,6 +867,33 @@
       "reason": null
     },
     {
+      "camera": "zone:dba7027d-519f-4eac-ba3c-f75c1b269b89",
+      "label": "Front garden — lawn",
+      "view": "day",
+      "outcome": "passed",
+      "attempts": [
+        {
+          "attempt": 1,
+          "passed": false,
+          "failures": [
+            "invented structure: Perimeter boundary walls along the left and rear of the garden, enclosing the space where the model shows open sand",
+            "viewpoint changed"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": true,
+          "failures": []
+        }
+      ],
+      "consistency": {
+        "passed": true,
+        "failures": [],
+        "anchor": false
+      },
+      "reason": null
+    },
+    {
       "camera": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
       "label": "Front garden — planting bed",
       "view": "day",
@@ -859,49 +922,22 @@
           "attempt": 1,
           "passed": false,
           "failures": [
-            "undesigned light: Warm uplight washes on the wall behind the grasses at left-of-centre and behind the fountain grass at centre, plus a visible in-bed spot glow at ground level — the night model shows no designed light points at bed or low-wall level, only faint glows at the very top of the frame.",
-            "viewpoint changed"
+            "undesigned light: Warm wall-wash grazing the garage corner wall at left, with no corresponding glow in the night model",
+            "undesigned light: Bright warm pool of light on the boundary wall and paving behind the planting bed (centre), indicating uplights/spots not present in the design",
+            "undesigned light: Warm uplighting on the grasses and agave in the bed centre-right"
           ]
         },
         {
           "attempt": 2,
           "passed": false,
           "failures": [
-            "F1 planting bed: moved or resized (Mulched planting bed with agaves, grasses and shrubs is clearly depicted, but it sits smaller and lower in the frame than the model's near-fullscreen bed, and lawn is visible bottom-right that the model only hints at.)",
-            "viewpoint changed"
+            "undesigned light: Warm uplight grazing the boundary wall behind the planting bed, with several distinct pools of light on the wall face",
+            "undesigned light: Uplighting on the grasses and agaves within the bed, and a lit glow on the lawn edge at the left, where the night model shows no light points at all"
           ]
         }
       ],
       "consistency": null,
       "reason": "gate_failed"
-    },
-    {
-      "camera": "zone:dba7027d-519f-4eac-ba3c-f75c1b269b89",
-      "label": "Front garden — lawn",
-      "view": "day",
-      "outcome": "passed",
-      "attempts": [
-        {
-          "attempt": 1,
-          "passed": false,
-          "failures": [
-            "invented structure: Tall rendered white boundary wall across the upper right of the frame",
-            "invented structure: Large-format stone paving strip along the right/bottom edge replacing designed ground surface",
-            "viewpoint changed"
-          ]
-        },
-        {
-          "attempt": 2,
-          "passed": true,
-          "failures": []
-        }
-      ],
-      "consistency": {
-        "passed": true,
-        "failures": [],
-        "anchor": false
-      },
-      "reason": null
     },
     {
       "camera": "garden:aerial",
@@ -911,6 +947,13 @@
       "attempts": [
         {
           "attempt": 1,
+          "passed": false,
+          "failures": [
+            "S1 louvred pergola: placement moved — at 85% across, 51% down in the render; 89%, 69% in the design"
+          ]
+        },
+        {
+          "attempt": 2,
           "passed": true,
           "failures": []
         }
@@ -926,24 +969,27 @@
       "camera": "garden:aerial",
       "label": "Whole garden — aerial",
       "view": "evening",
-      "outcome": "passed",
+      "outcome": "substituted",
       "attempts": [
         {
           "attempt": 1,
           "passed": false,
           "failures": [
-            "undesigned light: Row of planting uplights washing the shrubs and frangipani along the whole front planter band, where the night model shows no glows",
-            "undesigned light: Uplight at the base of the palm tree illuminating its trunk and crown"
+            "undesigned light: Ground uplights washing the trunks and canopies of the frangipani and palm trees, where the model shows only wall-mounted points"
           ]
         },
         {
           "attempt": 2,
-          "passed": true,
-          "failures": []
+          "passed": false,
+          "failures": [
+            "invented structure: Small built outdoor-kitchen/counter volume with appliance niche left of the pergola (approx. x 71-80%, y 53-68%)",
+            "undesigned light: Three wall/step light fittings on the left-hand side wing walls and courtyard (approx. x 9-17%, y 15-30% and x 11%, y 42%) where the night model shows no glow",
+            "undesigned light: Lit lawn/planting patch in the left side courtyard (approx. x 4-13%, y 18-27%) with no designed light point"
+          ]
         }
       ],
       "consistency": null,
-      "reason": null
+      "reason": "gate_failed"
     },
     {
       "camera": "garden:garden-1",
@@ -955,18 +1001,22 @@
           "attempt": 1,
           "passed": false,
           "failures": [
-            "S1 existing grey steel garden shed (kept): placement moved — at 3% across, 41% down in the render; 41%, 86% in the design"
+            "T1 existing frangipani tree (kept): moved or resized (A frangipani appears at lower left as a small slender tree, not the large foreground canopy filling the bottom centre of the model.)",
+            "T2 existing palm tree (kept): moved or resized (Palms are shown in the mid-distance centre, much smaller and lower than the tall palm crown in the model.)",
+            "T3 existing frangipani tree (kept): missing (No second frangipani in the mid-ground; that position is occupied by palms and shrubs.)",
+            "invented structure: Large louvred aluminium pergola with posts spanning the courtyard",
+            "invented structure: Outdoor BBQ kitchen counter with sink and stone benchtop on the right",
+            "invented structure: Rendered masonry bench seat with timber slat top along right wall",
+            "invented structure: Tall rendered boundary/privacy wall along the right side",
+            "viewpoint changed",
+            "S1 existing grey steel garden shed (kept): placement moved — at 34% across, 52% down in the render; 41%, 86% in the design"
           ]
         },
         {
           "attempt": 2,
           "passed": false,
           "failures": [
-            "T1 existing frangipani tree (kept): moved or resized (A frangipani is shown, but it is pushed to the left edge and is far smaller than the large foreground canopy that dominates the lower centre of the model.)",
-            "S1 existing grey steel garden shed (kept): moved or resized (Grey corrugated steel shed appears at the extreme left edge and much larger/nearer, not at the mid-left position shown in the model.)",
-            "invented structure: Large black louvred pergola/canopy with posts framing the entire foreground — no such structure exists in the design model",
-            "viewpoint changed",
-            "S1 existing grey steel garden shed (kept): placement moved — at 7% across, 67% down in the render; 41%, 86% in the design"
+            "S1 existing grey steel garden shed (kept): placement moved — at 1% across, 35% down in the render; 41%, 86% in the design"
           ]
         }
       ],
@@ -990,40 +1040,40 @@
       "attempts": [
         {
           "attempt": 1,
-          "passed": true,
-          "failures": []
+          "passed": false,
+          "failures": [
+            "S2 built-in bench: moved or resized (A timber-slat bench top appears but it sits on a masonry BBQ counter far higher up the frame (approx y 38-51%) rather than at the bottom edge.)",
+            "invented structure: Masonry BBQ/outdoor kitchen counter with built-in grill and sink against the villa wall",
+            "S2 built-in bench: placement moved — at 44% across, 45% down in the render; 38%, 98% in the design"
+          ]
+        },
+        {
+          "attempt": 2,
+          "passed": false,
+          "failures": [
+            "S1 louvred pergola: moved or resized (Louvred pergola with square posts and blade roof is present, but it sits small in the upper middle of the frame instead of large in the bottom-right foreground.)",
+            "F2 lawn: moved or resized (Lawn is present but shifted down and left, filling the lower-centre foreground rather than the mid-right band.)",
+            "S2 built-in bench: moved or resized (Built-in bench with timber slat top appears on the RIGHT side/bottom-right, not at the bottom-left position of the model; two bench runs shown.)",
+            "S3 existing garden gate (kept): missing (No garden gate visible in the lower-left; that area is villa wall and paving in the visualisation.)",
+            "invented structure: Built-in outdoor BBQ kitchen counter with grill and sink against the villa wall on the left",
+            "viewpoint changed",
+            "S1 louvred pergola: placement moved — at 62% across, 39% down in the render; 75%, 88% in the design",
+            "S2 built-in bench: placement moved — at 81% across, 83% down in the render; 38%, 98% in the design",
+            "S3 existing garden gate (kept): placement not located in the render"
+          ]
         }
       ],
-      "consistency": {
-        "passed": false,
-        "failures": [
-          "inconsistent pergola design with the anchor view (Image 1 shows the dark bronze aluminium louvre-blade pergola with square posts; Image 2 shows a structure with wide timber slats on a metal frame, a different material and roof design.)"
-        ],
-        "anchor": false
-      },
-      "reason": "inconsistent"
+      "consistency": null,
+      "reason": "gate_failed"
     },
     {
       "camera": "garden:garden-2",
       "label": "Whole garden — view 2",
       "view": "evening",
-      "outcome": "passed",
-      "attempts": [
-        {
-          "attempt": 1,
-          "passed": false,
-          "failures": [
-            "undesigned light: Wall sconce on the villa's paving-side wall (~38%,58%) is lit and washes the wall, where the night model shows no glow at that fixture"
-          ]
-        },
-        {
-          "attempt": 2,
-          "passed": true,
-          "failures": []
-        }
-      ],
+      "outcome": "substituted",
+      "attempts": [],
       "consistency": null,
-      "reason": null
+      "reason": "no_passed_day"
     }
   ],
   "mix": {
@@ -1460,6 +1510,7 @@
         "views": [
           "Door landing — villa door",
           "Front garden — lawn",
+          "Front garden — planting bed",
           "Garden entrance area — porcelain paving",
           "Porcelain path — garden gate to side garden",
           "Rear garden — lawn",
@@ -1484,6 +1535,7 @@
         "views": [
           "Door landing — villa door",
           "Front garden — lawn",
+          "Front garden — planting bed",
           "Garden entrance area — porcelain paving",
           "Porcelain path — garden gate to side garden",
           "Rear garden — lawn",
@@ -2022,82 +2074,89 @@
   },
   "consistency": [
     {
-      "render_id": "a7ee8683-960d-4295-b332-2dce147d58ec",
+      "render_id": "3f4c4262-6879-4512-8325-0513b289eb4a",
       "camera": "zone:94a612f3-9a07-4466-b6fc-53e48c550ed1",
       "passed": true,
       "failures": [],
       "status": "anchor"
     },
     {
-      "render_id": "82a735f6-3aae-434b-bf94-aa1938f75c46",
+      "render_id": "991b28cf-e44d-4dc7-935d-0f5e2fc1a305",
+      "camera": "zone:f3d76980-13a9-4830-86e2-0c8127bfee42",
+      "passed": true,
+      "failures": [],
+      "status": "ran"
+    },
+    {
+      "render_id": "93c4b8e8-98a2-4960-9208-57f42291e80b",
       "camera": "zone:ec59cb9e-41bc-4dbc-819a-649859c672cd",
       "passed": true,
       "failures": [],
       "status": "ran"
     },
     {
-      "render_id": "85654e3a-f576-4049-9ef7-c670768dbf2e",
+      "render_id": "fd31c6ef-a518-4637-bd45-79066689d44a",
+      "camera": "zone:08c15fed-e1aa-4ab0-b500-e0ecb59f4c71",
+      "passed": false,
+      "failures": [
+        "inconsistent pergola design with the anchor view (Image 1 shows the dark bronze powder-coated louvred aluminium pergola with deep beams and square posts; the pergola visible in the background of Image 2 reads as a pale timber-look rafter/beam structure, not the dark louvred system.)"
+      ],
+      "status": "ran"
+    },
+    {
+      "render_id": "71ea7cbb-5de7-4682-a1ef-b2e13b27b8af",
       "camera": "zone:dffac8a5-5c8a-4be7-85de-917ea6becb62",
       "passed": true,
       "failures": [],
       "status": "ran"
     },
     {
-      "render_id": "1271fde0-44c6-4327-8332-604f1a8e6dfa",
+      "render_id": "12afbd53-6ffc-4bef-a6c2-1aaad10129c3",
       "camera": "zone:05430548-c9bf-4e5a-9735-25abcfc62caa",
       "passed": true,
       "failures": [],
       "status": "ran"
     },
     {
-      "render_id": "dfbfde35-c6c0-47ae-a76b-4c9e80d69f3d",
+      "render_id": "62b6ad3b-a2ef-4281-aecb-6b51799ee718",
       "camera": "zone:31cded47-9d42-476f-b60e-583bc532b18f",
       "passed": true,
       "failures": [],
       "status": "ran"
     },
     {
-      "render_id": "28155503-3111-4297-82b2-1f39db406061",
+      "render_id": "c0069530-d500-44e9-a184-680dc4fd700c",
       "camera": "zone:3fb94d19-3786-48d4-bb29-48514e8777ba",
       "passed": true,
       "failures": [],
       "status": "ran"
     },
     {
-      "render_id": "97cb46a1-33f1-428c-aa2d-e10e8a75d8c7",
+      "render_id": "f9bcab27-17b8-461a-88c1-00c5fec26bb9",
       "camera": "zone:113e3a84-c292-476e-ae2b-cd3cad688d55",
       "passed": true,
       "failures": [],
       "status": "ran"
     },
     {
-      "render_id": "e3818b84-73b1-4596-926e-f9d724dce8f3",
-      "camera": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
-      "passed": true,
-      "failures": [],
-      "status": "ran"
-    },
-    {
-      "render_id": "6e7be517-b1c8-4679-8923-18ad96840932",
+      "render_id": "d77e5334-5f38-4fd4-9c8c-a9a4ca22e231",
       "camera": "zone:dba7027d-519f-4eac-ba3c-f75c1b269b89",
       "passed": true,
       "failures": [],
       "status": "ran"
     },
     {
-      "render_id": "64a9b1bc-0b9d-4437-b2ae-0ed4f374b6f5",
-      "camera": "garden:aerial",
+      "render_id": "529f5e76-0faf-434b-a12e-ec4b62a5c816",
+      "camera": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
       "passed": true,
       "failures": [],
       "status": "ran"
     },
     {
-      "render_id": "8a81621b-7641-4e40-9590-9ba592360652",
-      "camera": "garden:garden-2",
-      "passed": false,
-      "failures": [
-        "inconsistent pergola design with the anchor view (Image 1 shows the dark bronze aluminium louvre-blade pergola with square posts; Image 2 shows a structure with wide timber slats on a metal frame, a different material and roof design.)"
-      ],
+      "render_id": "ee8b9fc4-1e4b-497c-9b88-ad92b6d60cdc",
+      "camera": "garden:aerial",
+      "passed": true,
+      "failures": [],
       "status": "ran"
     }
   ],
@@ -2188,25 +2247,23 @@
       ]
     },
     {
-      "id": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
-      "label": "Front garden — planting bed",
-      "mode": "eye",
-      "clean": false,
-      "clean_reasons": [
-        "cramped standpoint (under 6 m of clear width)",
-        "solid mass within 2.2 m of the lens (6% of frame)",
-        "no horizon in frame"
-      ]
-    },
-    {
       "id": "zone:dba7027d-519f-4eac-ba3c-f75c1b269b89",
       "label": "Front garden — lawn",
       "mode": "eye",
       "clean": false,
       "clean_reasons": [
         "cramped standpoint (under 6 m of clear width)",
-        "solid mass within 2.2 m of the lens (32% of frame)",
-        "no horizon in frame"
+        "solid mass within 2.2 m of the lens (35% of frame)"
+      ]
+    },
+    {
+      "id": "zone:5542fe1d-d6f5-4aa8-b889-67781f2e0715",
+      "label": "Front garden — planting bed",
+      "mode": "eye",
+      "clean": false,
+      "clean_reasons": [
+        "cramped standpoint (under 6 m of clear width)",
+        "solid mass within 2.2 m of the lens (9% of frame)"
       ]
     },
     {
@@ -2352,13 +2409,13 @@
     "active_design_min": null,
     "time_to_first_full_boq_min": 1517.7,
     "first_full_boq_at": "2026-09-15T17:58:42.314283+00:00",
-    "boq_generations": 31,
+    "boq_generations": 34,
     "render_gate": {
-      "renders": 200,
-      "passed": 75,
-      "substituted": 125,
-      "pass_rate": 0.375,
-      "attempt_pass_rate": 0.385
+      "renders": 227,
+      "passed": 92,
+      "substituted": 135,
+      "pass_rate": 0.405,
+      "attempt_pass_rate": 0.388
     },
     "friction": [
       {
@@ -2415,6 +2472,11 @@
         "at": "2026-09-17T15:00:20.336382+00:00",
         "note": "A garden BoQ had no line for outdoor water taps or for planting-bed soil preparation: both are real work a client expects priced; added as QS-to-price lines (GL-25, GL-26).",
         "area": "boq"
+      },
+      {
+        "at": "2026-09-20T18:55:23.078309+00:00",
+        "note": "A measured figure that cannot be mapped is held, not applied: the 5.3 m front border applied to the front garden it leaves the drive ~1.0 m wide (garage/drive block 6.3 m per the type plan); which edge the 5.3 m runs between is not clear from the capture — pending clarification with the firm. The front garden stays on its type-plan derived footprint. The front garden stays on the type plan's derived footprint and the measure is flagged for clarification with the firm.",
+        "area": "measurement"
       }
     ],
     "corrections": {
@@ -2440,13 +2502,13 @@
     ]
   },
   "results": [
-    "PASS  BoQ generates — AED 116216.57",
+    "PASS  BoQ generates — AED 116679.07",
     "PASS  pack readiness: no untyped counter, nothing undecided, needs_selection empty — {\"untyped\":[],\"undecided\":0,\"stale\":[]}",
     "PASS  needs_selection is empty on the BoQ",
     "PASS  the BoQ knows it is a draft",
     "PASS  boundary-dependent quantities carry the derived flag — 10 derived lines",
     "PASS  every priced landscape line carries the market-reference source label — 15 priced lines",
-    "PASS  drawing set, render pack and BoQ export as PDFs — {\"drawingsPdf\":{\"status\":200,\"bytes\":4176942},\"packPdf\":{\"status\":200,\"bytes\":8269835},\"boqPdf\":{\"status\":200,\"bytes\":504552}}",
+    "PASS  drawing set, render pack and BoQ export as PDFs — {\"drawingsPdf\":{\"status\":200,\"bytes\":4115457},\"packPdf\":{\"status\":200,\"bytes\":7503405},\"boqPdf\":{\"status\":200,\"bytes\":505751}}",
     "PASS  drawings: cover, site plan, a sheet per zone, finish schedule — L-000 L-100 L-101 L-102 L-103 L-104 L-105 L-106 L-107 L-108 L-109 L-110 L-111 L-112 L-201 L-301 L-302 L-303 L-401 L-402 L-501",
     "PASS  drawings: sectional elevations for the designed structures — 3 elevation sheets",
     "PASS  drawings: electrical + irrigation/drainage overlays",
@@ -2455,21 +2517,21 @@
     "PASS  watermark: the render-pack cover carries the statement",
     "PASS  the pack carries the Design assumptions page",
     "PASS  watermark: every BoQ PDF page header carries the statement — 3 pages",
-    "PASS  the BoQ total renders with the derived convention, never a bare number — ≈ AED 116,200*",
+    "PASS  the BoQ total renders with the derived convention, never a bare number — ≈ AED 116,700*",
     "PASS  BoQ page: draft header, derived total and derived line flags visible",
     "PASS  plan page: the draft banner and derived markers are visible",
     "PASS  zero contractor-identity leakage across drawings, pack, BoQ PDF, BoQ data and BoQ page — 2 identity tokens × 47 documents",
     "PASS  client-safe captions: no QA text in the pack",
-    "PASS  legibility: no text in the render pack under 3.1 mm — min 3.1 mm over 476 runs",
+    "PASS  legibility: no text in the render pack under 3.1 mm — min 3.1 mm over 478 runs",
     "PASS  legibility: no text in the BoQ PDF under 2.6 mm (A4) — min 2.6 mm",
     "PASS  the BoQ PDF carries the indicative delivery programme",
     "PASS  L-201 title block says ground (external works), not an interior level",
     "PASS  L-301 pergola: four posts on the graph and drawn — 2 post dimensions",
-    "PASS  extended gate: every passed render checked built-feature placement against the scene — 17 passed render(s)",
+    "PASS  extended gate: every passed render checked built-feature placement against the scene — 34 passed render(s)",
     "PASS  before/after: the counter under the pergola is visible, or the caption says it is out of crop — 1 passed pair(s) with a built feature added under the pergola",
     "PASS  parity counts overlay symbols against their lines (drainage, taps, lighting) — garden_light 12/12, boundary_light 6/6, water_tap 2/2, drainage_point 2/2",
     "PASS  no internal sales or commercial language on any client-facing page",
-    "PASS  no render that disagrees with the anchor view enters the pack (cross-view consistency) — 11 views checked against zone:94a612f3-9a07-4466-b6fc-53e48c550ed1; 1 demoted to design views: inconsistent pergola design with the anchor view (Image 1 shows the dark bronze aluminium louvre-blade pergola with square posts; Image 2 shows a structure with wide timber slats on a metal frame, a different material and roof design.)",
+    "PASS  no render that disagrees with the anchor view enters the pack (cross-view consistency) — 12 views checked against zone:94a612f3-9a07-4466-b6fc-53e48c550ed1; 1 demoted to design views: inconsistent pergola design with the anchor view (Image 1 shows the dark bronze powder-coated louvred aluminium pergola with deep beams and square posts; the pergola visible in the background of Image 2 reads as a pale timber-look rafter/beam structure, not the dark louvred system.)",
     "PASS  parity: every BoQ line is drawn and shown, every drawn cost is priced"
   ]
 }

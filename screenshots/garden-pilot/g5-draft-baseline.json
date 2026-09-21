@@ -1,19 +1,19 @@
 {
-  "captured_at": "2026-09-19T07:12:31.873Z",
-  "boq_id": "449e25b7-5333-42d0-aaad-9d05b1c4bc5b",
+  "captured_at": "2026-09-20T19:18:20.905Z",
+  "boq_id": "737e078f-d640-4eb6-83c2-9280314ee780",
   "draft": true,
   "derived": [
     "plot boundary",
     "zone: Pergola court — porcelain paving",
     "zone: Side garden — lawn",
     "zone: Rear planting bed",
-    "zone: Side garden — planting bed",
-    "zone: Louvred pergola (replaces existing gazebo)",
-    "zone: Garden entrance area — porcelain paving",
+    "zone: Front garden — planting bed",
     "zone: Rear garden — lawn",
+    "zone: Garden entrance area — porcelain paving",
     "zone: Side garden — porcelain paving terrace",
     "zone: Front garden — lawn",
-    "zone: Front garden — planting bed",
+    "zone: Side garden — planting bed",
+    "zone: Louvred pergola (replaces existing gazebo)",
     "run: BBQ counter (under the pergola)",
     "run: L-seating bench (pergola court)",
     "context: Existing villa",
@@ -23,7 +23,7 @@
     "context: Side garden street wall",
     "context: Rear strip end wall"
   ],
-  "grand_total_aed": 116216.57,
+  "grand_total_aed": 116679.07,
   "lines": [
     {
       "key": "Demolition|GL-03",
@@ -139,27 +139,27 @@
       "key": "Soft Landscaping|GL-07",
       "section": "Soft Landscaping",
       "description": "Artificial grass supply",
-      "quantity": 50,
+      "quantity": 54.22,
       "unit": "m2",
       "rate_aed": 26.4,
-      "total_aed": 1320,
+      "total_aed": 1431.41,
       "qty_derived": true
     },
     {
       "key": "Soft Landscaping|GL-08",
       "section": "Soft Landscaping",
       "description": "Artificial grass installation (base+sand+borders)",
-      "quantity": 50,
+      "quantity": 54.22,
       "unit": "m2",
       "rate_aed": 70.4,
-      "total_aed": 3520,
+      "total_aed": 3817.09,
       "qty_derived": true
     },
     {
       "key": "Soft Landscaping|GL-25",
       "section": "Soft Landscaping",
       "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
-      "quantity": 40.36,
+      "quantity": 23.74,
       "unit": "m2",
       "rate_aed": 0,
       "total_aed": 0,
@@ -240,7 +240,7 @@
     {
       "work_item_key": "garden.grass_install",
       "element_id": "dba7027d-519f-4eac-ba3c-f75c1b269b89",
-      "qty": 2.18,
+      "qty": 6.4,
       "unit": "m2"
     },
     {
@@ -258,7 +258,7 @@
     {
       "work_item_key": "garden.grass_supply",
       "element_id": "dba7027d-519f-4eac-ba3c-f75c1b269b89",
-      "qty": 2.18,
+      "qty": 6.4,
       "unit": "m2"
     },
     {
@@ -354,7 +354,7 @@
     {
       "work_item_key": "garden.planting_bed",
       "element_id": "5542fe1d-d6f5-4aa8-b889-67781f2e0715",
-      "qty": 19.02,
+      "qty": 2.4,
       "unit": "m2"
     },
     {

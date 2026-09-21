@@ -1102,6 +1102,26 @@ applies is asserted against it.
   percent; `normalisePlacements` converts with the candidate's real size
   (`imageSize`, from the header) before judging — g5d-1 had failed correct renders
   as "moved" on exactly that.
+- **A measure that cannot be mapped is held, not applied.** The front / street
+  border measured 5.3 m; mapped onto the front garden it left the drive ~1.0 m
+  wide, so the measurement and the type plan disagree about which edge "the front
+  border" is. It is recorded in `UNMAPPED_MEASURES` with the reason, printed on the
+  pack's Design assumptions page, and logged as pilot friction ("a measured figure
+  that cannot be mapped"); the front garden keeps its type-plan derived footprint
+  (2.2 × 4.0 m, drive 4.1 m) and the other six measures stand. The grass aggregate
+  is then met over the zones it can cover — rear + side = 47.82 m² against ≈ 50 —
+  and the front garden's 6.40 m² is stated as outside it rather than quietly
+  resized to make the arithmetic close (AED 116,217 → 116,679).
+- **A render is stale only when its own view changed** (`lib/scene/view-hash.ts`).
+  The cache key carries the whole scene's hash, so a change at one end of the plot
+  invalidated all 30 renders of it and made a small amendment expensive enough to
+  discourage making it. A render is now carried forward when the camera's manifest
+  is IDENTICAL to the one it was gated against and every object whose geometry
+  changed is at least 12 m from the lens (so it cannot have cast a shadow into a
+  frame it is not in). It fails closed — no fingerprint, no exact manifest match,
+  no reuse — and the carried-forward row records `reused_from` with the reasons,
+  so no pack shows an image nobody can trace. Reverting the front border re-rendered
+  the views that see the front garden or the garage's notch and reused the rest.
 - **Photo pairs** (`g5d-1`): a structure replaced in place carries what the plan
   builds inside it — the BBQ counter under the pergola is an `add` item that must
   show, or the gate reports it out of crop and the caption says so.

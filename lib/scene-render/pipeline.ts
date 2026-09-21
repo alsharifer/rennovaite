@@ -25,6 +25,7 @@ import { lightingByZone, type ZoneLight } from "@/lib/render-batch/plan";
 import { buildEditInput, getRenderPrediction, createRenderPrediction, extractImageUrl } from "@/lib/render-image";
 import { uploadRenderBytes } from "@/lib/render-storage";
 import { buildManifest, chooseCameras, RENDER_H, RENDER_W, type CameraManifest, type GardenCamera } from "@/lib/scene/cameras";
+import { reuseVerdict, viewFingerprint, type ViewFingerprint } from "@/lib/scene/view-hash";
 import { buildGardenScene } from "@/lib/scene/garden-scene";
 import type { Scene } from "@/lib/scene/mesh";
 import { encodePng } from "@/lib/scene/png";
@@ -100,6 +101,10 @@ export interface SceneGateRecord {
   spec_hash?: string;
   /** G5c: the passed render this view was conditioned to match, if any. */
   anchor_id?: string | null;
+  /** G5d: what the scene looked like when this view was rendered, object by object. */
+  view_fp?: ViewFingerprint;
+  /** G5d: this image was made for an earlier scene in which THIS camera saw exactly the same things. */
+  reused_from?: { render_id: string; scene_hash: string; reasons: string[] } | null;
   /** G5c: cross-view consistency against the pack's anchor render. A passed render
    *  that fails it does not enter a pack as a render. */
   consistency?: { anchor_id: string; passed: boolean; failures: string[]; status: "ran" | "unavailable"; checked_at: string };
@@ -281,6 +286,25 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
   // restyle is conditioned on and what the gate compares against (G5c).
   const flat = renderScene(ctx.scene, cam, RENDER_W, RENDER_H, { lighting: "day" });
   const manifest = buildManifest(ctx.projectId, cameraId, ctx.scene, flat);
+  const fingerprint = viewFingerprint(ctx.scene);
+
+  // G5d: the scene changed somewhere, but did it change HERE? A render whose camera
+  // shows exactly the same objects, in the same places, and with every changed
+  // object far enough away to be out of frame and out of shadow, still depicts this
+  // garden — it is carried forward as a new row that records what it was reused
+  // from. Everything else is rendered again.
+  const reused = await reusableRender(ctx, cameraId, view, cam, manifest, fingerprint, anchor?.id ?? null);
+  if (reused) {
+    const gate: SceneGateRecord = { ...reused.gate, manifest, scene_hash: ctx.sceneHash, spec_hash: ctx.specHash, view_fp: fingerprint, reused_from: { render_id: reused.id, scene_hash: reused.gate.scene_hash ?? "", reasons: reused.reasons } };
+    const { data: row, error } = await sb
+      .from("renders")
+      .insert({ project_id: ctx.projectId, room_id: cam.zoneId, prompt: "(reused — this camera's view is unchanged)", image_url: reused.image_url, source_image_url: reused.gate.scene_url, model: "reuse", mode: "scene", view, camera: cameraId, cache_key: cacheKey, gate, status: "succeeded" })
+      .select("id")
+      .single<{ id: string }>();
+    if (!error && row) {
+      return { render_id: row.id, image_url: reused.image_url, view, camera_id: cameraId, outcome: gate.outcome, design_view_reason: gate.design_view_reason ?? null, cached: true, attempts: gate.attempts };
+    }
+  }
   const flatUrl = await uploadRenderBytes(`${base}-day-flat.png`, encodePng(flat.rgb, flat.width, flat.height, 3), "image/png");
   const day = renderScene(ctx.scene, cam, RENDER_W, RENDER_H, { lighting: "day", textured: true });
   const dayPng = encodePng(day.rgb, day.width, day.height, 3);
@@ -384,6 +408,7 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
     scene_hash: ctx.sceneHash,
     spec_hash: ctx.specHash,
     anchor_id: anchor?.id ?? null,
+    view_fp: fingerprint,
     attempts,
     gate_model: "claude-opus-5",
   };
@@ -420,6 +445,43 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
   const error = saved?.error;
   if (error || !row) throw new Error(`could not save the render: ${error?.message}`);
   return { render_id: row.id, image_url: final.url, view, camera_id: cameraId, outcome: final.outcome, design_view_reason: designViewReason, cached: false, attempts };
+}
+
+/**
+ * G5d: the newest render of this camera/view whose picture still stands for the
+ * garden as it is now (same manifest, every changed object out of frame and far
+ * enough off to cast nothing into it). Null when there is none — then it renders.
+ */
+async function reusableRender(
+  ctx: GardenSceneContext,
+  cameraId: string,
+  view: SceneView,
+  cam: GardenCamera,
+  manifest: CameraManifest,
+  fingerprint: ViewFingerprint,
+  anchorId: string | null,
+): Promise<{ id: string; image_url: string; gate: SceneGateRecord; reasons: string[] } | null> {
+  const { data } = await db()
+    .from("renders")
+    .select("id, image_url, gate")
+    .eq("project_id", ctx.projectId)
+    .eq("camera", cameraId)
+    .eq("view", view)
+    .eq("mode", "scene")
+    .eq("status", "succeeded")
+    .order("created_at", { ascending: false })
+    .limit(8);
+  for (const r of (data ?? []) as { id: string; image_url: string; gate: SceneGateRecord | null }[]) {
+    const g = r.gate;
+    // Only a render of the same pipeline, style, specification and anchor — those
+    // decide what was asked for, which reuse must not silently change.
+    if (!g || !r.image_url || g.pipeline !== SCENE_PIPELINE_VERSION || g.spec_hash !== ctx.specHash) continue;
+    if ((g.anchor_id ?? null) !== anchorId) continue;
+    if (g.scene_hash === ctx.sceneHash) continue; // an exact hit is handled by the cache key
+    const v = reuseVerdict({ storedManifest: g.manifest, currentManifest: manifest, stored: g.view_fp, current: fingerprint, cameraPos: cam.pos });
+    if (v.reusable) return { id: r.id, image_url: r.image_url, gate: g, reasons: v.reasons };
+  }
+  return null;
 }
 
 /**
