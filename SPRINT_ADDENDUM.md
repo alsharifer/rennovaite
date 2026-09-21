@@ -1,11 +1,18 @@
-# Sprint-2 Addendum — confirmed facts (R2 · Design Journey)
+# Sprint-3 Addendum — confirmed facts (pre-flight)
 
-_Prepend this block to every Sprint-2 prompt. It **supersedes** the Sprint-1
-addendum, which superseded the Pilot-Seven P0 addendum. Every fact below was
-re-verified against the code and the live database during the Sprint-2
-pre-flight on **2026-09-01**. Facts read from the running database are marked
-**[DB]**; facts read from source are marked **[code]**. Nothing here was
-carried over unverified._
+_Prepend this block to every Sprint-3 prompt. It **supersedes** the Sprint-2
+addendum (itself superseding Sprint-1 and the Pilot-Seven P0 addendum; all are
+in git history). Every fact below was re-verified against the code and the
+database during the Sprint-3 pre-flight on **2026-09-21**. Facts read from the
+running database are marked **[DB]**; facts read from source are marked
+**[code]**. Nothing here was carried over unverified._
+
+> **Which database "[DB]" means changed during the garden series.** As of I8,
+> `.env.local` **and** the Supabase CLI link (`supabase/.temp/project-ref`)
+> both point at the **dev** project `askzyqgcnjmbqegfifxq`, not production
+> (`efrcgktrlsjnzkzzuhof`, `PRODUCTION_REF` in `scripts/_target-guard.mjs`).
+> Every [DB] fact below is **dev**. Production was **not** probed in this
+> pre-flight — no production credentials are in `.env.local`, by design.
 
 ---
 
@@ -18,25 +25,26 @@ rather than assumed.
 ### Verification never writes to production data
 
 **Mudon pilot villa (`6b5fda9d`) is calibration ground truth, not a test
-fixture.** It is the only fully-parsed, rendered, priced project that exists,
-and the business case rests on having more calibrated projects to compare
-against, not fewer. Its rows are evidence.
+fixture**, and so are the garden ground truth (`8d460645`, Villa 94) and the
+live client garden (`ec4497c7`, Arabella). Their rows are evidence.
 
 So: **do not write to production data to make a test pass.** If a check needs
 state that does not exist — a different locked style, an overlapping plan, a
 project with no BoQ — create it on a **scratch project** or a **local seed**,
-not on Mudon and not on a real customer project.
+not on a ground-truth or client project. The garden series has a purpose-built
+stand-in for this: `12904f6d` "Client garden stand-in (isolation fixture)",
+seeded from the same records by `scripts/lib/garden-seed.ts`.
 
 This was broken during F1: a `style_choices` row was inserted against Mudon to
 demonstrate that changing the StyleBoard updates the walkthrough. It was
-deleted afterwards and the row count returned to 7, but "I put it back" is not
-the same as "I did not touch it" — a crash between the write and the delete
-leaves the pilot villa in a state nobody chose. Read production; fabricate
-elsewhere.
+deleted afterwards, but "I put it back" is not the same as "I did not touch
+it" — a crash between the write and the delete leaves the pilot villa in a
+state nobody chose. Read production; fabricate elsewhere.
 
 Where a write is genuinely unavoidable, the pre-destructive-operation ritual in
 `POST_DEMO_FOLLOWUPS.md` applies in full: count the blast radius before, state
-it, and re-count after.
+it, and re-count after. Scripts that can write refuse production unless
+`ALLOW_PROD_WRITE=1` (`scripts/_target-guard.mjs`).
 
 ### Never edit `.env.local`
 
@@ -52,90 +60,79 @@ TEXTURED_WALKTHROUGH=true npm run dev
 ```
 
 ```bash
-TASTE_SEED_ENABLED=true BOQ_ENGINE=llm npm run dev
+GARDEN_PILOT_ENABLED=true DRAWINGS_ENABLED=true npm run dev
 ```
 
-Flags are read from `process.env` at server start, so an inline variable
-behaves identically to one in the file — including needing a restart to change.
-This also keeps the two states honestly separable: nothing lingers in a file to
-be forgotten about and mistaken for the default later.
-
-This was broken during F1 too: `TEXTURED_WALKTHROUGH=true` was appended to
-`.env.local` to verify the flag, then removed and confirmed byte-identical. The
-inline form makes the backup-and-restore dance unnecessary.
+On this Windows machine the preview config `.claude/launch.json` has a
+`garden` entry that does exactly this (`set GARDEN_PILOT_ENABLED=true&& …`,
+port 3098) — that file carries an **uncommitted** local modification; leave it
+out of commits unless asked.
 
 ---
 
 ## 0. Repo state at pre-flight
 
-- Base is **`master` @ `da0394d`** (merge of `feat/property-os-landing`).
-  **As of 2026-09-11 the base is `master` @ `5033c9d`** (merge of
-  `fix/area-provenance-and-dispute-review`, PR #56): the parse overhaul
-  (#54/#55/#56) and the I7–I10 ops-hardening series are merged, working tree
-  clean apart from an untracked `QS Package/`.
-  Working tree clean except `.claude/settings.local.json`. The full Sprint-1
-  series is merged: `8039daf` 413/compression fix · `790cc24` project asset
-  library (A3/A4/C2) · `e0f70ba`/`a658a76`/`9f1598f`/`fedbc88`/`25d4ec1`/
-  `f38d7e8`/`ac448e4` parse overhaul + provider interface · `4ba9195` openings
-  plumbing (A5) · `0418829` dashboard+my-projects merge (G1) · `13ce4dc`
-  Property OS landing.
-- **The status-file rename (SV) did NOT land.** `PILOT_SEVEN_STATUS.md` is
-  still at the repo root and has not been touched since `e33005b`. Its
-  migration-application table is **stale** (see §1). Treat SV as outstanding.
-- Baseline is **GREEN**: `tsc --noEmit` **0 errors** · `eslint` **0 errors**
-  (1 pre-existing warning — custom fonts, `app/layout.tsx:71`) · `vitest run`
-  **152 tests / 18 files, all passing** · `next build` **exit 0**, 19 page
-  routes + 27 API routes.
+- Base is **`master` @ `64b07ff`** (merge of PR #58
+  `fix/garden-front-border-unmapped` — the "G5e" follow-up to G5d; no commit is
+  literally labelled G5e). The whole garden pilot G1 → G5d landed as PR #57
+  (`26061ff`). Working tree: `.claude/launch.json` modified (local preview
+  config) and an untracked `QS Package/`; nothing else.
+- Baseline is **GREEN** (re-run 2026-09-21):
+  - `tsc --noEmit` **0 errors**
+  - `eslint` **0 errors**, 1 pre-existing warning (custom fonts,
+    `app/layout.tsx:71`)
+  - `vitest run` **694 tests / 61 files, all passing** (was 152 / 18 at
+    Sprint-2)
+  - `next build` **exit 0** — 25 `page.tsx` routes, 41 API `route.ts` files
+  - `npm run db:check` — "history intact — no migration has been edited or
+    removed"
 - Next.js **16.2.4**, React **19.2.4**, TypeScript 5, Tailwind v4, zod 4,
   three 0.185 / r3f 9 / drei 10. App Router. **Read
   `node_modules/next/dist/docs/` before writing Next code — this is not the
   Next.js in your training data** (per `AGENTS.md`).
+- **The status-file rename (SV) still has not landed** — `PILOT_SEVEN_STATUS.md`
+  is at the root and its migration table is stale. Use §1 below, not that file.
 
-## 1. Migrations — high-water mark **030**, ALL APPLIED [DB]
+## 1. Migrations — high-water mark **040**, ALL APPLIED on dev [DB]
 
-Files `scripts/migrations/001…030`. Re-verified 2026-09-09 by probing one
-artefact per migration against the live database.
+**This moved.** Sprint-2 ended at 030. The garden series added **031–040**, and
+they exist **only** in `supabase/migrations/`
+(`20260101003100_…` → `20260101004000_session_capture.sql`, 40 files total).
+`scripts/migrations/` is **frozen at 030** — it is the historical record, must
+not be edited, and must not gain new files. Apply with `npm run db:manifest` +
+`npm run db:push` (the wrapper refuses when the CLI link and `.env.local`
+disagree); see `docs/MIGRATIONS.md`.
 
-**Re-checked 2026-09-11 (garden-pilot pre-flight): nothing moved.** The
-high-water mark is still **030**. `scripts/migrations/` and
-`supabase/migrations/` both end at `030_project_archive` /
-`20260101003000_project_archive.sql`; no migration has been added since.
+Probed one artefact per migration against dev, 2026-09-21 — all present:
 
-**029 was applied on 2026-09-09** via `supabase db push` — the first migration
-in this project applied by the runner rather than by hand. Production now
-matches the migrations exactly:
-
-    shadow (all 30, built from zero): 29 tables, 257 columns
-    tables absent in production : none
-    columns absent in production: none
-
-| # | Artefact probed | Live? |
+| # | Name | Artefact probed |
 |---|---|---|
-| 027 | `project_briefs.project_id`, `moodboard_items`, `renders.reference_refs` | yes |
-| 028 | `accessory_catalog`, `accessory_selections` | yes |
-| 029 | `plans.has_overlaps` | yes (2026-09-09, via `db push`) |
-| 030 | `projects.archived_at` | yes |
+| 031 | authored plans + outdoor zones | `plans.source, plot_width_m`, `rooms.unroofed`, `plan_elements` |
+| 032 | rate_book internal_ref | `rate_book.internal_ref` |
+| 033 | plan element variant | `plan_elements.variant` |
+| 034 | landscape fixtures | (CHECK change on `plan_fixtures` — not column-probeable; 035+ depend on it) |
+| 035 | garden documents | `rooms.area_derived_m2`, `renders.view`, `boq_outcomes.delta_lines` |
+| 036 | garden scene | `rooms.level_mm, spec`, `plan_context`, `renders.camera` |
+| 037 | client garden draft | `plans.dims_derived`, `rooms.disposition`, `boq_corrections`, `pilot_events` |
+| 038 | project display name | `projects.display_name` |
+| 039 | garden gates | `plan_openings.context_id, spec` |
+| 040 | session capture | `boq_corrections.attributed_to, confidence, session_ref`, `plan_context.spec` |
 
-A correction worth carrying: an earlier probe of this reported 027 as partially
-applied because it selected `project_briefs.id`, and that table has no `id`
-column — its primary key is `project_id`. A missing column and a missing table
-look identical through PostgREST, so probe a column the migration actually
-creates.
+Probe a column the migration actually **creates** — a missing column and a
+missing table look identical through PostgREST.
 
-The 409 overlap gate still reads overlaps LIVE from the loaded rooms rather
-than from `plans.has_overlaps` — deliberately. A stale cache must not decide
-whether a number is trustworthy; the column is for reporting only.
+Live dev counts [DB]: `projects` 4 · `plans` 4 · `rooms` 36 · `takeoff_items`
+113 · `boqs` 58 · `rate_book` **35** (15 `seed` + 20 `actual_transaction`
+`garden.%`) · `boq_outcomes` 1 · `boq_corrections` 3 · `pilot_events` 279 ·
+`plan_elements` 16 · `plan_context` 33 · `plan_fixtures` 109 ·
+`plan_openings` 1 · `renders` 394 · `pricing_skus` 600 · `labour_rates` 52.
 
-Other live counts [DB]: `projects` 7 · `plans` 7 · `rooms` 93 ·
-`takeoff_items` 184 · `rate_book` 61 · `pricing_skus` 600 ·
-`labour_rates` 52 · `plan_fixtures` 151 · `accessory_catalog` 45 ·
-`accessory_selections` 0 · `furniture_prices` **0** (module fallback in use;
-PK is `(item_key, tier)` — **no `id` column**).
-
-**Migrations are no longer applied by hand.** As of I7 the Supabase CLI is the
-only supported path — see `supabase/migrations/` and `docs/MIGRATIONS.md`.
-The `scripts/migrations/*.sql` files are retained as the historical record and
-must not be edited. RLS is disabled on every table.
+**Dev is not a copy of production.** The 46 Mudon interior
+`actual_transaction` rate rows and Mudon's `boq_outcomes` entry #1 are **not**
+in dev; dev's single `boq_outcomes` row is garden entry #2 (below). Anything
+that needs Mudon actuals from the DB must be verified against production
+read-only, or run from the ground-truth modules (which is what the engine does
+anyway — §3.3).
 
 ## 2. Feature flags — current states [.env.local + code]
 
@@ -146,462 +143,342 @@ behaviour.
 | Flag | `.env.local` | Gates |
 |---|---|---|
 | `KG_ENABLED` | **true** | KG grounding (also needs Neo4j reachable) |
-| `DRAWINGS_ENABLED` | **true** | `/project/[id]/drawings` |
+| `DRAWINGS_ENABLED` | **true** | `/project/[id]/drawings`, drawing/render-pack/BoQ-PDF/parity routes |
 | `OVERLAYS_ENABLED` | **true** | electrical/plumbing overlays + their BoQ sections |
 | `VIEWER_3D_ENABLED` | **true** | `/project/[id]/viewer` (also gates P4 inspect) |
 | `WHATIF_ENABLED` | **true** | grade toggles / budget dial over the BoQ |
 | `PERMIT_CHECK_ENABLED` | **true** | Dubai permit-trigger checklist |
 | `STAGING_ENABLED` | **true** | furniture staging prompt block + optional BoQ section |
 | `PROPERTY_OS_LANDING` | **true** | `/` = Property OS intro; homepage at `/rennovaite` |
-| `BOQ_ENGINE` | **unset** | unset = deterministic `lib/boq` engine; `"llm"` = legacy Claude path |
-| `RENDER_MODEL` | **unset** | default `google/nano-banana` |
-| `PARSE_PROVIDER` | **unset** | defaults to `"inhouse"` — see §5 |
 | `TASTE_SEED_ENABLED` | **false** | B3 — the project moodboard conditions renders |
 | `TEXTURED_WALKTHROUGH` | **true** | F1 — 3D walkthrough reads StyleBoard finishes |
+| `GARDEN_PILOT_ENABLED` | **unset** (new) | G1+: authored plans, outdoor zones, elements layer, photo pairs. Run inline / via the `garden` launch config |
+| `BOQ_ENGINE` | **unset** | unset = deterministic `lib/boq` engine; `"llm"` = legacy Claude path |
+| `RENDER_MODEL` | **unset** | default `google/nano-banana` |
+| `PARSE_PROVIDER` | **unset** | defaults to `"inhouse"`; anything else throws |
 
-The last two rows were missing from this table until the 2026-09-11 re-check;
-both were present in `.env.local` all along. **No flag value has changed since
-the Sprint-2 pre-flight.**
-
-~~**`PARSE_PROVIDER` is undocumented**~~ — **fixed.** It now appears in
-`.env.local.example` (line 58, commented) and in the CLAUDE.md env table.
+**Changed since Sprint-2:** `GARDEN_PILOT_ENABLED` is new (13 `process.env`
+reads) and deliberately **not** in `.env.local` — the garden series always ran
+it inline. Non-flag env added by I8: `ALLOW_PROD_WRITE`, `DEV_/PROD_SUPABASE_URL`,
+`DEV_/PROD_SERVICE_ROLE_KEY` (script target guard only; not in `.env.local`).
+No other flag value changed.
 
 ## 3. BoQ · takeoff · rate_book · boq_outcomes shapes
-
-**No Sprint-1 change altered any of these four shapes.** The only Sprint-1
-touch was `fedbc88` (true polygon perimeter for non-rectangular rooms), which
-changes computed *values*, not the schema.
 
 ### 3.1 BoQ storage [code + DB]
 
 - One **jsonb** column, `boqs.sections`, holding the whole document:
   `{ sections: BoqSection[], subtotal_aed, contingency_pct, contingency_aed,
-  vat_pct, vat_aed, grand_total_aed, engine{…} }` — the array lives at
-  `boqs.sections.sections`. Full `boqs` columns [DB]: `id, project_id,
-  total_aed, sections, locked_at, created_at, kg_bundle_id`.
+  vat_pct, vat_aed, grand_total_aed, engine{…}, programme?, garden? }` — the
+  array lives at `boqs.sections.sections`. `programme` (G5d,
+  `lib/boq/programme.ts`) is an indicative delivery programme, **never a line**.
 - `BoqSection = { work_section, lines, section_total_aed }`. `work_section` is
-  a **POMI** enum — never a room, trade, or free-form name
-  (`lib/boq/schema.ts`). Includes the P2 overlay sections
-  `"Electrical Installations"` and `"Plumbing & Sanitary"`.
-- `BoqLine` required: `description, quantity, unit, rate_aed, total_aed,
-  vendor_or_source, notes, rule_id, kind, rate_band, wastage_pct`. Additive
-  **optional** fields (pre-P2 lines still validate):
-  - `element_refs: string[] | null` — the element/fixture ids the quantity was
-    counted from (P2/P4/P5 build on this).
-  - `rate_status: "priced" | "needs_qs"` — `needs_qs` (rate 0) renders a
-    terracotta dot. Staging furniture uses a third value `"indicative"`, but
-    that section is never written into `boqs.sections` (§3.5).
+  a **POMI** enum (`lib/boq/schema.ts`). Garden additions: `External Works`,
+  `Landscape Structures`, `Irrigation`, `External Lighting` (G2) and the G3
+  garden grouping (Preliminaries · Demolition · Hardscape & Structures · Soft
+  Landscaping · Irrigation · Electrical & Lighting), merged into existing
+  sections when a project has both.
+- `BoqLine` optional fields now: `element_refs`, **`rate_status` ∈
+  `indicative | site_assessment | needs_qs | needs_selection`** (was two
+  values), and **`qty_derived`** (a quantity scaled or measured off derived
+  geometry — distinct from `rate_status`, which is about the price).
 - Validate with `BoqSchema` / `BoqSectionSchema` / `BoqLineSchema` at the
   boundary. **Never** hand raw model output into a render or a DB write.
 
 ### 3.2 takeoff_items (017) [code + DB]
 
-One row per `(project × work_item)` or `(element × work_item)`, computed
-deterministically from the `PlanGraph` **before** POMI aggregation. Columns:
-`project_id, plan_snapshot_id, work_item_key, room_id, element_id, qty, unit,
-wet_area, computed_at`. **184 rows** for Mudon.
+Unchanged shape. One row per `(project × work_item)` or
+`(element × work_item)`; aggregated POMI line quantity = Σ of its take-off
+items, `element_refs` = their element ids. The garden take-off
+(`lib/boq/garden-takeoff.ts`) writes per-zone/per-run rows too (lumps write
+none). 113 rows on dev.
 
-**Aggregation-at-assembly rule** (the element↔line contract): an aggregated
-POMI line's `quantity` is the **SUM** over its take-off items and its
-`element_refs` are those items' element ids. Per-room detail lives **only** in
-`takeoff_items` + views — the stored POMI document never gains extra per-room
-lines. `lib/boq/quantify.ts` is pure geometry (no LLM, no DB, no aggregation)
-and unit-tested for "per-room sums == each aggregated line quantity".
+### 3.3 rate_book (018 + 022 + 032) [code + DB]
 
-Pipeline: `computeTakeoff` (F-xx formulas, `rules.ts`) → `rates.ts` (R-xx
-resolution) → priced BoQ (`lib/boq/engine.ts`).
+Columns as before plus 032's **`internal_ref`** (contractor identity — rendered
+nowhere; `source` carries the public label). **Important correction to the
+mental model: `rate_book` is not on either BoQ pricing path** — see spot-check
+(a). Its only runtime reader is the what-if engine (`lib/whatif/rate-book.ts`).
+Interior pricing resolves from `labour_rates` + `pricing_skus` +
+`RATE_RULES`; garden pricing resolves from constants in
+`lib/ground-truth/villa94-garden.ts`. The seeders copy those constants into
+`rate_book` as a record, not as the source the engine reads.
 
-### 3.3 rate_book (018 + 022) [code + DB]
+### 3.4 boq_outcomes (023 + 035) + delta log [DB]
 
-Columns: `city (default 'Dubai'), work_section, item_key, grade ∈
-{economy,standard,premium}, unit, rate_aed (NET), source, qs_validated,
-valid_from`, plus 022's `list_rate_aed`, `scope`
-(`null | supply_only | install_only | supply_and_install`, CHECK), and
-`provenance` (`seed | indicative | actual_transaction`, CHECK, default `seed`).
+035 added `delta_lines` (per-line class + reason). Dev holds **entry #2 only**:
+Villa 94 garden `8d460645` — platform **147,679.18** vs actual **152,059.44**
+→ **−2.88 %** (10/14 quantity lines within ±10 %), recorded 2026-09-12. Entry
+#1 (Mudon, +1.6 %) lives in production.
 
-Resolution reads the **newest `valid_from`** per `(city, item_key, grade,
-scope)` — the actuals reseed **supersedes** seed rows rather than deleting
-them. **Live [DB]: 61 rows** — provenance `seed` 15 / `actual_transaction` 46;
-scope `null` 15 / `supply_only` 22 / `install_only` 2 / `supply_and_install`
-22. `indicative` is still unused in `rate_book` (it is the furniture marker
-elsewhere). Unchanged since Sprint-1.
+### 3.5 boq_corrections (037 + 040) [code + DB]
 
-**Scope enforcement** (`lib/boq/scope.ts`, unit-tested): a
-`supply_and_install` composite (joinery, aluminum) must never receive an added
-install line; a `supply_only` line (tiles, sanitary) must be paired with its
-`install_only` labour line or is flagged `install_missing`.
+`correction_type` ∈ rate | quantity | scope | design | **confirm**;
+`provenance` is always `market_fair`; 040 adds `attributed_to` (free text —
+the firm), `confidence` ∈ firm | estimate, `session_ref`. **3 rows on dev**,
+all `attributed_to: "Newspace"`, `session_ref: "three-firms #1 — Arabella
+design session, Sep 2026"` (1 confirm, 1 scope, 1 design). Captured, counted
+by `computePilotMetrics`, **never applied to any price**.
 
-### 3.4 boq_outcomes (023) + delta log [DB]
+### 3.6 Read-time-only sections [code]
 
-Columns: `project_id, platform_boq_total, platform_by_section (jsonb),
-actual_total, actual_by_section (jsonb), delta_pct, capture_gap_notes,
-recorded_at`. **Entry #1 (Mudon) is still the only row and is unchanged**:
-platform **460,470** vs actual **453,228.5036** → **delta +1.6 %**, recorded
-2026-08-04. Written replace-in-place by `scripts/record-boq-outcome.ts`.
+- **Joinery & Aluminum** (`lib/boq/joinery-aluminum.ts`) — composites +
+  site-assessment allowances.
+- **Furniture (optional)** (P7) — separate prop to `BoqView`, never in
+  `boqs.sections`.
 
-Ground truth: `lib/ground-truth/mudon-actuals.ts` (Villa 94, first floor,
-`MUDON_M2 = 178.5`), transcribed from
-`data/ground-truth/Mudon_Villa94_Ground_Truth_and_Delta_Log.xlsx`. Trade
-totals: labour net 200,000 / tiles 39,263.94 / joinery 70,090.56 / aluminum
-92,449 / sanitary 14,925. Known capture gaps: staircase renovation, office
-build-out, terrace balcony, master-bath built-in, tile-supply split, openings
-deductions.
+## 4. Openings [code + DB]
 
-### 3.5 Read-time-only sections [code]
-
-- **Joinery & Aluminum** (`lib/boq/joinery-aluminum.ts`) — joinery as
-  `supply_and_install` composites; aluminum & glass as **site-assessment
-  allowances**, because the plan graph still has no real openings (§4.3).
-- **Furniture (optional)** (P7) — built at read time by
-  `lib/staging/furniture-boq.ts` + `collect.ts`, passed to `BoqView` as a
-  **separate prop, never written into `boqs.sections`**, all lines
-  `rate_status: "indicative"`. Every contractor-facing surface that reads the
-  stored jsonb excludes it by construction.
-
-## 4. Openings — the schema as actually built (A5) [code + DB]
-
-### 4.1 Table `plan_openings` (migration 026, applied, **0 rows**)
-
-Openings are first-class children of **walls**, not rooms.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | uuid PK | |
-| `plan_id` | uuid NOT NULL → `plans` | cascade delete |
-| `room_id` | uuid → `rooms` | nullable, `on delete set null` |
-| `wall_ref` | text | a **hint only** — derived wall ids are volatile |
-| `kind` | text NOT NULL | CHECK: door / window / archway |
-| `width_mm`, `height_mm`, `sill_mm` | numeric | |
-| `position` | jsonb | normalised `[x, y]` midpoint (same space as `rooms.polygon`) |
-| `along_offset` | numeric | 0..1 along the wall |
-| `source` | text NOT NULL, default `user_drawn` | CHECK: parsed / user_drawn |
-| `derived` | boolean NOT NULL, default false | **true when dimensions were DEFAULTED** — a defaulted opening must never read as measured |
-| `created_at` | timestamptz | |
-
-Indexes on `plan_id` and `room_id`; RLS disabled.
-
-### 4.2 Provider-contract support [code]
-
-`lib/parse/providers/types.ts` defines `RawProvidedOpening`
-(`wall_ref?, room_id?, type, width_mm?, height_mm?, sill_mm?, position,
-along_offset?, derived?`) and an optional `RawParseResult.openings?`.
-**The in-house Claude provider does not emit openings** — the field is
-forward-looking for a hosted / vector-extraction provider. `RawParseResult`
-also has an optional `walls?: unknown[]` that is **declared but not yet
-consumed** (`buildPlanGraph` still derives walls from shared polygon edges).
-
-### 4.3 Graph + BoQ consumption [code]
-
-`buildPlanGraph` ingests openings and **snaps each to its nearest derived
-wall** (because derived wall ids are volatile). `lib/boq/quantify.ts` already
-deducts opening area from `wall_plaster` / `wall_paint` net.
-`derivePlanGraph(projectId)` (`lib/plan/derive.ts`) reads `plan_openings`
-best-effort. `DEFAULT_OPENING_DIMS` lives in `lib/plan/geometry.ts`.
-Unit-tested in `lib/plan/__tests__/openings.test.ts`.
-
-**Because the table is empty, every opening-dependent quantity is currently
-running the zero-openings path** — joinery/aluminum are still allowances and
-wall nets are still gross.
-
-### 4.4 Editor entry points [code] — **route exists, UI does not**
-
-`app/api/plan-openings/route.ts` implements `POST` (zod-validated; missing
-dimensions are defaulted server-side from `DEFAULT_OPENING_DIMS` and flagged
-`derived: true`; always writes `source: "user_drawn"`) and `DELETE` (by `id`).
-**Nothing in `app/`, `components/`, or `lib/` calls this route** — grep for
-`plan-openings` outside the route itself returns zero hits. The R2 2D
-opening-drawing UI is **unbuilt**; the API contract is ready for it.
+`plan_openings` (026) as documented in Sprint-2, plus **039**: `kind` now
+includes **`gate`**, `context_id` (the `plan_context` wall it sits in — never
+re-snapped), `spec`, and the site-reference columns (`site_reference`,
+`disposition`, `dims_derived`, `derived_note`). **1 row on dev** (the Arabella
+separator gate). Interior opening drawing UI (R2) is still unbuilt; the
+door/window schedule is still the missing A5 consumer.
 
 ## 5. Parse provider config [code]
 
-- `lib/parse/` = `constants.ts`, `repair.ts` (overlap repair, unit-tested),
-  `providers/{index,inhouse,types}.ts`.
-- `getParseProvider()` reads `process.env.PARSE_PROVIDER ?? "inhouse"`.
-  **`"inhouse"` is the only accepted value today** — any other value **throws**
-  (deliberately, so a typo cannot silently mis-parse). The hosted raster→vector
-  adapter (CubiCasa) is tagged `TODO(S4b)` and needs a key + a confirmed
-  image-ingest path + an upload-consent line.
-- `ParseProvider = { readonly name: string; parse(asset: ParseAsset) }`;
-  `ParseAsset` is `{kind:"pdf", data}` or `{kind:"image", data, mediaType}`.
-  `RawParsedRoom` carries an **N-vertex normalised polygon following real walls
-  (not a bounding box)** plus a 0..1 `confidence`. Everything downstream of the
-  provider (repair → `buildPlanGraph`) is provider-agnostic.
-- `parse_metrics` (025) records one row per parse and per correction-save:
-  `kind ('parse'|'corrections'), provider, room_count, mean_confidence,
-  low_confidence_count, corrections jsonb {move,resize,vertex,relabel,delete},
-  correction_total, needed_split_count, needed_merge_count, detail, recorded_at`.
-  Surfaced by `app/api/parse-metrics/route.ts`. **0 rows** — no parse has run
-  since 025 was applied, and every `rooms.confidence` is still `null`.
-- Strategy doc: `PARSE_STRATEGY.md` (build-vs-buy spike, A1b).
+Unchanged: `getParseProvider()` reads `PARSE_PROVIDER ?? "inhouse"`; any other
+value throws. `lib/parse/sheet/pdf.ts` (mupdf) extracts text + vectors from
+plan sheets. The CubiCasa adapter is still `TODO(S4b)`.
 
-## 6. Project asset library [code + DB]
+## 6. Project asset library [code]
 
-- **Table `project_assets`** (024): `id, project_id, kind, room_id,
-  storage_path, filename, mime, bytes, uploaded_at, source`. CHECKs:
-  `kind` ∈ floorplan / drawing_mep / drawing_electrical / drawing_hvac / photo
-  / reference_image / other; `source` ∈ intake / render / moodboard, or null.
-- **Storage**: the existing **public `plan-uploads`** bucket at
-  `<projectId>/assets/<uuid>.<ext>` (the floorplan keeps
-  `<projectId>/<uuid>.<ext>`; room photos keep
-  `<projectId>/rooms/<roomId>/<uuid>.<ext>`). Public URLs are derived at read
-  time — **no url column**.
-- **Pure vocabulary/validation**: `lib/assets/types.ts` (`ASSET_KINDS`,
-  `ASSET_SOURCES`, `DRAWING_KINDS`, `KIND_LABEL`, `KIND_ICON`,
-  `DRAWING_DISCIPLINES`, `HUB_GROUPS`, `groupAssetsForHub`, `validateAssetFile`,
-  `assetExtension`, `MAX_ASSET_BYTES = 25 MB`) — unit-tested. Server reads:
-  `lib/assets/load.ts` (`ASSET_BUCKET`, `assetStoragePath`, `publicUrlForPath`,
-  `toAssetLite`, `loadProjectAssets`, `loadProjectPhotoAssets`,
-  `loadProjectAssetsOfKind`) — all degrade to `[]` if the table is absent.
-- **Route** `app/api/project-asset/route.ts`: `POST` (multipart `file` +
-  `project_id` + `kind` + `source?` + `room_id?`, per-kind validation, 25 MB
-  structured 413, storage rollback on DB failure); `PATCH` assigns an existing
-  photo asset to a room.
-- **The reusable picker is `AssetPicker` at
-  [`components/assets/AssetPicker.tsx`](components/assets/AssetPicker.tsx)**
-  (exports `AssetPickerProps` + `AssetPicker`). Its **only** consumer today is
-  `app/project/[id]/render/_components/render-interactive.tsx:1048`. Assigning
-  a photo mirrors a `room_photos` row so the render pipeline is unchanged.
-  The hub panel is
-  [`components/assets/ProjectFilesPanel.tsx`](components/assets/ProjectFilesPanel.tsx).
-- **Client compression** before every image upload: `lib/image/compress.ts`
-  (EXIF-baked decode, long edge ≤ 2048 px, JPEG q0.85; ≤1 MB in-dimension
-  originals pass through byte-identical; HEIC converted where decodable).
-  Unit-tested in `lib/image/__tests__`. `next.config.ts` sets
-  `experimental.proxyClientMaxBodySize: "25mb"`.
-- **Live data [DB]**: 3 rows — two `floorplan`/`intake`, and one Mudon
-  `photo`/`source:render` (`living-before.jpg`) already assigned to a room.
+Unchanged shape (024). `kind` ∈ floorplan / drawing_mep / drawing_electrical /
+drawing_hvac / photo / reference_image / other — **there is no `quotation`
+kind** (relevant to spot-check b). `AssetPicker` is also used by the B2
+moodboard.
 
 ## 7. Render lineage [code + DB]
 
-`renders` columns, verified live: `id, project_id, room_id, prompt, image_url,
-parent_render_id, created_at, kg_bundle_id, source_image_url, model, mode,
-prediction_id, status, qa, kind, staging_set`.
-
-- `parent_render_id` threads tweak/iterate lineage.
-- `mode` ∈ photo / offplan / tweak, with `source_image_url` and `model` as the
-  provenance/A-B triple. `status` ∈ pending / succeeded / failed (default
-  `succeeded`), `qa` = jsonb vision verdict, `kind` ∈ still / pano (default
-  `still`), `staging_set` = jsonb (P7).
-- **Prompt assembly order in `app/api/render/route.ts`**:
-  `buildEditPrompt` → `Materials:` clause (`vendor_selections` → `pricing_skus`)
-  → KG context → **STAGING block last** (so real KG fixtures keep precedence).
-  The cache key is the prompt + `mode` + `source_image_url`, so flag-off and
-  flag-on are simply two cache entries.
-- **Image inputs**: `[sourceImageUrl, moodboardDataUri]` — the style moodboard
-  is read from `public/moodboards/<key>-<room>.png` and passed as a **base64
-  data URI** (Replicate fetches inputs from its own servers, so a localhost URL
-  is unreachable).
-- Prompt builders `lib/render-prompts.ts`; Replicate helpers
-  `lib/render-image.ts`; grounding `lib/render-grounding.ts`.
-- **48 render rows** live; older rows have `model`/`mode`/`source_image_url`
-  `null` (pre-tracing).
+`renders` gained `view` (day | evening, 035) and `camera` (036) alongside the
+Sprint-2 columns; `mode` now also takes `photo_pair`, and scene renders carry
+the gate verdict + `reused_from` (G5d per-view reuse). Scene cache keys start
+with the project id. **394 rows on dev.** Garden pipeline version `g5d-2`.
 
 ## 8. KG env + resolver IDs [code]
 
-- Env: `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` (`kg/retrieval/agent.ts`,
-  dev default password `rennovaite_dev`) and `KG_ENABLED` (`lib/kg/context.ts`).
-  `getKgContext` **never throws** — returns `{context:"", bundleId:null}` on
-  disabled / unknown-style / 10 s timeout / error.
-- Resolver `lib/kg/brief.ts` targets **fixed Mudon slugs regardless of the
-  project record** (`void project`): community `community:mudon-al-naseem`,
-  property `property:villa-mudon-4br-first-floor`, budget tiers
-  `["mid","premium","luxury"]`, and the style map — `contemporary-majlis`,
-  `modern-hijazi`, `coastal-emirati`, `scandi-arabic`, `andalusian-heritage`
-  each to their own `style:<key>` node, and **`luxe-minimal` → `style:minimalist`**.
-- **Caveat unchanged:** the KG seed / loader / `docker-compose.yml` live in a
-  **separate standalone module with its own git repo** at
-  `C:\Users\alsha\OneDrive\Desktop\RennovAIte\RennovAIte\kg`. This repo's `kg/`
-  holds **only** the vendored consumer copy `kg/retrieval/agent.ts` (1 tracked
-  file) — **there is no compose file here**, so `cd kg && docker compose up -d`
-  from the repo root fails. The nodes those slugs resolve against are not
-  version-controlled here.
-- **Starting Neo4j** — the container `rennovaite-neo4j` (`neo4j:5-community`)
-  already exists and its named volumes `kg_neo4j_data` / `kg_neo4j_logs`
-  persist the seed across restarts, so the reliable start needs no compose file
-  and works from any directory: **`docker start rennovaite-neo4j`** (allow
-  ~40 s to reach `healthy`). Use compose only from the OneDrive module path
-  above.
-- **Verified live 2026-09-02**: Bolt reachable at `bolt://localhost:7687` with
-  the `.env.local` credentials; **204 nodes**; 15 labels (`Community`,
-  `PropertyType`, `Style`, `Material`, `Fixture`, `Vendor`, `Regulation`,
-  `Space`, `CostBand`, `ClimateProfile`, `ColorPalette`, `CulturalContext`,
-  `Project`, `ProjectOutcome`, `ReferenceAsset`); **all 8 resolver slugs
-  present**, matched on the **`id`** property (not `slug`, not `key`).
-- `kg_bundle_id` is persisted on `renders` / `boqs` / `feedback_events` only
-  when grounding actually ran.
+Unchanged from Sprint-2. `docker start rennovaite-neo4j`; the seed/loader/
+compose live in the separate OneDrive KG module. Resolver still targets fixed
+Mudon slugs regardless of project.
 
-## 9. Canonical demo project [DB]
+## 9. Projects on dev [DB]
 
-**`Mudon pilot villa` · `6b5fda9d-e40f-4e16-940c-7a17d27ec5dc`** — 4-bed
-first-floor refit, 13 rooms, gross **178.5 m²**, created 2026-04-26.
-Hard-coded in `scripts/record-boq-outcome.ts`, `scripts/verify-graph-integrity.ts`,
-and the test fixtures. The other 6 projects in the DB are `Untitled` scratch
-rows. **Its current locked style is `luxe-minimal`** (`style_choices`, newest
-row 2026-09-01; project-wide, `room_id: null`).
+| id | name | role |
+|---|---|---|
+| `6b5fda9d` | Demo villa (dev) | the Mudon demo, dev copy |
+| `8d460645` | Villa 94 garden (ground truth) — display "Contemporary Villa Garden — Completed Renovation" | garden ground truth, delta-log #2 |
+| `ec4497c7` | Arabella Garden — Draft for Review | live client garden (G5 → G5e) |
+| `12904f6d` | Client garden stand-in (isolation fixture) | scratch — the one to write to |
 
 ## 10. Test runner + fixtures [code]
 
-- Runner: **vitest** (`npm test` → `vitest run`). No other runner. **`tsx` is
-  not available** — `.ts` scripts run via `node` directly per their headers.
-- **18 test files, 152 tests**, all under `lib/**/__tests__/`:
-  `lib/__tests__/smoke` · `assets/types` · `boq/{downstream-nonrectilinear,
-  joinery-aluminum, quantify, scope}` · `compliance/triggers` ·
-  `drawings/{dimension-closure, render-smoke}` · `image/compress` ·
-  `overlays/seed` · `parse/repair` · `plan/{geometry, openings,
-  plan-interaction}` · `staging/staging` · `viewer/scene` · `whatif/engine`.
+- Runner: **vitest** (`npm test`). **`tsx` is not available** — `.ts`
+  scripts run via `node --import ./scripts/_alias-hook.mjs <script>`.
+- **61 files, 694 tests**, all passing. Still pure-module tests (plus scene /
+  sheet SVG assertions); **no component or route tests exist**.
 - Fixtures: `lib/boq/fixtures/mudon-first-floor.ts`,
-  `lib/plan/__tests__/mudon.fixture.ts`, `lib/plan/__tests__/synthetic.fixtures.ts`.
-- **No component or route tests exist.** Every test is a pure-module test.
+  `lib/plan/__tests__/{mudon,synthetic}.fixture(s).ts`,
+  `lib/ground-truth/villa94-garden-geometry.ts`,
+  `lib/client-garden/arabella-reference.ts`.
 
 ---
 
-## 11. Sprint-2 spot checks
+## 11. Sprint-3 spot checks (report only — nothing changed)
 
-### (a) B1 / B2 / B3 — what actually exists
+### (a) Rate resolution order; where a per-firm overlay slots in; where firm-attributed `market_fair` corrections live
 
-**B1 ideation questionnaire — nothing exists.** Zero hits for questionnaire /
-ideation / design-brief anywhere in `app`, `lib`, or `components`. The only
-intake capture is `app/project/new/_components/villa-intake.tsx`, whose entire
-state is `plan, photos, drawings, discipline, projectName, city (default
-"Dubai"), budget (default 850,000)`. There is no table, no route, and no
-component for taste/lifestyle capture. **T2 builds this from zero.**
+**Interior** (`app/api/generate-boq/route.ts` → `lib/boq/engine.ts`): the route
+loads `labour_rates` (route.ts:580) and `pricing_skus` (:586), then
+`generateDeterministicBoq` (:759) builds a `RateResolver` (engine.ts:32) and
+resolves per take-off item (rates.ts:139–238):
 
-**B2 moodboard — partial, static only.** What exists: 24 PNGs in
-`public/moodboards/` (**6 styles × 4 rooms**: `bedroom`, `secondary-bedroom`,
-`bathroom`, `living`), surfaced as `Style.reference_images` in `lib/styles.ts`
-(a static 6-entry `STYLES` array with `key, name_en, name_ar, one_line,
-cost_delta_aed, palette[4], reference_images[4], what_changes[3]`). Displayed
-by `app/project/[id]/style/_components/style-grid.tsx:180`; consumed by the
-render pipeline via `loadMoodboardDataUri`. `AssetPicker` and
-`lib/assets/types.ts` already carry a `source: "moodboard"` value. What does
-not exist: no `moodboards` table, no generation route, no per-project or
-per-user moodboard. `MOODBOARD_ROOM` in `lib/render-grounding.ts` maps only
-those 4 room buckets — any new room type falls through to `null` (ungrounded).
-**T2 extends the static art into a per-project artifact; the asset-library
-`source:"moodboard"` slot is the intended landing place.**
+1. no `RATE_RULES[item_key]` → **throws**;
+2. material rule → `pricing_skus` filtered by category/subcategory, SKU picked
+   at the tier percentile;
+3. material rule with an empty pool → `rule.allowance_aed`, else throws;
+4. labour rule → exact `(work_section, description)` match in `labour_rates`,
+   band by tier; missing → throws;
+5. allowance-only rule → `rule.allowance_aed`;
+6. **then** the accessory selection is laid over the result (`applyAccessory`,
+   rates.ts:76–117, from `loadAccessoryOverrides`, route.ts:787).
 
-**B3 reference-image → render-prompt — partial, taxonomy only.** What exists:
-`reference_image` is a valid `AssetKind` (`lib/assets/types.ts`), validated
-(PNG/JPG), labelled "Reference image", iconed `wallpaper`, and grouped in the
-hub under "References & moodboards". Users can upload one today via
-`/api/project-asset`. What does not exist: **nothing reads it.** The render
-route's only image inputs are `[sourceImageUrl, moodboardDataUri]`; grep for
-`reference_image` under `app/api/render*` returns nothing. `style.reference_images`
-in the render UI (`render-interactive.tsx:885`) is the **static style art**,
-not a user upload. **T2 wires the existing upload path into the existing
-two-image input — the plumbing on both ends exists, the middle does not.**
+After the engine, sections with their own rates are appended: overlays
+(`FIXTURE_META.unitRateAed` or 0/`needs_qs`), joinery/aluminium (constants in
+`mudon-actuals.ts`), garden (below).
 
-### (b) StyleBoard finishes — where they live, and texture assets
+**Garden** (`appendGardenSections` → `priceGardenTakeoff`,
+garden-takeoff.ts:616): `UNPRICED_GARDEN_ITEMS` → 0 / `needs_qs` under
+`UNPRICED_SOURCE_LABEL`; otherwise `rate()` (:248) → `getGardenRate`
+(villa94-garden.ts:211), module constants, missing → throws; then
+`rate_factor` (irrigation band).
 
-- **There is no per-surface finish selection.** The only persisted design
-  choice is `style_choices.style_key` (columns: `id, project_id, style_key,
-  room_id` + `created_at` from migration 005). `room_id` is nullable and is
-  **null in practice** — choices are project-wide. 19 rows live.
-- Finishes are **derived from that one key by two pure lookup tables**:
-  - `lib/viewer/finishes.ts` → `styleFloorColor(styleKey)` (one muted hex per
-    style, falls back to `FLOOR_BONE`) and `styleFinishes(styleKey)` (human
-    `{floor, wall, ceiling}` **label strings**, e.g. "Honed travertine, large
-    format").
-  - `lib/styles.ts` → `palette[4]` hexes + `what_changes[3]` editorial lines.
-- Consumers: `app/project/[id]/viewer/page.tsx:111` (3D floor tint + inspector)
-  and `app/project/[id]/drawings/page.tsx:87` → `buildFinishRows` →
-  `renderFinishSchedule` (the A3 finish-schedule sheet: Room / Surface /
-  Material spec / Area m² / Notes).
-- **Texture assets usable by the 3D viewer: none.** `lib/viewer/scene.ts` is a
-  deliberately non-photoreal **clay model** — flat hex per surface, no UVs, no
-  maps. The candidate image sources and why each falls short for T5:
-  - `public/moodboards/` (24 PNGs) — composed scene art, **not tileable**.
-  - `public/materials/` (16 files) — the swatch set behind `lib/materials.ts`
-    `MATERIALS`. **Mixed and mostly unusable**: 5 are `.svg` flat tone chips
-    (`metal-brass`, `metal-brushed-bronze`, `metal-matte-black`,
-    `walnut-american`, `walnut-quarter-sawn`), 11 are `.jpg` photos. Untiled,
-    unnormalised, no scale metadata. `MATERIALS` is hardcoded, **client-state
-    only, no persistence** (`render-interactive.tsx:227-231` — 4 visible slots,
-    the swap modal writes to `useState` and nothing else); this is stub #3 in
-    `MIGRATION_TODO.md`. `SURFACE_SPECS` beside it is 4 decorative fixed strings
-    (Reflectivity 0.42, Roughness 0.08, …), not real PBR values.
-  - `pricing_skus.Photo_url` — **135 of 600 populated (22.5 %)**; product
-    shots, not textures.
-  - **T5 needs a new texture layer.** The cheapest honest extension is to give
-    `styleFinishes()` a per-surface texture/PBR field alongside its label and
-    to persist real per-surface choices; it cannot be sourced from existing
-    assets.
+**Neither path reads `rate_book`.** Only what-if does (`loadRateBook`: newest
+`valid_from`, then provenance, per `(item_key, grade)` — note it does **not**
+key on `scope`, despite 022's comment). Furniture: `furniture_prices` over
+`FURNITURE_PRICES`.
 
-### (c) Accessory / fixture catalogue beyond the P8 spec-class map
+**Where a per-firm overlay slots in** — the same seam as accessories, twice:
+- interior: an optional `firmRates` argument to `RateResolver`, applied after
+  `resolveFromRules` and before/alongside `applyAccessory` (rates.ts:139),
+  threaded through `EngineInput` from route.ts:759;
+- garden: `rate()` at garden-takeoff.ts:248 is the single choke point —
+  `priceGardenTakeoff` takes an optional firm map, `appendGardenSections`
+  loads it.
+- storage: there is **no firms entity** (no `firms`/`contractors` table;
+  `vendor_selections` is per-SKU, `pricing_skus.vendor` is free text). A firm
+  overlay needs either a firm-keyed rate table or `rate_book.firm_ref`, and
+  **both pricing paths would need new code to read the DB at all.**
+- identity constraint: migration 040's own comment says firm identity lives on
+  its own corrections "and nowhere else (never on a rate book row, never on a
+  client document)". A firm overlay must therefore keep identity in an
+  internal-only column (the `internal_ref` pattern) and put a neutral label in
+  `source` / `vendor_or_source` — or that rule is consciously revised.
 
-Yes — **three independent catalogues exist**, none of them merged:
+**Where `market_fair` corrections with firm identity live today:**
+`boq_corrections` (037, extended by 040). Written by `POST /api/boq-corrections`
+(always `provenance: "market_fair"`, also writes a `correction` pilot event)
+from `ReviewCorrections` (mounted at `boq/page.tsx:314`) and from
+`scripts/arabella-session-apply.ts` with `attributed_to: SESSION_FIRM`
+(`"Newspace"`, `lib/client-garden/arabella-session.ts:46`). Read by
+`GET /api/boq-corrections` and `computePilotMetrics` (counts only). Nothing in
+`lib/boq`, `lib/whatif` or `generate-boq` references the table.
 
-1. **`pricing_skus` — 600 rows [DB]**, seeded from `assets/pricing_skus.csv`
-   (columns `ID, SKU, Brand, Category, Subcategory, Description_en,
-   Description_ar, Unit, Price_aed, Vendor, Source_url, Photo_url,
-   Lead_time_days, in_stock, Last_verified`). **21 categories**: Tiles 85 ·
-   Furniture 65 · Sanitaryware 60 · Drywall & Ceilings 40 · Kitchen 35 ·
-   Faucets & Mixers 35 · Stone & Slabs 30 · Soft Furnishings 30 · HVAC 30 ·
-   Tools 25 · Storage 25 · Paint & Supplies 25 · Hardware 25 · Lighting 20 ·
-   Building Materials 15 · Bathware 14 · Bathroom Furniture 12 ·
-   Security & CCTV 10 · Electrical 10 · Decor 5 · **Bathroom Accessories 4**.
-   This is the real accessory catalogue and it is **only** reachable today via
-   `/project/[id]/vendors` → `vendor_selections` (3 rows) → the render
-   `Materials:` clause. **T3's likely source of truth.**
-2. **`lib/staging/sets.ts` — 34 `FurnitureKey` values** (`sofa-3seat`,
-   `majlis-floor-seating`, `king-bed`, `pendant-feature`, `wall-art`,
-   `mirror-feature`, …) with per-style × per-room-type sets and per-style
-   labels; priced by `lib/staging/prices.ts` at three tiers
-   (IKEA / Home Centre / Danube Home), always `rate_status: "indicative"`.
-   `furniture_prices` (the DB override) is **empty**, so the module is live.
-3. **`lib/overlays/types.ts` — 15 point-fixture types**: 8 electrical
-   (`socket_13a, socket_kitchen, switch_1g, switch_2way, light_point, ac_point,
-   dp_isolator, data_point`) + 7 plumbing (`wc_point, basin_point, shower_mixer,
-   sink_point, washing_machine_point, water_heater, floor_drain`). 151 live
-   `plan_fixtures` rows. Counts feed the two overlay BoQ sections.
+**Found in passing (not fixed — flag for the owner):** the identity rule is
+held on the garden path but **not** on the Mudon interior seed —
+`scripts/seed-rate-book-actuals.ts:58–93` writes supplier/contractor names and
+cart references into `rate_book.source`. What-if copies `source` into
+`perChange[].source` (`lib/whatif/engine.ts:137`); no BoQ component renders it
+today, so it is latent, not a visible leak. Production-only (those rows are not
+on dev).
 
-The P8 spec-class map itself is **`lib/whatif/grades.ts`** — `GRADE_SPECS` over
-5 `GradeableItem`s (`floor_finish, wet_tiling, ceiling_finish, wall_paint,
-wall_plaster`) × 3 grades, each a concrete spec + AED rate + source +
-`qs_validated`, plus a **separate** sanitary spec-class reference map (added by
-the ground-truth work) modelling exposed-vs-concealed as *distinct spec
-classes, not one item at two prices*.
+### (b) The S6 / P8 document-ingestion path
 
-### (d) Mudon phase / timeline data — **none exists** — SUPERSEDED
+**What they are.** **S6** is "S6-pre" — pre-review *scope components*
+(`docs/S6_PRE_SCOPE_COMPONENTS.md`): Newspace's column-G annotations on the
+Mudon delta log became four flagged rules R-45…R-48 (AED 13,445,
+`lib/boq/scope-components.ts`). It is not an ingestion mechanism. **P8** is the
+ground-truth ingestion: one workbook → one hand-structured TypeScript module
+(`lib/ground-truth/mudon-actuals.ts`, `villa94-garden.ts`), "unzip + sheet
+XML, never retyped", then seed scripts write `rate_book`
+(`provenance: actual_transaction`) and `boq_outcomes`
+(`scripts/record-*-outcome.ts`).
 
-> **Correction (2026-09-11).** T4 shipped on 2026-09-03 as `17be0c0`
-> *feat(timeline): phase plan + duration ranges seeded from Mudon actuals (D2)*.
-> `/project/[id]/timeline` is a real route (`page.tsx` +
-> `_components/phase-plan.tsx`) and `lib/journey.ts` now marks
-> `scope_timeline` `available: () => true`, so **the journey is 9 navigable
-> steps, not 8**. CLAUDE.md still says 8 — treat that line as stale. Durations
-> are seeded from the Mudon delta-log actuals; **no `phases` / `milestones`
-> table was added**, so the schema half of the bullets below still holds.
+**Input / output.** Input is a specific, known xlsx (sheet names and cells
+known in advance). Output is module constants, `rate_book` rows and a
+`boq_outcomes` row. The only xlsx reader in the repo is `readWorkbook()` inside
+`scripts/arabella-session-apply.ts:83–102` (`fflate` unzip + regex over
+`sharedStrings`/sheet XML → cell→string map; no types, dates, formulas or
+merged cells; `fflate` is only a **transitive** dependency). Validation is
+`check()` assertions against expected constants — no zod. **Script-only**, run
+with the service-role key; no route, no UI.
 
+**What a "quotation" would need that it lacks:**
+1. **Generic tabular extraction** — header detection, qty/unit/rate/amount
+   columns, number/unit/date parsing. Today every reader is bespoke.
+2. **PDF quote extraction** — mupdf exists but only for plan sheets; no table
+   reconstruction, OCR or LLM extraction (which would need a zod schema).
+3. **Line → `item_key` / POMI mapping** with confidence and a review queue;
+   inclusion/absorption rules (`INCLUSIVE_SCOPE`, `ABSORBED_SCOPE`) are
+   hand-coded per project.
+4. **A quote entity** — counterparty, reference, date, validity/expiry,
+   subtotal/discount/VAT, payment terms, source-file link. `rate_book` has
+   `valid_from` only; `boq_outcomes` is totals.
+5. **Net vs list policy as data** — discounts are handled per module (0.6
+   tiles, 0.88 garden, labour discount undistributed); nothing records whether
+   a discount is relationship pricing or repeatable market price.
+6. **Identity handling enforced, not per-script** — a counterparty table with
+   internal-only identity (see (a)'s Mudon finding).
+7. **Provenance vocabulary** — CHECK allows only `seed | indicative |
+   actual_transaction`; a quote is neither transacted nor seed, and expiry /
+   supersession has no value.
+8. **Additive persistence** — both seeders delete-then-insert
+   (`actual_transaction` wholesale, or `garden.%`), so a second quote would
+   erase the first.
+9. **Upload + review surface** — no `quotation` asset kind, no staging table
+   for parsed lines, nothing ever flips `qs_validated`.
+10. **Structured inclusions/exclusions/variations** — bespoke constants today.
 
-- No `milestones`, `phases`, or `schedule` table; no such column on `projects`.
-  No dates in `data/ground-truth/` beyond the delta-log workbook, and none in
-  `assets/`.
-- The only timeline in the product is **hardcoded**: `const TIMELINE` at
-  `app/project/[id]/page.tsx:883`, rendered by `TimelineCard()` at line 890
-  (comment: *"hardcoded dates per spec"*) — stub #2 in `MIGRATION_TODO.md`,
-  whose close condition is exactly "a real schedule / milestones source exists".
-  A second, unrelated hardcoded set of relative due strings ("Due in 3 days",
-  "Due in 5 days", "Due in 1 week") drives the next-steps queue on the same page.
-- **T4 starts from zero on both schema and data. Abdallah must supply the
-  Mudon dates.**
+### (c) Where BoQ figures render — one component or scattered (I4 sizing)
 
-### (e) Door/window schedule — **no document view consumes openings**
+**Scattered.** ~10 UI surfaces + the BoQ PDF, ~30 render sites, **11+ local AED
+formatters** that disagree on rounding, the `AED` prefix, sign style and k/M
+shortening. The only shared helper is `derivedTotal()`
+(`lib/documents/boq-derived.ts`), used by the BoQ page headline and the PDF.
 
-- `lib/drawings/` contains `sheet, plan-sheet, demo-sheet, finish-schedule,
-  electrical-sheet, plumbing-sheet, overlay-sheet, dimensions, export, persist`.
-  **There is no door schedule, window schedule, or opening schedule sheet**, and
-  no sheet module references doors or windows.
-- `generateDrawingSet` (`lib/drawings/export.ts:195`) emits exactly:
-  **A-101 As-Built Plan**, the demolition sheet, the electrical services sheet,
-  the plumbing services sheet, and **A-201 Finish Schedule**. None reads
-  `plan_openings`.
-- Openings reach only three consumers today, all non-document:
-  `lib/boq/quantify.ts` (net wall deduction), `lib/plan/geometry.ts` +
-  `derive.ts` (graph assembly/snapping), and `lib/viewer/scene.ts` (cut into
-  the 3D walls, **centred** — the contract carries `along_offset` but the scene
-  builder does not yet use it). `lib/drawings/plan-sheet.ts` matches the grep
-  only via its `PlanGraph` type import.
-- **The door/window schedule is unbuilt and is the remaining A5 consumer, as
-  CLAUDE.md states.** With `plan_openings` at 0 rows it would render empty
-  until R2's editor (or a hosted provider) populates it.
+| Surface | Figures | Number source |
+|---|---|---|
+| `boq/_components/boq-view.tsx` (~15 sites) | headline/footer total (:472, :678), budget/headroom (:480–495), section bar (:518), sensitivity (:774–808), section totals (:1070), line rate/total (:1003–1006, :1201–1204, bare `toLocaleString`), room rollup (:885–900), furniture (:952), programme (:1322) | stored jsonb + client recompute (sensitivity, what-if, furniture) |
+| `boq/_components/whatif-sidebar.tsx` | Δ, baseline → scenario, per-option Δ, budget target | recomputed (`lib/whatif/engine.ts`) |
+| `app/project/[id]/page.tsx:695–720` (hub) | spent of budget, materials/labour split | stored `boqs.total_aed` + recompute |
+| `app/dashboard/page.tsx:288, 362` | activity "BoQ priced at…", BoQ value stat | stored, summed |
+| `dashboard/_components/portfolio-browser.tsx` | budget, BoQ total, over/under | stored |
+| `vendors/_components/vendor-picker.tsx` | live grand total, Δ, SKU prices | recomputed client-side (subtotal+contingency+VAT) |
+| `render/_components/render-interactive.tsx:534` | room BoQ chip | recomputed room rollup |
+| `accessories/_components/accessory-picker.tsx` | effective rate, rate×qty, Δ | recomputed |
+| `components/viewer/InspectPanel.tsx:100` (viewer, drawings, plan layers) | per-element line totals | stored |
+| `style/_components/style-grid.tsx` | style Δ vs a static 850k baseline | static |
+| `lib/documents/boq-pdf.ts` | line, section, subtotal, contingency, VAT, grand total | stored + `derivedTotal` |
+
+Notes: the **web UI never shows subtotal / contingency / VAT** (only the PDF
+does; the vendor picker computes them silently). There is no separate garden
+BoQ page — gardens render through `boq-view`. The render pack carries **no**
+AED by design (test-enforced). **Sizing for I4: L** (a low L if scoped to BoQ
+page + PDF + hub + dashboard). The first step is one shared `lib/format/aed`
+with range/derived variants; the hard part is that the recomputed figures
+(what-if, sensitivity, vendor, rollups) would diverge from stored ones unless
+they carry the same markers.
+
+### (d) Pack generation — UI-reachable vs script-only
+
+| Piece | Route | UI entry | Gate |
+|---|---|---|---|
+| Drawing set, per sheet | `GET /api/projects/[id]/drawings?format=pdf&sheet=<n>` | `drawings/page.tsx:219` | `DRAWINGS_ENABLED` |
+| Drawing set, whole (`sheet=all`) | same | `drawings/page.tsx:144` | `DRAWINGS_ENABLED` |
+| Render pack PDF (incl. design-assumptions page) | `GET /api/projects/[id]/render-pack` | `drawings/page.tsx:153` (plain link) | `DRAWINGS_ENABLED`; 409 on not-ready / parity fail |
+| Render pack `?format=json/pages` | same | **none** | — |
+| BoQ PDF | `GET /api/projects/[id]/boq-pdf` | `boq-view.tsx:545` (garden BoQs only) | route needs `DRAWINGS_ENABLED`, **button is not gated** → can 404 |
+| "Generate all" batch | `POST /api/render/batch` → `/render/scene`, `/render/evening` | `render-interactive.tsx:421` → `generate-all.tsx` | none |
+| Parity gate | `GET /api/projects/[id]/parity` | **none** (surfaces only as the render-pack 409 JSON) | `DRAWINGS_ENABLED` |
+| Pack readiness | inside render-pack + boq-pdf | none of its own | — |
+| Photo pairs | `POST/GET /api/render/photo-pair` | **none** | `GARDEN_PILOT_ENABLED` |
+| Consistency gate | `POST /api/render/consistency` (and inside `renderGardenCamera` when an anchor is passed) | **none** — the UI batch client never sends an anchor (`lib/render-batch/client.ts:130`) | none |
+| `display_name` | `PATCH /api/projects/[id]` | **none** | — |
+
+**Script-only today:**
+1. **Consistency gate + anchor strategy** — anchor-first ordering, retry
+   against the anchor (`scripts/lib/garden-render-run.ts:95–120`). Renders
+   produced from the UI are never cross-checked for "one garden, not three".
+2. **Photo pairs** — one per zone with second-photo fallback
+   (`garden-draft-pack.ts:125–146`); no UI at all.
+3. **Parity / readiness visibility** — a failure is a raw 409 JSON body behind
+   a link.
+4. **Printed-content assertions** — draft watermark, derived total,
+   contractor-identity / "ground truth" / house-number / metadata leak checks
+   (`garden-draft-pack.ts`, `garden-reference-pack.ts`).
+5. **`display_name`** — set only by script or direct PATCH.
+6. **Bundled output** — PDFs + gate table + metrics + Step-5 baseline written
+   together; the UI downloads each PDF separately.
+7. Everything else in `scripts/garden-*`, `arabella-*`, `record-*-outcome`
+   (dry-runs, change report, isolation check, session apply, seeding) is
+   script-only by design.
+
+---
+
+## 12. Pre-flight verdict — **GO**
+
+Baseline is green on every gate (tsc, eslint, 694/694, build, migration
+history), migrations 031–040 are applied on the database the app targets, and
+nothing in the spot-checks blocks starting Sprint 3. Carry these into scoping:
+
+- **Firm overlay (a)** is new plumbing, not configuration: neither pricing path
+  reads `rate_book`, and no firms entity exists. It must be designed around the
+  040 identity rule.
+- **Quotation ingest (b)** is near-greenfield; the P8 pattern does not
+  generalise and its seeders are destructive on re-run.
+- **I4 (c)** is **L**; decide up front whether recomputed client-side figures
+  are in scope.
+- **Pack (d)**: the consistency gate and photo pairs are script-only — a
+  UI-generated garden pack is *not* equivalent to a script-generated one.
+- Production was not probed; confirm 031–040 on production before any deploy.
+- Mudon interior seed leaks supplier names into `rate_book.source` (latent).
