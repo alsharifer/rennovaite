@@ -22,16 +22,17 @@ import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 
 import {
-  GARDEN_PROVENANCE,
   GARDEN_RATES,
   INTERNAL_REF,
   PUBLIC_SOURCE_LABEL,
   ratesAreConsistent,
 } from "../lib/ground-truth/villa94-garden.ts";
+// T1.0: rate_book is now what the garden take-off prices from at runtime, so the
+// priced fields come from transcriptionGardenRows() — the SAME rows the offline
+// book prices from. The seed and the pure dry-run cannot disagree on a rate.
+import { transcriptionGardenRows } from "../lib/boq/garden-rates.ts";
 
 const ROOT = "C:/dev/rennovaite";
-const VALID_FROM = "2026-09-12";
-const WORK_SECTION = "Landscape & External Works";
 
 async function loadEnvLocal(): Promise<Record<string, string>> {
   const env: Record<string, string> = {};
@@ -46,22 +47,17 @@ async function loadEnvLocal(): Promise<Record<string, string>> {
 }
 
 function buildRows() {
+  const priced = new Map(transcriptionGardenRows().map((r) => [r.item_key, r] as const));
   return GARDEN_RATES.map((g) => ({
+    // item_key, grade, unit, rate_aed, scope, provenance, valid_from, work_section
+    ...priced.get(g.item_key)!,
     city: "Dubai",
-    work_section: WORK_SECTION,
-    item_key: g.item_key,
-    grade: "standard",
-    unit: g.unit,
-    rate_aed: g.net_rate,
     // A rate that arrived already net has no separate list price to record.
     // Writing the net value into list_rate_aed would make it look discounted.
     list_rate_aed: g.already_net ? null : g.list_rate,
-    scope: g.scope,
-    provenance: GARDEN_PROVENANCE,
     qs_validated: false,
     source: `${PUBLIC_SOURCE_LABEL} · ${g.label}${g.note ? ` — ${g.note}` : ""}`,
     internal_ref: INTERNAL_REF,
-    valid_from: VALID_FROM,
   }));
 }
 
@@ -113,7 +109,7 @@ async function main() {
   );
 
   const byScope = rows.reduce<Record<string, number>>(
-    (m, r) => ((m[r.scope] = (m[r.scope] ?? 0) + 1), m),
+    (m, r) => ((m[r.scope ?? "null"] = (m[r.scope ?? "null"] ?? 0) + 1), m),
     {},
   );
   console.log(`seeded ${rows.length} garden rates:`, JSON.stringify(byScope));

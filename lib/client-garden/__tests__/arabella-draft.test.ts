@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildGardenSections } from "@/lib/boq/garden-boq-feed";
+import { buildGardenSections as buildWithBook } from "@/lib/boq/garden-boq-feed";
 import { PLOT, SOURCE_NOTE, X, Y, ZONES, arabellaPlanInput, referenceCoverage } from "@/lib/client-garden/arabella-reference";
 import { buildBoqPdfPages } from "@/lib/documents/boq-pdf";
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "@/lib/documents/boq-derived";
@@ -14,6 +14,12 @@ import { buildPlanGraph, graphDraftStatus } from "@/lib/plan/geometry";
 import { MUDON_FIXTURE } from "@/lib/plan/__tests__/mudon.fixture";
 import { DRAFT_STATEMENT } from "@/lib/plan/site-reference";
 import { buildGardenScene } from "@/lib/scene/garden-scene";
+import { transcriptionGardenBook } from "@/lib/boq/garden-rates";
+
+// T1.0: the take-off prices through a rate book. These tests check the rules
+// against the transcription, so they use the offline transcription book.
+const BOOK = transcriptionGardenBook();
+const buildGardenSections = (i: Parameters<typeof buildWithBook>[0]) => buildWithBook(i, BOOK);
 
 type Disp = Parameters<typeof arabellaPlanInput>[0];
 

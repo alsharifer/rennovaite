@@ -557,8 +557,15 @@ book and a set of pure rules change nothing until something calls them.
   `item_key LIKE 'garden.%'`, so a re-run cannot reach the Mudon interior
   actuals.
 - **`lib/boq/garden-takeoff.ts`** is a SEPARATE take-off from
-  `lib/boq/takeoff.ts`, and its rates come from the ground-truth module rather
-  than `lib/boq/rates.ts`. The interior `RateResolver` is driven by `RATE_RULES`
+  `lib/boq/takeoff.ts`, and its rates come from a `GardenRateBook` rather
+  than `lib/boq/rates.ts`. **Since T1.0 that book is read from `rate_book`**
+  (`loadGardenRateBook`, `lib/boq/garden-rates.ts`) and a missing landscape
+  book is a hard error, never a fallback to the constants; the ground-truth
+  module keeps only the vocabulary (labels, units, inclusion rules) and the
+  transcription the seeder writes (`transcriptionGardenRows`), which the pure
+  dry-run and unit tests price from (`transcriptionGardenBook`). Pricing paths
+  select `rate_book` through `REFERENCE_COLUMNS` (`lib/rates/reference.ts`),
+  which never includes `source` or `internal_ref`. The interior `RateResolver` is driven by `RATE_RULES`
   over `labour_rates` + `pricing_skus` and throws on an unknown key, so routing
   garden keys through it would have meant inventing labour rows or editing
   interior rules. Rules **GL-01…GL-19** cover project lumps, hardscape

@@ -1,0 +1,3348 @@
+{
+  "value": {
+    "sections": [
+      {
+        "work_section": "Demolition",
+        "lines": [
+          {
+            "description": "Full soft strip — finishes, ceilings, doors, cabinets, sanitary ware (no structural)",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 25,
+            "total_aed": 4975,
+            "vendor_or_source": "labour_rates: Soft strip — carpets, fixtures, fittings removal (no structural)",
+            "notes": "R-01: low band (tier value); total floor area incl. terrace = 199 m²",
+            "rule_id": "Q-01/R-01",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Existing floor finish removal — all areas incl. terrace",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 35,
+            "total_aed": 6965,
+            "vendor_or_source": "labour_rates: Floor tile removal — intact substrate",
+            "notes": "R-02: low band (tier value); total floor area = 199 m²",
+            "rule_id": "Q-02/R-02",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile removal — full height",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 45,
+            "total_aed": 3541,
+            "vendor_or_source": "labour_rates: Wall tile removal — bathroom",
+            "notes": "R-03: low band (tier value); F-03: Σ bath (perimeter × 2.9 m − door) = 78.69 m²",
+            "rule_id": "Q-03/R-03",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 15481
+      },
+      {
+        "work_section": "Blockwork",
+        "lines": [
+          {
+            "description": "Civil alterations — opening closures/openings, new partitions, storage room",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 15000,
+            "total_aed": 15000,
+            "vendor_or_source": "allowance",
+            "notes": "R-35: Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (Villa 94 §2: AED 15k). Design-dependent; QS to re-measure per project.; allowance pending design layout (R-35)",
+            "rule_id": "Q-05/R-35",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 15000
+      },
+      {
+        "work_section": "Plaster",
+        "lines": [
+          {
+            "description": "Plaster make-good / skim after strip-out",
+            "quantity": 58.24,
+            "unit": "m2",
+            "rate_aed": 25,
+            "total_aed": 1456,
+            "vendor_or_source": "labour_rates: Internal skim or smoothing coat",
+            "notes": "R-04: low band (tier value); F-05: interior net wall 388.27 m² × 0.15 = 58.24 m²",
+            "rule_id": "Q-04/R-04",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 1456
+      },
+      {
+        "work_section": "Floor Finishes",
+        "lines": [
+          {
+            "description": "Floor screed 50mm incl. falls — wet areas + terrace",
+            "quantity": 68,
+            "unit": "m2",
+            "rate_aed": 40,
+            "total_aed": 2720,
+            "vendor_or_source": "labour_rates: Floor screed 50mm",
+            "notes": "R-05: low band (tier value); bath floors 18 + terrace 50 m²",
+            "rule_id": "Q-06/R-05",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Waterproofing membrane — terrace",
+            "quantity": 50,
+            "unit": "m2",
+            "rate_aed": 50,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-34: Full waterproofing membrane to external terrace, AED 50/m². No labour-rates row yet — QS to confirm.; terrace area = 50 m²",
+            "rule_id": "Q-07/R-34",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Engineered wood flooring — labour",
+            "quantity": 131,
+            "unit": "m2",
+            "rate_aed": 55,
+            "total_aed": 7205,
+            "vendor_or_source": "labour_rates: Engineered wood flooring — installation labour only",
+            "notes": "R-08: low band (tier value); dry interior floor = 131 m² (wood in dry rooms only)",
+            "rule_id": "Q-08/R-08",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Engineered wood flooring — material supply",
+            "quantity": 141.48,
+            "unit": "m2",
+            "rate_aed": 180,
+            "total_aed": 25466,
+            "vendor_or_source": "allowance — no seeded SKU",
+            "notes": "R-09: No engineered-wood SKU seeded yet — allowance AED 180/m² supply (mid-range click-lock, Danube/BRKZ ballpark).; qty incl. 8% wastage on 131 m2 net (net laid area; wastage added at pricing per W-01/W-02)",
+            "rule_id": "Q-09/R-09",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 8
+          },
+          {
+            "description": "Porcelain floor tiling — wet areas + terrace, labour",
+            "quantity": 68,
+            "unit": "m2",
+            "rate_aed": 45,
+            "total_aed": 3060,
+            "vendor_or_source": "labour_rates: Porcelain floor tiling — labour only",
+            "notes": "R-06: low band (tier value); bath floors 18 + terrace 50 m²",
+            "rule_id": "Q-09b/R-06",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tile — wet areas + terrace, material supply",
+            "quantity": 74.8,
+            "unit": "m2",
+            "rate_aed": 120,
+            "total_aed": 8976,
+            "vendor_or_source": "RAK Ceramics — RAK-MRB-MAXIMUSC-60X60",
+            "notes": "R-07: Maximus Classic marble-effect porcelain floor & wall tile, Polished, 60x60 cm (tier value, pick 1/2 by price); qty incl. 10% wastage on 68 m2 net (net laid area; wastage per W-01)",
+            "rule_id": "Q-09c/R-07",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 10
+          },
+          {
+            "description": "Skirting — tile-matched, dry rooms + terrace",
+            "quantity": 142.38,
+            "unit": "lm",
+            "rate_aed": 30,
+            "total_aed": 4271,
+            "vendor_or_source": "labour_rates: Skirting installation (MDF or wood)",
+            "notes": "R-10: low band (tier value); F-04: Σ (dry + terrace) perimeter − door widths = 142.38 lm",
+            "rule_id": "Q-10/R-10",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "allowance",
+            "notes": "R-36: Staircase renovation allowance — LABOUR ONLY: tread/riser preparation, tile fixing labour and LED nosing circuit, excl. handrail (Villa 94 §5: AED 6k). Delta Log G15 (\"Only labor\") confirms the Villa 94 staircase line carried no material. The tile MATERIAL comes solely from Q-11b/R-44 floor.stair_tile — this note previously read \"tread tiling\", which would have described the same material twice. Rate unchanged. QS to confirm.; allowance (R-36); treads TBC from stair drawing",
+            "rule_id": "Q-11/R-36",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 60198
+      },
+      {
+        "work_section": "Wall Finishes",
+        "lines": [
+          {
+            "description": "Bathroom wall tiling — full height, labour",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 55,
+            "total_aed": 4328,
+            "vendor_or_source": "labour_rates: Ceramic or porcelain wall tiling — bathroom, labour only",
+            "notes": "R-11: low band (tier value); F-03 (as Q-03) = 78.69 m²",
+            "rule_id": "Q-12/R-11",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile — material supply",
+            "quantity": 88.13,
+            "unit": "m2",
+            "rate_aed": 49,
+            "total_aed": 4318,
+            "vendor_or_source": "Danube Home — DH-TIL-1420",
+            "notes": "R-12: Indian Milano Mosaic Tile Hex Black, 30X30 cm (tier value, pick 8/29 by price); qty incl. 12% wastage on 78.69 m2 net (net tiled area; wastage per W-03)",
+            "rule_id": "Q-13/R-12",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 12
+          }
+        ],
+        "section_total_aed": 8646
+      },
+      {
+        "work_section": "Ceilings",
+        "lines": [
+          {
+            "description": "Gypsum false ceiling incl. plastering + painting — all interior rooms",
+            "quantity": 134.1,
+            "unit": "m2",
+            "rate_aed": 125,
+            "total_aed": 16763,
+            "vendor_or_source": "allowance",
+            "notes": "R-30: Gypsum false ceiling incl. plastering + painting, AED 125/m² (Villa 94: AED 21k ÷ 130 m² + 120 lm cove). No labour-rates row yet — QS to confirm.; F-12: interior area 149 m² × 0.9 = 134.1 m²",
+            "rule_id": "Q-14/R-30",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Continuous LED cove channel within gypsum ceiling",
+            "quantity": 111.35,
+            "unit": "lm",
+            "rate_aed": 45,
+            "total_aed": 5011,
+            "vendor_or_source": "allowance",
+            "notes": "R-31: Continuous cove + recessed LED channel, AED 45/lm labour (strips client-supplied). No labour-rates row yet — QS to confirm.; F-13: dry interior area 131 m² × 0.85 = 111.35 lm",
+            "rule_id": "Q-15/R-31",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 21774
+      },
+      {
+        "work_section": "Decoration & Painting",
+        "lines": [
+          {
+            "description": "Internal painting — walls + ceilings, 2 coats",
+            "quantity": 456.42,
+            "unit": "m2",
+            "rate_aed": 18,
+            "total_aed": 8216,
+            "vendor_or_source": "labour_rates: Internal painting — 2 coats over prepared surface",
+            "notes": "R-13: low band (tier value); F-02: dry (net wall + ceiling) + bath ceilings = 456.42 m²",
+            "rule_id": "Q-16/R-13",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 8216
+      },
+      {
+        "work_section": "Electrical",
+        "lines": [
+          {
+            "description": "LED downlights — supply and install (interior)",
+            "quantity": 48,
+            "unit": "no",
+            "rate_aed": 110,
+            "total_aed": 5280,
+            "vendor_or_source": "labour_rates: LED downlight — supply and install",
+            "notes": "R-14: low band (tier value); F-06: Σ interior ceil(area / 3.5) = 48",
+            "rule_id": "Q-17/R-14",
+            "kind": "supply_and_install",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Power sockets and switches — supply and install (interior)",
+            "quantity": 63,
+            "unit": "no",
+            "rate_aed": 90,
+            "total_aed": 5670,
+            "vendor_or_source": "labour_rates: Power socket or switch — supply and install",
+            "notes": "R-15: low band (tier value); F-07: Σ interior ceil(area × 0.4) = 63",
+            "rule_id": "Q-18/R-15",
+            "kind": "supply_and_install",
+            "rate_band": "low",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 10950
+      },
+      {
+        "work_section": "Plumbing",
+        "lines": [
+          {
+            "description": "Bathroom plumbing re-pipe (full PPR) — per bathroom",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 4500,
+            "total_aed": 13500,
+            "vendor_or_source": "labour_rates: Bathroom plumbing rewire — per bathroom, full",
+            "notes": "R-16: low band (tier value); bathroom count = 3",
+            "rule_id": "Q-19/R-16",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Concealed water heater — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1500,
+            "total_aed": 4500,
+            "vendor_or_source": "labour_rates: Concealed water heater — supply and install",
+            "notes": "R-17: low band (tier value); 1 per bathroom × 3 (Villa 94 retained existing heaters — QS to confirm inclusion)",
+            "rule_id": "Q-20/R-17",
+            "kind": "supply_and_install",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Floor / linear shower drain — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 350,
+            "total_aed": 1050,
+            "vendor_or_source": "labour_rates: Floor drain — supply and install",
+            "notes": "R-18: low band (tier value); 1 per bathroom × 3",
+            "rule_id": "Q-21/R-18",
+            "kind": "supply_and_install",
+            "rate_band": "low",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 19050
+      },
+      {
+        "work_section": "Sanitaryware",
+        "lines": [
+          {
+            "description": "Wall-hung WC incl. concealed cistern — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1400,
+            "total_aed": 4200,
+            "vendor_or_source": "labour_rates: WC suite supply and install — mid-range",
+            "notes": "R-19: low band (tier value); 1 per bathroom × 3",
+            "rule_id": "Q-22/R-19",
+            "kind": "supply_and_install",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Vanity basin with mixer — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 900,
+            "total_aed": 2700,
+            "vendor_or_source": "labour_rates: Wash basin with mixer — supply and install",
+            "notes": "R-20: low band (tier value); 1 per bathroom × 3",
+            "rule_id": "Q-23/R-20",
+            "kind": "supply_and_install",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shower system with concealed thermostatic valve — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1500,
+            "total_aed": 4500,
+            "vendor_or_source": "labour_rates: Shower system — mixer, handset, rain head",
+            "notes": "R-21: low band (tier value); 1 per bathroom × 3",
+            "rule_id": "Q-24/R-21",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shattaf (health faucet), matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 250,
+            "total_aed": 750,
+            "vendor_or_source": "allowance",
+            "notes": "R-40: GROHE shattaf, matt black — Laspinas 46703 line 1025302431 (supply); 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24a/R-40",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Paper holder, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 210,
+            "total_aed": 630,
+            "vendor_or_source": "allowance",
+            "notes": "R-41: GROHE Essentials paper holder, matt black — Laspinas 46703 line 1024652430; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24b/R-41",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Towel rail, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 260,
+            "total_aed": 780,
+            "vendor_or_source": "allowance",
+            "notes": "R-42: GROHE Essentials towel rail, matt black — Laspinas 46703 line 1022512430; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24c/R-42",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "WC actuator plate, vertical square — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 450,
+            "total_aed": 1350,
+            "vendor_or_source": "allowance",
+            "notes": "R-43: GROHE actuator plate, vertical square — Laspinas 46703 line 38732KF0; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24d/R-43",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 14910
+      },
+      {
+        "work_section": "MEP / HVAC",
+        "lines": [
+          {
+            "description": "New ducted AC unit incl. ductwork, grilles, thermostat — secondary bedrooms",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 8000,
+            "total_aed": 16000,
+            "vendor_or_source": "labour_rates: Concealed ducted AC FCU replacement",
+            "notes": "R-32: low band (tier value); F-15: 1 per secondary bedroom × 2",
+            "rule_id": "Q-25/R-32",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Split AC unit (2 ton) — office, incl. commissioning",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 3500,
+            "total_aed": 3500,
+            "vendor_or_source": "labour_rates: Split AC unit (1.5-2.5 ton) — supply and install",
+            "notes": "R-33: low band (tier value); F-16: 1 per office × 1",
+            "rule_id": "Q-26/R-33",
+            "kind": "supply_and_install",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "FCU deep service and clean — retained units",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 200,
+            "total_aed": 400,
+            "vendor_or_source": "labour_rates: AC servicing and cleaning",
+            "notes": "R-22: low band (tier value); rooms retaining existing FCU = 2",
+            "rule_id": "Q-27/R-22",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 19900
+      },
+      {
+        "work_section": "Lighting",
+        "lines": [
+          {
+            "description": "Cove LED strip — supply (living/dining/master)",
+            "quantity": 43.29,
+            "unit": "lm",
+            "rate_aed": 85,
+            "total_aed": 3680,
+            "vendor_or_source": "allowance",
+            "notes": "R-45: G10 — cove LED strip SUPPLY, AED 85/lm indicative (24V 14.4W/m COB strip + driver + profile, Dubai trade counter mid-2026). Complements R-31, which prices the cove LABOUR at 45/lm and explicitly assumes 'strips client-supplied' — this is the material that assumption left out. QS to confirm.; S6-02: Σ perimeter over 2 eligible room(s) (living/dining/majlis/master only), perimeter from area at aspect 1.3 = 43.29 lm",
+            "rule_id": "S6-02/R-45",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_status": "indicative"
+          },
+          {
+            "description": "Decorative pendants — installation",
+            "quantity": 5,
+            "unit": "no",
+            "rate_aed": 150,
+            "total_aed": 750,
+            "vendor_or_source": "labour_rates: Decorative pendant — installation labour only",
+            "notes": "R-26: low band (tier value); F-09: 1 per bedroom (3) + 2 living = 5",
+            "rule_id": "Q-31/R-26",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 4430
+      },
+      {
+        "work_section": "Preliminaries",
+        "lines": [
+          {
+            "description": "Site setup, hoarding, protection, daily clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
+            "notes": "R-27: low band (tier value); lump sum per project",
+            "rule_id": "Q-32/R-27",
+            "kind": "lump",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "DM / DEWA permits and fees",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 2500,
+            "total_aed": 2500,
+            "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
+            "notes": "R-28: low band (tier value); lump sum per project",
+            "rule_id": "Q-33/R-28",
+            "kind": "lump",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Skip hire and waste disposal",
+            "quantity": 9,
+            "unit": "no",
+            "rate_aed": 800,
+            "total_aed": 7200,
+            "vendor_or_source": "labour_rates: Skip hire and waste disposal",
+            "notes": "R-29: low band (tier value); F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips",
+            "rule_id": "Q-34/R-29",
+            "kind": "labour",
+            "rate_band": "low",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Protective floor covering over new tiling until handover",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 8,
+            "total_aed": 1592,
+            "vendor_or_source": "allowance",
+            "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 199 m²",
+            "rule_id": "Q-35/R-37",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Rolling scaffold hire — ceiling + painting works",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 2500,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-36/R-38",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Final clearance + professional handover clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 1500,
+            "total_aed": 1500,
+            "vendor_or_source": "allowance",
+            "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-37/R-39",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 21292
+      },
+      {
+        "work_section": "Joinery",
+        "lines": [
+          {
+            "rule_id": "GT/joinery/dresser",
+            "description": "Master bedroom dresser cabinet, glass doors + LED",
+            "quantity": 10.08,
+            "unit": "m2",
+            "rate_aed": 1100,
+            "total_aed": 11088,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 10.08 m² per master (Atrium 1.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/cladding",
+            "description": "Master bedroom wall cladding with hidden LED",
+            "quantity": 6.16,
+            "unit": "m2",
+            "rate_aed": 800,
+            "total_aed": 4928,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 6.16 m² per master (Atrium 1.2)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/cabinet",
+            "description": "Fitted bedroom cabinet, melamine MDF + architrave",
+            "quantity": 14,
+            "unit": "m2",
+            "rate_aed": 850,
+            "total_aed": 11900,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 7 m² per bedroom × 2 (Atrium 2.1/3.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/bath_cabinet",
+            "description": "Bathroom cabinet with doors, MR melamine",
+            "quantity": 3,
+            "unit": "item",
+            "rate_aed": 2400,
+            "total_aed": 7200,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "One per bathroom × 3",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/vanity",
+            "description": "Bathroom vanity box, MR melamine",
+            "quantity": 3,
+            "unit": "item",
+            "rate_aed": 1800,
+            "total_aed": 5400,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "One per bathroom × 3",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/door_leaf",
+            "description": "Solid door leaf, new handle + hinges",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 2700,
+            "total_aed": 16200,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Bedrooms + bathrooms = 6 leaves (Atrium 5.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/door_frame",
+            "description": "Solid meranti door frame, painted + fixed",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 1550,
+            "total_aed": 9300,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "6 frames (Atrium 5.2)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-05/R-46",
+            "description": "Vanity counter slab — allowance, requires site measurement",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1450,
+            "total_aed": 4350,
+            "vendor_or_source": "S6-pre G19 — excluded from the RAK tiles quotation; indicative allowance",
+            "notes": "S6-05: 1 slab per vanity unit in the joinery scope = 3",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          }
+        ],
+        "section_total_aed": 70366
+      },
+      {
+        "work_section": "Aluminum & Glass",
+        "lines": [
+          {
+            "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
+            "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 5150,
+            "total_aed": 10300,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
+            "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 5150,
+            "total_aed": 10300,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
+            "description": "Master bathroom — Tilt & turn system DG, 950×950",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 3000,
+            "total_aed": 3000,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
+            "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 12040,
+            "total_aed": 12040,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
+            "description": "Office — Thermal-break sliding system DG, 1700×2300",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 10384,
+            "total_aed": 10384,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
+            "description": "Office — Thermal-break sliding system DG, 1830×3000",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 14176,
+            "total_aed": 14176,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
+            "description": "Living area — Skylight DG, 1830×3750",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 15749,
+            "total_aed": 15749,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
+            "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
+            "quantity": 10,
+            "unit": "lm",
+            "rate_aed": 1650,
+            "total_aed": 16500,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-06/R-47",
+            "description": "Frameless shower glass partition — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2200,
+            "total_aed": 6600,
+            "vendor_or_source": "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+            "notes": "S6-06: 1 per wet room with a shower (bathroom/ensuite; powder excluded) = 3",
+            "rate_status": "indicative",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-07/R-48",
+            "description": "Bathroom mirror — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 650,
+            "total_aed": 1950,
+            "vendor_or_source": "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+            "notes": "S6-07: max(wet rooms 3, vanity units 3) = 3",
+            "rate_status": "indicative",
+            "scope": "supply_and_install"
+          }
+        ],
+        "section_total_aed": 100999
+      }
+    ],
+    "subtotal_aed": 392668,
+    "contingency_pct": 8,
+    "contingency_aed": 31413,
+    "vat_pct": 5,
+    "vat_aed": 21204,
+    "grand_total_aed": 445285,
+    "engine": {
+      "version": "0.2.0",
+      "tier": "value",
+      "flooring": "engineered_wood",
+      "style_key": "scandi-arabic"
+    }
+  },
+  "mid": {
+    "sections": [
+      {
+        "work_section": "Demolition",
+        "lines": [
+          {
+            "description": "Full soft strip — finishes, ceilings, doors, cabinets, sanitary ware (no structural)",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 40,
+            "total_aed": 7960,
+            "vendor_or_source": "labour_rates: Soft strip — carpets, fixtures, fittings removal (no structural)",
+            "notes": "R-01: mid band (tier mid); total floor area incl. terrace = 199 m²",
+            "rule_id": "Q-01/R-01",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Existing floor finish removal — all areas incl. terrace",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 55,
+            "total_aed": 10945,
+            "vendor_or_source": "labour_rates: Floor tile removal — intact substrate",
+            "notes": "R-02: mid band (tier mid); total floor area = 199 m²",
+            "rule_id": "Q-02/R-02",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile removal — full height",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 70,
+            "total_aed": 5508,
+            "vendor_or_source": "labour_rates: Wall tile removal — bathroom",
+            "notes": "R-03: mid band (tier mid); F-03: Σ bath (perimeter × 2.9 m − door) = 78.69 m²",
+            "rule_id": "Q-03/R-03",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 24413
+      },
+      {
+        "work_section": "Blockwork",
+        "lines": [
+          {
+            "description": "Civil alterations — opening closures/openings, new partitions, storage room",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 15000,
+            "total_aed": 15000,
+            "vendor_or_source": "allowance",
+            "notes": "R-35: Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (Villa 94 §2: AED 15k). Design-dependent; QS to re-measure per project.; allowance pending design layout (R-35)",
+            "rule_id": "Q-05/R-35",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 15000
+      },
+      {
+        "work_section": "Plaster",
+        "lines": [
+          {
+            "description": "Plaster make-good / skim after strip-out",
+            "quantity": 58.24,
+            "unit": "m2",
+            "rate_aed": 35,
+            "total_aed": 2038,
+            "vendor_or_source": "labour_rates: Internal skim or smoothing coat",
+            "notes": "R-04: mid band (tier mid); F-05: interior net wall 388.27 m² × 0.15 = 58.24 m²",
+            "rule_id": "Q-04/R-04",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 2038
+      },
+      {
+        "work_section": "Floor Finishes",
+        "lines": [
+          {
+            "description": "Floor screed 50mm incl. falls — wet areas + terrace",
+            "quantity": 68,
+            "unit": "m2",
+            "rate_aed": 60,
+            "total_aed": 4080,
+            "vendor_or_source": "labour_rates: Floor screed 50mm",
+            "notes": "R-05: mid band (tier mid); bath floors 18 + terrace 50 m²",
+            "rule_id": "Q-06/R-05",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Waterproofing membrane — terrace",
+            "quantity": 50,
+            "unit": "m2",
+            "rate_aed": 50,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-34: Full waterproofing membrane to external terrace, AED 50/m². No labour-rates row yet — QS to confirm.; terrace area = 50 m²",
+            "rule_id": "Q-07/R-34",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tiling — labour",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 70,
+            "total_aed": 13930,
+            "vendor_or_source": "labour_rates: Porcelain floor tiling — labour only",
+            "notes": "R-06: mid band (tier mid); total floor area = 199 m² (porcelain throughout incl. wet areas + terrace)",
+            "rule_id": "Q-08/R-06",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tiling — material supply",
+            "quantity": 218.9,
+            "unit": "m2",
+            "rate_aed": 120,
+            "total_aed": 26268,
+            "vendor_or_source": "RAK Ceramics — RAK-MRB-MAXIMUSC-60X60",
+            "notes": "R-07: Maximus Classic marble-effect porcelain floor & wall tile, Polished, 60x60 cm (tier mid, pick 1/2 by price); qty incl. 10% wastage on 199 m2 net (net laid area; wastage added at pricing per W-01/W-02)",
+            "rule_id": "Q-09/R-07",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 10
+          },
+          {
+            "description": "Skirting — tile-matched, dry rooms + terrace",
+            "quantity": 142.38,
+            "unit": "lm",
+            "rate_aed": 55,
+            "total_aed": 7831,
+            "vendor_or_source": "labour_rates: Skirting installation (MDF or wood)",
+            "notes": "R-10: mid band (tier mid); F-04: Σ (dry + terrace) perimeter − door widths = 142.38 lm",
+            "rule_id": "Q-10/R-10",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "allowance",
+            "notes": "R-36: Staircase renovation allowance — LABOUR ONLY: tread/riser preparation, tile fixing labour and LED nosing circuit, excl. handrail (Villa 94 §5: AED 6k). Delta Log G15 (\"Only labor\") confirms the Villa 94 staircase line carried no material. The tile MATERIAL comes solely from Q-11b/R-44 floor.stair_tile — this note previously read \"tread tiling\", which would have described the same material twice. Rate unchanged. QS to confirm.; allowance (R-36); treads TBC from stair drawing",
+            "rule_id": "Q-11/R-36",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 60609
+      },
+      {
+        "work_section": "Wall Finishes",
+        "lines": [
+          {
+            "description": "Bathroom wall tiling — full height, labour",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 85,
+            "total_aed": 6689,
+            "vendor_or_source": "labour_rates: Ceramic or porcelain wall tiling — bathroom, labour only",
+            "notes": "R-11: mid band (tier mid); F-03 (as Q-03) = 78.69 m²",
+            "rule_id": "Q-12/R-11",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile — material supply",
+            "quantity": 88.13,
+            "unit": "m2",
+            "rate_aed": 87,
+            "total_aed": 7667,
+            "vendor_or_source": "RAK Ceramics — RAK-CON-ENDORA-60X60",
+            "notes": "R-12: Endora concrete effect tile 60x60 cm (tier mid, pick 15/29 by price); qty incl. 12% wastage on 78.69 m2 net (net tiled area; wastage per W-03)",
+            "rule_id": "Q-13/R-12",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 12
+          }
+        ],
+        "section_total_aed": 14356
+      },
+      {
+        "work_section": "Ceilings",
+        "lines": [
+          {
+            "description": "Gypsum false ceiling incl. plastering + painting — all interior rooms",
+            "quantity": 134.1,
+            "unit": "m2",
+            "rate_aed": 125,
+            "total_aed": 16763,
+            "vendor_or_source": "allowance",
+            "notes": "R-30: Gypsum false ceiling incl. plastering + painting, AED 125/m² (Villa 94: AED 21k ÷ 130 m² + 120 lm cove). No labour-rates row yet — QS to confirm.; F-12: interior area 149 m² × 0.9 = 134.1 m²",
+            "rule_id": "Q-14/R-30",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Continuous LED cove channel within gypsum ceiling",
+            "quantity": 111.35,
+            "unit": "lm",
+            "rate_aed": 45,
+            "total_aed": 5011,
+            "vendor_or_source": "allowance",
+            "notes": "R-31: Continuous cove + recessed LED channel, AED 45/lm labour (strips client-supplied). No labour-rates row yet — QS to confirm.; F-13: dry interior area 131 m² × 0.85 = 111.35 lm",
+            "rule_id": "Q-15/R-31",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 21774
+      },
+      {
+        "work_section": "Decoration & Painting",
+        "lines": [
+          {
+            "description": "Internal painting — walls + ceilings, 2 coats",
+            "quantity": 456.42,
+            "unit": "m2",
+            "rate_aed": 30,
+            "total_aed": 13693,
+            "vendor_or_source": "labour_rates: Internal painting — 2 coats over prepared surface",
+            "notes": "R-13: mid band (tier mid); F-02: dry (net wall + ceiling) + bath ceilings = 456.42 m²",
+            "rule_id": "Q-16/R-13",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 13693
+      },
+      {
+        "work_section": "Electrical",
+        "lines": [
+          {
+            "description": "LED downlights — supply and install (interior)",
+            "quantity": 48,
+            "unit": "no",
+            "rate_aed": 180,
+            "total_aed": 8640,
+            "vendor_or_source": "labour_rates: LED downlight — supply and install",
+            "notes": "R-14: mid band (tier mid); F-06: Σ interior ceil(area / 3.5) = 48",
+            "rule_id": "Q-17/R-14",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Power sockets and switches — supply and install (interior)",
+            "quantity": 63,
+            "unit": "no",
+            "rate_aed": 140,
+            "total_aed": 8820,
+            "vendor_or_source": "labour_rates: Power socket or switch — supply and install",
+            "notes": "R-15: mid band (tier mid); F-07: Σ interior ceil(area × 0.4) = 63",
+            "rule_id": "Q-18/R-15",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 17460
+      },
+      {
+        "work_section": "Plumbing",
+        "lines": [
+          {
+            "description": "Bathroom plumbing re-pipe (full PPR) — per bathroom",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 7500,
+            "total_aed": 22500,
+            "vendor_or_source": "labour_rates: Bathroom plumbing rewire — per bathroom, full",
+            "notes": "R-16: mid band (tier mid); bathroom count = 3",
+            "rule_id": "Q-19/R-16",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Concealed water heater — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2800,
+            "total_aed": 8400,
+            "vendor_or_source": "labour_rates: Concealed water heater — supply and install",
+            "notes": "R-17: mid band (tier mid); 1 per bathroom × 3 (Villa 94 retained existing heaters — QS to confirm inclusion)",
+            "rule_id": "Q-20/R-17",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Floor / linear shower drain — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 650,
+            "total_aed": 1950,
+            "vendor_or_source": "labour_rates: Floor drain — supply and install",
+            "notes": "R-18: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-21/R-18",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 32850
+      },
+      {
+        "work_section": "Sanitaryware",
+        "lines": [
+          {
+            "description": "Wall-hung WC incl. concealed cistern — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2400,
+            "total_aed": 7200,
+            "vendor_or_source": "labour_rates: WC suite supply and install — mid-range",
+            "notes": "R-19: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-22/R-19",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Vanity basin with mixer — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1800,
+            "total_aed": 5400,
+            "vendor_or_source": "labour_rates: Wash basin with mixer — supply and install",
+            "notes": "R-20: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-23/R-20",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shower system with concealed thermostatic valve — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 3500,
+            "total_aed": 10500,
+            "vendor_or_source": "labour_rates: Shower system — mixer, handset, rain head",
+            "notes": "R-21: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-24/R-21",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shattaf (health faucet), matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 250,
+            "total_aed": 750,
+            "vendor_or_source": "allowance",
+            "notes": "R-40: GROHE shattaf, matt black — Laspinas 46703 line 1025302431 (supply); 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24a/R-40",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Paper holder, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 210,
+            "total_aed": 630,
+            "vendor_or_source": "allowance",
+            "notes": "R-41: GROHE Essentials paper holder, matt black — Laspinas 46703 line 1024652430; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24b/R-41",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Towel rail, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 260,
+            "total_aed": 780,
+            "vendor_or_source": "allowance",
+            "notes": "R-42: GROHE Essentials towel rail, matt black — Laspinas 46703 line 1022512430; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24c/R-42",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "WC actuator plate, vertical square — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 450,
+            "total_aed": 1350,
+            "vendor_or_source": "allowance",
+            "notes": "R-43: GROHE actuator plate, vertical square — Laspinas 46703 line 38732KF0; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24d/R-43",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 26610
+      },
+      {
+        "work_section": "MEP / HVAC",
+        "lines": [
+          {
+            "description": "New ducted AC unit incl. ductwork, grilles, thermostat — secondary bedrooms",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 14000,
+            "total_aed": 28000,
+            "vendor_or_source": "labour_rates: Concealed ducted AC FCU replacement",
+            "notes": "R-32: mid band (tier mid); F-15: 1 per secondary bedroom × 2",
+            "rule_id": "Q-25/R-32",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Split AC unit (2 ton) — office, incl. commissioning",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 5500,
+            "total_aed": 5500,
+            "vendor_or_source": "labour_rates: Split AC unit (1.5-2.5 ton) — supply and install",
+            "notes": "R-33: mid band (tier mid); F-16: 1 per office × 1",
+            "rule_id": "Q-26/R-33",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "FCU deep service and clean — retained units",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 350,
+            "total_aed": 700,
+            "vendor_or_source": "labour_rates: AC servicing and cleaning",
+            "notes": "R-22: mid band (tier mid); rooms retaining existing FCU = 2",
+            "rule_id": "Q-27/R-22",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 34200
+      },
+      {
+        "work_section": "Lighting",
+        "lines": [
+          {
+            "description": "Cove LED strip — supply (living/dining/master)",
+            "quantity": 43.29,
+            "unit": "lm",
+            "rate_aed": 85,
+            "total_aed": 3680,
+            "vendor_or_source": "allowance",
+            "notes": "R-45: G10 — cove LED strip SUPPLY, AED 85/lm indicative (24V 14.4W/m COB strip + driver + profile, Dubai trade counter mid-2026). Complements R-31, which prices the cove LABOUR at 45/lm and explicitly assumes 'strips client-supplied' — this is the material that assumption left out. QS to confirm.; S6-02: Σ perimeter over 2 eligible room(s) (living/dining/majlis/master only), perimeter from area at aspect 1.3 = 43.29 lm",
+            "rule_id": "S6-02/R-45",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_status": "indicative"
+          },
+          {
+            "description": "Decorative pendants — installation",
+            "quantity": 5,
+            "unit": "no",
+            "rate_aed": 280,
+            "total_aed": 1400,
+            "vendor_or_source": "labour_rates: Decorative pendant — installation labour only",
+            "notes": "R-26: mid band (tier mid); F-09: 1 per bedroom (3) + 2 living = 5",
+            "rule_id": "Q-31/R-26",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 5080
+      },
+      {
+        "work_section": "Preliminaries",
+        "lines": [
+          {
+            "description": "Site setup, hoarding, protection, daily clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 12000,
+            "total_aed": 12000,
+            "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
+            "notes": "R-27: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-32/R-27",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "DM / DEWA permits and fees",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
+            "notes": "R-28: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-33/R-28",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Skip hire and waste disposal",
+            "quantity": 9,
+            "unit": "no",
+            "rate_aed": 1500,
+            "total_aed": 13500,
+            "vendor_or_source": "labour_rates: Skip hire and waste disposal",
+            "notes": "R-29: mid band (tier mid); F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips",
+            "rule_id": "Q-34/R-29",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Protective floor covering over new tiling until handover",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 8,
+            "total_aed": 1592,
+            "vendor_or_source": "allowance",
+            "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 199 m²",
+            "rule_id": "Q-35/R-37",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Rolling scaffold hire — ceiling + painting works",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 2500,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-36/R-38",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Final clearance + professional handover clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 1500,
+            "total_aed": 1500,
+            "vendor_or_source": "allowance",
+            "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-37/R-39",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 37092
+      },
+      {
+        "work_section": "Joinery",
+        "lines": [
+          {
+            "rule_id": "GT/joinery/dresser",
+            "description": "Master bedroom dresser cabinet, glass doors + LED",
+            "quantity": 10.08,
+            "unit": "m2",
+            "rate_aed": 1100,
+            "total_aed": 11088,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 10.08 m² per master (Atrium 1.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/cladding",
+            "description": "Master bedroom wall cladding with hidden LED",
+            "quantity": 6.16,
+            "unit": "m2",
+            "rate_aed": 800,
+            "total_aed": 4928,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 6.16 m² per master (Atrium 1.2)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/cabinet",
+            "description": "Fitted bedroom cabinet, melamine MDF + architrave",
+            "quantity": 14,
+            "unit": "m2",
+            "rate_aed": 850,
+            "total_aed": 11900,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 7 m² per bedroom × 2 (Atrium 2.1/3.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/bath_cabinet",
+            "description": "Bathroom cabinet with doors, MR melamine",
+            "quantity": 3,
+            "unit": "item",
+            "rate_aed": 2400,
+            "total_aed": 7200,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "One per bathroom × 3",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/vanity",
+            "description": "Bathroom vanity box, MR melamine",
+            "quantity": 3,
+            "unit": "item",
+            "rate_aed": 1800,
+            "total_aed": 5400,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "One per bathroom × 3",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/door_leaf",
+            "description": "Solid door leaf, new handle + hinges",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 2700,
+            "total_aed": 16200,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Bedrooms + bathrooms = 6 leaves (Atrium 5.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/door_frame",
+            "description": "Solid meranti door frame, painted + fixed",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 1550,
+            "total_aed": 9300,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "6 frames (Atrium 5.2)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-05/R-46",
+            "description": "Vanity counter slab — allowance, requires site measurement",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1450,
+            "total_aed": 4350,
+            "vendor_or_source": "S6-pre G19 — excluded from the RAK tiles quotation; indicative allowance",
+            "notes": "S6-05: 1 slab per vanity unit in the joinery scope = 3",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          }
+        ],
+        "section_total_aed": 70366
+      },
+      {
+        "work_section": "Aluminum & Glass",
+        "lines": [
+          {
+            "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
+            "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 5150,
+            "total_aed": 10300,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
+            "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 5150,
+            "total_aed": 10300,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
+            "description": "Master bathroom — Tilt & turn system DG, 950×950",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 3000,
+            "total_aed": 3000,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
+            "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 12040,
+            "total_aed": 12040,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
+            "description": "Office — Thermal-break sliding system DG, 1700×2300",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 10384,
+            "total_aed": 10384,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
+            "description": "Office — Thermal-break sliding system DG, 1830×3000",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 14176,
+            "total_aed": 14176,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
+            "description": "Living area — Skylight DG, 1830×3750",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 15749,
+            "total_aed": 15749,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
+            "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
+            "quantity": 10,
+            "unit": "lm",
+            "rate_aed": 1650,
+            "total_aed": 16500,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-06/R-47",
+            "description": "Frameless shower glass partition — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2200,
+            "total_aed": 6600,
+            "vendor_or_source": "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+            "notes": "S6-06: 1 per wet room with a shower (bathroom/ensuite; powder excluded) = 3",
+            "rate_status": "indicative",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-07/R-48",
+            "description": "Bathroom mirror — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 650,
+            "total_aed": 1950,
+            "vendor_or_source": "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+            "notes": "S6-07: max(wet rooms 3, vanity units 3) = 3",
+            "rate_status": "indicative",
+            "scope": "supply_and_install"
+          }
+        ],
+        "section_total_aed": 100999
+      }
+    ],
+    "subtotal_aed": 476540,
+    "contingency_pct": 8,
+    "contingency_aed": 38123,
+    "vat_pct": 5,
+    "vat_aed": 25733,
+    "grand_total_aed": 540396,
+    "engine": {
+      "version": "0.2.0",
+      "tier": "mid",
+      "flooring": "porcelain",
+      "style_key": "contemporary-majlis"
+    }
+  },
+  "premium": {
+    "sections": [
+      {
+        "work_section": "Demolition",
+        "lines": [
+          {
+            "description": "Full soft strip — finishes, ceilings, doors, cabinets, sanitary ware (no structural)",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 60,
+            "total_aed": 11940,
+            "vendor_or_source": "labour_rates: Soft strip — carpets, fixtures, fittings removal (no structural)",
+            "notes": "R-01: high band (tier premium); total floor area incl. terrace = 199 m²",
+            "rule_id": "Q-01/R-01",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Existing floor finish removal — all areas incl. terrace",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 85,
+            "total_aed": 16915,
+            "vendor_or_source": "labour_rates: Floor tile removal — intact substrate",
+            "notes": "R-02: high band (tier premium); total floor area = 199 m²",
+            "rule_id": "Q-02/R-02",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile removal — full height",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 110,
+            "total_aed": 8656,
+            "vendor_or_source": "labour_rates: Wall tile removal — bathroom",
+            "notes": "R-03: high band (tier premium); F-03: Σ bath (perimeter × 2.9 m − door) = 78.69 m²",
+            "rule_id": "Q-03/R-03",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 37511
+      },
+      {
+        "work_section": "Blockwork",
+        "lines": [
+          {
+            "description": "Civil alterations — opening closures/openings, new partitions, storage room",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 15000,
+            "total_aed": 15000,
+            "vendor_or_source": "allowance",
+            "notes": "R-35: Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (Villa 94 §2: AED 15k). Design-dependent; QS to re-measure per project.; allowance pending design layout (R-35)",
+            "rule_id": "Q-05/R-35",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 15000
+      },
+      {
+        "work_section": "Plaster",
+        "lines": [
+          {
+            "description": "Plaster make-good / skim after strip-out",
+            "quantity": 58.24,
+            "unit": "m2",
+            "rate_aed": 50,
+            "total_aed": 2912,
+            "vendor_or_source": "labour_rates: Internal skim or smoothing coat",
+            "notes": "R-04: high band (tier premium); F-05: interior net wall 388.27 m² × 0.15 = 58.24 m²",
+            "rule_id": "Q-04/R-04",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 2912
+      },
+      {
+        "work_section": "Floor Finishes",
+        "lines": [
+          {
+            "description": "Floor screed 50mm incl. falls — wet areas + terrace",
+            "quantity": 68,
+            "unit": "m2",
+            "rate_aed": 85,
+            "total_aed": 5780,
+            "vendor_or_source": "labour_rates: Floor screed 50mm",
+            "notes": "R-05: high band (tier premium); bath floors 18 + terrace 50 m²",
+            "rule_id": "Q-06/R-05",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Waterproofing membrane — terrace",
+            "quantity": 50,
+            "unit": "m2",
+            "rate_aed": 50,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-34: Full waterproofing membrane to external terrace, AED 50/m². No labour-rates row yet — QS to confirm.; terrace area = 50 m²",
+            "rule_id": "Q-07/R-34",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tiling — labour",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 95,
+            "total_aed": 18905,
+            "vendor_or_source": "labour_rates: Porcelain floor tiling — labour only",
+            "notes": "R-06: high band (tier premium); total floor area = 199 m² (porcelain throughout incl. wet areas + terrace)",
+            "rule_id": "Q-08/R-06",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tiling — material supply",
+            "quantity": 218.9,
+            "unit": "m2",
+            "rate_aed": 120,
+            "total_aed": 26268,
+            "vendor_or_source": "RAK Ceramics — RAK-MRB-MAXIMUSC-60X60",
+            "notes": "R-07: Maximus Classic marble-effect porcelain floor & wall tile, Polished, 60x60 cm (tier premium, pick 1/2 by price); qty incl. 10% wastage on 199 m2 net (net laid area; wastage added at pricing per W-01/W-02)",
+            "rule_id": "Q-09/R-07",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 10
+          },
+          {
+            "description": "Skirting — tile-matched, dry rooms + terrace",
+            "quantity": 142.38,
+            "unit": "lm",
+            "rate_aed": 90,
+            "total_aed": 12814,
+            "vendor_or_source": "labour_rates: Skirting installation (MDF or wood)",
+            "notes": "R-10: high band (tier premium); F-04: Σ (dry + terrace) perimeter − door widths = 142.38 lm",
+            "rule_id": "Q-10/R-10",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "allowance",
+            "notes": "R-36: Staircase renovation allowance — LABOUR ONLY: tread/riser preparation, tile fixing labour and LED nosing circuit, excl. handrail (Villa 94 §5: AED 6k). Delta Log G15 (\"Only labor\") confirms the Villa 94 staircase line carried no material. The tile MATERIAL comes solely from Q-11b/R-44 floor.stair_tile — this note previously read \"tread tiling\", which would have described the same material twice. Rate unchanged. QS to confirm.; allowance (R-36); treads TBC from stair drawing",
+            "rule_id": "Q-11/R-36",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 72267
+      },
+      {
+        "work_section": "Wall Finishes",
+        "lines": [
+          {
+            "description": "Bathroom wall tiling — full height, labour",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 120,
+            "total_aed": 9443,
+            "vendor_or_source": "labour_rates: Ceramic or porcelain wall tiling — bathroom, labour only",
+            "notes": "R-11: high band (tier premium); F-03 (as Q-03) = 78.69 m²",
+            "rule_id": "Q-12/R-11",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile — material supply",
+            "quantity": 88.13,
+            "unit": "m2",
+            "rate_aed": 119,
+            "total_aed": 10487,
+            "vendor_or_source": "RAK Ceramics — RAK-CON-STONEEFF-60X120",
+            "notes": "R-12: Outdoor Stone Effect outdoor porcelain tile 60x120 cm (tier premium, pick 23/29 by price); qty incl. 12% wastage on 78.69 m2 net (net tiled area; wastage per W-03)",
+            "rule_id": "Q-13/R-12",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 12
+          }
+        ],
+        "section_total_aed": 19930
+      },
+      {
+        "work_section": "Ceilings",
+        "lines": [
+          {
+            "description": "Gypsum false ceiling incl. plastering + painting — all interior rooms",
+            "quantity": 134.1,
+            "unit": "m2",
+            "rate_aed": 125,
+            "total_aed": 16763,
+            "vendor_or_source": "allowance",
+            "notes": "R-30: Gypsum false ceiling incl. plastering + painting, AED 125/m² (Villa 94: AED 21k ÷ 130 m² + 120 lm cove). No labour-rates row yet — QS to confirm.; F-12: interior area 149 m² × 0.9 = 134.1 m²",
+            "rule_id": "Q-14/R-30",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Continuous LED cove channel within gypsum ceiling",
+            "quantity": 111.35,
+            "unit": "lm",
+            "rate_aed": 45,
+            "total_aed": 5011,
+            "vendor_or_source": "allowance",
+            "notes": "R-31: Continuous cove + recessed LED channel, AED 45/lm labour (strips client-supplied). No labour-rates row yet — QS to confirm.; F-13: dry interior area 131 m² × 0.85 = 111.35 lm",
+            "rule_id": "Q-15/R-31",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 21774
+      },
+      {
+        "work_section": "Decoration & Painting",
+        "lines": [
+          {
+            "description": "Internal painting — walls + ceilings, 2 coats",
+            "quantity": 456.42,
+            "unit": "m2",
+            "rate_aed": 45,
+            "total_aed": 20539,
+            "vendor_or_source": "labour_rates: Internal painting — 2 coats over prepared surface",
+            "notes": "R-13: high band (tier premium); F-02: dry (net wall + ceiling) + bath ceilings = 456.42 m²",
+            "rule_id": "Q-16/R-13",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 20539
+      },
+      {
+        "work_section": "Electrical",
+        "lines": [
+          {
+            "description": "LED downlights — supply and install (interior)",
+            "quantity": 48,
+            "unit": "no",
+            "rate_aed": 300,
+            "total_aed": 14400,
+            "vendor_or_source": "labour_rates: LED downlight — supply and install",
+            "notes": "R-14: high band (tier premium); F-06: Σ interior ceil(area / 3.5) = 48",
+            "rule_id": "Q-17/R-14",
+            "kind": "supply_and_install",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Power sockets and switches — supply and install (interior)",
+            "quantity": 63,
+            "unit": "no",
+            "rate_aed": 220,
+            "total_aed": 13860,
+            "vendor_or_source": "labour_rates: Power socket or switch — supply and install",
+            "notes": "R-15: high band (tier premium); F-07: Σ interior ceil(area × 0.4) = 63",
+            "rule_id": "Q-18/R-15",
+            "kind": "supply_and_install",
+            "rate_band": "high",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 28260
+      },
+      {
+        "work_section": "Plumbing",
+        "lines": [
+          {
+            "description": "Bathroom plumbing re-pipe (full PPR) — per bathroom",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 13000,
+            "total_aed": 39000,
+            "vendor_or_source": "labour_rates: Bathroom plumbing rewire — per bathroom, full",
+            "notes": "R-16: high band (tier premium); bathroom count = 3",
+            "rule_id": "Q-19/R-16",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Concealed water heater — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 5000,
+            "total_aed": 15000,
+            "vendor_or_source": "labour_rates: Concealed water heater — supply and install",
+            "notes": "R-17: high band (tier premium); 1 per bathroom × 3 (Villa 94 retained existing heaters — QS to confirm inclusion)",
+            "rule_id": "Q-20/R-17",
+            "kind": "supply_and_install",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Floor / linear shower drain — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1200,
+            "total_aed": 3600,
+            "vendor_or_source": "labour_rates: Floor drain — supply and install",
+            "notes": "R-18: high band (tier premium); 1 per bathroom × 3",
+            "rule_id": "Q-21/R-18",
+            "kind": "supply_and_install",
+            "rate_band": "high",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 57600
+      },
+      {
+        "work_section": "Sanitaryware",
+        "lines": [
+          {
+            "description": "Wall-hung WC incl. concealed cistern — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 5500,
+            "total_aed": 16500,
+            "vendor_or_source": "labour_rates: WC suite supply and install — mid-range",
+            "notes": "R-19: high band (tier premium); 1 per bathroom × 3",
+            "rule_id": "Q-22/R-19",
+            "kind": "supply_and_install",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Vanity basin with mixer — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 4500,
+            "total_aed": 13500,
+            "vendor_or_source": "labour_rates: Wash basin with mixer — supply and install",
+            "notes": "R-20: high band (tier premium); 1 per bathroom × 3",
+            "rule_id": "Q-23/R-20",
+            "kind": "supply_and_install",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shower system with concealed thermostatic valve — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 9000,
+            "total_aed": 27000,
+            "vendor_or_source": "labour_rates: Shower system — mixer, handset, rain head",
+            "notes": "R-21: high band (tier premium); 1 per bathroom × 3",
+            "rule_id": "Q-24/R-21",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shattaf (health faucet), matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 250,
+            "total_aed": 750,
+            "vendor_or_source": "allowance",
+            "notes": "R-40: GROHE shattaf, matt black — Laspinas 46703 line 1025302431 (supply); 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24a/R-40",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Paper holder, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 210,
+            "total_aed": 630,
+            "vendor_or_source": "allowance",
+            "notes": "R-41: GROHE Essentials paper holder, matt black — Laspinas 46703 line 1024652430; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24b/R-41",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Towel rail, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 260,
+            "total_aed": 780,
+            "vendor_or_source": "allowance",
+            "notes": "R-42: GROHE Essentials towel rail, matt black — Laspinas 46703 line 1022512430; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24c/R-42",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "WC actuator plate, vertical square — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 450,
+            "total_aed": 1350,
+            "vendor_or_source": "allowance",
+            "notes": "R-43: GROHE actuator plate, vertical square — Laspinas 46703 line 38732KF0; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24d/R-43",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 60510
+      },
+      {
+        "work_section": "MEP / HVAC",
+        "lines": [
+          {
+            "description": "New ducted AC unit incl. ductwork, grilles, thermostat — secondary bedrooms",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 22000,
+            "total_aed": 44000,
+            "vendor_or_source": "labour_rates: Concealed ducted AC FCU replacement",
+            "notes": "R-32: high band (tier premium); F-15: 1 per secondary bedroom × 2",
+            "rule_id": "Q-25/R-32",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Split AC unit (2 ton) — office, incl. commissioning",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 8500,
+            "total_aed": 8500,
+            "vendor_or_source": "labour_rates: Split AC unit (1.5-2.5 ton) — supply and install",
+            "notes": "R-33: high band (tier premium); F-16: 1 per office × 1",
+            "rule_id": "Q-26/R-33",
+            "kind": "supply_and_install",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "FCU deep service and clean — retained units",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 600,
+            "total_aed": 1200,
+            "vendor_or_source": "labour_rates: AC servicing and cleaning",
+            "notes": "R-22: high band (tier premium); rooms retaining existing FCU = 2",
+            "rule_id": "Q-27/R-22",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 53700
+      },
+      {
+        "work_section": "Lighting",
+        "lines": [
+          {
+            "description": "Cove LED strip — supply (living/dining/master)",
+            "quantity": 43.29,
+            "unit": "lm",
+            "rate_aed": 85,
+            "total_aed": 3680,
+            "vendor_or_source": "allowance",
+            "notes": "R-45: G10 — cove LED strip SUPPLY, AED 85/lm indicative (24V 14.4W/m COB strip + driver + profile, Dubai trade counter mid-2026). Complements R-31, which prices the cove LABOUR at 45/lm and explicitly assumes 'strips client-supplied' — this is the material that assumption left out. QS to confirm.; S6-02: Σ perimeter over 2 eligible room(s) (living/dining/majlis/master only), perimeter from area at aspect 1.3 = 43.29 lm",
+            "rule_id": "S6-02/R-45",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_status": "indicative"
+          },
+          {
+            "description": "Decorative pendants — installation",
+            "quantity": 5,
+            "unit": "no",
+            "rate_aed": 500,
+            "total_aed": 2500,
+            "vendor_or_source": "labour_rates: Decorative pendant — installation labour only",
+            "notes": "R-26: high band (tier premium); F-09: 1 per bedroom (3) + 2 living = 5",
+            "rule_id": "Q-31/R-26",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 6180
+      },
+      {
+        "work_section": "Preliminaries",
+        "lines": [
+          {
+            "description": "Site setup, hoarding, protection, daily clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 25000,
+            "total_aed": 25000,
+            "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
+            "notes": "R-27: high band (tier premium); lump sum per project",
+            "rule_id": "Q-32/R-27",
+            "kind": "lump",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "DM / DEWA permits and fees",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 15000,
+            "total_aed": 15000,
+            "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
+            "notes": "R-28: high band (tier premium); lump sum per project",
+            "rule_id": "Q-33/R-28",
+            "kind": "lump",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Skip hire and waste disposal",
+            "quantity": 9,
+            "unit": "no",
+            "rate_aed": 3000,
+            "total_aed": 27000,
+            "vendor_or_source": "labour_rates: Skip hire and waste disposal",
+            "notes": "R-29: high band (tier premium); F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips",
+            "rule_id": "Q-34/R-29",
+            "kind": "labour",
+            "rate_band": "high",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Protective floor covering over new tiling until handover",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 8,
+            "total_aed": 1592,
+            "vendor_or_source": "allowance",
+            "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 199 m²",
+            "rule_id": "Q-35/R-37",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Rolling scaffold hire — ceiling + painting works",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 2500,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-36/R-38",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Final clearance + professional handover clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 1500,
+            "total_aed": 1500,
+            "vendor_or_source": "allowance",
+            "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-37/R-39",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 72592
+      },
+      {
+        "work_section": "Joinery",
+        "lines": [
+          {
+            "rule_id": "GT/joinery/dresser",
+            "description": "Master bedroom dresser cabinet, glass doors + LED",
+            "quantity": 10.08,
+            "unit": "m2",
+            "rate_aed": 1100,
+            "total_aed": 11088,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 10.08 m² per master (Atrium 1.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/cladding",
+            "description": "Master bedroom wall cladding with hidden LED",
+            "quantity": 6.16,
+            "unit": "m2",
+            "rate_aed": 800,
+            "total_aed": 4928,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 6.16 m² per master (Atrium 1.2)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/cabinet",
+            "description": "Fitted bedroom cabinet, melamine MDF + architrave",
+            "quantity": 14,
+            "unit": "m2",
+            "rate_aed": 850,
+            "total_aed": 11900,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 7 m² per bedroom × 2 (Atrium 2.1/3.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/bath_cabinet",
+            "description": "Bathroom cabinet with doors, MR melamine",
+            "quantity": 3,
+            "unit": "item",
+            "rate_aed": 2400,
+            "total_aed": 7200,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "One per bathroom × 3",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/vanity",
+            "description": "Bathroom vanity box, MR melamine",
+            "quantity": 3,
+            "unit": "item",
+            "rate_aed": 1800,
+            "total_aed": 5400,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "One per bathroom × 3",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/door_leaf",
+            "description": "Solid door leaf, new handle + hinges",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 2700,
+            "total_aed": 16200,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Bedrooms + bathrooms = 6 leaves (Atrium 5.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/door_frame",
+            "description": "Solid meranti door frame, painted + fixed",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 1550,
+            "total_aed": 9300,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "6 frames (Atrium 5.2)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-05/R-46",
+            "description": "Vanity counter slab — allowance, requires site measurement",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1450,
+            "total_aed": 4350,
+            "vendor_or_source": "S6-pre G19 — excluded from the RAK tiles quotation; indicative allowance",
+            "notes": "S6-05: 1 slab per vanity unit in the joinery scope = 3",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          }
+        ],
+        "section_total_aed": 70366
+      },
+      {
+        "work_section": "Aluminum & Glass",
+        "lines": [
+          {
+            "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
+            "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 5150,
+            "total_aed": 10300,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
+            "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 5150,
+            "total_aed": 10300,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
+            "description": "Master bathroom — Tilt & turn system DG, 950×950",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 3000,
+            "total_aed": 3000,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
+            "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 12040,
+            "total_aed": 12040,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
+            "description": "Office — Thermal-break sliding system DG, 1700×2300",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 10384,
+            "total_aed": 10384,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
+            "description": "Office — Thermal-break sliding system DG, 1830×3000",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 14176,
+            "total_aed": 14176,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
+            "description": "Living area — Skylight DG, 1830×3750",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 15749,
+            "total_aed": 15749,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
+            "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
+            "quantity": 10,
+            "unit": "lm",
+            "rate_aed": 1650,
+            "total_aed": 16500,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-06/R-47",
+            "description": "Frameless shower glass partition — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2200,
+            "total_aed": 6600,
+            "vendor_or_source": "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+            "notes": "S6-06: 1 per wet room with a shower (bathroom/ensuite; powder excluded) = 3",
+            "rate_status": "indicative",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-07/R-48",
+            "description": "Bathroom mirror — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 650,
+            "total_aed": 1950,
+            "vendor_or_source": "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+            "notes": "S6-07: max(wet rooms 3, vanity units 3) = 3",
+            "rate_status": "indicative",
+            "scope": "supply_and_install"
+          }
+        ],
+        "section_total_aed": 100999
+      }
+    ],
+    "subtotal_aed": 640140,
+    "contingency_pct": 8,
+    "contingency_aed": 51211,
+    "vat_pct": 5,
+    "vat_aed": 34568,
+    "grand_total_aed": 725919,
+    "engine": {
+      "version": "0.2.0",
+      "tier": "premium",
+      "flooring": "porcelain",
+      "style_key": "luxe-minimal"
+    }
+  },
+  "none": {
+    "sections": [
+      {
+        "work_section": "Demolition",
+        "lines": [
+          {
+            "description": "Full soft strip — finishes, ceilings, doors, cabinets, sanitary ware (no structural)",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 40,
+            "total_aed": 7960,
+            "vendor_or_source": "labour_rates: Soft strip — carpets, fixtures, fittings removal (no structural)",
+            "notes": "R-01: mid band (tier mid); total floor area incl. terrace = 199 m²",
+            "rule_id": "Q-01/R-01",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Existing floor finish removal — all areas incl. terrace",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 55,
+            "total_aed": 10945,
+            "vendor_or_source": "labour_rates: Floor tile removal — intact substrate",
+            "notes": "R-02: mid band (tier mid); total floor area = 199 m²",
+            "rule_id": "Q-02/R-02",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile removal — full height",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 70,
+            "total_aed": 5508,
+            "vendor_or_source": "labour_rates: Wall tile removal — bathroom",
+            "notes": "R-03: mid band (tier mid); F-03: Σ bath (perimeter × 2.9 m − door) = 78.69 m²",
+            "rule_id": "Q-03/R-03",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 24413
+      },
+      {
+        "work_section": "Blockwork",
+        "lines": [
+          {
+            "description": "Civil alterations — opening closures/openings, new partitions, storage room",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 15000,
+            "total_aed": 15000,
+            "vendor_or_source": "allowance",
+            "notes": "R-35: Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (Villa 94 §2: AED 15k). Design-dependent; QS to re-measure per project.; allowance pending design layout (R-35)",
+            "rule_id": "Q-05/R-35",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 15000
+      },
+      {
+        "work_section": "Plaster",
+        "lines": [
+          {
+            "description": "Plaster make-good / skim after strip-out",
+            "quantity": 58.24,
+            "unit": "m2",
+            "rate_aed": 35,
+            "total_aed": 2038,
+            "vendor_or_source": "labour_rates: Internal skim or smoothing coat",
+            "notes": "R-04: mid band (tier mid); F-05: interior net wall 388.27 m² × 0.15 = 58.24 m²",
+            "rule_id": "Q-04/R-04",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 2038
+      },
+      {
+        "work_section": "Floor Finishes",
+        "lines": [
+          {
+            "description": "Floor screed 50mm incl. falls — wet areas + terrace",
+            "quantity": 68,
+            "unit": "m2",
+            "rate_aed": 60,
+            "total_aed": 4080,
+            "vendor_or_source": "labour_rates: Floor screed 50mm",
+            "notes": "R-05: mid band (tier mid); bath floors 18 + terrace 50 m²",
+            "rule_id": "Q-06/R-05",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Waterproofing membrane — terrace",
+            "quantity": 50,
+            "unit": "m2",
+            "rate_aed": 50,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-34: Full waterproofing membrane to external terrace, AED 50/m². No labour-rates row yet — QS to confirm.; terrace area = 50 m²",
+            "rule_id": "Q-07/R-34",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tiling — labour",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 70,
+            "total_aed": 13930,
+            "vendor_or_source": "labour_rates: Porcelain floor tiling — labour only",
+            "notes": "R-06: mid band (tier mid); total floor area = 199 m² (porcelain throughout incl. wet areas + terrace)",
+            "rule_id": "Q-08/R-06",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Porcelain floor tiling — material supply",
+            "quantity": 218.9,
+            "unit": "m2",
+            "rate_aed": 120,
+            "total_aed": 26268,
+            "vendor_or_source": "RAK Ceramics — RAK-MRB-MAXIMUSC-60X60",
+            "notes": "R-07: Maximus Classic marble-effect porcelain floor & wall tile, Polished, 60x60 cm (tier mid, pick 1/2 by price); qty incl. 10% wastage on 199 m2 net (net laid area; wastage added at pricing per W-01/W-02)",
+            "rule_id": "Q-09/R-07",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 10
+          },
+          {
+            "description": "Skirting — tile-matched, dry rooms + terrace",
+            "quantity": 142.38,
+            "unit": "lm",
+            "rate_aed": 55,
+            "total_aed": 7831,
+            "vendor_or_source": "labour_rates: Skirting installation (MDF or wood)",
+            "notes": "R-10: mid band (tier mid); F-04: Σ (dry + terrace) perimeter − door widths = 142.38 lm",
+            "rule_id": "Q-10/R-10",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "allowance",
+            "notes": "R-36: Staircase renovation allowance — LABOUR ONLY: tread/riser preparation, tile fixing labour and LED nosing circuit, excl. handrail (Villa 94 §5: AED 6k). Delta Log G15 (\"Only labor\") confirms the Villa 94 staircase line carried no material. The tile MATERIAL comes solely from Q-11b/R-44 floor.stair_tile — this note previously read \"tread tiling\", which would have described the same material twice. Rate unchanged. QS to confirm.; allowance (R-36); treads TBC from stair drawing",
+            "rule_id": "Q-11/R-36",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 60609
+      },
+      {
+        "work_section": "Wall Finishes",
+        "lines": [
+          {
+            "description": "Bathroom wall tiling — full height, labour",
+            "quantity": 78.69,
+            "unit": "m2",
+            "rate_aed": 85,
+            "total_aed": 6689,
+            "vendor_or_source": "labour_rates: Ceramic or porcelain wall tiling — bathroom, labour only",
+            "notes": "R-11: mid band (tier mid); F-03 (as Q-03) = 78.69 m²",
+            "rule_id": "Q-12/R-11",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Bathroom wall tile — material supply",
+            "quantity": 88.13,
+            "unit": "m2",
+            "rate_aed": 87,
+            "total_aed": 7667,
+            "vendor_or_source": "RAK Ceramics — RAK-CON-ENDORA-60X60",
+            "notes": "R-12: Endora concrete effect tile 60x60 cm (tier mid, pick 15/29 by price); qty incl. 12% wastage on 78.69 m2 net (net tiled area; wastage per W-03)",
+            "rule_id": "Q-13/R-12",
+            "kind": "material",
+            "rate_band": "sku",
+            "wastage_pct": 12
+          }
+        ],
+        "section_total_aed": 14356
+      },
+      {
+        "work_section": "Ceilings",
+        "lines": [
+          {
+            "description": "Gypsum false ceiling incl. plastering + painting — all interior rooms",
+            "quantity": 134.1,
+            "unit": "m2",
+            "rate_aed": 125,
+            "total_aed": 16763,
+            "vendor_or_source": "allowance",
+            "notes": "R-30: Gypsum false ceiling incl. plastering + painting, AED 125/m² (Villa 94: AED 21k ÷ 130 m² + 120 lm cove). No labour-rates row yet — QS to confirm.; F-12: interior area 149 m² × 0.9 = 134.1 m²",
+            "rule_id": "Q-14/R-30",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Continuous LED cove channel within gypsum ceiling",
+            "quantity": 111.35,
+            "unit": "lm",
+            "rate_aed": 45,
+            "total_aed": 5011,
+            "vendor_or_source": "allowance",
+            "notes": "R-31: Continuous cove + recessed LED channel, AED 45/lm labour (strips client-supplied). No labour-rates row yet — QS to confirm.; F-13: dry interior area 131 m² × 0.85 = 111.35 lm",
+            "rule_id": "Q-15/R-31",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 21774
+      },
+      {
+        "work_section": "Decoration & Painting",
+        "lines": [
+          {
+            "description": "Internal painting — walls + ceilings, 2 coats",
+            "quantity": 456.42,
+            "unit": "m2",
+            "rate_aed": 30,
+            "total_aed": 13693,
+            "vendor_or_source": "labour_rates: Internal painting — 2 coats over prepared surface",
+            "notes": "R-13: mid band (tier mid); F-02: dry (net wall + ceiling) + bath ceilings = 456.42 m²",
+            "rule_id": "Q-16/R-13",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 13693
+      },
+      {
+        "work_section": "Electrical",
+        "lines": [
+          {
+            "description": "LED downlights — supply and install (interior)",
+            "quantity": 48,
+            "unit": "no",
+            "rate_aed": 180,
+            "total_aed": 8640,
+            "vendor_or_source": "labour_rates: LED downlight — supply and install",
+            "notes": "R-14: mid band (tier mid); F-06: Σ interior ceil(area / 3.5) = 48",
+            "rule_id": "Q-17/R-14",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Power sockets and switches — supply and install (interior)",
+            "quantity": 63,
+            "unit": "no",
+            "rate_aed": 140,
+            "total_aed": 8820,
+            "vendor_or_source": "labour_rates: Power socket or switch — supply and install",
+            "notes": "R-15: mid band (tier mid); F-07: Σ interior ceil(area × 0.4) = 63",
+            "rule_id": "Q-18/R-15",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 17460
+      },
+      {
+        "work_section": "Plumbing",
+        "lines": [
+          {
+            "description": "Bathroom plumbing re-pipe (full PPR) — per bathroom",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 7500,
+            "total_aed": 22500,
+            "vendor_or_source": "labour_rates: Bathroom plumbing rewire — per bathroom, full",
+            "notes": "R-16: mid band (tier mid); bathroom count = 3",
+            "rule_id": "Q-19/R-16",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Concealed water heater — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2800,
+            "total_aed": 8400,
+            "vendor_or_source": "labour_rates: Concealed water heater — supply and install",
+            "notes": "R-17: mid band (tier mid); 1 per bathroom × 3 (Villa 94 retained existing heaters — QS to confirm inclusion)",
+            "rule_id": "Q-20/R-17",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Floor / linear shower drain — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 650,
+            "total_aed": 1950,
+            "vendor_or_source": "labour_rates: Floor drain — supply and install",
+            "notes": "R-18: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-21/R-18",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 32850
+      },
+      {
+        "work_section": "Sanitaryware",
+        "lines": [
+          {
+            "description": "Wall-hung WC incl. concealed cistern — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2400,
+            "total_aed": 7200,
+            "vendor_or_source": "labour_rates: WC suite supply and install — mid-range",
+            "notes": "R-19: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-22/R-19",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Vanity basin with mixer — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1800,
+            "total_aed": 5400,
+            "vendor_or_source": "labour_rates: Wash basin with mixer — supply and install",
+            "notes": "R-20: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-23/R-20",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shower system with concealed thermostatic valve — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 3500,
+            "total_aed": 10500,
+            "vendor_or_source": "labour_rates: Shower system — mixer, handset, rain head",
+            "notes": "R-21: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-24/R-21",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Shattaf (health faucet), matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 250,
+            "total_aed": 750,
+            "vendor_or_source": "allowance",
+            "notes": "R-40: GROHE shattaf, matt black — Laspinas 46703 line 1025302431 (supply); 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24a/R-40",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Paper holder, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 210,
+            "total_aed": 630,
+            "vendor_or_source": "allowance",
+            "notes": "R-41: GROHE Essentials paper holder, matt black — Laspinas 46703 line 1024652430; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24b/R-41",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Towel rail, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 260,
+            "total_aed": 780,
+            "vendor_or_source": "allowance",
+            "notes": "R-42: GROHE Essentials towel rail, matt black — Laspinas 46703 line 1022512430; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24c/R-42",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "WC actuator plate, vertical square — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 450,
+            "total_aed": 1350,
+            "vendor_or_source": "allowance",
+            "notes": "R-43: GROHE actuator plate, vertical square — Laspinas 46703 line 38732KF0; 1 per wet room × 3 (Laspinas)",
+            "rule_id": "Q-24d/R-43",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 26610
+      },
+      {
+        "work_section": "MEP / HVAC",
+        "lines": [
+          {
+            "description": "New ducted AC unit incl. ductwork, grilles, thermostat — secondary bedrooms",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 14000,
+            "total_aed": 28000,
+            "vendor_or_source": "labour_rates: Concealed ducted AC FCU replacement",
+            "notes": "R-32: mid band (tier mid); F-15: 1 per secondary bedroom × 2",
+            "rule_id": "Q-25/R-32",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Split AC unit (2 ton) — office, incl. commissioning",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 5500,
+            "total_aed": 5500,
+            "vendor_or_source": "labour_rates: Split AC unit (1.5-2.5 ton) — supply and install",
+            "notes": "R-33: mid band (tier mid); F-16: 1 per office × 1",
+            "rule_id": "Q-26/R-33",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "FCU deep service and clean — retained units",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 350,
+            "total_aed": 700,
+            "vendor_or_source": "labour_rates: AC servicing and cleaning",
+            "notes": "R-22: mid band (tier mid); rooms retaining existing FCU = 2",
+            "rule_id": "Q-27/R-22",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 34200
+      },
+      {
+        "work_section": "Lighting",
+        "lines": [
+          {
+            "description": "Cove LED strip — supply (living/dining/master)",
+            "quantity": 43.29,
+            "unit": "lm",
+            "rate_aed": 85,
+            "total_aed": 3680,
+            "vendor_or_source": "allowance",
+            "notes": "R-45: G10 — cove LED strip SUPPLY, AED 85/lm indicative (24V 14.4W/m COB strip + driver + profile, Dubai trade counter mid-2026). Complements R-31, which prices the cove LABOUR at 45/lm and explicitly assumes 'strips client-supplied' — this is the material that assumption left out. QS to confirm.; S6-02: Σ perimeter over 2 eligible room(s) (living/dining/majlis/master only), perimeter from area at aspect 1.3 = 43.29 lm",
+            "rule_id": "S6-02/R-45",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_status": "indicative"
+          },
+          {
+            "description": "Decorative pendants — installation",
+            "quantity": 5,
+            "unit": "no",
+            "rate_aed": 280,
+            "total_aed": 1400,
+            "vendor_or_source": "labour_rates: Decorative pendant — installation labour only",
+            "notes": "R-26: mid band (tier mid); F-09: 1 per bedroom (3) + 2 living = 5",
+            "rule_id": "Q-31/R-26",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 5080
+      },
+      {
+        "work_section": "Preliminaries",
+        "lines": [
+          {
+            "description": "Site setup, hoarding, protection, daily clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 12000,
+            "total_aed": 12000,
+            "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
+            "notes": "R-27: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-32/R-27",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "DM / DEWA permits and fees",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
+            "notes": "R-28: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-33/R-28",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Skip hire and waste disposal",
+            "quantity": 9,
+            "unit": "no",
+            "rate_aed": 1500,
+            "total_aed": 13500,
+            "vendor_or_source": "labour_rates: Skip hire and waste disposal",
+            "notes": "R-29: mid band (tier mid); F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips",
+            "rule_id": "Q-34/R-29",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Protective floor covering over new tiling until handover",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 8,
+            "total_aed": 1592,
+            "vendor_or_source": "allowance",
+            "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 199 m²",
+            "rule_id": "Q-35/R-37",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Rolling scaffold hire — ceiling + painting works",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 2500,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-36/R-38",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          },
+          {
+            "description": "Final clearance + professional handover clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 1500,
+            "total_aed": 1500,
+            "vendor_or_source": "allowance",
+            "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-37/R-39",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0
+          }
+        ],
+        "section_total_aed": 37092
+      },
+      {
+        "work_section": "Joinery",
+        "lines": [
+          {
+            "rule_id": "GT/joinery/dresser",
+            "description": "Master bedroom dresser cabinet, glass doors + LED",
+            "quantity": 10.08,
+            "unit": "m2",
+            "rate_aed": 1100,
+            "total_aed": 11088,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 10.08 m² per master (Atrium 1.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/cladding",
+            "description": "Master bedroom wall cladding with hidden LED",
+            "quantity": 6.16,
+            "unit": "m2",
+            "rate_aed": 800,
+            "total_aed": 4928,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 6.16 m² per master (Atrium 1.2)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/cabinet",
+            "description": "Fitted bedroom cabinet, melamine MDF + architrave",
+            "quantity": 14,
+            "unit": "m2",
+            "rate_aed": 850,
+            "total_aed": 11900,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Heuristic: 7 m² per bedroom × 2 (Atrium 2.1/3.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/bath_cabinet",
+            "description": "Bathroom cabinet with doors, MR melamine",
+            "quantity": 3,
+            "unit": "item",
+            "rate_aed": 2400,
+            "total_aed": 7200,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "One per bathroom × 3",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/vanity",
+            "description": "Bathroom vanity box, MR melamine",
+            "quantity": 3,
+            "unit": "item",
+            "rate_aed": 1800,
+            "total_aed": 5400,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "One per bathroom × 3",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/door_leaf",
+            "description": "Solid door leaf, new handle + hinges",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 2700,
+            "total_aed": 16200,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "Bedrooms + bathrooms = 6 leaves (Atrium 5.1)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/joinery/door_frame",
+            "description": "Solid meranti door frame, painted + fixed",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 1550,
+            "total_aed": 9300,
+            "vendor_or_source": "Atrium Technical Services QTN20261407 (actual composite rates)",
+            "notes": "6 frames (Atrium 5.2)",
+            "rate_status": "actual_transaction",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-05/R-46",
+            "description": "Vanity counter slab — allowance, requires site measurement",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1450,
+            "total_aed": 4350,
+            "vendor_or_source": "S6-pre G19 — excluded from the RAK tiles quotation; indicative allowance",
+            "notes": "S6-05: 1 slab per vanity unit in the joinery scope = 3",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          }
+        ],
+        "section_total_aed": 70366
+      },
+      {
+        "work_section": "Aluminum & Glass",
+        "lines": [
+          {
+            "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
+            "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 5150,
+            "total_aed": 10300,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
+            "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 5150,
+            "total_aed": 10300,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
+            "description": "Master bathroom — Tilt & turn system DG, 950×950",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 3000,
+            "total_aed": 3000,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
+            "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 12040,
+            "total_aed": 12040,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
+            "description": "Office — Thermal-break sliding system DG, 1700×2300",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 10384,
+            "total_aed": 10384,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
+            "description": "Office — Thermal-break sliding system DG, 1830×3000",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 14176,
+            "total_aed": 14176,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
+            "description": "Living area — Skylight DG, 1830×3750",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 15749,
+            "total_aed": 15749,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
+            "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
+            "quantity": 10,
+            "unit": "lm",
+            "rate_aed": 1650,
+            "total_aed": 16500,
+            "vendor_or_source": "Global Creation Services ref 3936/R1 (allowance)",
+            "notes": "Requires site measurement — allowance only",
+            "rate_status": "site_assessment",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-06/R-47",
+            "description": "Frameless shower glass partition — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2200,
+            "total_aed": 6600,
+            "vendor_or_source": "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+            "notes": "S6-06: 1 per wet room with a shower (bathroom/ensuite; powder excluded) = 3",
+            "rate_status": "indicative",
+            "scope": "supply_and_install"
+          },
+          {
+            "rule_id": "S6-07/R-48",
+            "description": "Bathroom mirror — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 650,
+            "total_aed": 1950,
+            "vendor_or_source": "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+            "notes": "S6-07: max(wet rooms 3, vanity units 3) = 3",
+            "rate_status": "indicative",
+            "scope": "supply_and_install"
+          }
+        ],
+        "section_total_aed": 100999
+      }
+    ],
+    "subtotal_aed": 476540,
+    "contingency_pct": 8,
+    "contingency_aed": 38123,
+    "vat_pct": 5,
+    "vat_aed": 25733,
+    "grand_total_aed": 540396,
+    "engine": {
+      "version": "0.2.0",
+      "tier": "mid",
+      "flooring": "porcelain",
+      "style_key": null
+    }
+  }
+}

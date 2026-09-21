@@ -17,6 +17,7 @@ import {
   findDoubleCounts,
   priceGardenTakeoff,
 } from "@/lib/boq/garden-takeoff";
+import { transcriptionGardenBook } from "@/lib/boq/garden-rates";
 
 import { VILLA94_GARDEN } from "./villa94-garden-plan";
 import {
@@ -170,8 +171,11 @@ function classify(
 }
 
 export function compareVilla94(): DryRunResult {
-  const takeoff = computeGardenTakeoff(VILLA94_GARDEN);
-  const priced = priceGardenTakeoff(takeoff.items);
+  // The dry-run calibrates the TRANSCRIPTION against the contract, so it prices
+  // at the transcription book — not whatever the database holds today.
+  const book = transcriptionGardenBook();
+  const takeoff = computeGardenTakeoff(VILLA94_GARDEN, book);
+  const priced = priceGardenTakeoff(takeoff.items, book);
   const byKey = new Map(priced.map((l) => [l.item_key, l] as const));
 
   const lines: DeltaLine[] = MAP.map((row) => {

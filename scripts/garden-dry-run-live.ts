@@ -23,6 +23,7 @@ import { readFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { computeGardenTakeoff, priceGardenTakeoff } from "../lib/boq/garden-takeoff.ts";
+import { transcriptionGardenBook } from "../lib/boq/garden-rates.ts";
 import { buildElevationSheets } from "../lib/drawings/garden-elevations.ts";
 import { buildGardenSheets } from "../lib/drawings/garden-sheets.ts";
 import { compareVilla94 } from "../lib/ground-truth/villa94-garden-dryrun.ts";
@@ -98,7 +99,8 @@ async function main() {
   const landscape = (boq?.sections ?? []).filter((s) => LANDSCAPE_SECTIONS.includes(s.work_section));
   check("landscape sections present, POMI-named", landscape.length === LANDSCAPE_SECTIONS.length, landscape.map((s) => s.work_section).join(" · "));
 
-  const pure = priceGardenTakeoff(computeGardenTakeoff(VILLA94_GARDEN).items);
+  const pureBook = transcriptionGardenBook();
+  const pure = priceGardenTakeoff(computeGardenTakeoff(VILLA94_GARDEN, pureBook).items, pureBook);
   const pureTotal = r2(pure.reduce((s, l) => s + l.total_aed, 0));
   const dry = compareVilla94();
   check("the pure take-off is the dry-run's platform side", Math.abs(dry.platform_total - pureTotal) < 0.01, money(dry.platform_total));

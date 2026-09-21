@@ -31,6 +31,13 @@ const MODEL = "claude-sonnet-4-6";
 
 const BodySchema = z.object({
   project_id: z.string().uuid(),
+  /**
+   * T1.0: assemble the BoQ exactly as a real run would and return it, but write
+   * NOTHING — no boqs row, no takeoff_items, no pilot event. This is how a
+   * pricing refactor proves it is byte-identical on a live project without
+   * adding a BoQ (or a "time to first BoQ" event) to it. Engine path only.
+   */
+  dry_run: z.boolean().optional(),
 });
 
 // Categories from pricing_skus relevant to a residential first-floor
@@ -539,6 +546,13 @@ export async function POST(request: NextRequest) {
       );
     }
     const projectId = parsedBody.data.project_id;
+    const dryRun = parsedBody.data.dry_run === true;
+    if (dryRun && process.env.BOQ_ENGINE === "llm") {
+      return NextResponse.json(
+        { success: false, error: "dry_run is only supported on the deterministic engine path." },
+        { status: 400 },
+      );
+    }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -733,7 +747,7 @@ export async function POST(request: NextRequest) {
         const graph = await derivePlanGraph(projectId);
         const proposed = await getProposedGraph(projectId);
         takeoffItems = quantifyPlan(graph, { proposed });
-        await persistTakeoffItems(projectId, takeoffItems, supabaseUntyped);
+        if (!dryRun) await persistTakeoffItems(projectId, takeoffItems, supabaseUntyped);
       } catch (e) {
         console.warn(
           "[api/generate-boq] P4 take-off skipped:",
@@ -803,7 +817,11 @@ export async function POST(request: NextRequest) {
       // G3: append the landscape sections from the drawn garden (zones, runs,
       // units, points) priced at the calibrated landscape rates. No-op for a
       // project with no outdoor zones, which is every interior project.
-      const boq = await appendGardenSections(withJoinery, projectId, supabaseUntyped);
+      const boq = await appendGardenSections(withJoinery, projectId, supabaseUntyped, { persist: !dryRun });
+
+      if (dryRun) {
+        return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq });
+      }
 
       const { data: inserted, error: insertErr } = await supabase
         .from("boqs")

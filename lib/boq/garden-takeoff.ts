@@ -1,9 +1,10 @@
 // =============================================================================
 // lib/boq/garden-takeoff.ts — deterministic landscape take-off (garden pilot G2).
 //
-// Zones, runs, discrete units and points → priced ScopeItems, using the Villa 94
-// net rates in lib/ground-truth/villa94-garden.ts. Pure: same input → identical
-// output, no LLM, no I/O.
+// Zones, runs, discrete units and points → priced ScopeItems, priced at the
+// landscape rate book passed in (rate_book rows at runtime — see
+// lib/boq/garden-rates.ts). Pure: same input + same book → identical output, no
+// LLM, no I/O.
 //
 // This is a SEPARATE take-off from lib/boq/takeoff.ts rather than more branches
 // inside it. The interior take-off's rules are F-xx formulas over rooms with
@@ -12,11 +13,18 @@
 // their own bucket (lib/boq/rules.ts LANDSCAPE_TYPES) precisely so a lawn could
 // not be priced as a terrace floor.
 //
-// Rates come from the ground-truth module, NOT from lib/boq/rates.ts. The
-// RateResolver is driven by RATE_RULES over labour_rates + pricing_skus and
-// throws on an unknown item_key, so routing garden keys through it would have
-// meant either inventing labour_rates rows or editing interior rules. Neither
-// is acceptable when the requirement is that zero interior rows move.
+// Rates come from a GardenRateBook (lib/boq/garden-rates.ts), NOT from
+// lib/boq/rates.ts. The RateResolver is driven by RATE_RULES over labour_rates +
+// pricing_skus and throws on an unknown item_key, so routing garden keys through
+// it would have meant either inventing labour_rates rows or editing interior
+// rules. Neither is acceptable when the requirement is that zero interior rows
+// move.
+//
+// T1.0: until then the rates were read straight off the ground-truth module's
+// constants. They are now `rate_book` rows, and the book is a parameter: the
+// runtime passes the book read from the database, the offline calibration passes
+// the transcription. The ground-truth module still supplies each key's label and
+// unit — vocabulary, not price.
 // =============================================================================
 
 import {
@@ -33,6 +41,7 @@ import { DERIVED_QTY_NOTE, isDemolished, isNewWork, isUndecided, type Dispositio
 
 export { DERIVED_QTY_NOTE };
 
+import type { GardenRateBook } from "./garden-rates";
 import type { PomiSection, ScopeItem } from "./schema";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -245,10 +254,14 @@ const IRRIGATION_BANDS: readonly { max_driver: number; factor: number; label: st
 
 // --- Rules -------------------------------------------------------------------
 
-function rate(item_key: string): number {
-  const g = getGardenRate(item_key);
-  if (!g) throw new Error(`No garden rate for "${item_key}".`);
-  return g.net_rate;
+/**
+ * THE garden rate choke point: every priced garden figure comes through here.
+ * Throws on a key the book does not carry — never an invented rate.
+ */
+function rate(book: GardenRateBook, item_key: string): number {
+  const r = book.resolve(item_key);
+  if (!r) throw new Error(`No garden rate for "${item_key}" in the landscape rate book.`);
+  return r.rate_aed;
 }
 
 function label(item_key: string): string {
@@ -286,7 +299,7 @@ function item(
  * Every emitted line is a quantity the drawing supports. Where a quantity is
  * inferred rather than measured (the irrigation lump), the line says so.
  */
-export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
+export function computeGardenTakeoff(input: GardenTakeoffInput, book: GardenRateBook): GardenTakeoff {
   const allZones = input.zones ?? [];
   const allRuns = input.runs ?? [];
   const allUnits = input.units ?? [];
@@ -513,7 +526,7 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   if (irrigationDriver > 0) {
     const band = IRRIGATION_BANDS.find((b) => irrigationDriver <= b.max_driver)!;
     // G5c: ONE allowance line — quantity 1, the band carried by the rate factor.
-    const reference = rate("garden.irrigation");
+    const reference = rate(book, "garden.irrigation");
     items.push(
       item(
         "GL-15",
@@ -612,8 +625,8 @@ export interface GardenPricedLine extends ScopeItem {
   vendor_or_source: string;
 }
 
-/** Price a take-off at the Villa 94 net rates. Deterministic. */
-export function priceGardenTakeoff(items: readonly ScopeItem[]): GardenPricedLine[] {
+/** Price a take-off at the landscape rate book. Deterministic for a given book. */
+export function priceGardenTakeoff(items: readonly ScopeItem[], book: GardenRateBook): GardenPricedLine[] {
   return items.map((i) => {
     // G5: a line with no reference rate goes to the QS at 0 — never at an
     // invented rate, and never under the market-reference label.
@@ -621,7 +634,8 @@ export function priceGardenTakeoff(items: readonly ScopeItem[]): GardenPricedLin
       return { ...i, rate_aed: 0, total_aed: 0, vendor_or_source: UNPRICED_SOURCE_LABEL };
     }
     // A banded allowance (G5c) is one lump at the reference rate × its band factor.
-    const r = i.rate_factor == null ? rate(i.item_key) : Math.round(rate(i.item_key) * i.rate_factor * 100) / 100;
+    const base = rate(book, i.item_key);
+    const r = i.rate_factor == null ? base : Math.round(base * i.rate_factor * 100) / 100;
     return {
       ...i,
       rate_aed: r,

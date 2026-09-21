@@ -29,6 +29,7 @@ import {
   type GardenTakeoffInput,
   type GardenUnit,
 } from "./garden-takeoff";
+import { GardenRateBookMissingError, loadGardenRateBook, type GardenRateBook } from "./garden-rates";
 import { indicativeProgramme } from "./programme";
 import { SECTION_ORDER } from "./rules";
 import type { PomiSection, ScopeItem } from "./schema";
@@ -281,10 +282,10 @@ export interface GardenBoqResult {
   violations: ReturnType<typeof findDoubleCounts>;
 }
 
-/** Build the landscape sections for a captured garden. Pure. */
-export function buildGardenSections(capture: GardenTakeoffInput): GardenBoqResult {
-  const takeoff = computeGardenTakeoff(capture);
-  const priced = priceGardenTakeoff(takeoff.items);
+/** Build the landscape sections for a captured garden, priced at `book`. Pure. */
+export function buildGardenSections(capture: GardenTakeoffInput, book: GardenRateBook): GardenBoqResult {
+  const takeoff = computeGardenTakeoff(capture, book);
+  const priced = priceGardenTakeoff(takeoff.items, book);
   const violations = findDoubleCounts(takeoff.items);
 
   const refsByKey = new Map<string, string[]>();
@@ -355,12 +356,17 @@ export async function appendGardenSections<T extends BoqLike>(
   boq: T,
   projectId: string,
   supabase: SupabaseClient,
+  opts: { persist?: boolean } = {},
 ): Promise<T> {
   try {
     const capture = await captureGarden(projectId, supabase);
     if (capture.zones.length === 0) return boq;
 
-    const built = buildGardenSections(capture);
+    // T1.0: the rates are read from rate_book. A missing book is NOT a
+    // best-effort skip (below) — a garden BoQ silently priced without its
+    // garden would be worse than a failed generation.
+    const book = await loadGardenRateBook(supabase);
+    const built = buildGardenSections(capture, book);
     if (built.sections.length === 0) return boq;
 
     if (built.violations.length > 0) {
@@ -388,7 +394,7 @@ export async function appendGardenSections<T extends BoqLike>(
     // Per-element take-off rows, so a zone can be asked what it costs. Same
     // table the interior P4 path writes; best-effort like everything else here.
     // G5: removals persist beside them as garden.removal rows (a kept item has none).
-    await persistGardenTakeoff(projectId, [
+    if (opts.persist !== false) await persistGardenTakeoff(projectId, [
       ...built.elements,
       ...built.removals.map((r) => ({ item_key: "garden.removal", element_id: r.element_id, qty: r.qty, unit: r.unit })),
     ], supabase);
@@ -421,6 +427,7 @@ export async function appendGardenSections<T extends BoqLike>(
     if (programme) (boq as T & { programme?: typeof programme }).programme = programme;
     return boq;
   } catch (e) {
+    if (e instanceof GardenRateBookMissingError) throw e;
     console.warn(
       "[boq/garden] landscape sections skipped:",
       e instanceof Error ? e.message : e,

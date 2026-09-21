@@ -1,15 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { buildGardenSections } from "@/lib/boq/garden-boq-feed";
+import { buildGardenSections as buildWithBook } from "@/lib/boq/garden-boq-feed";
 import {
-  computeGardenTakeoff,
+  computeGardenTakeoff as computeWithBook,
   DERIVED_QTY_NOTE,
-  priceGardenTakeoff,
+  priceGardenTakeoff as priceWithBook,
   UNPRICED_SOURCE_LABEL,
   type GardenTakeoffInput,
 } from "@/lib/boq/garden-takeoff";
 import { PUBLIC_SOURCE_LABEL } from "@/lib/ground-truth/villa94-garden";
 import { DRAFT_STATEMENT, draftStatus, isDemolished, isInDesign, isNewWork, isUndecided, replacedBy } from "@/lib/plan/site-reference";
+import { transcriptionGardenBook } from "@/lib/boq/garden-rates";
+
+// T1.0: the take-off prices through a rate book. These tests check the rules
+// against the transcription, so they use the offline transcription book.
+const BOOK = transcriptionGardenBook();
+const computeGardenTakeoff = (i: Parameters<typeof computeWithBook>[0]) => computeWithBook(i, BOOK);
+const priceGardenTakeoff = (i: Parameters<typeof priceWithBook>[0]) => priceWithBook(i, BOOK);
+const buildGardenSections = (i: Parameters<typeof buildWithBook>[0]) => buildWithBook(i, BOOK);
 
 const lawn = { id: "z-lawn", name: "Lawn", kind: "artificial_grass", area_m2: 40 };
 const gazebo = (disposition: "keep" | "remove" | "replace" | null) => ({ id: "z-gazebo", name: "Gazebo (existing)", kind: "structure", area_m2: 12.25, site_reference: true, disposition });
