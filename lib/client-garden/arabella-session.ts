@@ -46,6 +46,26 @@ export const AGGREGATE_NOTE = "sized to measured aggregate";
 export const SESSION_FIRM = "Newspace";
 export const SESSION_REF = "three-firms #1 — Arabella design session, Sep 2026";
 
+/**
+ * G5d, after review: a measure that was CAPTURED but is not mapped onto the plan.
+ *
+ * The front / street border measured 5.3 m. Applied, it left the drive about 1.0 m
+ * wide — no car passes that — so the measurement and the type plan disagree about
+ * what "the front border" is, and mapping it anyway would have put a wrong
+ * dimension on a client drawing under the word "measured". It is held here,
+ * visible, until the firm says which edge they measured. The front garden keeps
+ * its type-plan derived footprint (2.2 × 4.0 m) and the drive its plausible width.
+ *
+ * The other six measures stand.
+ */
+export const UNMAPPED_MEASURES: { key: keyof typeof SESSION_MEASURES; value: string; why: string }[] = [
+  {
+    key: "front_border_width_m",
+    value: "5.3 m",
+    why: "applied to the front garden it leaves the drive ~1.0 m wide (garage/drive block 6.3 m per the type plan); which edge the 5.3 m runs between is not clear from the capture — pending clarification with the firm. The front garden stays on its type-plan derived footprint.",
+  },
+];
+
 /** Sheet A, as captured (the session script re-reads the workbook and asserts these). */
 export const SESSION_MEASURES = {
   entrance_area_width_m: 5.85,
@@ -130,10 +150,17 @@ function fixedTiled(): number {
 export const ENTRANCE_DEPTH_M = r2((M.total_tiled_m2 - fixedTiled() + M.door_landing_m[0] * M.door_landing_m[1]) / M.entrance_area_width_m);
 /** Rear lawn along the measured path, at its designed 2.7 m depth. */
 const REAR_LAWN = rect(PATH_X0, 0.6, SEPARATOR_X, 3.3);
-/** Front lawn patch: the drafted patch's proportions (1.6 : 4.0), sized so the grass total reconciles. */
-const FRONT_PATCH_M2 = M.total_grass_m2 - polyArea(REAR_LAWN) - polyArea(DRAFT_ZONES.find((z) => z.key === "side-lawn")!.poly);
-const FRONT_PATCH_W = r2(Math.sqrt((FRONT_PATCH_M2 * 1.6) / 4.0));
-const FRONT_PATCH_D = r2(FRONT_PATCH_M2 / FRONT_PATCH_W);
+/**
+ * The front garden's grass, as the type plan drafts it. It was briefly a patch
+ * sized to the grass aggregate, which only worked because the 5.3 m border had
+ * widened the front garden; with that measure UNMAPPED the front garden is back on
+ * derived dimensions, so the aggregate is met by the zones the firm could have
+ * measured (rear + side = 47.82 m² against ≈ 50) and the front garden's 6.40 m²
+ * stands outside it, stated (see GRASS_OUTSIDE_AGGREGATE).
+ */
+const FRONT_LAWN = DRAFT_ZONES.find((z) => z.key === "front-lawn")!.poly;
+export const GRASS_OUTSIDE_AGGREGATE =
+  "the front garden's lawn is on the type plan's derived footprint while the 5.3 m front-border measure is unmapped, so it is not part of the measured grass aggregate";
 
 /**
  * The client garden's zones after the session, in two stages so every movement
@@ -149,11 +176,11 @@ const FRONT_PATCH_D = r2(FRONT_PATCH_M2 / FRONT_PATCH_W);
  */
 export function sessionZones(stage: "measured" | "refit" = "refit"): SessionZone[] {
   const refit = stage === "refit";
-  const fx1 = M.front_border_width_m;
   const draft = (k: ZoneKey) => DRAFT_ZONES.find((z) => z.key === k)!;
   const measured = (what: string) => `${what} (${SESSION_SOURCE})`;
+  const unmapped = UNMAPPED_MEASURES[0]!;
+  const frontNote = `front garden on its type-plan derived footprint (2.2 × 4.0 m assumed); the session's ${unmapped.value} front-border measure is CAPTURED BUT NOT MAPPED — ${unmapped.why}`;
   const ey = refit ? r2(4.3 - ENTRANCE_DEPTH_M) : 3.3;
-  const patch: Pt[] = refit ? rect(0.6, r2(10.5 - FRONT_PATCH_D), r2(0.6 + FRONT_PATCH_W), 10.5) : rect(0.6, 6.5, fx1, 10.5);
   const both: Cause[] = ["dimension update", "aggregate refit"];
   return [
     {
@@ -222,31 +249,30 @@ export function sessionZones(stage: "measured" | "refit" = "refit"): SessionZone
     { ...draft("side-bed"), dims_derived: true, note: SOURCE_NOTE, drivers: [], because: "designed split (unchanged)" },
     {
       ...draft("front-lawn"),
-      poly: patch,
+      poly: FRONT_LAWN,
       dims_derived: true,
-      note: refit
-        ? `lawn patch ${FRONT_PATCH_W} × ${FRONT_PATCH_D} m ${AGGREGATE_NOTE} (total grass ≈ ${M.total_grass_m2} m²); front garden depth 4.0 m assumed`
-        : `fills the measured ${M.front_border_width_m} m border at the assumed 4.0 m depth; ${SOURCE_NOTE}`,
-      drivers: refit ? both : ["dimension update"],
-      because: refit ? `border widened to ${M.front_border_width_m} m, then the lawn cut to a patch so the grass total is ≈ ${M.total_grass_m2} m²` : `front border width measured ${M.front_border_width_m} m (assumed 2.2)`,
+      note: `${frontNote}; ${SOURCE_NOTE}`,
+      drivers: [],
+      because: "type-plan derived footprint — the front-border measure is unmapped, pending clarification",
     },
     {
       ...draft("front-bed"),
-      poly: refit
-        ? [[0, 6.5], [fx1, 6.5], [fx1, 10.5], [patch[1]![0], 10.5], [patch[1]![0], patch[0]![1]], [patch[0]![0], patch[0]![1]], [patch[0]![0], 10.5], [0, 10.5]]
-        : draft("front-bed").poly,
       dims_derived: true,
-      note: refit
-        ? `${measured(`front border width ${M.front_border_width_m} m`)}; depth 4.0 m assumed; the bed is the border less the lawn patch (${AGGREGATE_NOTE})`
-        : `0.6 m bed along the border's outer edge as drafted; ${SOURCE_NOTE}`,
-      drivers: refit ? ["aggregate refit"] : [],
-      because: refit ? `the border less the lawn patch the grass aggregate allows` : "as drafted",
+      note: `0.6 m bed along the border's outer edge as drafted; ${frontNote}`,
+      drivers: [],
+      because: "type-plan derived footprint — the front-border measure is unmapped, pending clarification",
     },
   ];
 }
 
-/** The garage/drive context reshaped around the measured front border (derived — the drive is not measured). */
-export const GARAGE_POLY: Pt[] = [[0, 4.3], [6.3, 4.3], [6.3, 10.5], [SESSION_MEASURES.front_border_width_m, 10.5], [SESSION_MEASURES.front_border_width_m, 6.5], [0, 6.5]];
+/**
+ * The garage/drive block as the type plan has it, notched around the front garden.
+ * It was reshaped to the measured 5.3 m border for one run, which left the drive
+ * ~1.0 m wide; with that measure unmapped the drive is back at 6.3 − 2.2 = 4.1 m.
+ */
+export const GARAGE_POLY: Pt[] = [[0, 4.3], [6.3, 4.3], [6.3, 10.5], [2.2, 10.5], [2.2, 6.5], [0, 6.5]];
+/** Clear drive width the garage block leaves beside the front garden (derived, plausible). */
+export const DRIVE_WIDTH_M = r2(6.3 - 2.2);
 
 /** The existing stepping path, its rear leg ending at the entrance area (the measured 12.2 m run from the gate). */
 export const STEPPING_PATH: Pt[] = [[PATH_X0, 3.8], [21.75, 3.8], [21.75, 10.0]];
@@ -289,8 +315,13 @@ const extent = (poly: readonly Pt[]) => {
 type Totals = { old: number; measured: number; new: number };
 export function reconciliation(): {
   rows: ReconciliationRow[];
-  totals: { grass: Totals & { target: number }; tiled: Totals & { target: number }; planting: Totals };
+  totals: {
+    grass: Totals & { target: number; in_aggregate: number; outside_aggregate: number; outside_note: string };
+    tiled: Totals & { target: number };
+    planting: Totals;
+  };
   residual: typeof RESIDUAL;
+  unmapped: typeof UNMAPPED_MEASURES;
 } {
   const mid = sessionZones("measured");
   const zones = sessionZones("refit");
@@ -316,10 +347,19 @@ export function reconciliation(): {
   const sum = (list: { type: string; poly: Pt[] }[], agg: "grass" | "tiled" | "planting") =>
     r2(list.filter((z) => (agg === "planting" ? z.type === "planting_bed" : aggregateOf(z.type) === agg)).reduce((s, z) => s + polyArea(z.poly), 0));
   const tot = (agg: "grass" | "tiled" | "planting") => ({ old: sum(DRAFT_ZONES, agg), measured: sum(mid, agg), new: sum(zones, agg) });
+  // The grass aggregate is met by the zones behind and beside the villa; the front
+  // garden's lawn sits outside it while the front-border measure is unmapped.
+  const outside = r2(sum(zones.filter((z) => z.key.startsWith("front-")), "grass"));
+  const grass = tot("grass");
   return {
     rows,
-    totals: { grass: { ...tot("grass"), target: SESSION_MEASURES.total_grass_m2 }, tiled: { ...tot("tiled"), target: SESSION_MEASURES.total_tiled_m2 }, planting: tot("planting") },
+    totals: {
+      grass: { ...grass, target: SESSION_MEASURES.total_grass_m2, in_aggregate: r2(grass.new - outside), outside_aggregate: outside, outside_note: GRASS_OUTSIDE_AGGREGATE },
+      tiled: { ...tot("tiled"), target: SESSION_MEASURES.total_tiled_m2 },
+      planting: tot("planting"),
+    },
     residual: RESIDUAL,
+    unmapped: UNMAPPED_MEASURES,
   };
 }
 

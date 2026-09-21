@@ -369,6 +369,29 @@ parity clean (lights 28/28, wall lights 9/9). No price, no identity, no draft.
 624 client rows / 752 objects untouched by the reference pack; 291 reference rows
 / 742 objects untouched by the client pack; 144 vs 214 cache keys, 0 shared.
 
+## After review — the front border, unmapped (2026-09-20)
+
+Newspace measured the front / street border at 5.3 m. Applied, it left the drive
+about 1.0 m wide, so the measure and the type plan disagree about which edge it
+runs between. It is now held UNMAPPED with the reason — on both front zones, on
+the pack's Design assumptions page and in the friction log — and the front garden
+is back on its type-plan footprint (lawn 6.40 m², bed 2.40 m², drive 4.1 m clear).
+The other six measures stand.
+
+Grass 54.22 m² = 47.82 within the measured aggregate (≈ 50 m²) + 6.40 m² front
+garden, stated as outside it rather than quietly resized to make the arithmetic
+close. Tiled unchanged at 69.41 m². BoQ AED 116,216.57 → 116,679.07 (+462.50:
+grass supply +111.41, grass install +297.09; planting beds 40.36 → 23.74 m² at
+rate 0). Cause: one — dimension update (reverted, measurement unmapped).
+
+Only the affected views were re-made. `lib/scene/view-hash.ts` carries a render
+forward when its camera's manifest is identical to the one it was gated against
+and every changed object is at least 12 m from the lens; it fails closed and the
+carried-forward row records `reused_from` and why. 7 views were reused; the views
+that see the front garden or the garage's notch — both front zones, the aerial,
+both whole-garden views and the entrance-end cameras — were rendered again.
+Pack 31/31, parity clean including overlay counts (12/12, 6/6, 2/2, 2/2).
+
 ## Next
 
 Newspace's written line-by-line review (rate corrections become market_fair records), the plot survey (the unallocated 2.35 m, the 1 m drive), then the client review — `garden-change-report.ts` for the receipt.

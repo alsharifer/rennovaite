@@ -328,6 +328,11 @@
       "label": "fix (late — drainage points reach the take-off)",
       "boq_id": "fbef954d-319b-4d64-b020-8cb976ff440d",
       "grand_total_aed": 116216.57
+    },
+    {
+      "label": "dimension update (reverted — front border unmapped)",
+      "boq_id": "e042b9eb-6053-41f4-8207-471e85d883f4",
+      "grand_total_aed": 116679.07
     }
   ],
   "change_report": [
@@ -576,6 +581,60 @@
           "status": "added"
         }
       ]
+    },
+    {
+      "cause": "dimension update",
+      "note": "the 5.3 m front-border measure is captured but not mapped — applied to the front garden it leaves the drive ~1.0 m wide (garage/drive block 6.3 m per the type plan); which edge the 5.3 m runs between is not clear from the capture — pending clarification with the firm. The front garden stays on its type-plan derived footprint.",
+      "boq": {
+        "old_total_aed": 116216.57,
+        "new_total_aed": 116679.07,
+        "delta_aed": 462.5,
+        "delta_pct": 0.4
+      },
+      "moved": [
+        {
+          "key": "Soft Landscaping|GL-07",
+          "section": "Soft Landscaping",
+          "description": "Artificial grass supply",
+          "unit": "m2",
+          "old_qty": 50,
+          "new_qty": 54.22,
+          "delta_qty": 4.22,
+          "delta_pct": 8.44,
+          "old_total_aed": 1320,
+          "new_total_aed": 1431.41,
+          "delta_aed": 111.41,
+          "status": "moved"
+        },
+        {
+          "key": "Soft Landscaping|GL-08",
+          "section": "Soft Landscaping",
+          "description": "Artificial grass installation (base+sand+borders)",
+          "unit": "m2",
+          "old_qty": 50,
+          "new_qty": 54.22,
+          "delta_qty": 4.22,
+          "delta_pct": 8.44,
+          "old_total_aed": 3520,
+          "new_total_aed": 3817.09,
+          "delta_aed": 297.09,
+          "status": "moved"
+        },
+        {
+          "key": "Soft Landscaping|GL-25",
+          "section": "Soft Landscaping",
+          "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+          "unit": "m2",
+          "old_qty": 40.36,
+          "new_qty": 23.74,
+          "delta_qty": -16.62,
+          "delta_pct": -41.18,
+          "old_total_aed": 0,
+          "new_total_aed": 0,
+          "delta_aed": 0,
+          "status": "moved"
+        }
+      ]
     }
   ],
   "overall": {
@@ -798,5 +857,12 @@
     "PASS  the export gate passes: nothing untyped, undecided or needs_selection — {\"ready\":true,\"untyped_counters\":[],\"undecided\":[],\"stale_boq_needs_selection\":[],\"has_boq\":true}",
     "PASS  the BoQ carries the indicative programme — 60 days: Mobilisation & setting out 5 · Demolition & site clearance 3 · Hardscape & structures 31 · Soft landscaping, irrigation & MEP 16 · Snagging & handover 5",
     "PASS  the plan is still a DRAFT (the plot is not measured) — plot boundary; zone: Front garden — lawn; zone: Front garden — planting bed; zone: Garden entrance area — porcelain paving"
+  ],
+  "unmapped": [
+    {
+      "key": "front_border_width_m",
+      "value": "5.3 m",
+      "why": "applied to the front garden it leaves the drive ~1.0 m wide (garage/drive block 6.3 m per the type plan); which edge the 5.3 m runs between is not clear from the capture — pending clarification with the firm. The front garden stays on its type-plan derived footprint."
+    }
   ]
 }

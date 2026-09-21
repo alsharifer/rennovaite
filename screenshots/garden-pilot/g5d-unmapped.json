@@ -1,0 +1,127 @@
+{
+  "project_id": "ec4497c7-71a7-44f5-9f4b-f5a731002d0d",
+  "applied_at": "2026-09-20T18:55:16.537Z",
+  "unmapped": [
+    {
+      "key": "front_border_width_m",
+      "value": "5.3 m",
+      "why": "applied to the front garden it leaves the drive ~1.0 m wide (garage/drive block 6.3 m per the type plan); which edge the 5.3 m runs between is not clear from the capture — pending clarification with the firm. The front garden stays on its type-plan derived footprint."
+    }
+  ],
+  "still_mapped": {
+    "entrance_area_width_m": 5.85,
+    "path_from_gate_m": 12.2,
+    "separator_to_end_wall_m": 6,
+    "door_landing_m": [
+      1.2,
+      1.3
+    ],
+    "total_grass_m2": 50,
+    "total_tiled_m2": 69.4
+  },
+  "front_garden": {
+    "before": [
+      {
+        "key": "front-lawn",
+        "area": 2.18
+      },
+      {
+        "key": "front-bed",
+        "area": 19.02
+      }
+    ],
+    "after": [
+      {
+        "key": "front-lawn",
+        "area": 6.4
+      },
+      {
+        "key": "front-bed",
+        "area": 2.4
+      }
+    ],
+    "drive_width_m": 4.1
+  },
+  "reconciliation": {
+    "grass": {
+      "old": 76.9,
+      "measured": 69.66,
+      "new": 54.22,
+      "target": 50,
+      "in_aggregate": 47.82,
+      "outside_aggregate": 6.4,
+      "outside_note": "the front garden's lawn is on the type plan's derived footprint while the 5.3 m front-border measure is unmapped, so it is not part of the measured grass aggregate"
+    },
+    "tiled": {
+      "old": 62.95,
+      "measured": 60.76,
+      "new": 69.41,
+      "target": 69.4
+    },
+    "planting": {
+      "old": 18.48,
+      "measured": 16.95,
+      "new": 23.74
+    }
+  },
+  "change_report": {
+    "cause": "dimension update (reverted — measurement unmapped)",
+    "boq": {
+      "old_total_aed": 116216.57,
+      "new_total_aed": 116679.07,
+      "delta_aed": 462.5,
+      "delta_pct": 0.4
+    },
+    "moved": [
+      {
+        "key": "Soft Landscaping|GL-07",
+        "section": "Soft Landscaping",
+        "description": "Artificial grass supply",
+        "unit": "m2",
+        "old_qty": 50,
+        "new_qty": 54.22,
+        "delta_qty": 4.22,
+        "delta_pct": 8.44,
+        "old_total_aed": 1320,
+        "new_total_aed": 1431.41,
+        "delta_aed": 111.41,
+        "status": "moved"
+      },
+      {
+        "key": "Soft Landscaping|GL-08",
+        "section": "Soft Landscaping",
+        "description": "Artificial grass installation (base+sand+borders)",
+        "unit": "m2",
+        "old_qty": 50,
+        "new_qty": 54.22,
+        "delta_qty": 4.22,
+        "delta_pct": 8.44,
+        "old_total_aed": 3520,
+        "new_total_aed": 3817.09,
+        "delta_aed": 297.09,
+        "status": "moved"
+      },
+      {
+        "key": "Soft Landscaping|GL-25",
+        "section": "Soft Landscaping",
+        "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+        "unit": "m2",
+        "old_qty": 40.36,
+        "new_qty": 23.74,
+        "delta_qty": -16.62,
+        "delta_pct": -41.18,
+        "old_total_aed": 0,
+        "new_total_aed": 0,
+        "delta_aed": 0,
+        "status": "moved"
+      }
+    ]
+  },
+  "results": [
+    "PASS  the plan saves with the front garden back on its type-plan footprint — []",
+    "PASS  the BoQ regenerates — AED 116679.07",
+    "PASS  only the front garden's quantities moved — Artificial grass supply; Artificial grass installation (base+sand; Planting beds — soil preparation and pla",
+    "PASS  both front zones are derived and say the measure is unmapped — Front garden — lawn 6.4; Front garden — planting bed 2.4",
+    "PASS  the plan is still a DRAFT"
+  ]
+}
