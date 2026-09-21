@@ -114,23 +114,24 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
   const doors = bedrooms.length + bathrooms; // one leaf per bedroom + bathroom
   if (bedrooms.length === 0 && bathrooms === 0) return null;
 
-  const src = "Atrium Technical Services QTN20261407 (actual composite rates)";
+  // I4: a role label, never the contractor or its quotation number (lib/identity/curation.ts).
+  const src = "joinery reference quotation (transacted composite rates)";
   const lines: GtBoqLine[] = [];
 
   // Master bedroom: dresser (1100/m² × 10.08) + wall cladding (800/m² × 6.16).
   if (masters > 0) {
     lines.push(line(
       "GT/joinery/dresser",
-      `Master bedroom dresser cabinet, glass doors + LED`, 10.08 * masters, "m2", rate("joinery_dresser"), src, "actual_transaction", "Heuristic: 10.08 m² per master (Atrium 1.1)"));
+      `Master bedroom dresser cabinet, glass doors + LED`, 10.08 * masters, "m2", rate("joinery_dresser"), src, "actual_transaction", "Heuristic: 10.08 m² per master (ref 1.1)"));
     lines.push(line(
       "GT/joinery/cladding",
-      `Master bedroom wall cladding with hidden LED`, 6.16 * masters, "m2", rate("joinery_cladding"), src, "actual_transaction", "Heuristic: 6.16 m² per master (Atrium 1.2)"));
+      `Master bedroom wall cladding with hidden LED`, 6.16 * masters, "m2", rate("joinery_cladding"), src, "actual_transaction", "Heuristic: 6.16 m² per master (ref 1.2)"));
   }
   // Kids bedrooms: fitted cabinet 850/m² × 7 m² each.
   if (kids > 0) {
     lines.push(line(
       "GT/joinery/cabinet",
-      `Fitted bedroom cabinet, melamine MDF + architrave`, 7 * kids, "m2", rate("joinery_cabinet"), src, "actual_transaction", `Heuristic: 7 m² per bedroom × ${kids} (Atrium 2.1/3.1)`));
+      `Fitted bedroom cabinet, melamine MDF + architrave`, 7 * kids, "m2", rate("joinery_cabinet"), src, "actual_transaction", `Heuristic: 7 m² per bedroom × ${kids} (ref 2.1/3.1)`));
   }
   // Bathrooms: bath cabinet (item) + vanity (item) each.
   if (bathrooms > 0) {
@@ -145,10 +146,10 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
   if (doors > 0) {
     lines.push(line(
       "GT/joinery/door_leaf",
-      `Solid door leaf, new handle + hinges`, doors, "no", rate("joinery_door_leaf"), src, "actual_transaction", `Bedrooms + bathrooms = ${doors} leaves (Atrium 5.1)`));
+      `Solid door leaf, new handle + hinges`, doors, "no", rate("joinery_door_leaf"), src, "actual_transaction", `Bedrooms + bathrooms = ${doors} leaves (ref 5.1)`));
     lines.push(line(
       "GT/joinery/door_frame",
-      `Solid meranti door frame, painted + fixed`, doors, "no", rate("joinery_door_frame"), src, "actual_transaction", `${doors} frames (Atrium 5.2)`));
+      `Solid meranti door frame, painted + fixed`, doors, "no", rate("joinery_door_frame"), src, "actual_transaction", `${doors} frames (ref 5.2)`));
   }
 
   // --- S6-pre (G19): "Excludes slabs for vanity of the 2 bedrooms" ---------
@@ -185,7 +186,8 @@ export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | n
   // villa fit-out. A plan with no interior rooms has none of them, and a garden
   // project was picking up the whole AED 92k allowance for nothing.
   if (rooms.length > 0 && rooms.every((r) => LANDSCAPE.has(r.room_type ?? ""))) return null;
-  const src = "Global Creation Services ref 3936/R1 (allowance)";
+  // I4: a role label, never the contractor or its quotation number (lib/identity/curation.ts).
+  const src = "aluminium & glazing reference quotation (allowance)";
   const slug = (v: string) =>
     v.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);
   const lines: GtBoqLine[] = ALUMINUM.map((a) =>
@@ -228,7 +230,7 @@ export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | n
           glass.quantity,
           "no",
           RATE_RULES["alum.shower_glass"]!.allowance_aed!,
-          "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+          "S6-pre G21 — excluded from the aluminium & glazing reference package; indicative rate",
           "indicative",
           glass.measurement,
         ),
@@ -242,7 +244,7 @@ export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | n
           mirrors.quantity,
           "no",
           RATE_RULES["alum.mirror"]!.allowance_aed!,
-          "S6-pre G21 — excluded from the Global Creation package; indicative rate",
+          "S6-pre G21 — excluded from the aluminium & glazing reference package; indicative rate",
           "indicative",
           mirrors.measurement,
         ),

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { Figure } from "@/components/figures/Figure";
+import { formatAed } from "@/lib/format/aed";
 import { cn } from "@/lib/utils";
 import type { Grade, GradeableItem } from "@/lib/whatif/grades";
 
@@ -11,6 +13,8 @@ export interface WhatIfOption {
   delta: number; // vs baseline, AED (signed)
   qs_validated: boolean;
   spec: string;
+  /** I4: a code-authored label (grades.ts / RATE_BOOK_LABEL) — never rate_book.source. */
+  source: string;
 }
 export interface WhatIfRow {
   item_key: GradeableItem;
@@ -22,14 +26,6 @@ export interface WhatIfRow {
 
 const GRADES: Grade[] = ["economy", "standard", "premium"];
 
-function fmtDelta(n: number): string {
-  if (Math.round(n) === 0) return "—";
-  const abs = Math.abs(Math.round(n)).toLocaleString("en-US");
-  return n > 0 ? `+${abs}` : `−${abs}`;
-}
-function fmtAed(n: number): string {
-  return `AED ${Math.round(n).toLocaleString("en-US")}`;
-}
 
 export function WhatIfSidebar({
   rows,
@@ -84,11 +80,23 @@ export function WhatIfSidebar({
               delta > 0 ? "text-error" : delta < 0 ? "text-tertiary" : "text-ink-500",
             )}
           >
-            {delta === 0 ? "±0" : fmtDelta(delta)}
+            <Figure
+              value={delta}
+              text={delta === 0 ? "±0" : formatAed(delta, "delta")}
+              provenance={{
+                title: "What-if change vs the stored BoQ",
+                steps: [
+                  { kind: "arith", label: "Project total", detail: `${formatAed(scenarioTotal)} − ${formatAed(baselineTotal)} = ${formatAed(delta, "signed")}` },
+                  { kind: "arith", label: "How", detail: "Σ (grade rate − stored rate) × stored quantity, then OH&P, contingency and VAT recomputed with the stored percentages — the figure a regenerated BoQ would store." },
+                ],
+                flags: ["scenario — not stored"],
+                traceable: true,
+              }}
+            />
           </span>
         </div>
         <p className="mt-xs font-mono text-[11px] text-ink-500">
-          {fmtAed(baselineTotal)} → {fmtAed(scenarioTotal)}
+          {formatAed(baselineTotal)} → {formatAed(scenarioTotal)}
         </p>
       </div>
 
@@ -132,7 +140,7 @@ export function WhatIfSidebar({
                       {g}
                     </span>
                     <span className="font-mono text-[10px] tabular-nums">
-                      {fmtDelta(opt.delta)}
+                      {formatAed(opt.delta, "delta")}
                     </span>
                   </button>
                 );
@@ -140,11 +148,28 @@ export function WhatIfSidebar({
             </div>
             {(() => {
               const sel = row.options.find((o) => o.grade === row.selected)!;
-              return !sel.qs_validated ? (
-                <span className="font-body-sm text-[11px] text-tertiary">
-                  Indicative — pending QS validation
+              return (
+                <span className="flex flex-wrap items-baseline gap-x-xs font-body-sm text-[11px] text-ink-500">
+                  <span className="capitalize">{sel.grade}</span>
+                  <Figure
+                    className="font-mono text-ink-900"
+                    value={sel.rate}
+                    text={`AED ${formatAed(sel.rate, "rate")}/m²`}
+                    provenance={{
+                      title: `${row.label} — ${sel.grade}`,
+                      steps: [
+                        { kind: "tier", label: "What-if rate book", detail: sel.spec },
+                        { kind: "source", label: "Source", detail: sel.source },
+                        { kind: "qs", label: "QS validation", detail: sel.qs_validated ? "QS-validated: yes." : "QS-validated: no — indicative." },
+                        { kind: "arith", label: "Change on this line", detail: `${formatAed(sel.delta, "signed")} over ${Math.round(row.qty)} m²` },
+                      ],
+                      flags: sel.qs_validated ? [] : ["indicative"],
+                      traceable: true,
+                    }}
+                  />
+                  {!sel.qs_validated && <span className="text-tertiary">· indicative — pending QS validation</span>}
                 </span>
-              ) : null;
+              );
             })()}
           </div>
         ))}
@@ -173,7 +198,7 @@ export function WhatIfSidebar({
               </span>
             </span>
             <span className="font-mono text-body-sm tabular-nums">
-              {furniture.on ? `+${fmtAed(furniture.total)}` : "off"}
+              {furniture.on ? formatAed(furniture.total, "signed") : "off"}
             </span>
           </button>
         </div>
@@ -183,7 +208,7 @@ export function WhatIfSidebar({
       <div className="mt-sm border-t border-bone pt-md">
         <div className="flex items-baseline justify-between">
           <span className="label-caps text-ink-500">Budget dial</span>
-          <span className="font-mono text-body-sm tabular-nums text-ink-900">{fmtAed(target)}</span>
+          <span className="font-mono text-body-sm tabular-nums text-ink-900">{formatAed(target)}</span>
         </div>
         <input
           type="range"

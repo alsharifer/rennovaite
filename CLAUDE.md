@@ -1226,6 +1226,40 @@ resolved line carries **`rate_tier`**.
 
 **DB step**: `npm run db:push` for `041`.
 
+## Figures + number provenance, identity curation (I4)
+
+- **One formatter, one component.** `lib/format/aed.ts` (`formatAed(n, format)`:
+  aed · amount · rate · signed · delta · short) replaced 14 local helpers; every
+  on-screen figure is `<Figure>` (`components/figures/Figure.tsx`). Don't add a
+  local AED formatter.
+- **One summary chain.** `lib/boq/totals.ts` `chainTotals` (subtotal → OH&P →
+  contingency → VAT). `applyOhp`, the what-if engine (`scenarioTotal`) and the
+  vendor picker all use it, so a browser-recomputed figure equals what a
+  regenerated BoQ stores (what-if deltas now carry OH&P/contingency/VAT). The
+  BoQ view shows Subtotal / OH&P / Contingency / VAT rows like the PDF.
+- **Provenance popover.** `lib/provenance/boq.ts` builds, server-side, a chain
+  for every figure of a STORED BoQ (any vintage — the tier is inferred when
+  `rate_tier` is absent): plan geometry (element names, derived notes,
+  "sized to measured aggregate"), resolution tier in the popover's words
+  (Private / market_fair / actual_transaction / Fallback — … / Indicative / QS to
+  price), a curated source, QS validation, and arithmetic checks. An
+  untraceable figure is marked `data-provenance="gap"` and listed in `findings`
+  — never given a story. One shared base-ui Popover per page (handle + payload).
+- **Identity curation** (`lib/identity/curation.ts`, SERVER-ONLY — it holds the
+  names it withholds; a test walks every client import graph). Source
+  contractor identities (Atrium, Global Creation, KAME/internal_ref, firm names
+  from `firms`) never reach BoQ text: emitted as role labels at source
+  (`joinery-aluminum.ts`, R-43 note) and `curateBoq` on every read path (BoQ
+  page, vendors, drawings, viewer, BoQ PDF, vendor-options, dry-run). Brands
+  that are specifications stay. **Ambiguous names are listed in
+  `AMBIGUOUS_NAMES`, not scrubbed** (Laspinas R-40–43, "Villa 94", RAK, Newspace)
+  pending a ruling. What-if never selects `rate_book.source`
+  (`RATE_BOOK_LABEL`).
+- **Checks:** `scripts/provenance-check.mjs [port] <ids>` (read-only: figure
+  counts, gaps, summary rows, identity scan of the full page payload) and
+  `scripts/figure-popover-sweep.mjs <url> [--shots=dir]` (headless Chrome over
+  CDP: hovers every figure, one tap, screenshots).
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

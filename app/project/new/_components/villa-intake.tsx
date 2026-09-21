@@ -19,6 +19,7 @@ import {
 } from "@/components/plan/plot-size-fields";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
 import { cn } from "@/lib/utils";
+import { formatAed } from "@/lib/format/aed";
 
 // The existing /api/upload only accepts PDF/PNG/JPG. The design copy mentions
 // DWG/RVT but the data flow is unchanged, so the picker is restricted to what
@@ -114,9 +115,6 @@ function formatBytes(b: number): string {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatAed(n: number): string {
-  return `AED ${n.toLocaleString("en-US")}`;
-}
 
 const isImageType = (t: string) => /^image\/(png|jpeg)$/.test(t);
 

@@ -17,6 +17,7 @@ import { esc } from "@/lib/drawings/sheet";
 import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
 
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "./boq-derived";
+import { formatAed } from "@/lib/format/aed";
 
 export const BOQ_PAGE_W = 210;
 export const BOQ_PAGE_H = 297;
@@ -80,7 +81,7 @@ const STATUS_MARK: Record<string, { mark: string; label: string }> = {
   priced: { mark: "P", label: "catalogue price" },
 };
 
-const aed = (n: number) => Math.round(n).toLocaleString("en-US");
+const aed = (n: number) => formatAed(n, "amount");
 const f1 = (n: number) => (Math.round(n * 10) / 10).toString();
 
 /**

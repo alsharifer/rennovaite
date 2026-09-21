@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import type { Style } from "@/lib/styles";
+import { formatAed, formatAedKDelta } from "@/lib/format/aed";
 
 const BASELINE_BUDGET_AED = 850_000;
 
@@ -16,19 +17,9 @@ type Props = {
 };
 
 function formatDelta(delta: number): { label: string; emphatic: boolean } {
-  if (delta === 0) return { label: "AED ±0 vs baseline", emphatic: false };
-  const abs = Math.abs(delta);
-  const k = Math.round(abs / 1000);
-  const sign = delta > 0 ? "+" : "−";
-  return {
-    label: `AED ${sign}${k}k vs baseline`,
-    emphatic: Math.abs(delta) >= 100_000,
-  };
+  return { label: `${formatAedKDelta(delta)} vs baseline`, emphatic: Math.abs(delta) >= 100_000 };
 }
 
-function formatAed(n: number): string {
-  return `AED ${Math.round(n).toLocaleString("en-US")}`;
-}
 
 export function StyleGrid({
   styles,

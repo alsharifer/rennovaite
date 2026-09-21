@@ -7,6 +7,10 @@ import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { DRAFT_STATEMENT } from "@/lib/plan/site-reference";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { curateBoq } from "@/lib/identity/curation";
+import { buildBoqProvenance } from "@/lib/provenance/boq";
+import { loadProvenanceContext } from "@/lib/provenance/load";
+import type { BoqProvenance } from "@/lib/provenance/types";
 import {
   hasTakeoffProvenance,
   type RateBook,
@@ -156,8 +160,17 @@ export default async function BoqPage({
   const project = projectRes.data;
   const budgetAed = project.budget_aed ?? FALLBACK_BUDGET_AED;
   const latestBoq = boqRes.data?.[0];
+  // I4: the plan context behind every figure's source chain, and the names that
+  // must never reach the page (firm names). The stored document is CURATED on
+  // its way out — a BoQ generated before I4 still holds contractor names.
+  const provenanceCtx = await loadProvenanceContext(sb, id);
   const boqPayload =
-    latestBoq && isBoqPayload(latestBoq.sections) ? latestBoq.sections : null;
+    latestBoq && isBoqPayload(latestBoq.sections)
+      ? curateBoq(latestBoq.sections, provenanceCtx.withheldNames)
+      : null;
+  const provenance: BoqProvenance | null = boqPayload
+    ? buildBoqProvenance(boqPayload as unknown as Parameters<typeof buildBoqProvenance>[0], provenanceCtx)
+    : null;
   const skus = skuRes.data ?? [];
   const lineOptions = boqPayload ? buildLineOptions(boqPayload, skus) : {};
 
@@ -341,6 +354,7 @@ export default async function BoqPage({
             rateBook={rateBook}
             initialSelections={initialSelections}
             furnitureSection={furnitureSection}
+            provenance={provenance}
           />
         ) : (
           <EmptyState projectId={id} />

@@ -12,6 +12,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { defaultRateBook, type RateBook, type Selections } from "./engine";
 import { type Grade, type GradeableItem } from "./grades";
 
+/**
+ * I4: what a what-if option says about where its rate came from. A constant per
+ * provenance — `rate_book.source` is never selected, because on the Mudon
+ * interior actuals it names the tile supplier's cart and the contractors'
+ * quotations, and this rate book is passed to the browser.
+ */
+export const RATE_BOOK_LABEL: Record<string, string> = {
+  actual_transaction: "transacted market reference (rate book)",
+  indicative: "indicative rate (rate book)",
+  seed: "seed rate (rate book)",
+};
+
 export async function loadRateBook(supabase: SupabaseClient): Promise<RateBook> {
   const rb = defaultRateBook();
   try {
@@ -25,7 +37,7 @@ export async function loadRateBook(supabase: SupabaseClient): Promise<RateBook> 
     // actual-transaction rate supersedes a same-dated seed rate.
     const { data, error } = await supabase
       .from("rate_book")
-      .select("item_key, grade, rate_aed, source, qs_validated, valid_from")
+      .select("item_key, grade, rate_aed, provenance, qs_validated, valid_from")
       .eq("city", "Dubai")
       .order("valid_from", { ascending: false })
       .order("provenance", { ascending: true });
@@ -35,7 +47,7 @@ export async function loadRateBook(supabase: SupabaseClient): Promise<RateBook> 
       item_key: GradeableItem;
       grade: Grade;
       rate_aed: number;
-      source: string;
+      provenance: string | null;
       qs_validated: boolean;
       valid_from: string | null;
     }[]) {
@@ -45,7 +57,7 @@ export async function loadRateBook(supabase: SupabaseClient): Promise<RateBook> 
       if (cell) {
         rb[r.item_key][r.grade] = {
           rate_aed: Number(r.rate_aed),
-          source: r.source,
+          source: RATE_BOOK_LABEL[r.provenance ?? "seed"] ?? RATE_BOOK_LABEL.seed!,
           qs_validated: !!r.qs_validated,
           spec: cell.spec, // spec label stays from grades.ts
         };

@@ -32,6 +32,7 @@ import {
   type SpecClass,
 } from "@/lib/accessories/types";
 import { cn } from "@/lib/utils";
+import { formatAed } from "@/lib/format/aed";
 
 export type RuleDefault = {
   rate_aed: number;
@@ -54,7 +55,7 @@ type Props = {
   degraded: boolean;
 };
 
-const aed = (n: number) => `AED ${Math.round(n).toLocaleString("en-US")}`;
+const aed = (n: number) => formatAed(n);
 
 export function AccessoryPicker({
   projectId,

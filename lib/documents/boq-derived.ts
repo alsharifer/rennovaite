@@ -16,6 +16,7 @@
 // Imports only the pure site-reference vocabulary: this module reaches the
 // client bundle, and the landscape take-off (with its rate provenance) must not.
 import { DERIVED_QTY_NOTE, DRAFT_STATEMENT } from "@/lib/plan/site-reference";
+import { formatAed } from "@/lib/format/aed";
 
 interface LineLike {
   qty_derived?: boolean;
@@ -42,7 +43,7 @@ export function boqDerivedInfo(boq: BoqLike): BoqDerivedInfo {
   return { derivedLines, draft, statement: draft ? boq.garden?.draft?.statement ?? DRAFT_STATEMENT : null };
 }
 
-const aed = (n: number) => `AED ${Math.round(n).toLocaleString("en-US")}`;
+const aed = (n: number) => formatAed(n);
 
 /** The total as it must be printed. */
 export function derivedTotal(amountAed: number, info: BoqDerivedInfo): { text: string; derived: boolean; footnote: string | null } {

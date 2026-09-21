@@ -1,3 +1,4 @@
+import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -49,7 +50,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       projectName: project.name,
       community: project.city,
       dateISO: new Date().toISOString().slice(0, 10),
-      boq: boq.data.sections,
+      // I4: curated — a stored BoQ may predate the source scrub.
+      boq: curateBoq(boq.data.sections, await loadWithheldNames(sb)),
     });
     if (json) return NextResponse.json({ readiness, pages: pages.length, bytes: pdf.byteLength, boq_id: boq.data.id });
     await recordPilotEvent(sb, projectId, "pack_exported", { document: "boq_pdf", boq_id: boq.data.id, pages: pages.length });

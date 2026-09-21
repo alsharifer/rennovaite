@@ -15,6 +15,7 @@ import {
   type PortfolioProject,
   type SortKey,
 } from "./_components/portfolio-types";
+import { formatAed } from "@/lib/format/aed";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +40,6 @@ type SelectionRow = { id: string; project_id: string; boq_line_id: string; creat
 // Helpers — dashboard summary
 // ---------------------------------------------------------------------------
 
-function formatAedShort(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
-  if (n >= 1_000_000) return `AED ${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `AED ${Math.round(n / 1_000)}k`;
-  return `AED ${Math.round(n)}`;
-}
 
 function relativeTime(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -285,7 +280,7 @@ export default async function DashboardPage({
   }
   for (const b of boqs.slice(0, 4)) {
     if (!b.created_at || !b.project_id) continue;
-    events.push({ id: `b-${b.id}`, when: b.created_at, projectId: b.project_id, icon: "receipt_long", description: `BoQ priced at ${formatAedShort(b.total_aed)} for ${projectNameById.get(b.project_id) ?? "a project"}` });
+    events.push({ id: `b-${b.id}`, when: b.created_at, projectId: b.project_id, icon: "receipt_long", description: `BoQ priced at ${formatAed(b.total_aed, "short")} for ${projectNameById.get(b.project_id) ?? "a project"}` });
   }
   for (const s of selections.slice(0, 4)) {
     if (!s.created_at || !s.project_id) continue;
@@ -359,7 +354,7 @@ export default async function DashboardPage({
             delta={newThisMonth > 0 ? `+${newThisMonth} this month` : "No new projects this month"}
             deltaTone={newThisMonth > 0 ? "tertiary" : "muted"}
           />
-          <StatCard label="BoQ value" value={formatAedShort(totalBoqValue)} delta="across all projects" deltaTone="muted" />
+          <StatCard label="BoQ value" value={formatAed(totalBoqValue, "short")} delta="across all projects" deltaTone="muted" />
           <StatCard label="Renders generated" value={String(rendersLast30)} delta="last 30 days" deltaTone="muted" />
           <StatCard
             label="Pending decisions"

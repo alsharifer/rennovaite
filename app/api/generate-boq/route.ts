@@ -1,3 +1,4 @@
+import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -835,7 +836,7 @@ export async function POST(request: NextRequest) {
       const boq = applyOhp(gardened, firm.ohpPct);
 
       if (dryRun) {
-        return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq });
+        return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq: curateBoq(boq, await loadWithheldNames(supabaseUntyped)) });
       }
 
       const { data: inserted, error: insertErr } = await supabase

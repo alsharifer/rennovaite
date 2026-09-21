@@ -4,7 +4,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Figure, FigureProvenanceProvider } from "@/components/figures/Figure";
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "@/lib/documents/boq-derived";
+import { formatAed } from "@/lib/format/aed";
+import type { BoqProvenance, FigureProvenance, LineProvenance } from "@/lib/provenance/types";
 import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
 import { cn } from "@/lib/utils";
 import {
@@ -47,6 +50,8 @@ export type BoqLine = {
   qty_derived?: boolean;
   // P4/P5: engine rule id (P4/quantify/<key> marks a gradeable line).
   rule_id?: string;
+  /** L1: which tier of the resolution order answered. */
+  rate_tier?: string;
 };
 
 export type BoqSection = {
@@ -113,6 +118,8 @@ type Props = {
   // P7: optional indicative furniture section (separate from boq.sections so it
   // never reaches a contractor export). Toggleable from the what-if panel.
   furnitureSection?: FurnitureSection | null;
+  /** I4: the source chain behind every figure, built on the server from the stored BoQ + plan. */
+  provenance?: BoqProvenance | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -140,13 +147,11 @@ const SENSITIVITY_TOGGLES = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatAed(n: number): string {
-  return `AED ${Math.round(n).toLocaleString("en-US")}`;
-}
+const fmtQty = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
-function formatAedSigned(n: number): string {
-  const abs = Math.abs(Math.round(n)).toLocaleString("en-US");
-  return n >= 0 ? `+AED ${abs}` : `−AED ${abs}`;
+/** A figure the browser computes from stored ones — its chain is built here, from the same numbers. */
+function computedProvenance(title: string, steps: FigureProvenance["steps"], flags: string[] = []): FigureProvenance {
+  return { title, steps, flags, traceable: true };
 }
 
 function sectionRef(work_section: string, idx: number): string {
@@ -249,6 +254,7 @@ export function BoqView({
   rateBook = null,
   initialSelections = {},
   furnitureSection = null,
+  provenance = null,
 }: Props) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   // P7: furniture is included in the display total by default; toggling it off
@@ -266,7 +272,16 @@ export function BoqView({
   const whatifOn = whatifEnabled && rateBook != null;
   const [selections, setSelections] = useState<Selections>(initialSelections);
   const scenarioBoq: ScenarioBoq = useMemo(
-    () => ({ grand_total_aed: boq.grand_total_aed, sections: boq.sections }),
+    () => ({
+      grand_total_aed: boq.grand_total_aed,
+      sections: boq.sections,
+      // I4: with these, a scenario total is the shared chain over the moved
+      // subtotal — the figure a regenerated BoQ would store.
+      subtotal_aed: boq.subtotal_aed,
+      contingency_pct: boq.contingency_pct,
+      vat_pct: boq.vat_pct,
+      ohp_pct: boq.ohp_pct,
+    }),
     [boq],
   );
   const scenario = useMemo(
@@ -291,6 +306,7 @@ export function BoqView({
           delta: Math.round((rateBook[c.item_key][g].rate_aed - c.baseline_rate) * c.quantity),
           qs_validated: rateBook[c.item_key][g].qs_validated,
           spec: rateBook[c.item_key][g].spec,
+          source: rateBook[c.item_key][g].source,
         })),
       }))
       .sort((a, b) => b.qty * b.options[1]!.rate - a.qty * a.options[1]!.rate);
@@ -341,7 +357,10 @@ export function BoqView({
     return { pct, changes };
   }, [activeToggles]);
 
-  const adjustedTotal = Math.round(baseTotal * (1 + adjustments.pct / 100));
+  // I4: with no toggle active the total IS the stored figure — rounding it here
+  // turned AED 116,679.07 into 116,679 and printed a phantom "−AED 0" adjustment.
+  const adjustedTotal =
+    adjustments.pct === 0 ? baseTotal : Math.round(baseTotal * (1 + adjustments.pct / 100) * 100) / 100;
   const scopeTotal = whatifOn && scenario ? scenario.total : adjustedTotal;
   const furnitureIncluded = furnitureOn ? furnitureTotal : 0;
   const displayTotal = scopeTotal + furnitureIncluded;
@@ -349,6 +368,53 @@ export function BoqView({
   const derivedInfo = boqDerivedInfo(boq);
   const totalFootnote = derivedTotal(displayTotal, derivedInfo).footnote;
   const headroom = budgetAed - displayTotal;
+
+  // I4: the summary chain the table shows — the stored one, or the scenario's
+  // (same arithmetic, lib/boq/totals.ts) when a what-if moved the subtotal.
+  const chain = scenario?.chain && scenario.delta !== 0
+    ? scenario.chain
+    : {
+        subtotal_aed: boq.subtotal_aed,
+        ohp_pct: boq.ohp_pct ?? 0,
+        ohp_aed: boq.ohp_aed ?? 0,
+        contingency_pct: boq.contingency_pct,
+        contingency_aed: boq.contingency_aed,
+        vat_pct: boq.vat_pct,
+        vat_aed: boq.vat_aed,
+        grand_total_aed: boq.grand_total_aed,
+      };
+  const scenarioMoved = !!(scenario && scenario.delta !== 0);
+  const sensitivityAed = whatifOn && scenario ? 0 : adjustedTotal - baseTotal;
+  const summaryProv = provenance?.summary;
+  const scenarioStep = (label: string, stored: number, now: number) => ({
+    kind: "arith" as const,
+    label,
+    detail: `stored ${formatAed(stored)} → scenario ${formatAed(now)} (what-if grades moved the subtotal by ${formatAed(scenario?.delta ?? 0, "signed")}; recomputed with the stored percentages)`,
+  });
+  const adjusted = scenarioMoved || sensitivityAed !== 0 || furnitureIncluded > 0;
+  const totalProv: FigureProvenance | null = !adjusted
+    ? summaryProv?.grand ?? null
+    : computedProvenance(
+        "Project total — as displayed",
+        [
+          { kind: "arith", label: "Stored project total", detail: formatAed(baseTotal) },
+          ...(scenarioMoved ? [scenarioStep("What-if scenario", baseTotal, chain.grand_total_aed)] : []),
+          ...(sensitivityAed !== 0 ? [{ kind: "arith" as const, label: `Sensitivity ${adjustments.pct > 0 ? "+" : ""}${adjustments.pct}%`, detail: `${formatAed(sensitivityAed, "signed")} — an illustrative percentage of the total, not a priced change` }] : []),
+          ...(furnitureIncluded > 0 ? [{ kind: "arith" as const, label: "Furniture (optional)", detail: `${formatAed(furnitureIncluded, "signed")} — indicative retail, never in contractor scope` }] : []),
+          { kind: "arith", label: "Displayed", detail: formatAed(displayTotal) },
+        ],
+        ["not the stored figure"],
+      );
+  const budgetProv = computedProvenance("Your budget", [
+    { kind: "source", label: "Project setting", detail: "The budget entered for this project (the platform default of AED 850,000 when none was entered)." },
+  ]);
+  const headroomProv = computedProvenance(headroom >= 0 ? "Headroom" : "Over budget", [
+    { kind: "arith", label: "Budget − displayed total", detail: `${formatAed(budgetAed)} − ${formatAed(displayTotal)} = ${formatAed(headroom, "signed")}` },
+  ]);
+  const sensitivityProv = (label: string, amount: number) =>
+    computedProvenance(label, [
+      { kind: "arith", label: "Illustrative", detail: `${formatAed(amount, "signed")} — a fixed percentage of the stored total (${formatAed(baseTotal)}); not a priced change and never stored` },
+    ], ["illustrative"]);
 
   // Top 5 sections by total for the stacked bar, with everything else
   // rolled into an "Other" bucket so the bar reads cleanly.
@@ -398,7 +464,7 @@ export function BoqView({
   );
 
   return (
-    <>
+    <FigureProvenanceProvider>
       {/* DUPLICATE-COMPONENT NOTICE -------------------------------------- */}
       {duplicateFindings.length > 0 && (
         <section className="-mx-12 border-y border-[#E8C9A0] bg-[#FEF6EC] px-margin py-md">
@@ -440,9 +506,13 @@ export function BoqView({
                     {f.duplicate_total_aed > 0 ? (
                       <>
                         {" · "}
-                        <span className="font-mono tabular-nums">
-                          AED {Math.round(f.duplicate_total_aed).toLocaleString()}
-                        </span>
+                        <Figure
+                          className="font-mono"
+                          value={f.duplicate_total_aed}
+                          provenance={computedProvenance(`Duplicated — ${f.label}`, [
+                            { kind: "arith", label: "Total of the duplicate line", detail: `${f.duplicate_key} in ${f.duplicate_line.work_section}` },
+                          ], ["priced twice"])}
+                        />
                         {" duplicated"}
                       </>
                     ) : (
@@ -473,7 +543,7 @@ export function BoqView({
             transition={{ duration: 0.24, ease: "easeOut" }}
             className="font-display text-headline-lg tabular-nums text-ink-900"
           >
-            {derivedTotal(displayTotal, derivedInfo).text}
+            <Figure value={displayTotal} text={derivedTotal(displayTotal, derivedInfo).text} provenance={totalProv} />
           </motion.h2>
           {totalFootnote && (
             <p className="font-body-sm text-[12px] leading-4 text-[#9A3412]" data-derived-total="true">
@@ -481,14 +551,14 @@ export function BoqView({
             </p>
           )}
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            against your {formatAed(budgetAed)} budget —{" "}
+            against your <Figure value={budgetAed} provenance={budgetProv} /> budget —{" "}
             <span
               className={cn(
                 "font-semibold",
                 headroom >= 0 ? "text-tertiary" : "text-error",
               )}
             >
-              {formatAed(Math.abs(headroom))}{" "}
+              <Figure value={Math.abs(headroom)} provenance={headroomProv} />{" "}
               {headroom >= 0 ? "headroom" : "over"}
             </span>
             {adjustments.pct !== 0 && (
@@ -496,7 +566,7 @@ export function BoqView({
                 {" "}
                 ·{" "}
                 <span className="text-ink-500">
-                  base {formatAed(baseTotal)} · adjusted{" "}
+                  base <Figure value={baseTotal} provenance={summaryProv?.grand ?? null} /> · adjusted{" "}
                   {adjustments.pct > 0 ? "+" : ""}
                   {adjustments.pct}%
                 </span>
@@ -660,23 +730,35 @@ export function BoqView({
                   lineOptions={lineOptions}
                   highlightRef={highlightRef}
                   changedItems={changedItems}
+                  provenance={provenance}
                 />
               ))}
-              {boq.ohp_aed != null && boq.ohp_aed > 0 && (
-                <tr className="border-t border-ink-100" data-ohp-line="true">
-                  <td className="px-md py-sm" colSpan={5}>
-                    <span className="font-body-sm text-body-sm text-ink-900">
-                      {OHP_LINE_LABEL} {boq.ohp_pct}%
-                    </span>
-                    <span className="ml-sm font-body-sm text-[12px] text-ink-500">
-                      on the {formatAed(boq.subtotal_aed)} subtotal — the contractor&apos;s markup, applied once here and never inside a rate
-                    </span>
-                  </td>
-                  <td className="px-md py-sm text-right font-mono tabular-nums text-body-sm text-ink-900">
-                    {Math.round(boq.ohp_aed).toLocaleString("en-US")}
-                  </td>
-                  <td colSpan={2} />
-                </tr>
+              {/* I4: the same summary the PDF prints — screen and paper agree. */}
+              <SummaryRow label="Subtotal" value={chain.subtotal_aed} provenance={scenarioMoved ? computedProvenance("Subtotal — scenario", [scenarioStep("Subtotal", boq.subtotal_aed, chain.subtotal_aed)], ["not the stored figure"]) : summaryProv?.subtotal ?? null} strong />
+              {chain.ohp_aed > 0 && (
+                <SummaryRow
+                  label={`${OHP_LINE_LABEL} ${chain.ohp_pct}%`}
+                  note="the contractor's markup, applied once here and never inside a rate"
+                  value={chain.ohp_aed}
+                  provenance={scenarioMoved ? computedProvenance("OH&P — scenario", [scenarioStep("OH&P", boq.ohp_aed ?? 0, chain.ohp_aed)], ["not the stored figure"]) : summaryProv?.ohp ?? null}
+                  dataAttr="ohp"
+                />
+              )}
+              <SummaryRow
+                label={`Contingency ${chain.contingency_pct}%`}
+                value={chain.contingency_aed}
+                provenance={scenarioMoved ? computedProvenance("Contingency — scenario", [scenarioStep("Contingency", boq.contingency_aed, chain.contingency_aed)], ["not the stored figure"]) : summaryProv?.contingency ?? null}
+              />
+              <SummaryRow
+                label={`VAT ${chain.vat_pct}%`}
+                value={chain.vat_aed}
+                provenance={scenarioMoved ? computedProvenance("VAT — scenario", [scenarioStep("VAT", boq.vat_aed, chain.vat_aed)], ["not the stored figure"]) : summaryProv?.vat ?? null}
+              />
+              {sensitivityAed !== 0 && (
+                <SummaryRow label={`Sensitivity ${adjustments.pct > 0 ? "+" : ""}${adjustments.pct}%`} note="illustrative — not a priced change" value={sensitivityAed} format="signed" provenance={sensitivityProv("Sensitivity adjustment", sensitivityAed)} />
+              )}
+              {furnitureIncluded > 0 && (
+                <SummaryRow label="Furniture (optional)" note="indicative retail — not in contractor scope" value={furnitureIncluded} format="signed" provenance={computedProvenance("Furniture (optional)", [{ kind: "tier", label: "Indicative", detail: "Indicative Dubai retail for staged furniture; the section below itemises it." }], ["indicative"])} />
               )}
               <tr className="border-t-2 border-ink-900">
                 <td className="px-md py-md" colSpan={5}>
@@ -695,7 +777,7 @@ export function BoqView({
                       fontFamily: "var(--font-jetbrains-mono), monospace",
                     }}
                   >
-                    {derivedTotal(displayTotal, derivedInfo).text}
+                    <Figure value={displayTotal} text={derivedTotal(displayTotal, derivedInfo).text} provenance={totalProv} />
                   </motion.span>
                 </td>
                 <td colSpan={2} />
@@ -791,7 +873,7 @@ export function BoqView({
               {adjustments.changes.length === 0 ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
                   No modifiers active — total holds at{" "}
-                  {formatAed(baseTotal)}.
+                  <Figure value={baseTotal} provenance={summaryProv?.grand ?? null} />.
                 </p>
               ) : (
                 <ul className="flex flex-col gap-sm">
@@ -810,7 +892,7 @@ export function BoqView({
                           c.pct > 0 ? "text-error" : "text-tertiary",
                         )}
                       >
-                        {formatAedSigned(baseTotal * (c.pct / 100))}
+                        <Figure value={baseTotal * (c.pct / 100)} format="signed" provenance={sensitivityProv(c.label, baseTotal * (c.pct / 100))} />
                       </span>
                     </li>
                   ))}
@@ -825,7 +907,7 @@ export function BoqView({
                         adjustments.pct > 0 ? "text-error" : "text-tertiary",
                       )}
                     >
-                      {formatAedSigned(adjustedTotal - baseTotal)}
+                      <Figure value={adjustedTotal - baseTotal} format="signed" provenance={sensitivityProv("Net sensitivity effect", adjustedTotal - baseTotal)} />
                     </span>
                   </li>
                 </ul>
@@ -862,7 +944,38 @@ export function BoqView({
       )}
       </>
       )}
-    </>
+    </FigureProvenanceProvider>
+  );
+}
+
+function SummaryRow({
+  label,
+  note,
+  value,
+  provenance,
+  format = "amount",
+  strong = false,
+  dataAttr,
+}: {
+  label: string;
+  note?: string;
+  value: number;
+  provenance: FigureProvenance | null;
+  format?: "amount" | "signed";
+  strong?: boolean;
+  dataAttr?: string;
+}) {
+  return (
+    <tr className={cn("border-t", strong ? "border-ink-900" : "border-ink-100")} data-summary-row={dataAttr ?? label.split(" ")[0]!.toLowerCase()} {...(dataAttr === "ohp" ? { "data-ohp-line": "true" } : {})}>
+      <td className="px-md py-sm" colSpan={5}>
+        <span className={cn("font-body-sm text-body-sm text-ink-900", strong && "font-semibold")}>{label}</span>
+        {note && <span className="ml-sm font-body-sm text-[12px] text-ink-500">{note}</span>}
+      </td>
+      <td className="px-md py-sm text-right font-mono text-body-sm text-ink-900">
+        <Figure value={value} format={format} provenance={provenance} />
+      </td>
+      <td colSpan={2} />
+    </tr>
   );
 }
 
@@ -902,7 +1015,18 @@ function ByRoomView({
                   </span>
                 </span>
                 <span className="font-mono text-body-sm tabular-nums text-ink-900">
-                  {formatAed(r.total_aed)}
+                  <Figure
+                    value={r.total_aed}
+                    provenance={{
+                      title: `Room total — ${r.roomName}`,
+                      steps: [
+                        { kind: "geometry", label: "Element take-off", detail: `Σ ${r.items.length} take-off item${r.items.length === 1 ? "" : "s"} measured in this room (takeoff_items)` },
+                        { kind: "tier", label: "Fallback — take-off constant", detail: "Each item at the representative rate in lib/boq/elements.ts. Excludes OH&P, contingency and VAT, and lines not attributable to a room." },
+                      ],
+                      flags: ["excl. contingency & VAT"],
+                      traceable: true,
+                    }}
+                  />
                 </span>
               </button>
               {expanded && (
@@ -917,7 +1041,18 @@ function ByRoomView({
                           {w.qty.toLocaleString("en-US")} {w.unit}
                         </td>
                         <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-                          {formatAed(w.total_aed)}
+                          <Figure
+                            value={w.total_aed}
+                            provenance={{
+                              title: `${w.description} — ${r.roomName}`,
+                              steps: [
+                                { kind: "geometry", label: "Measured", detail: `${fmtQty(w.qty)} ${w.unit} in this room (takeoff_items)` },
+                                { kind: "tier", label: "Fallback — take-off constant", detail: "At the representative rate in lib/boq/elements.ts." },
+                              ],
+                              flags: [],
+                              traceable: true,
+                            }}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -969,7 +1104,12 @@ function FurnitureBlock({
         </div>
         <div className="flex items-center gap-md">
           <span className="font-mono text-body-md tabular-nums text-ink-900">
-            {on ? formatAed(section.section_total_aed) : "—"}
+            {on ? (
+              <Figure
+                value={section.section_total_aed}
+                provenance={{ title: "Furniture (optional)", steps: [{ kind: "arith", label: `Σ ${section.lines.length} lines`, detail: formatAed(section.section_total_aed) }, { kind: "tier", label: "Indicative", detail: "Indicative Dubai retail — never in contractor scope." }], flags: ["indicative"], traceable: true }}
+              />
+            ) : "—"}
           </span>
           <button
             type="button"
@@ -1020,10 +1160,10 @@ function FurnitureBlock({
                 {line.quantity}
               </td>
               <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-                {line.rate_aed.toLocaleString("en-US")}
+                <Figure value={line.rate_aed} format="rate" provenance={{ title: `Rate — ${line.description}`, steps: [{ kind: "tier", label: "Indicative", detail: "Indicative Dubai retail price for this piece at the style's tier." }, { kind: "source", label: "Retail tier", detail: line.vendor_or_source }, { kind: "qs", label: "QS validation", detail: "Indicative — not QS-validated." }], flags: ["indicative"], traceable: true }} />
               </td>
               <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-                {line.total_aed.toLocaleString("en-US")}
+                <Figure value={line.total_aed} format="amount" provenance={{ title: `Total — ${line.description}`, steps: [{ kind: "arith", label: "Quantity × rate", detail: `${fmtQty(line.quantity)} × ${formatAed(line.rate_aed, "rate")} = ${formatAed(line.total_aed, "amount")}` }], flags: ["indicative"], traceable: true }} />
               </td>
               <td className="px-md py-sm font-body-sm text-[12px] text-on-surface-variant">
                 <span className="line-clamp-2">{line.vendor_or_source}</span>
@@ -1067,6 +1207,7 @@ function SectionGroup({
   lineOptions,
   highlightRef,
   changedItems,
+  provenance,
 }: {
   section: BoqSection;
   expandedKey: string | null;
@@ -1074,6 +1215,7 @@ function SectionGroup({
   lineOptions: Record<string, VendorOption[]>;
   highlightRef: string | null;
   changedItems: Set<GradeableItem>;
+  provenance: BoqProvenance | null;
 }) {
   return (
     <>
@@ -1087,7 +1229,7 @@ function SectionGroup({
           colSpan={2}
           className="px-md text-right font-mono text-body-sm tabular-nums text-ink-900"
         >
-          {formatAed(section.section_total_aed)}
+          <Figure value={section.section_total_aed} provenance={provenance?.sections[section.work_section] ?? null} />
         </td>
       </tr>
       {section.lines.map((line, idx) => {
@@ -1107,6 +1249,7 @@ function SectionGroup({
             options={lineOptions[key] ?? []}
             highlighted={ref === highlightRef}
             scenarioChanged={gi ? changedItems.has(gi) : false}
+            prov={provenance?.lines[key] ?? null}
           />
         );
       })}
@@ -1124,7 +1267,9 @@ function LineRow({
   options,
   highlighted,
   scenarioChanged,
+  prov,
 }: {
+  prov: LineProvenance | null;
   lineKey: string;
   ref_: string;
   line: BoqLine;
@@ -1215,13 +1360,13 @@ function LineRow({
           {line.unit}
         </td>
         <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-          {line.quantity.toLocaleString("en-US")}
+          <Figure value={line.quantity} text={fmtQty(line.quantity)} provenance={prov?.quantity ?? null} />
         </td>
         <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-          {line.rate_aed.toLocaleString("en-US")}
+          <Figure value={line.rate_aed} format="rate" provenance={prov?.rate ?? null} />
         </td>
         <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-          {line.total_aed.toLocaleString("en-US")}
+          <Figure value={line.total_aed} format="rate" provenance={prov?.total ?? null} />
         </td>
         <td className="px-md py-sm font-body-sm text-[12px] text-on-surface-variant">
           <span className="line-clamp-2">{line.vendor_or_source}</span>
@@ -1326,7 +1471,11 @@ function VendorMini({
         {option.sku ?? "—"}
       </p>
       <p className="font-mono text-body-sm tabular-nums text-ink-900">
-        AED {option.price_aed.toLocaleString("en-US")}
+        <Figure
+          value={option.price_aed}
+          text={`AED ${formatAed(option.price_aed, "rate")}`}
+          provenance={{ title: `${option.brand ?? "Alternative"} ${option.sku ?? ""}`.trim(), steps: [{ kind: "source", label: "Supplier catalogue", detail: "pricing_skus list price — the brand and SKU are the specification. Not in the BoQ until chosen on the vendors step." }], flags: ["alternative, not priced in"], traceable: true }}
+        />
         <span className="text-ink-500"> / {unit}</span>
       </p>
     </div>

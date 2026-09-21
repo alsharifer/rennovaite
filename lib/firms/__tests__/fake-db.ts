@@ -80,6 +80,11 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
     this.orderBy = col;
     return this;
   }
+  private cap: number | null = null;
+  limit(n: number) {
+    this.cap = n;
+    return this;
+  }
   returns() {
     return this;
   }
@@ -110,6 +115,7 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
         const k = this.orderBy;
         out = out.slice().sort((a, b) => String(a[k]).localeCompare(String(b[k])));
       }
+      if (this.cap != null) out = out.slice(0, this.cap);
       if (this.head) return { data: null, error: null, count: this.count ? out.length : null };
     } else if (this.op === "insert") {
       const incoming = (Array.isArray(this.payload) ? this.payload : [this.payload!]).map((r) => ({

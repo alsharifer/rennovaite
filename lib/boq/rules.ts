@@ -459,7 +459,7 @@ export const RATE_RULES: Record<string, RateRule> = {
     rule_id: "R-47",
     allowance_aed: 2200,
     allowance_note:
-      "G21 — frameless 10mm tempered shower partition, AED 2,200/no indicative (Dubai supply+install, typical 900-1200mm screen). Excluded from the Global Creation aluminum package. QS to confirm.",
+      "G21 — frameless 10mm tempered shower partition, AED 2,200/no indicative (Dubai supply+install, typical 900-1200mm screen). Excluded from the aluminium & glazing reference package. QS to confirm.",
   },
   "alum.mirror": {
     rule_id: "R-48",

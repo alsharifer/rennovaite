@@ -16,9 +16,15 @@ import {
   type Grade,
   type GradeableItem,
 } from "./grades";
+import { chainWithSubtotal, type ChainTotals } from "@/lib/boq/totals";
 
 export interface RateBookEntry {
   rate_aed: number;
+  /**
+   * A CODE-AUTHORED label (grades.ts, or the rate-book tier label set by
+   * loadRateBook) — never `rate_book.source`, which names suppliers and
+   * contractors. I4: this travels to the browser and into `perChange`.
+   */
   source: string;
   qs_validated: boolean;
   spec: string;
@@ -35,6 +41,27 @@ export interface ScenarioLine {
 export interface ScenarioBoq {
   sections: { work_section: string; lines: ScenarioLine[] }[];
   grand_total_aed: number;
+  /**
+   * I4: with the summary percentages present, a scenario total is the shared
+   * chain over the moved subtotal (lib/boq/totals.ts) — OH&P, contingency and
+   * VAT move with the lines, exactly as a regenerated BoQ would store them.
+   * Absent (a bare fixture), the delta is added to the grand total as before.
+   */
+  subtotal_aed?: number;
+  contingency_pct?: number;
+  vat_pct?: number;
+  ohp_pct?: number;
+}
+
+/** The scenario's summary chain, or null when the BoQ carries no percentages. */
+export function scenarioChain(boq: ScenarioBoq, delta: number): ChainTotals | null {
+  if (boq.subtotal_aed == null || boq.contingency_pct == null || boq.vat_pct == null) return null;
+  return chainWithSubtotal({ contingency_pct: boq.contingency_pct, vat_pct: boq.vat_pct, ohp_pct: boq.ohp_pct }, round2(boq.subtotal_aed + delta));
+}
+
+/** The project total a scenario whose lines moved by `delta` would store. */
+export function scenarioTotal(boq: ScenarioBoq, delta: number): number {
+  return scenarioChain(boq, delta)?.grand_total_aed ?? round2(boq.grand_total_aed + delta);
 }
 
 export type Selections = Partial<Record<GradeableItem, Grade>>;
@@ -56,9 +83,12 @@ export interface PerChange {
 }
 
 export interface RecalcResult {
-  /** baseline grand total + Σ delta (the animated "project total"). */
+  /** The scenario's project total — the shared chain over subtotal + Σ delta. */
   total: number;
+  /** Σ line deltas (the SUBTOTAL movement, before OH&P / contingency / VAT). */
   delta: number;
+  /** The scenario's summary chain, when the BoQ carries its percentages. */
+  chain: ChainTotals | null;
   perChange: PerChange[];
   changedItemKeys: GradeableItem[];
 }
@@ -140,8 +170,9 @@ export function recalc(
   }
 
   return {
-    total: round2(boq.grand_total_aed + delta),
+    total: scenarioTotal(boq, delta),
     delta,
+    chain: scenarioChain(boq, delta),
     perChange,
     changedItemKeys: changed,
   };
@@ -170,11 +201,11 @@ export function suggestForBudget(
     .sort((a, b) => b.save - a.save);
 
   const selections: Selections = {};
-  let current = baseline;
+  let saved = 0;
   for (const { item_key, save } of savings) {
-    if (current <= targetTotal) break;
+    if (scenarioTotal(boq, -saved) <= targetTotal) break;
     selections[item_key] = "economy";
-    current = round2(current - save);
+    saved = round2(saved + save);
   }
   return selections;
 }

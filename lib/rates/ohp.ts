@@ -11,7 +11,12 @@
 //   subtotal + OH&P) → + VAT (on all of it) → grand total.
 // A book with ohp_pct = 0 (or no firm) leaves the document untouched — no field
 // is even added — so every pre-L1 BoQ regenerates byte for byte.
+//
+// I4: the arithmetic is the shared chain (lib/boq/totals.ts), so a figure the
+// browser recomputes is the figure this writes.
 // =============================================================================
+
+import { chainTotals } from "@/lib/boq/totals";
 
 export interface BoqTotalsLike {
   subtotal_aed: number;
@@ -26,15 +31,13 @@ export interface BoqTotalsLike {
 
 export const OHP_LINE_LABEL = "Overheads & profit";
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
 export function applyOhp<T extends BoqTotalsLike>(boq: T, pct: number): T {
   if (!(pct > 0)) return boq;
-  const ohp_aed = Math.round((boq.subtotal_aed * pct) / 100);
-  boq.ohp_pct = pct;
-  boq.ohp_aed = ohp_aed;
-  boq.contingency_aed = Math.round(((boq.subtotal_aed + ohp_aed) * boq.contingency_pct) / 100);
-  boq.vat_aed = Math.round(((boq.subtotal_aed + ohp_aed + boq.contingency_aed) * boq.vat_pct) / 100);
-  boq.grand_total_aed = round2(boq.subtotal_aed + ohp_aed + boq.contingency_aed + boq.vat_aed);
+  const c = chainTotals({ subtotal_aed: boq.subtotal_aed, contingency_pct: boq.contingency_pct, vat_pct: boq.vat_pct, ohp_pct: pct });
+  boq.ohp_pct = c.ohp_pct;
+  boq.ohp_aed = c.ohp_aed;
+  boq.contingency_aed = c.contingency_aed;
+  boq.vat_aed = c.vat_aed;
+  boq.grand_total_aed = c.grand_total_aed;
   return boq;
 }
