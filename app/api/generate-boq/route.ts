@@ -11,6 +11,9 @@ import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map"
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
+import { loadProjectFirmOverlay } from "@/lib/rates/firm";
+import { applyOhp } from "@/lib/rates/ohp";
+import { loadReferenceRows } from "@/lib/rates/reference";
 import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { getProposedGraph } from "@/lib/plan/snapshots";
@@ -756,6 +759,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // L1: the books behind every rate. The project's firm overlay (tiers 1–2 —
+    // FirmOverlay.none() for a project with no firm, which is every project
+    // before L1) and the reference book (tiers 3 and 5). Order documented in
+    // lib/rates/tiers.ts.
+    const firm = await loadProjectFirmOverlay(supabaseUntyped, projectId);
+    const referenceRows = await loadReferenceRows(supabaseUntyped);
+
     // 2a. DEFAULT PATH — fully deterministic financial model (lib/boq).
     // Quantities, rate selection, SKU picks, and totals are all rules-driven;
     // no LLM in the pricing path. Set BOQ_ENGINE="llm" to fall back to the
@@ -799,6 +809,8 @@ export async function POST(request: NextRequest) {
         // item_key only. `{}` before migration 028 or with nothing selected,
         // which reproduces the pre-D1 BoQ byte for byte.
         accessorySelections: await loadAccessoryOverrides(projectId),
+        referenceRows,
+        firm,
       });
 
       // P4: rebuild mapped POMI sections from the take-off (element_refs + true
@@ -817,7 +829,10 @@ export async function POST(request: NextRequest) {
       // G3: append the landscape sections from the drawn garden (zones, runs,
       // units, points) priced at the calibrated landscape rates. No-op for a
       // project with no outdoor zones, which is every interior project.
-      const boq = await appendGardenSections(withJoinery, projectId, supabaseUntyped, { persist: !dryRun });
+      const gardened = await appendGardenSections(withJoinery, projectId, supabaseUntyped, { persist: !dryRun, firm });
+      // L1: the firm's OH&P, LAST — its own summary line over the priced
+      // subtotal, never inside a rate. A no-op without a firm book.
+      const boq = applyOhp(gardened, firm.ohpPct);
 
       if (dryRun) {
         return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq });
@@ -934,8 +949,8 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
     // ground-truth Joinery + Aluminum & Glass sections.
     const mappedLlm = applyElementMapping(llmBoq, takeoffItems);
     const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
-    const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabaseUntyped);
-    const boq = appendJoineryAluminumSections(gardenedLlm, rooms);
+    const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabaseUntyped, { firm });
+    const boq = applyOhp(appendJoineryAluminumSections(gardenedLlm, rooms), firm.ohpPct);
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase

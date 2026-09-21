@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "@/lib/documents/boq-derived";
+import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
 import { cn } from "@/lib/utils";
 import {
   recalc,
@@ -62,6 +63,9 @@ export type BoqPayload = {
   vat_pct: number;
   vat_aed: number;
   grand_total_aed: number;
+  /** L1: the firm's overheads & profit — its own line, never inside a rate. */
+  ohp_pct?: number;
+  ohp_aed?: number;
   /** G5: a garden BoQ's verdict on itself (draft, derived lines, site-reference decisions). */
   garden?: {
     draft: { draft: boolean; derived: string[]; note: string | null; statement: string | null };
@@ -658,6 +662,22 @@ export function BoqView({
                   changedItems={changedItems}
                 />
               ))}
+              {boq.ohp_aed != null && boq.ohp_aed > 0 && (
+                <tr className="border-t border-ink-100" data-ohp-line="true">
+                  <td className="px-md py-sm" colSpan={5}>
+                    <span className="font-body-sm text-body-sm text-ink-900">
+                      {OHP_LINE_LABEL} {boq.ohp_pct}%
+                    </span>
+                    <span className="ml-sm font-body-sm text-[12px] text-ink-500">
+                      on the {formatAed(boq.subtotal_aed)} subtotal — the contractor&apos;s markup, applied once here and never inside a rate
+                    </span>
+                  </td>
+                  <td className="px-md py-sm text-right font-mono tabular-nums text-body-sm text-ink-900">
+                    {Math.round(boq.ohp_aed).toLocaleString("en-US")}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              )}
               <tr className="border-t-2 border-ink-900">
                 <td className="px-md py-md" colSpan={5}>
                   <span className="label-caps text-brass-600">

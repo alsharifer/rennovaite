@@ -31,8 +31,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   GARDEN_PROVENANCE,
   GARDEN_RATES,
+  PUBLIC_SOURCE_LABEL,
   getGardenRate,
 } from "@/lib/ground-truth/villa94-garden";
+import type { FirmOverlay } from "@/lib/rates/firm";
+import {
+  FIRM_CORRECTION_LABEL,
+  FIRM_RATE_LABEL,
+  INDICATIVE_LABEL,
+  type RateTier,
+} from "@/lib/rates/tiers";
 import {
   indexReference,
   loadReferenceRows,
@@ -48,7 +56,7 @@ export const GARDEN_ITEM_PREFIX = "garden.";
 export const GARDEN_VALID_FROM = "2026-09-12";
 export const GARDEN_WORK_SECTION = "Landscape & External Works";
 
-export type GardenRateTier = "reference" | "indicative";
+export type GardenRateTier = Extract<RateTier, "firm_private" | "firm_correction" | "reference" | "indicative">;
 
 export interface GardenResolvedRate {
   rate_aed: number;
@@ -56,8 +64,35 @@ export interface GardenResolvedRate {
 }
 
 export interface GardenRateBook {
-  /** The rate for a garden key, or null when the book has none. */
-  resolve(item_key: string): GardenResolvedRate | null;
+  /**
+   * The rate for a garden key, or null when the book has none. `unit` is the
+   * unit the take-off measures in; a firm entry in another unit throws.
+   */
+  resolve(item_key: string, unit?: string): GardenResolvedRate | null;
+}
+
+/** The public label a garden line carries for each tier. Never a database string. */
+export const GARDEN_TIER_LABEL: Record<GardenRateTier, string> = {
+  firm_private: FIRM_RATE_LABEL,
+  firm_correction: FIRM_CORRECTION_LABEL,
+  reference: PUBLIC_SOURCE_LABEL,
+  indicative: INDICATIVE_LABEL,
+};
+
+/**
+ * L1: the firm overlay on top of the landscape book — tiers 1–2 before the
+ * reference (3) and indicative (5) rows. An empty overlay returns the book
+ * itself, so a project with no firm prices exactly as before.
+ */
+export function withFirmOverlay(book: GardenRateBook, firm: FirmOverlay): GardenRateBook {
+  if (firm.isEmpty) return book;
+  return {
+    resolve(item_key, unit) {
+      const hit = firm.lookup(item_key, GARDEN_GRADE, unit);
+      if (hit) return { rate_aed: hit.entry.rate_aed, tier: hit.tier };
+      return book.resolve(item_key, unit);
+    },
+  };
 }
 
 export class GardenRateBookMissingError extends Error {

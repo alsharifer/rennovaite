@@ -5,6 +5,8 @@
 // Same input → byte-identical output. No LLM anywhere in this path.
 // =============================================================================
 
+import { isFirmTier } from "@/lib/rates/tiers";
+
 import { RateResolver } from "./rates";
 import {
   CONTINGENCY_PCT,
@@ -34,6 +36,7 @@ export function generateDeterministicBoq(
     input.skus,
     tier,
     input.accessorySelections ?? {},
+    { reference: input.referenceRows, firm: input.firm },
   );
 
   const bySection = new Map<PomiSection, BoqLine[]>();
@@ -67,12 +70,16 @@ export function generateDeterministicBoq(
       // accessory selection still wins: choosing a real product is stronger
       // evidence than the rule's default.
       ...(item.rate_status ? { rate_status: item.rate_status } : {}),
+      // L1: a firm's own rate is a priced figure in its own right — it replaces
+      // the provenance the rule default carried (S6-pre "indicative").
+      ...(isFirmTier(rate.rate_tier) ? { rate_status: "priced" as const } : {}),
       ...(chosen
         ? {
             element_refs: [chosen.catalog_item_id],
             rate_status: chosen.qs_validated ? ("priced" as const) : ("needs_qs" as const),
           }
         : {}),
+      rate_tier: rate.rate_tier,
     };
     const lines = bySection.get(item.work_section) ?? [];
     lines.push(line);

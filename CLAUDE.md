@@ -1166,6 +1166,66 @@ applies is asserted against it.
 
 **DB step**: `supabase db push` for `040`.
 
+## Rate resolution + private firm rate books (T1.0 / L1)
+
+**One resolution order for every pricing path** (`lib/rates/tiers.ts`, first
+answer wins): **1** `firm_private` (the project's firm's own entry) → **2**
+`firm_correction` (that firm's market_fair correction, *explicitly promoted*) →
+**3** `reference` (`rate_book`, `actual_transaction`) → **4** the interior R-xx
+fallbacks: `catalog` (pricing_skus tier pick) / `allowance` / `labour_book` →
+**5** `indicative` (`rate_book` seed/indicative rows, only when 4 cannot
+answer). `unpriced` (a garden QS-to-price line at 0) and `selection` (a D1
+accessory laid over whichever tier answered) complete the vocabulary. Every
+resolved line carries **`rate_tier`**.
+
+- **Hooks** — exactly two, at the accessory layer: `RateResolver.resolveBase`
+  (`lib/boq/rates.ts`) and the garden `rate()` / `priceGardenTakeoff`
+  (`lib/boq/garden-takeoff.ts`, via `withFirmOverlay`). No interior `rate_book`
+  row shares a key with a `RATE_RULES` item today, so tier 3 answers only for
+  garden keys and every pre-L1 BoQ regenerates unchanged
+  (`lib/boq/__tests__/pricing-golden.test.ts` + `scripts/boq-regen-check.mjs`).
+- **T1.0** moved the landscape rates into `rate_book` first (see G2 above):
+  an overlay needs a store to shadow.
+- **Firms** (migration `041`): `firms` (name, `private` default true,
+  `created_by`), `firm_rate_books` (one per firm, `ohp_pct` 0–50),
+  `firm_rate_entries` (`item_key`, `grade` null = all grades, `unit`,
+  `rate_aed`, `kind` labour|supply|supply_and_install|lump, `origin`
+  firm_entry|promoted_correction, `correction_id`), `projects.firm_id`,
+  `boq_corrections.firm_id` / `promoted_at` / `promoted_entry_id`. 041
+  backfilled one firm per distinct `attributed_to` (Newspace) and created no
+  books. Entries are validated against the take-off vocabulary
+  (`lib/firms/vocabulary.ts`: known key, its unit, a kind that cannot change
+  what the line contains).
+- **Isolation.** `FirmOverlay.forProject` refuses any book or entry that is not
+  the project's firm's (`FirmIsolationError`); every store query is scoped by
+  `firm_id` (another firm's entry is 404 through your path); a firm entry in
+  the wrong unit throws at pricing time. **There is no user auth on API routes
+  yet** — isolation is by scoping; the check for "who is asking" belongs in
+  `requireFirm` (`lib/firms/store.ts`) when auth lands.
+- **Identity.** A firm's rate reaches a line as the constant
+  "contractor rate book" — never its name. Pricing paths read `rate_book`
+  only through `REFERENCE_COLUMNS` (no `source`, no `internal_ref`) and
+  `toReferenceRow` copies whitelisted fields only. Nothing under `app/` or
+  `lib/` writes `rate_book` (static test).
+- **Corrections** stay recorded-never-applied until
+  `POST /api/firms/:firmId/promote` (own firm only, `rate` type with an
+  item_key, once). `POST /api/boq-corrections` now normalises `attributed_to`
+  (or takes `firm_id`).
+- **OH&P** (`lib/rates/ohp.ts`): applied LAST at assembly as `ohp_pct` /
+  `ohp_aed` — subtotal → + OH&P → contingency on both → VAT → total. Never in
+  a rate. Shown as its own row on the BoQ page and PDF. 0% / no firm adds no
+  field.
+- **Routes**: `GET/POST /api/firms`, `GET/PATCH/DELETE /api/firms/:firmId`,
+  `GET/POST /api/firms/:firmId/rates`, `PATCH/DELETE
+  /api/firms/:firmId/rates/:entryId`, `POST /api/firms/:firmId/promote`,
+  `PATCH /api/projects/:id { firm_id }`. No UI page yet.
+- **`generate-boq { dry_run: true }`** assembles the BoQ through the real
+  pipeline and writes nothing (no boqs row, takeoff_items or pilot event).
+  `scripts/firm-overlay-check.mjs [port]` runs the whole L1 flow live on scratch
+  firms + the isolation stand-in and cleans up.
+
+**DB step**: `npm run db:push` for `041`.
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.

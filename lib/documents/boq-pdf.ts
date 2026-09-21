@@ -14,6 +14,8 @@
 
 import { esc } from "@/lib/drawings/sheet";
 
+import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
+
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "./boq-derived";
 
 export const BOQ_PAGE_W = 210;
@@ -54,6 +56,9 @@ export interface BoqPdfInput {
     vat_pct: number;
     vat_aed: number;
     grand_total_aed: number;
+    /** L1: the firm's OH&P — printed as its own summary row, never folded into a rate. */
+    ohp_pct?: number;
+    ohp_aed?: number;
     garden?: {
       draft?: { draft?: boolean; statement?: string | null; note?: string | null } | null;
       derived_lines?: number;
@@ -239,6 +244,7 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   };
   svg += `<line x1="110" y1="${f1(y - 3)}" x2="${BOQ_PAGE_W - M}" y2="${f1(y - 3)}" stroke="${INK_900}" stroke-width="0.35"/>`;
   sumRow("Subtotal", aed(boq.subtotal_aed));
+  if (boq.ohp_aed && boq.ohp_aed > 0) sumRow(`${OHP_LINE_LABEL} ${boq.ohp_pct}%`, aed(boq.ohp_aed));
   sumRow(`Contingency ${boq.contingency_pct}%`, aed(boq.contingency_aed));
   sumRow(`VAT ${boq.vat_pct}%`, aed(boq.vat_aed));
   sumRow("Grand total", total.text, true);

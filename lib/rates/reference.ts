@@ -104,5 +104,23 @@ export async function loadReferenceRows(
   if (opts.itemKeyPrefix) q = q.like("item_key", `${opts.itemKeyPrefix}%`);
   const { data, error } = await q.returns<ReferenceRateRow[]>();
   if (error) throw new Error(`rate_book read failed: ${error.message}`);
-  return (data ?? []).map((r) => ({ ...r, rate_aed: Number(r.rate_aed) }));
+  return (data ?? []).map(toReferenceRow);
+}
+
+/**
+ * Copy ONLY the whitelisted fields. The projection already excludes `source` and
+ * `internal_ref`; this is the second wall — a row that somehow carries them
+ * (a `select("*")` upstream, a future view) still cannot pass them on.
+ */
+export function toReferenceRow(r: ReferenceRateRow): ReferenceRateRow {
+  return {
+    item_key: r.item_key,
+    grade: r.grade,
+    unit: r.unit,
+    rate_aed: Number(r.rate_aed),
+    scope: r.scope ?? null,
+    provenance: r.provenance,
+    valid_from: r.valid_from,
+    work_section: r.work_section,
+  };
 }

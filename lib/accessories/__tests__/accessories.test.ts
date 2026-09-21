@@ -460,6 +460,7 @@ describe("client and engine agree on the re-priced rate", () => {
           vendor_or_source: "rule",
           kind,
           rate_band: "mid" as const,
+          rate_tier: "labour_book" as const,
           wastage: 0,
           notes: null,
         };
