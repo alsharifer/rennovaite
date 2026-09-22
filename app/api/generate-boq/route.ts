@@ -1,3 +1,4 @@
+import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -11,6 +12,10 @@ import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map"
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
+import { loadProjectFirmOverlay } from "@/lib/rates/firm";
+import { elementPricer } from "@/lib/boq/rates";
+import { applyOhp } from "@/lib/rates/ohp";
+import { loadReferenceRows } from "@/lib/rates/reference";
 import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { getProposedGraph } from "@/lib/plan/snapshots";
@@ -31,6 +36,13 @@ const MODEL = "claude-sonnet-4-6";
 
 const BodySchema = z.object({
   project_id: z.string().uuid(),
+  /**
+   * T1.0: assemble the BoQ exactly as a real run would and return it, but write
+   * NOTHING — no boqs row, no takeoff_items, no pilot event. This is how a
+   * pricing refactor proves it is byte-identical on a live project without
+   * adding a BoQ (or a "time to first BoQ" event) to it. Engine path only.
+   */
+  dry_run: z.boolean().optional(),
 });
 
 // Categories from pricing_skus relevant to a residential first-floor
@@ -539,6 +551,13 @@ export async function POST(request: NextRequest) {
       );
     }
     const projectId = parsedBody.data.project_id;
+    const dryRun = parsedBody.data.dry_run === true;
+    if (dryRun && process.env.BOQ_ENGINE === "llm") {
+      return NextResponse.json(
+        { success: false, error: "dry_run is only supported on the deterministic engine path." },
+        { status: 400 },
+      );
+    }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -733,7 +752,7 @@ export async function POST(request: NextRequest) {
         const graph = await derivePlanGraph(projectId);
         const proposed = await getProposedGraph(projectId);
         takeoffItems = quantifyPlan(graph, { proposed });
-        await persistTakeoffItems(projectId, takeoffItems, supabaseUntyped);
+        if (!dryRun) await persistTakeoffItems(projectId, takeoffItems, supabaseUntyped);
       } catch (e) {
         console.warn(
           "[api/generate-boq] P4 take-off skipped:",
@@ -741,6 +760,13 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    // L1: the books behind every rate. The project's firm overlay (tiers 1–2 —
+    // FirmOverlay.none() for a project with no firm, which is every project
+    // before L1) and the reference book (tiers 3 and 5). Order documented in
+    // lib/rates/tiers.ts.
+    const firm = await loadProjectFirmOverlay(supabaseUntyped, projectId);
+    const referenceRows = await loadReferenceRows(supabaseUntyped);
 
     // 2a. DEFAULT PATH — fully deterministic financial model (lib/boq).
     // Quantities, rate selection, SKU picks, and totals are all rules-driven;
@@ -785,11 +811,14 @@ export async function POST(request: NextRequest) {
         // item_key only. `{}` before migration 028 or with nothing selected,
         // which reproduces the pre-D1 BoQ byte for byte.
         accessorySelections: await loadAccessoryOverrides(projectId),
+        referenceRows,
+        firm,
       });
 
       // P4: rebuild mapped POMI sections from the take-off (element_refs + true
       // per-room quantities). No-op when there are no take-off items.
-      const mappedBoq = applyElementMapping(engineBoq, takeoffItems);
+      // T3b: the element sections resolve through the same firm overlay.
+      const mappedBoq = applyElementMapping(engineBoq, takeoffItems, elementPricer(firm, engineBoq.engine.tier));
       // P2: append Electrical Installations + Plumbing & Sanitary sections from
       // plan_fixtures counts (flagged, best-effort, no-op when off/empty).
       const overlaid = await appendOverlaySections(
@@ -803,7 +832,14 @@ export async function POST(request: NextRequest) {
       // G3: append the landscape sections from the drawn garden (zones, runs,
       // units, points) priced at the calibrated landscape rates. No-op for a
       // project with no outdoor zones, which is every interior project.
-      const boq = await appendGardenSections(withJoinery, projectId, supabaseUntyped);
+      const gardened = await appendGardenSections(withJoinery, projectId, supabaseUntyped, { persist: !dryRun, firm });
+      // L1: the firm's OH&P, LAST — its own summary line over the priced
+      // subtotal, never inside a rate. A no-op without a firm book.
+      const boq = applyOhp(gardened, firm.ohpPct);
+
+      if (dryRun) {
+        return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq: curateBoq(boq, await loadWithheldNames(supabaseUntyped, projectId)) });
+      }
 
       const { data: inserted, error: insertErr } = await supabase
         .from("boqs")
@@ -914,10 +950,10 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
 
     // P4: rebuild mapped sections from the take-off, then P2 overlays, then the
     // ground-truth Joinery + Aluminum & Glass sections.
-    const mappedLlm = applyElementMapping(llmBoq, takeoffItems);
+    const mappedLlm = applyElementMapping(llmBoq, takeoffItems, elementPricer(firm, "mid"));
     const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
-    const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabaseUntyped);
-    const boq = appendJoineryAluminumSections(gardenedLlm, rooms);
+    const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabaseUntyped, { firm });
+    const boq = applyOhp(appendJoineryAluminumSections(gardenedLlm, rooms), firm.ohpPct);
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase

@@ -1,0 +1,1172 @@
+{
+  "mapped": {
+    "sections": [
+      {
+        "work_section": "Blockwork",
+        "lines": [
+          {
+            "description": "Civil alterations — opening closures/openings, new partitions, storage room",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 15000,
+            "total_aed": 15000,
+            "vendor_or_source": "allowance",
+            "notes": "R-35: Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (reference project §2: AED 15k). Design-dependent; QS to re-measure per project.; allowance pending design layout (R-35)",
+            "rule_id": "Q-05/R-35",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          }
+        ],
+        "section_total_aed": 15000
+      },
+      {
+        "work_section": "Plaster",
+        "lines": [
+          {
+            "description": "Wall plaster / skim coat (net of openings)",
+            "quantity": 426.95,
+            "unit": "m2",
+            "rate_aed": 55,
+            "total_aed": 23482,
+            "vendor_or_source": "Deterministic take-off (P4)",
+            "notes": "Aggregated from 63 element take-off items.",
+            "rule_id": "P4/quantify/wall_plaster",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "element_refs": [
+              "wall-1",
+              "wall-2",
+              "wall-3",
+              "wall-4",
+              "wall-5",
+              "wall-6",
+              "wall-7",
+              "wall-8",
+              "wall-9",
+              "wall-10",
+              "wall-11",
+              "wall-12",
+              "wall-13",
+              "wall-14",
+              "wall-15",
+              "wall-16",
+              "wall-17",
+              "wall-18",
+              "wall-19",
+              "wall-20",
+              "wall-21",
+              "wall-22",
+              "wall-23",
+              "wall-24",
+              "wall-25",
+              "wall-26",
+              "wall-27",
+              "wall-28",
+              "wall-29",
+              "wall-30",
+              "wall-31",
+              "wall-32",
+              "wall-33",
+              "wall-34",
+              "wall-35",
+              "wall-36",
+              "wall-37",
+              "wall-38",
+              "wall-39",
+              "wall-40",
+              "wall-41",
+              "wall-42",
+              "wall-43",
+              "wall-44",
+              "wall-45",
+              "wall-46",
+              "wall-47",
+              "wall-48",
+              "wall-49",
+              "wall-50",
+              "wall-51",
+              "wall-52",
+              "wall-53",
+              "wall-54",
+              "wall-55",
+              "wall-56",
+              "wall-57",
+              "wall-58",
+              "wall-59",
+              "wall-60",
+              "wall-61",
+              "wall-62",
+              "wall-63"
+            ],
+            "rate_status": "priced",
+            "work_item_key": "wall_plaster"
+          }
+        ],
+        "section_total_aed": 23482
+      },
+      {
+        "work_section": "Floor Finishes",
+        "lines": [
+          {
+            "description": "Floor finish — supply & install",
+            "quantity": 138.5,
+            "unit": "m2",
+            "rate_aed": 190,
+            "total_aed": 26315,
+            "vendor_or_source": "Deterministic take-off (P4)",
+            "notes": "Aggregated from 12 element take-off items.",
+            "rule_id": "P4/quantify/floor_finish",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "element_refs": [
+              "bath-01",
+              "bed3-01",
+              "bed4-01",
+              "dress-01",
+              "family-01",
+              "balc-01",
+              "mbath-01",
+              "mbed-01",
+              "pass-01",
+              "terr-01",
+              "terr-02",
+              "toilet-01"
+            ],
+            "rate_status": "priced",
+            "work_item_key": "floor_finish"
+          }
+        ],
+        "section_total_aed": 26315
+      },
+      {
+        "work_section": "Wall Finishes",
+        "lines": [
+          {
+            "description": "Wet-area wall tiling — supply & install",
+            "quantity": 93,
+            "unit": "m2",
+            "rate_aed": 260,
+            "total_aed": 24180,
+            "vendor_or_source": "Deterministic take-off (P4)",
+            "notes": "Aggregated from 3 element take-off items.",
+            "rule_id": "P4/quantify/wet_tiling",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "element_refs": [
+              "bath-01",
+              "mbath-01",
+              "toilet-01"
+            ],
+            "rate_status": "priced",
+            "work_item_key": "wet_tiling"
+          }
+        ],
+        "section_total_aed": 24180
+      },
+      {
+        "work_section": "Ceilings",
+        "lines": [
+          {
+            "description": "Gypsum ceiling + finish",
+            "quantity": 145.7,
+            "unit": "m2",
+            "rate_aed": 130,
+            "total_aed": 18941,
+            "vendor_or_source": "Deterministic take-off (P4)",
+            "notes": "Aggregated from 13 element take-off items.",
+            "rule_id": "P4/quantify/ceiling_finish",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "element_refs": [
+              "bath-01",
+              "bed3-01",
+              "bed4-01",
+              "dress-01",
+              "family-01",
+              "balc-01",
+              "mbath-01",
+              "mbed-01",
+              "pass-01",
+              "stair-01",
+              "terr-01",
+              "terr-02",
+              "toilet-01"
+            ],
+            "rate_status": "priced",
+            "work_item_key": "ceiling_finish"
+          }
+        ],
+        "section_total_aed": 18941
+      },
+      {
+        "work_section": "Joinery & Carpentry",
+        "lines": [
+          {
+            "description": "Built-in wardrobes — bedrooms",
+            "quantity": 8.4,
+            "unit": "lm",
+            "rate_aed": 1800,
+            "total_aed": 15120,
+            "vendor_or_source": "labour_rates: Built-in wardrobe — mid-range MDF with lacquer or melamine",
+            "notes": "R-23: mid band (tier mid); F-08: master 3.6 lm + secondary 2.4 lm each = 8.4 lm",
+            "rule_id": "Q-28/R-23",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Bathroom vanity with quartz top",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 7000,
+            "total_aed": 21000,
+            "vendor_or_source": "labour_rates: Vanity cabinet with quartz top — bathroom",
+            "notes": "R-24: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-29/R-24",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Internal doors — supply and hang",
+            "quantity": 6,
+            "unit": "no",
+            "rate_aed": 2400,
+            "total_aed": 14400,
+            "vendor_or_source": "labour_rates: Flush internal door — supply and fit",
+            "notes": "R-25: mid band (tier mid); F-10: bedrooms 3 + bathrooms 3 = 6",
+            "rule_id": "Q-30/R-25",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          }
+        ],
+        "section_total_aed": 50520
+      },
+      {
+        "work_section": "Sanitaryware",
+        "lines": [
+          {
+            "description": "Wall-hung WC incl. concealed cistern — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2400,
+            "total_aed": 7200,
+            "vendor_or_source": "labour_rates: WC suite supply and install — mid-range",
+            "notes": "R-19: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-22/R-19",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Vanity basin with mixer — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 1800,
+            "total_aed": 5400,
+            "vendor_or_source": "labour_rates: Wash basin with mixer — supply and install",
+            "notes": "R-20: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-23/R-20",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Shower system with concealed thermostatic valve — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 3500,
+            "total_aed": 10500,
+            "vendor_or_source": "labour_rates: Shower system — mixer, handset, rain head",
+            "notes": "R-21: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-24/R-21",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Shattaf (health faucet), matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 250,
+            "total_aed": 750,
+            "vendor_or_source": "allowance",
+            "notes": "R-40: GROHE shattaf, matt black — sanitaryware supplier (supply); 1 per wet room × 3 (sanitaryware supplier)",
+            "rule_id": "Q-24a/R-40",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          },
+          {
+            "description": "Paper holder, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 210,
+            "total_aed": 630,
+            "vendor_or_source": "allowance",
+            "notes": "R-41: GROHE Essentials paper holder, matt black — sanitaryware supplier; 1 per wet room × 3 (sanitaryware supplier)",
+            "rule_id": "Q-24b/R-41",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          },
+          {
+            "description": "Towel rail, matt black — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 260,
+            "total_aed": 780,
+            "vendor_or_source": "allowance",
+            "notes": "R-42: GROHE Essentials towel rail, matt black — sanitaryware supplier; 1 per wet room × 3 (sanitaryware supplier)",
+            "rule_id": "Q-24c/R-42",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          },
+          {
+            "description": "WC actuator plate, vertical square — supply",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 450,
+            "total_aed": 1350,
+            "vendor_or_source": "allowance",
+            "notes": "R-43: GROHE actuator plate, vertical square — sanitaryware supplier; 1 per wet room × 3 (sanitaryware supplier)",
+            "rule_id": "Q-24d/R-43",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          }
+        ],
+        "section_total_aed": 26610
+      },
+      {
+        "work_section": "Electrical",
+        "lines": [
+          {
+            "description": "LED downlights — supply and install (interior)",
+            "quantity": 48,
+            "unit": "no",
+            "rate_aed": 180,
+            "total_aed": 8640,
+            "vendor_or_source": "labour_rates: LED downlight — supply and install",
+            "notes": "R-14: mid band (tier mid); F-06: Σ interior ceil(area / 3.5) = 48",
+            "rule_id": "Q-17/R-14",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Power sockets and switches — supply and install (interior)",
+            "quantity": 63,
+            "unit": "no",
+            "rate_aed": 140,
+            "total_aed": 8820,
+            "vendor_or_source": "labour_rates: Power socket or switch — supply and install",
+            "notes": "R-15: mid band (tier mid); F-07: Σ interior ceil(area × 0.4) = 63",
+            "rule_id": "Q-18/R-15",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          }
+        ],
+        "section_total_aed": 17460
+      },
+      {
+        "work_section": "Plumbing",
+        "lines": [
+          {
+            "description": "Bathroom plumbing re-pipe (full PPR) — per bathroom",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 7500,
+            "total_aed": 22500,
+            "vendor_or_source": "labour_rates: Bathroom plumbing rewire — per bathroom, full",
+            "notes": "R-16: mid band (tier mid); bathroom count = 3",
+            "rule_id": "Q-19/R-16",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Concealed water heater — supply and install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 2800,
+            "total_aed": 8400,
+            "vendor_or_source": "labour_rates: Concealed water heater — supply and install",
+            "notes": "R-17: mid band (tier mid); 1 per bathroom × 3 (reference project retained existing heaters — QS to confirm inclusion)",
+            "rule_id": "Q-20/R-17",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Floor / linear shower drain — install",
+            "quantity": 3,
+            "unit": "no",
+            "rate_aed": 650,
+            "total_aed": 1950,
+            "vendor_or_source": "labour_rates: Floor drain — supply and install",
+            "notes": "R-18: mid band (tier mid); 1 per bathroom × 3",
+            "rule_id": "Q-21/R-18",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          }
+        ],
+        "section_total_aed": 32850
+      },
+      {
+        "work_section": "MEP / HVAC",
+        "lines": [
+          {
+            "description": "New ducted AC unit incl. ductwork, grilles, thermostat — secondary bedrooms",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 14000,
+            "total_aed": 28000,
+            "vendor_or_source": "labour_rates: Concealed ducted AC FCU replacement",
+            "notes": "R-32: mid band (tier mid); F-15: 1 per secondary bedroom × 2",
+            "rule_id": "Q-25/R-32",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Split AC unit (2 ton) — office, incl. commissioning",
+            "quantity": 1,
+            "unit": "no",
+            "rate_aed": 5500,
+            "total_aed": 5500,
+            "vendor_or_source": "labour_rates: Split AC unit (1.5-2.5 ton) — supply and install",
+            "notes": "R-33: mid band (tier mid); F-16: 1 per office × 1",
+            "rule_id": "Q-26/R-33",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "FCU deep service and clean — retained units",
+            "quantity": 2,
+            "unit": "no",
+            "rate_aed": 350,
+            "total_aed": 700,
+            "vendor_or_source": "labour_rates: AC servicing and cleaning",
+            "notes": "R-22: mid band (tier mid); rooms retaining existing FCU = 2",
+            "rule_id": "Q-27/R-22",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          }
+        ],
+        "section_total_aed": 34200
+      },
+      {
+        "work_section": "Lighting",
+        "lines": [
+          {
+            "description": "Cove LED strip — supply (living/dining/master)",
+            "quantity": 43.29,
+            "unit": "lm",
+            "rate_aed": 85,
+            "total_aed": 3680,
+            "vendor_or_source": "allowance",
+            "notes": "R-45: G10 — cove LED strip SUPPLY, AED 85/lm indicative (24V 14.4W/m COB strip + driver + profile, Dubai trade counter mid-2026). Complements R-31, which prices the cove LABOUR at 45/lm and explicitly assumes 'strips client-supplied' — this is the material that assumption left out. QS to confirm.; S6-02: Σ perimeter over 2 eligible room(s) (living/dining/majlis/master only), perimeter from area at aspect 1.3 = 43.29 lm",
+            "rule_id": "S6-02/R-45",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_status": "indicative",
+            "rate_tier": "allowance"
+          },
+          {
+            "description": "Decorative pendants — installation",
+            "quantity": 5,
+            "unit": "no",
+            "rate_aed": 280,
+            "total_aed": 1400,
+            "vendor_or_source": "labour_rates: Decorative pendant — installation labour only",
+            "notes": "R-26: mid band (tier mid); F-09: 1 per bedroom (3) + 2 living = 5",
+            "rule_id": "Q-31/R-26",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          }
+        ],
+        "section_total_aed": 5080
+      },
+      {
+        "work_section": "Decoration & Painting",
+        "lines": [
+          {
+            "description": "Wall painting — primer + 2 coats",
+            "quantity": 426.95,
+            "unit": "m2",
+            "rate_aed": 35,
+            "total_aed": 14943,
+            "vendor_or_source": "Deterministic take-off (P4)",
+            "notes": "Aggregated from 63 element take-off items.",
+            "rule_id": "P4/quantify/wall_paint",
+            "kind": "supply_and_install",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "element_refs": [
+              "wall-1",
+              "wall-2",
+              "wall-3",
+              "wall-4",
+              "wall-5",
+              "wall-6",
+              "wall-7",
+              "wall-8",
+              "wall-9",
+              "wall-10",
+              "wall-11",
+              "wall-12",
+              "wall-13",
+              "wall-14",
+              "wall-15",
+              "wall-16",
+              "wall-17",
+              "wall-18",
+              "wall-19",
+              "wall-20",
+              "wall-21",
+              "wall-22",
+              "wall-23",
+              "wall-24",
+              "wall-25",
+              "wall-26",
+              "wall-27",
+              "wall-28",
+              "wall-29",
+              "wall-30",
+              "wall-31",
+              "wall-32",
+              "wall-33",
+              "wall-34",
+              "wall-35",
+              "wall-36",
+              "wall-37",
+              "wall-38",
+              "wall-39",
+              "wall-40",
+              "wall-41",
+              "wall-42",
+              "wall-43",
+              "wall-44",
+              "wall-45",
+              "wall-46",
+              "wall-47",
+              "wall-48",
+              "wall-49",
+              "wall-50",
+              "wall-51",
+              "wall-52",
+              "wall-53",
+              "wall-54",
+              "wall-55",
+              "wall-56",
+              "wall-57",
+              "wall-58",
+              "wall-59",
+              "wall-60",
+              "wall-61",
+              "wall-62",
+              "wall-63"
+            ],
+            "rate_status": "priced",
+            "work_item_key": "wall_paint"
+          }
+        ],
+        "section_total_aed": 14943
+      },
+      {
+        "work_section": "Preliminaries",
+        "lines": [
+          {
+            "description": "Site setup, hoarding, protection, daily clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 12000,
+            "total_aed": 12000,
+            "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
+            "notes": "R-27: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-32/R-27",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "DM / DEWA permits and fees",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
+            "notes": "R-28: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-33/R-28",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Skip hire and waste disposal",
+            "quantity": 9,
+            "unit": "no",
+            "rate_aed": 1500,
+            "total_aed": 13500,
+            "vendor_or_source": "labour_rates: Skip hire and waste disposal",
+            "notes": "R-29: mid band (tier mid); F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips",
+            "rule_id": "Q-34/R-29",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Protective floor covering over new tiling until handover",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 8,
+            "total_aed": 1592,
+            "vendor_or_source": "allowance",
+            "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 199 m²",
+            "rule_id": "Q-35/R-37",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          },
+          {
+            "description": "Rolling scaffold hire — ceiling + painting works",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 2500,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-36/R-38",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          },
+          {
+            "description": "Final clearance + professional handover clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 1500,
+            "total_aed": 1500,
+            "vendor_or_source": "allowance",
+            "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-37/R-39",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          }
+        ],
+        "section_total_aed": 37092
+      }
+    ],
+    "subtotal_aed": 326673,
+    "contingency_pct": 8,
+    "contingency_aed": 26134,
+    "vat_pct": 5,
+    "vat_aed": 17640,
+    "grand_total_aed": 370447,
+    "engine": {
+      "version": "0.2.0",
+      "tier": "mid",
+      "flooring": "porcelain",
+      "style_key": "contemporary-majlis"
+    }
+  },
+  "rooms": [
+    {
+      "room_id": "bath-01",
+      "total_aed": 13341,
+      "items": [
+        {
+          "work_item_key": "wet_tiling",
+          "description": "Wet-area wall tiling — supply & install",
+          "qty": 33.82,
+          "unit": "m2",
+          "total_aed": 8793
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 33.82,
+          "unit": "m2",
+          "total_aed": 1860
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 33.82,
+          "unit": "m2",
+          "total_aed": 1184
+        },
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 4.7,
+          "unit": "m2",
+          "total_aed": 893
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 4.7,
+          "unit": "m2",
+          "total_aed": 611
+        }
+      ]
+    },
+    {
+      "room_id": "mbath-01",
+      "total_aed": 12426,
+      "items": [
+        {
+          "work_item_key": "wet_tiling",
+          "description": "Wet-area wall tiling — supply & install",
+          "qty": 33.82,
+          "unit": "m2",
+          "total_aed": 8793
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 23.66,
+          "unit": "m2",
+          "total_aed": 1301
+        },
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 4.7,
+          "unit": "m2",
+          "total_aed": 893
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 23.66,
+          "unit": "m2",
+          "total_aed": 828
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 4.7,
+          "unit": "m2",
+          "total_aed": 611
+        }
+      ]
+    },
+    {
+      "room_id": "bed4-01",
+      "total_aed": 11694,
+      "items": [
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 19.9,
+          "unit": "m2",
+          "total_aed": 3781
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 59.18,
+          "unit": "m2",
+          "total_aed": 3255
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 19.9,
+          "unit": "m2",
+          "total_aed": 2587
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 59.18,
+          "unit": "m2",
+          "total_aed": 2071
+        }
+      ]
+    },
+    {
+      "room_id": "family-01",
+      "total_aed": 10877,
+      "items": [
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 24,
+          "unit": "m2",
+          "total_aed": 4560
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 24,
+          "unit": "m2",
+          "total_aed": 3120
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 35.52,
+          "unit": "m2",
+          "total_aed": 1954
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 35.52,
+          "unit": "m2",
+          "total_aed": 1243
+        }
+      ]
+    },
+    {
+      "room_id": "terr-02",
+      "total_aed": 9509,
+      "items": [
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 16.4,
+          "unit": "m2",
+          "total_aed": 3116
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 47.34,
+          "unit": "m2",
+          "total_aed": 2604
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 16.4,
+          "unit": "m2",
+          "total_aed": 2132
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 47.34,
+          "unit": "m2",
+          "total_aed": 1657
+        }
+      ]
+    },
+    {
+      "room_id": "bed3-01",
+      "total_aed": 9257,
+      "items": [
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 16.8,
+          "unit": "m2",
+          "total_aed": 3192
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 43.12,
+          "unit": "m2",
+          "total_aed": 2372
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 16.8,
+          "unit": "m2",
+          "total_aed": 2184
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 43.12,
+          "unit": "m2",
+          "total_aed": 1509
+        }
+      ]
+    },
+    {
+      "room_id": "mbed-01",
+      "total_aed": 8651,
+      "items": [
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 19.9,
+          "unit": "m2",
+          "total_aed": 3781
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 19.9,
+          "unit": "m2",
+          "total_aed": 2587
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 25.36,
+          "unit": "m2",
+          "total_aed": 1395
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 25.36,
+          "unit": "m2",
+          "total_aed": 888
+        }
+      ]
+    },
+    {
+      "room_id": "toilet-01",
+      "total_aed": 8447,
+      "items": [
+        {
+          "work_item_key": "wet_tiling",
+          "description": "Wet-area wall tiling — supply & install",
+          "qty": 25.36,
+          "unit": "m2",
+          "total_aed": 6594
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 10.99,
+          "unit": "m2",
+          "total_aed": 604
+        },
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 2.7,
+          "unit": "m2",
+          "total_aed": 513
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 10.99,
+          "unit": "m2",
+          "total_aed": 385
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 2.7,
+          "unit": "m2",
+          "total_aed": 351
+        }
+      ]
+    },
+    {
+      "room_id": "terr-01",
+      "total_aed": 7662,
+      "items": [
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 13,
+          "unit": "m2",
+          "total_aed": 2470
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 38.9,
+          "unit": "m2",
+          "total_aed": 2140
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 13,
+          "unit": "m2",
+          "total_aed": 1690
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 38.9,
+          "unit": "m2",
+          "total_aed": 1362
+        }
+      ]
+    },
+    {
+      "room_id": "balc-01",
+      "total_aed": 6037,
+      "items": [
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 43.96,
+          "unit": "m2",
+          "total_aed": 2418
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 43.96,
+          "unit": "m2",
+          "total_aed": 1539
+        },
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 6.5,
+          "unit": "m2",
+          "total_aed": 1235
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 6.5,
+          "unit": "m2",
+          "total_aed": 845
+        }
+      ]
+    },
+    {
+      "room_id": "dress-01",
+      "total_aed": 4547,
+      "items": [
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 33.81,
+          "unit": "m2",
+          "total_aed": 1860
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 33.81,
+          "unit": "m2",
+          "total_aed": 1183
+        },
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 4.7,
+          "unit": "m2",
+          "total_aed": 893
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 4.7,
+          "unit": "m2",
+          "total_aed": 611
+        }
+      ]
+    },
+    {
+      "room_id": "stair-01",
+      "total_aed": 2762,
+      "items": [
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 20.29,
+          "unit": "m2",
+          "total_aed": 1116
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 7.2,
+          "unit": "m2",
+          "total_aed": 936
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 20.29,
+          "unit": "m2",
+          "total_aed": 710
+        }
+      ]
+    },
+    {
+      "room_id": "pass-01",
+      "total_aed": 2654,
+      "items": [
+        {
+          "work_item_key": "floor_finish",
+          "description": "Floor finish — supply & install",
+          "qty": 5.2,
+          "unit": "m2",
+          "total_aed": 988
+        },
+        {
+          "work_item_key": "ceiling_finish",
+          "description": "Gypsum ceiling + finish",
+          "qty": 5.2,
+          "unit": "m2",
+          "total_aed": 676
+        },
+        {
+          "work_item_key": "wall_plaster",
+          "description": "Wall plaster / skim coat (net of openings)",
+          "qty": 11,
+          "unit": "m2",
+          "total_aed": 605
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 11,
+          "unit": "m2",
+          "total_aed": 385
+        }
+      ]
+    }
+  ]
+}

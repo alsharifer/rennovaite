@@ -1,3 +1,4 @@
+import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
@@ -58,6 +59,7 @@ type BoqPayload = {
   vat_pct: number;
   vat_aed: number;
   grand_total_aed: number;
+  ohp_pct?: number;
 };
 
 function isBoqPayload(v: unknown): v is BoqPayload {
@@ -148,7 +150,8 @@ export default async function VendorsPage({
   }
 
   const project = projectRes.data;
-  const boqPayload = latestBoq.sections;
+  // I4: curated on its way to the browser — a stored BoQ may predate the source scrub.
+  const boqPayload = curateBoq(latestBoq.sections, await loadWithheldNames(sb, id));
   const boqId = latestBoq.id;
   const budgetAed = project.budget_aed ?? FALLBACK_BUDGET_AED;
 
@@ -236,6 +239,7 @@ export default async function VendorsPage({
     boq_id: boqId,
     contingency_pct: boqPayload.contingency_pct,
     vat_pct: boqPayload.vat_pct,
+    ohp_pct: boqPayload.ohp_pct,
     base_subtotal_aed: boqPayload.subtotal_aed,
     base_grand_total_aed: boqPayload.grand_total_aed,
     budget_aed: budgetAed,

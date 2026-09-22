@@ -22,7 +22,10 @@
 import { readFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { verificationJobs } from "./lib/verification-job.mjs";
+
 import { computeGardenTakeoff, priceGardenTakeoff } from "../lib/boq/garden-takeoff.ts";
+import { transcriptionGardenBook } from "../lib/boq/garden-rates.ts";
 import { buildElevationSheets } from "../lib/drawings/garden-elevations.ts";
 import { buildGardenSheets } from "../lib/drawings/garden-sheets.ts";
 import { compareVilla94 } from "../lib/ground-truth/villa94-garden-dryrun.ts";
@@ -98,7 +101,8 @@ async function main() {
   const landscape = (boq?.sections ?? []).filter((s) => LANDSCAPE_SECTIONS.includes(s.work_section));
   check("landscape sections present, POMI-named", landscape.length === LANDSCAPE_SECTIONS.length, landscape.map((s) => s.work_section).join(" · "));
 
-  const pure = priceGardenTakeoff(computeGardenTakeoff(VILLA94_GARDEN).items);
+  const pureBook = transcriptionGardenBook();
+  const pure = priceGardenTakeoff(computeGardenTakeoff(VILLA94_GARDEN, pureBook).items, pureBook);
   const pureTotal = r2(pure.reduce((s, l) => s + l.total_aed, 0));
   const dry = compareVilla94();
   check("the pure take-off is the dry-run's platform side", Math.abs(dry.platform_total - pureTotal) < 0.01, money(dry.platform_total));
@@ -160,7 +164,9 @@ async function main() {
   }
 
   // --- The live drawing set prints the pure sheets' figures ------------------------------
-  const liveSet = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`)).json().catch(() => ({}))) as { sheets?: { sheetNumber: string; kind: string; svg: string }[]; error?: string };
+  // T5: the drawings route answers only a pack job; this read opens one and releases nothing.
+  const vj = verificationJobs(db, "garden-dry-run-live");
+  const liveSet = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`, { headers: await vj.headers(projectId) })).json().catch(() => ({}))) as { sheets?: { sheetNumber: string; kind: string; svg: string }[]; error?: string };
   const graph = buildPlanGraph({
     projectId,
     planId,
@@ -207,6 +213,7 @@ async function main() {
   for (const line of results) console.log(line);
   const failed = results.filter((r) => r.startsWith("FAIL")).length;
   console.log(`\n${results.length - failed} passed, ${failed} failed`);
+  await vj.close();
   if (failed) process.exitCode = 1;
 }
 

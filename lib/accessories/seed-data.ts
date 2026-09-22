@@ -64,7 +64,8 @@ export interface SkuRow {
   last_verified: string | null;
 }
 
-const LASPINAS = "Laspinas quotation 46703, 13 Jun 2026 (Mudon Villa 94)";
+// T3b ruling: the supplier whose quotation priced these is withheld (lib/identity/curation.ts).
+const LASPINAS = "sanitaryware supplier quotation, 13 Jun 2026 (reference project)";
 
 /** Finish read from a GROHE description — only when it literally says so. */
 function finishOf(desc: string): string | undefined {

@@ -4,9 +4,15 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { roomRollup } from "@/lib/boq/elements";
+import { elementPricer } from "@/lib/boq/rates";
+import { loadProjectFirmOverlay } from "@/lib/rates/firm";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { DRAFT_STATEMENT } from "@/lib/plan/site-reference";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { curateBoq } from "@/lib/identity/curation";
+import { buildBoqProvenance } from "@/lib/provenance/boq";
+import { loadProvenanceContext } from "@/lib/provenance/load";
+import type { BoqProvenance } from "@/lib/provenance/types";
 import {
   hasTakeoffProvenance,
   type RateBook,
@@ -29,6 +35,8 @@ import {
   type RoomRollupView,
   type VendorOption,
 } from "./_components/boq-view";
+import { packExportEnabled } from "@/lib/documents/pack-export/guard";
+
 import { GenerateBoqButton } from "./_components/generate-boq-button";
 import { ReviewCorrections } from "./_components/review-corrections";
 
@@ -156,8 +164,17 @@ export default async function BoqPage({
   const project = projectRes.data;
   const budgetAed = project.budget_aed ?? FALLBACK_BUDGET_AED;
   const latestBoq = boqRes.data?.[0];
+  // I4: the plan context behind every figure's source chain, and the names that
+  // must never reach the page (firm names). The stored document is CURATED on
+  // its way out — a BoQ generated before I4 still holds contractor names.
+  const provenanceCtx = await loadProvenanceContext(sb, id);
   const boqPayload =
-    latestBoq && isBoqPayload(latestBoq.sections) ? latestBoq.sections : null;
+    latestBoq && isBoqPayload(latestBoq.sections)
+      ? curateBoq(latestBoq.sections, provenanceCtx.withheldNames)
+      : null;
+  const provenance: BoqProvenance | null = boqPayload
+    ? buildBoqProvenance(boqPayload as unknown as Parameters<typeof buildBoqProvenance>[0], provenanceCtx)
+    : null;
   const skus = skuRes.data ?? [];
   const lineOptions = boqPayload ? buildLineOptions(boqPayload, skus) : {};
 
@@ -191,7 +208,10 @@ export default async function BoqPage({
       wet_area: !!r.wet_area,
     }));
     if (items.length > 0) {
-      const rollups = roomRollup(items);
+      // T3b: room totals price each element item the way its BoQ line does.
+      const firm = await loadProjectFirmOverlay(sb, id);
+      const tier = (boqPayload as { engine?: { tier?: "value" | "mid" | "premium" } } | null)?.engine?.tier ?? "mid";
+      const rollups = roomRollup(items, elementPricer(firm, tier));
       const { data: roomRows } = await supabase
         .from("rooms")
         .select("id, name_en")
@@ -341,6 +361,8 @@ export default async function BoqPage({
             rateBook={rateBook}
             initialSelections={initialSelections}
             furnitureSection={furnitureSection}
+            provenance={provenance}
+            packExport={packExportEnabled()}
           />
         ) : (
           <EmptyState projectId={id} />

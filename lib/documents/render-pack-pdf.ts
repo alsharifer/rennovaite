@@ -9,6 +9,7 @@
 // their own resolution.
 // =============================================================================
 
+import { stampPdfDay } from "@/lib/documents/pdf-date";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { generateDrawingSet } from "@/lib/drawings/export";
@@ -20,6 +21,7 @@ import { derivePlanGraph } from "@/lib/plan/derive";
 import { graphDraftStatus } from "@/lib/plan/geometry";
 import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 import { SCENE_PIPELINE_VERSION } from "@/lib/scene-render/prompts";
+import { curateText, loadWithheldNames } from "@/lib/identity/curation";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { loadParity } from "./parity-load";
@@ -261,7 +263,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   }
   const unavailable = new Set(wanted.filter((r) => !bytesById.has(r.id)).map((r) => r.id));
 
-  const { pages, zones } = buildRenderPack({
+  const built = buildRenderPack({
     graph,
     fixtures: (fixturesRes.data ?? []) as GardenFixture[],
     renders: byRoom,
@@ -288,11 +290,16 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
         }
       : null,
   });
+  // T3b: every printed string passes identity curation, with THIS project's
+  // withheld firm names (a firm may appear only on its own projects' pages).
+  const withheld = await loadWithheldNames(supabase, projectId);
+  const pages = built.pages.map((p) => ({ ...p, svg: curateText(p.svg, withheld) }));
+  const zones = built.zones;
 
   const { Resvg } = await import("@resvg/resvg-js");
   const { PDFDocument } = await import("pdf-lib");
-  const pdf = await PDFDocument.create();
-  pdf.setTitle(`${projectRes.name} — render pack`);
+  const pdf = stampPdfDay(await PDFDocument.create());
+  pdf.setTitle(curateText(`${projectRes.name} — render pack`, withheld));
   pdf.setAuthor("RennovAIte");
   pdf.setCreator("RennovAIte");
   pdf.setProducer("RennovAIte");

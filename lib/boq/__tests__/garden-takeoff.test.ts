@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  computeGardenTakeoff,
+  computeGardenTakeoff as computeWithBook,
   findDoubleCounts,
-  priceGardenTakeoff,
+  priceGardenTakeoff as priceWithBook,
   type GardenTakeoffInput,
 } from "@/lib/boq/garden-takeoff";
 import { LANDSCAPE_TYPES, SECTION_ORDER } from "@/lib/boq/rules";
 import { computeTakeoff } from "@/lib/boq/takeoff";
-import { buildGardenSections } from "@/lib/boq/garden-boq-feed";
+import { buildGardenSections as buildWithBook } from "@/lib/boq/garden-boq-feed";
 import { POMI_SECTIONS } from "@/lib/boq/schema";
 import {
   ABSORBED_SCOPE,
@@ -25,6 +25,14 @@ import {
   netRate,
   ratesAreConsistent,
 } from "@/lib/ground-truth/villa94-garden";
+import { transcriptionGardenBook } from "@/lib/boq/garden-rates";
+
+// T1.0: the take-off prices through a rate book. These tests check the rules
+// against the transcription, so they use the offline transcription book.
+const BOOK = transcriptionGardenBook();
+const computeGardenTakeoff = (i: Parameters<typeof computeWithBook>[0]) => computeWithBook(i, BOOK);
+const priceGardenTakeoff = (i: Parameters<typeof priceWithBook>[0]) => priceWithBook(i, BOOK);
+const buildGardenSections = (i: Parameters<typeof buildWithBook>[0]) => buildWithBook(i, BOOK);
 
 // ---------------------------------------------------------------------------
 // The reference garden, rebuilt from the contract's own quantities.

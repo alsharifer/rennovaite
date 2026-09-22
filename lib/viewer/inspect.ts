@@ -48,20 +48,12 @@ export interface MatchedLine {
   needs_qs: boolean;
 }
 
-/** Same REF the BoQ table renders (components boq-view.tsx sectionRef). */
-export function sectionRef(work_section: string, idx: number): string {
-  const initials = work_section
-    .split(/[\s&/]+/)
-    .filter(Boolean)
-    .map((w) => w[0]!.toUpperCase())
-    .join("")
-    .slice(0, 4);
-  return `${initials}-${String(idx + 1).padStart(2, "0")}`;
-}
 
 /** Every BoQ line whose element_refs intersect the given element ids. */
 export function findBoqLines(boq: InspectBoq, elementIds: string[]): MatchedLine[] {
   const want = new Set(elementIds);
+  // D5: the same unique REF the BoQ table and PDF print (lib/boq/refs.ts).
+  const lineRefs = assignRefs(boq.sections);
   const out: MatchedLine[] = [];
   for (const section of boq.sections) {
     section.lines.forEach((line, idx) => {
@@ -69,7 +61,7 @@ export function findBoqLines(boq: InspectBoq, elementIds: string[]): MatchedLine
       if (!refs || refs.length === 0) return;
       if (refs.some((r) => want.has(r))) {
         out.push({
-          ref: sectionRef(section.work_section, idx),
+          ref: lineRefs[`${section.work_section}-${idx}`]!,
           work_section: section.work_section,
           description: line.description,
           quantity: line.quantity,
@@ -150,4 +142,5 @@ export function roomTarget(room: RoomMeta): InspectTarget {
     dims: [{ label: "Floor area", value: m2(room.area_m2) }],
     finish: room.floorFinish,
   };
-}
+}import { assignRefs } from "@/lib/boq/refs";
+

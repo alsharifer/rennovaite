@@ -10,6 +10,7 @@ import { runPermitCheck, type PermitCheckResult } from "@/lib/compliance/check";
 import { loadMoodboard } from "@/lib/moodboard/load";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { cn } from "@/lib/utils";
+import { formatAed } from "@/lib/format/aed";
 
 export const dynamic = "force-dynamic";
 
@@ -56,10 +57,6 @@ function isBoqPayload(v: unknown): v is BoqPayload {
   return Array.isArray(o.sections) && typeof o.grand_total_aed === "number";
 }
 
-function formatAed(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return `AED ${Math.round(n).toLocaleString("en-US")}`;
-}
 
 function formatShortDate(iso: string | null | undefined): string {
   if (!iso) return "—";

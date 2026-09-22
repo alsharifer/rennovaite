@@ -18,50 +18,37 @@
 // Run: node scripts/seed-rate-book-garden.ts   (after migrations 022 + 032)
 // =============================================================================
 
-import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 
+// The shared target guard: honours variables set in the shell over .env.local,
+// prints which database it is about to write, and refuses production unless
+// ALLOW_PROD_WRITE=1. (This script used to read .env.local directly, so a
+// production URL set in the shell was silently ignored and dev was seeded.)
+import { resolveTarget } from "./_target-guard.mjs";
+
 import {
-  GARDEN_PROVENANCE,
   GARDEN_RATES,
   INTERNAL_REF,
   PUBLIC_SOURCE_LABEL,
   ratesAreConsistent,
 } from "../lib/ground-truth/villa94-garden.ts";
-
-const ROOT = "C:/dev/rennovaite";
-const VALID_FROM = "2026-09-12";
-const WORK_SECTION = "Landscape & External Works";
-
-async function loadEnvLocal(): Promise<Record<string, string>> {
-  const env: Record<string, string> = {};
-  const raw = await readFile(`${ROOT}/.env.local`, "utf8").catch(() => "");
-  for (const line of raw.split(/\r?\n/)) {
-    const t = line.trim();
-    if (!t || t.startsWith("#")) continue;
-    const eq = t.indexOf("=");
-    if (eq !== -1) env[t.slice(0, eq).trim()] = t.slice(eq + 1).trim();
-  }
-  return env;
-}
+// T1.0: rate_book is now what the garden take-off prices from at runtime, so the
+// priced fields come from transcriptionGardenRows() — the SAME rows the offline
+// book prices from. The seed and the pure dry-run cannot disagree on a rate.
+import { transcriptionGardenRows } from "../lib/boq/garden-rates.ts";
 
 function buildRows() {
+  const priced = new Map(transcriptionGardenRows().map((r) => [r.item_key, r] as const));
   return GARDEN_RATES.map((g) => ({
+    // item_key, grade, unit, rate_aed, scope, provenance, valid_from, work_section
+    ...priced.get(g.item_key)!,
     city: "Dubai",
-    work_section: WORK_SECTION,
-    item_key: g.item_key,
-    grade: "standard",
-    unit: g.unit,
-    rate_aed: g.net_rate,
     // A rate that arrived already net has no separate list price to record.
     // Writing the net value into list_rate_aed would make it look discounted.
     list_rate_aed: g.already_net ? null : g.list_rate,
-    scope: g.scope,
-    provenance: GARDEN_PROVENANCE,
     qs_validated: false,
     source: `${PUBLIC_SOURCE_LABEL} · ${g.label}${g.note ? ` — ${g.note}` : ""}`,
     internal_ref: INTERNAL_REF,
-    valid_from: VALID_FROM,
   }));
 }
 
@@ -73,10 +60,7 @@ async function main() {
     );
   }
 
-  const env = await loadEnvLocal();
-  const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Missing Supabase env in .env.local");
+  const { url, key } = resolveTarget({ script: "seed-rate-book-garden", writes: true });
   const supabase = createClient(url, key);
 
   // Blast radius, counted before and after — nothing outside 'garden.%' may move.
@@ -113,7 +97,7 @@ async function main() {
   );
 
   const byScope = rows.reduce<Record<string, number>>(
-    (m, r) => ((m[r.scope] = (m[r.scope] ?? 0) + 1), m),
+    (m, r) => ((m[r.scope ?? "null"] = (m[r.scope ?? "null"] ?? 0) + 1), m),
     {},
   );
   console.log(`seeded ${rows.length} garden rates:`, JSON.stringify(byScope));

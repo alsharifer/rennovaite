@@ -1,3 +1,4 @@
+import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     // 1. Load the BoQ.
     const { data: boq, error: boqErr } = await supabase
       .from("boqs")
-      .select("id, sections")
+      .select("id, project_id, sections")
       .eq("id", boq_id)
       .single();
     if (boqErr || !boq) {
@@ -109,7 +110,8 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
-    const { sections } = payloadCheck.data;
+    // I4: curated — line text reaches the client in this response.
+    const { sections } = curateBoq(payloadCheck.data, await loadWithheldNames(supabaseUntyped, (boq as { project_id?: string | null }).project_id ?? null));
 
     // 2. Pre-load every SKU we might match against, in one query.
     const { data: skus, error: skuErr } = await supabaseUntyped

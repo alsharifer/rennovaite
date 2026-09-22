@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
+
 import { generateDrawingSet, renderSetPdf, renderSheetPdf, type SheetKind } from "@/lib/drawings/export";
 
 export const runtime = "nodejs";
@@ -50,6 +52,9 @@ export async function GET(
     const projectId = parsed.data;
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format");
+    // T5: the sheets (SVG or PDF) go only to a running pack export.
+    const denied = await guardDocumentRoute(request, projectId);
+    if (denied) return denied;
 
     const set = await generateDrawingSet(projectId);
 

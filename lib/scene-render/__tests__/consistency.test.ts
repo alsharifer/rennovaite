@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { arabellaPlanInput, toSite, toSitePath, PLOT, X } from "@/lib/client-garden/arabella-reference";
-import { computeGardenTakeoff } from "@/lib/boq/garden-takeoff";
+import { computeGardenTakeoff as computeWithBook } from "@/lib/boq/garden-takeoff";
 import { buildPlanGraph } from "@/lib/plan/geometry";
 import { consistencyPrompt, judgeConsistency, parseConsistencyReply } from "@/lib/scene-render/consistency";
 import { designSpec, specHash } from "@/lib/scene-render/design-spec";
 import { getGardenStyle } from "@/lib/garden-styles";
 import { dayPrompt } from "@/lib/scene-render/prompts";
 import type { CameraManifest } from "@/lib/scene/cameras";
+import { transcriptionGardenBook } from "@/lib/boq/garden-rates";
+
+// T1.0: the take-off prices through a rate book. These tests check the rules
+// against the transcription, so they use the offline transcription book.
+const BOOK = transcriptionGardenBook();
+const computeGardenTakeoff = (i: Parameters<typeof computeWithBook>[0]) => computeWithBook(i, BOOK);
 
 const same = { same: true, note: "" };
 

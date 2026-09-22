@@ -29,6 +29,10 @@ import {
   type GardenTakeoffInput,
   type GardenUnit,
 } from "./garden-takeoff";
+import { FirmIsolationError, FirmOverlay, FirmRateUnitError } from "@/lib/rates/firm";
+import { isFirmTier } from "@/lib/rates/tiers";
+
+import { GardenRateBookMissingError, loadGardenRateBook, withFirmOverlay, type GardenRateBook } from "./garden-rates";
 import { indicativeProgramme } from "./programme";
 import { SECTION_ORDER } from "./rules";
 import type { PomiSection, ScopeItem } from "./schema";
@@ -281,10 +285,10 @@ export interface GardenBoqResult {
   violations: ReturnType<typeof findDoubleCounts>;
 }
 
-/** Build the landscape sections for a captured garden. Pure. */
-export function buildGardenSections(capture: GardenTakeoffInput): GardenBoqResult {
-  const takeoff = computeGardenTakeoff(capture);
-  const priced = priceGardenTakeoff(takeoff.items);
+/** Build the landscape sections for a captured garden, priced at `book`. Pure. */
+export function buildGardenSections(capture: GardenTakeoffInput, book: GardenRateBook): GardenBoqResult {
+  const takeoff = computeGardenTakeoff(capture, book);
+  const priced = priceGardenTakeoff(takeoff.items, book);
   const violations = findDoubleCounts(takeoff.items);
 
   const refsByKey = new Map<string, string[]>();
@@ -313,12 +317,14 @@ export function buildGardenSections(capture: GardenTakeoffInput): GardenBoqResul
       rate_band: "sku",
       wastage_pct: 0,
       // An unflagged landscape line is a rate somebody actually paid. Saying so
-      // is the whole point of ingesting the actuals.
-      rate_status: l.rate_status ?? "actual_transaction",
+      // is the whole point of ingesting the actuals. A firm's own rate (L1) is
+      // priced, but it is not a transaction on record.
+      rate_status: l.rate_status ?? (isFirmTier(l.rate_tier) ? "priced" : "actual_transaction"),
       ...(l.qty_derived ? { qty_derived: true } : {}),
       // The zones, runs or units this line was measured from — what makes it
       // traceable back to the drawing rather than just a number in a table.
       ...(refs && refs.length > 0 ? { element_refs: refs.slice().sort() } : {}),
+      rate_tier: l.rate_tier,
     };
     const arr = bySection.get(l.work_section) ?? [];
     arr.push(line);
@@ -355,12 +361,18 @@ export async function appendGardenSections<T extends BoqLike>(
   boq: T,
   projectId: string,
   supabase: SupabaseClient,
+  opts: { persist?: boolean; firm?: FirmOverlay } = {},
 ): Promise<T> {
   try {
     const capture = await captureGarden(projectId, supabase);
     if (capture.zones.length === 0) return boq;
 
-    const built = buildGardenSections(capture);
+    // T1.0: the rates are read from rate_book. A missing book is NOT a
+    // best-effort skip (below) — a garden BoQ silently priced without its
+    // garden would be worse than a failed generation.
+    // L1: the project's firm overlay sits on top — tiers 1–2 before the book.
+    const book = withFirmOverlay(await loadGardenRateBook(supabase), opts.firm ?? FirmOverlay.none());
+    const built = buildGardenSections(capture, book);
     if (built.sections.length === 0) return boq;
 
     if (built.violations.length > 0) {
@@ -388,7 +400,7 @@ export async function appendGardenSections<T extends BoqLike>(
     // Per-element take-off rows, so a zone can be asked what it costs. Same
     // table the interior P4 path writes; best-effort like everything else here.
     // G5: removals persist beside them as garden.removal rows (a kept item has none).
-    await persistGardenTakeoff(projectId, [
+    if (opts.persist !== false) await persistGardenTakeoff(projectId, [
       ...built.elements,
       ...built.removals.map((r) => ({ item_key: "garden.removal", element_id: r.element_id, qty: r.qty, unit: r.unit })),
     ], supabase);
@@ -421,6 +433,9 @@ export async function appendGardenSections<T extends BoqLike>(
     if (programme) (boq as T & { programme?: typeof programme }).programme = programme;
     return boq;
   } catch (e) {
+    // Pricing-integrity failures are never a best-effort skip: a missing book,
+    // a foreign firm's rates, or a firm rate in the wrong unit fail the BoQ.
+    if (e instanceof GardenRateBookMissingError || e instanceof FirmIsolationError || e instanceof FirmRateUnitError) throw e;
     console.warn(
       "[boq/garden] landscape sections skipped:",
       e instanceof Error ? e.message : e,

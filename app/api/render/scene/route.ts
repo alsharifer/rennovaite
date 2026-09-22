@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { NotCachedError } from "@/lib/scene-render/pipeline";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -21,6 +22,8 @@ const BodySchema = z.object({
   view: z.enum(["day", "evening"]).default("day"),
   /** G5c: a passed render of this project the view should match in materials and design. */
   anchor_render_id: z.string().uuid().nullish(),
+  /** T5: answer from cache / reuse only; never render (pack export "use existing renders"). */
+  cache_only: z.boolean().optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -52,7 +55,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
-  const { project_id, camera_id, view, anchor_render_id } = parsed.data;
+  const { project_id, camera_id, view, anchor_render_id, cache_only } = parsed.data;
   try {
     const ctx = await loadGardenSceneContext(project_id);
     const cam = ctx.cameras.find((c) => c.id === camera_id);
@@ -60,9 +63,10 @@ export async function POST(request: NextRequest) {
     if (view === "evening" && !cam.lit) {
       return NextResponse.json({ error: "This view has no designed lighting, so it has no evening render.", code: "no_lighting" }, { status: 422 });
     }
-    const result = await renderGardenCamera(ctx, camera_id, view, { anchorRenderId: anchor_render_id ?? null });
+    const result = await renderGardenCamera(ctx, camera_id, view, { anchorRenderId: anchor_render_id ?? null, cacheOnly: cache_only === true });
     return NextResponse.json({ ...result, prompt: result.outcome === "passed" ? "Plan-faithful render" : "3D design view (render withheld)" });
   } catch (err) {
+    if (err instanceof NotCachedError) return NextResponse.json({ outcome: "not_cached", cached: false, render_id: null, camera_id, view });
     console.error("[api/render/scene] error", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Scene render failed." }, { status: 500 });
   }

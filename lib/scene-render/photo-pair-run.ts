@@ -7,6 +7,7 @@
 // packed). Cached per project + asset + decisions + style.
 // =============================================================================
 
+import { NotCachedError } from "./pipeline";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { publicUrlForPath } from "@/lib/assets/load";
@@ -48,7 +49,7 @@ export interface PhotoPairResult {
   attempts: { attempt: number; passed: boolean; failures: string[]; summary: string }[];
 }
 
-export async function renderPhotoPair(input: { projectId: string; assetId: string; zoneId: string; itemIds: string[] }): Promise<PhotoPairResult> {
+export async function renderPhotoPair(input: { projectId: string; assetId: string; zoneId: string; itemIds: string[]; cacheOnly?: boolean }): Promise<PhotoPairResult> {
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
   const ctx = await loadGardenSceneContext(input.projectId);
 
@@ -129,6 +130,8 @@ export async function renderPhotoPair(input: { projectId: string; assetId: strin
     .limit(1)
     .maybeSingle<{ id: string; image_url: string; gate: { outcome: "passed" | "withheld"; attempts: (PhotoPairResult["attempts"][number] & { image_url?: string })[] } }>();
   if (cached?.gate && !(cached.gate.outcome === "withheld" && isVerdictless(cached.gate.attempts))) return { render_id: cached.id, image_url: cached.image_url, outcome: cached.gate.outcome, cached: true, attempts: cached.gate.attempts };
+  // T5: a cache-only call (pack export with existing renders) never renders.
+  if (input.cacheOnly) throw new NotCachedError(`photo pair for asset ${input.assetId}`);
 
   const before = await fetchSceneBytes(photoUrl);
   const beforeMime = before[0] === 0x89 ? "image/png" : "image/jpeg";

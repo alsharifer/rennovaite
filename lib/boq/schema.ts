@@ -8,6 +8,9 @@
 // wastage_pct, rate_band) are additive and ignored by the current reader.
 // =============================================================================
 
+import type { FirmOverlay } from "@/lib/rates/firm";
+import type { ReferenceRateRow } from "@/lib/rates/reference";
+import { RATE_TIERS } from "@/lib/rates/tiers";
 import { z } from "zod";
 
 import type { AccessoryOverride } from "./rates";
@@ -88,6 +91,13 @@ export type EngineInput = {
    * Absent/empty → every line prices from its R-xx rule, exactly as before.
    */
   accessorySelections?: Record<string, AccessoryOverride>;
+  /**
+   * L1: the reference book (rate_book rows through REFERENCE_COLUMNS). Tier 3 of
+   * the resolution order; indicative rows are tier 5. Absent = neither answers.
+   */
+  referenceRows?: ReferenceRateRow[];
+  /** L1: the project's firm overlay (tiers 1–2). Absent = no firm. */
+  firm?: FirmOverlay;
 };
 
 // --- Take-off (intermediate) ---------------------------------------------------
@@ -146,7 +156,7 @@ export const BoqLineSchema = z.object({
   // -- engine-only additive fields --
   rule_id: z.string(),
   kind: z.enum(["labour", "material", "supply_and_install", "lump", "allowance"]),
-  rate_band: z.enum(["low", "mid", "high", "sku", "allowance"]),
+  rate_band: z.enum(["low", "mid", "high", "sku", "allowance", "book"]),
   wastage_pct: z.number().nonnegative(),
   // -- P2/P4/P5 additive (optional so pre-P2 lines validate unchanged) --
   /** Fixture / element ids this line's quantity was counted from (P2 overlays). */
@@ -163,6 +173,8 @@ export const BoqLineSchema = z.object({
   rate_status: z
     .enum(["priced", "needs_qs", "indicative", "site_assessment", "actual_transaction", "needs_selection"])
     .optional(),
+  /** L1: which tier of the resolution order answered (lib/rates/tiers.ts). */
+  rate_tier: z.enum(RATE_TIERS).optional(),
 });
 
 export const BoqSectionSchema = z.object({
@@ -179,6 +191,9 @@ export const BoqSchema = z.object({
   vat_pct: z.number().nonnegative(),
   vat_aed: z.number().nonnegative(),
   grand_total_aed: z.number().nonnegative(),
+  /** L1: the firm's overheads & profit — its own summary line, never in a rate. */
+  ohp_pct: z.number().nonnegative().optional(),
+  ohp_aed: z.number().nonnegative().optional(),
   // -- engine-only additive metadata --
   engine: z.object({
     version: z.string(),

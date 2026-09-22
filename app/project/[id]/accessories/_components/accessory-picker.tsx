@@ -32,6 +32,8 @@ import {
   type SpecClass,
 } from "@/lib/accessories/types";
 import { cn } from "@/lib/utils";
+import { formatAed } from "@/lib/format/aed";
+import { WHATIF_BEFORE_MARKUPS } from "@/lib/whatif/engine";
 
 export type RuleDefault = {
   rate_aed: number;
@@ -54,7 +56,7 @@ type Props = {
   degraded: boolean;
 };
 
-const aed = (n: number) => `AED ${Math.round(n).toLocaleString("en-US")}`;
+const aed = (n: number) => formatAed(n);
 
 export function AccessoryPicker({
   projectId,
@@ -358,6 +360,7 @@ export function AccessoryPicker({
       <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-md rounded-xl border border-ink-100 bg-paper p-lg">
         <div>
           <p className="label-caps text-ink-500">Change against the engine defaults</p>
+          <p className="font-body text-[11px] text-ink-500" data-markup-basis="before">Line re-pricing, {WHATIF_BEFORE_MARKUPS}.</p>
           <p
             className={cn(
               "font-mono text-headline-md tabular-nums",

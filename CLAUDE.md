@@ -557,8 +557,15 @@ book and a set of pure rules change nothing until something calls them.
   `item_key LIKE 'garden.%'`, so a re-run cannot reach the Mudon interior
   actuals.
 - **`lib/boq/garden-takeoff.ts`** is a SEPARATE take-off from
-  `lib/boq/takeoff.ts`, and its rates come from the ground-truth module rather
-  than `lib/boq/rates.ts`. The interior `RateResolver` is driven by `RATE_RULES`
+  `lib/boq/takeoff.ts`, and its rates come from a `GardenRateBook` rather
+  than `lib/boq/rates.ts`. **Since T1.0 that book is read from `rate_book`**
+  (`loadGardenRateBook`, `lib/boq/garden-rates.ts`) and a missing landscape
+  book is a hard error, never a fallback to the constants; the ground-truth
+  module keeps only the vocabulary (labels, units, inclusion rules) and the
+  transcription the seeder writes (`transcriptionGardenRows`), which the pure
+  dry-run and unit tests price from (`transcriptionGardenBook`). Pricing paths
+  select `rate_book` through `REFERENCE_COLUMNS` (`lib/rates/reference.ts`),
+  which never includes `source` or `internal_ref`. The interior `RateResolver` is driven by `RATE_RULES`
   over `labour_rates` + `pricing_skus` and throws on an unknown key, so routing
   garden keys through it would have meant inventing labour rows or editing
   interior rules. Rules **GL-01…GL-19** cover project lumps, hardscape
@@ -1159,6 +1166,188 @@ applies is asserted against it.
 
 **DB step**: `supabase db push` for `040`.
 
+## Rate resolution + private firm rate books (T1.0 / L1)
+
+**One resolution order for every pricing path** (`lib/rates/tiers.ts`, first
+answer wins): **1** `firm_private` (the project's firm's own entry) → **2**
+`firm_correction` (that firm's market_fair correction, *explicitly promoted*) →
+**3** `reference` (`rate_book`, `actual_transaction`) → **4** the interior R-xx
+fallbacks: `catalog` (pricing_skus tier pick) / `allowance` / `labour_book` →
+**5** `indicative` (`rate_book` seed/indicative rows, only when 4 cannot
+answer). `unpriced` (a garden QS-to-price line at 0) and `selection` (a D1
+accessory laid over whichever tier answered) complete the vocabulary. Every
+resolved line carries **`rate_tier`**.
+
+- **Hooks** — at the accessory layer: `RateResolver.resolveBase`
+  (`lib/boq/rates.ts`), the garden `rate()` / `priceGardenTakeoff`
+  (`lib/boq/garden-takeoff.ts`, via `withFirmOverlay`), and — since T3b — the
+  six P4 element sections (Demolition, Plaster, Floor / Wall Finishes,
+  Ceilings, Painting), which the viewer flag rebuilds from the element
+  take-off: `elementPricer(firm, tier)` → `applyElementMapping` /
+  `roomRollup`. Firm tiers answer there; otherwise the `WORK_ITEM_DEF`
+  constant (byte-identical, `element-mapping.golden.json`). The reference
+  book is deliberately NOT consulted for element keys — production
+  `rate_book` holds what-if grade cells under the same keys. A firm prices
+  plaster on this path as `wall_plaster` (the element keys are in the
+  firm-entry vocabulary). No interior `rate_book`
+  row shares a key with a `RATE_RULES` item today, so tier 3 answers only for
+  garden keys and every pre-L1 BoQ regenerates unchanged
+  (`lib/boq/__tests__/pricing-golden.test.ts` + `scripts/boq-regen-check.mjs`).
+- **T1.0** moved the landscape rates into `rate_book` first (see G2 above):
+  an overlay needs a store to shadow.
+- **Firms** (migration `041`): `firms` (name, `private` default true,
+  `created_by`), `firm_rate_books` (one per firm, `ohp_pct` 0–50),
+  `firm_rate_entries` (`item_key`, `grade` null = all grades, `unit`,
+  `rate_aed`, `kind` labour|supply|supply_and_install|lump, `origin`
+  firm_entry|promoted_correction, `correction_id`), `projects.firm_id`,
+  `boq_corrections.firm_id` / `promoted_at` / `promoted_entry_id`. 041
+  backfilled one firm per distinct `attributed_to` (Newspace) and created no
+  books. Entries are validated against the take-off vocabulary
+  (`lib/firms/vocabulary.ts`: known key, its unit, a kind that cannot change
+  what the line contains).
+- **Isolation.** `FirmOverlay.forProject` refuses any book or entry that is not
+  the project's firm's (`FirmIsolationError`); every store query is scoped by
+  `firm_id` (another firm's entry is 404 through your path); a firm entry in
+  the wrong unit throws at pricing time. **There is no user auth on API routes
+  yet** — isolation is by scoping; the check for "who is asking" belongs in
+  `requireFirm` (`lib/firms/store.ts`) when auth lands.
+- **Identity.** A firm's rate reaches a line as the constant
+  "contractor rate book" — never its name. Pricing paths read `rate_book`
+  only through `REFERENCE_COLUMNS` (no `source`, no `internal_ref`) and
+  `toReferenceRow` copies whitelisted fields only. Nothing under `app/` or
+  `lib/` writes `rate_book` (static test).
+- **Corrections** stay recorded-never-applied until
+  `POST /api/firms/:firmId/promote` (own firm only, `rate` type with an
+  item_key, once). `POST /api/boq-corrections` now normalises `attributed_to`
+  (or takes `firm_id`).
+- **OH&P** (`lib/rates/ohp.ts`): applied LAST at assembly as `ohp_pct` /
+  `ohp_aed` — subtotal → + OH&P → contingency on both → VAT → total. Never in
+  a rate. Shown as its own row on the BoQ page and PDF. 0% / no firm adds no
+  field.
+- **Routes**: `GET/POST /api/firms`, `GET/PATCH/DELETE /api/firms/:firmId`,
+  `GET/POST /api/firms/:firmId/rates`, `PATCH/DELETE
+  /api/firms/:firmId/rates/:entryId`, `POST /api/firms/:firmId/promote`,
+  `PATCH /api/projects/:id { firm_id }`. No UI page yet.
+- **`generate-boq { dry_run: true }`** assembles the BoQ through the real
+  pipeline and writes nothing (no boqs row, takeoff_items or pilot event).
+  `scripts/firm-overlay-check.mjs [port]` runs the whole L1 flow live on scratch
+  firms + the isolation stand-in and cleans up.
+
+**DB step**: `npm run db:push` for `041`.
+
+## Figures + number provenance, identity curation (I4)
+
+- **One formatter, one component.** `lib/format/aed.ts` (`formatAed(n, format)`:
+  aed · amount · rate · signed · delta · short) replaced 14 local helpers; every
+  on-screen figure is `<Figure>` (`components/figures/Figure.tsx`). Don't add a
+  local AED formatter.
+- **One summary chain.** `lib/boq/totals.ts` `chainTotals` (subtotal → OH&P →
+  contingency → VAT). `applyOhp`, the what-if engine (`scenarioTotal`) and the
+  vendor picker all use it, so a browser-recomputed figure equals what a
+  regenerated BoQ stores (what-if deltas now carry OH&P/contingency/VAT). The
+  BoQ view shows Subtotal / OH&P / Contingency / VAT rows like the PDF.
+- **Provenance popover.** `lib/provenance/boq.ts` builds, server-side, a chain
+  for every figure of a STORED BoQ (any vintage — the tier is inferred when
+  `rate_tier` is absent): plan geometry (element names, derived notes,
+  "sized to measured aggregate"), resolution tier in the popover's words
+  (Private / market_fair / actual_transaction / Fallback — … / Indicative / QS to
+  price), a curated source, QS validation, and arithmetic checks. An
+  untraceable figure is marked `data-provenance="gap"` and listed in `findings`
+  — never given a story. One shared base-ui Popover per page (handle + payload).
+- **Identity curation** (`lib/identity/curation.ts`, SERVER-ONLY — it holds the
+  names it withholds; a test walks every client import graph). Source
+  contractor identities (Atrium, Global Creation, KAME/internal_ref, firm names
+  from `firms`) never reach BoQ text: emitted as role labels at source
+  (`joinery-aluminum.ts`, R-43 note) and `curateBoq` on every read path (BoQ
+  page, vendors, drawings, viewer, BoQ PDF, vendor-options, dry-run). Brands
+  that are specifications stay. **T3b rulings** (`NAME_RULINGS`): Laspinas →
+  "sanitaryware supplier"; "Villa 94" → "reference project" on every
+  firm-facing surface; the vanity slab is "excluded from the client-supplied
+  tile package"; RAK stays as a catalogue brand. **Firm names**: a firm's name
+  may appear only on its OWN projects (`projects.firm_id`) —
+  `loadWithheldNames(sb, projectId)` withholds every other firm, and it is
+  applied to BoQ reads, the drawing set (`generateDrawingSet`) and the render
+  pack. What-if never selects `rate_book.source` (`RATE_BOOK_LABEL`).
+  `scripts/document-identity-scan.mjs [port] <ids>` scans every sheet, pack
+  page and BoQ page payload of a project.
+- **Checks:** `scripts/provenance-check.mjs [port] <ids>` (read-only: figure
+  counts, gaps, summary rows, identity scan of the full page payload) and
+  `scripts/figure-popover-sweep.mjs <url> [--shots=dir]` (headless Chrome over
+  CDP: hovers every figure, one tap, screenshots).
+- **D4 — unpriced lines out of the headline.** A QS-to-price line at rate 0
+  (`isUnpricedLine`, `lib/documents/boq-derived.ts`) is never silently inside
+  a total: `derivedTotal` returns `headline` =
+  `≈ AED N* · excludes K lines to be priced` plus the lines, named. The BoQ
+  page (headline + Project total row) and the BoQ PDF (title block + grand
+  total) print both. A needs_qs line WITH a rate is priced, not excluded.
+- **D5 — REF codes.** `lib/boq/refs.ts`: one unique code per section
+  (`SECTION_REF_CODES` — PLA / PLB / PRE, not three "P"s), `assignRefs`
+  suffixes any in-BoQ collision, so a REF is unique in a BoQ. The screen, the
+  PDF (new REF column) and 3D tap-to-inspect links use the same codes. Old
+  codes: `legacyRef` reproduces them, `resolveRef` accepts one in a deep link
+  only when unambiguous, and the migration table is the PDF's "REF changes"
+  page and `GET /api/projects/:id/boq-refs[?format=csv]`.
+- **What-if basis labels.** The scenario TOTAL runs the shared chain; per-grade
+  and per-line deltas and the accessory re-pricing do not. Displays say which
+  (`WHATIF_INCL_MARKUPS` / `WHATIF_BEFORE_MARKUPS`, `lib/whatif/engine.ts`)
+  until they are applied consistently.
+
+## One gated pack export, in the app and on the CLI (T5)
+
+The pilot's script assembled and checked the client pack; the UI's own links
+(drawing set, render pack, BoQ PDF) went straight to the routes — no consistency
+anchors, no photo pairs, no printed-content or identity-leak checks, no
+display-name check, outputs not saved together. There is now ONE path.
+
+- **`lib/documents/pack-export/run.ts`** is the export: BoQ regeneration → the
+  export gate → renders (anchor first, faithfulness + consistency) → before/after
+  pairs → the documents through their routes → the printed-content checks
+  (`checks.ts`, the script's assertions made generic) → outputs + manifest saved
+  together. `scripts/garden-draft-pack.ts` and the in-app **Export pack** action
+  both call it and differ ONLY in transport (which origin the routes are on) and
+  sink (a local folder, or the private `packs` bucket). Verified on the same
+  project state: the CLI's and the button's three PDFs are **byte-identical**
+  (equal sha256) — PDF dates are pinned to the UTC day (`lib/documents/pdf-date.ts`)
+  so a run is reproducible.
+- **No ungated output path.** Every document route calls `guardDocumentRoute`,
+  which serves a document only to a RUNNING `pack_exports` job (migration 042,
+  header `x-pack-export-job`, 3 h TTL, project-scoped). A browser navigation is
+  redirected to the Export pack panel; anything else gets `403 use_pack_export`.
+  The design-lock archive (`lib/drawings/persist.ts`) no longer mints year-long
+  signed URLs — it records storage paths. `ungated-paths.test.ts` scans the app
+  for a direct link to a document route and for a route that produces a PDF
+  without the guard. Internal verification scripts READ documents through
+  `scripts/lib/verification-job.mjs`, which opens a job and releases nothing.
+- **The gate is a checklist, not a 409.** `checklist.ts` names what is open —
+  untyped counters, undecided existing items, a stale BoQ, unpriced drawn scope,
+  lines nothing shows, overlay counts, and a working name — with the page to fix
+  each on. A blocked run stops BEFORE producing a document; a run whose printed
+  checks fail releases nothing but its manifest.
+- **The gate is SCOPE-AWARE** (the T4 finding): interior rooms are priced by the
+  interior take-off's area-driven rules, so `parity.interiorRows` passes a room
+  the element lines name, EXEMPTS the rest when interior work is priced, and
+  fails only when rooms are drawn and no interior work is priced at all. Before
+  this every interior room read as "drawn with cost impact, no BoQ line" and
+  every interior BoQ PDF 409'd.
+- **One visibility rule** fixes the 404 bug: `packExportEnabled()` is
+  `PACK_EXPORT_ENABLED && DRAWINGS_ENABLED`, and it governs the button AND the
+  routes — the BoQ PDF button used to show on any garden BoQ while its route
+  required `DRAWINGS_ENABLED`. Flag off = the action is absent from both pages,
+  the prose does not mention it, and every document route 404s (`/boq-pdf?format=json`,
+  which carries no document content, stays open).
+- **Options**: renders `full | cached | skip` (`cached` spends no render —
+  `cache_only` on the scene and photo-pair routes returns `not_cached`), pairs,
+  `regenerateBoq`, `boqPdf` (false only for the CLI reference pack: negotiated
+  prices never leave as a document), and `stage` for the pilot events the run
+  causes. A CLI `--stage verification` run never overwrites the tracked pilot
+  records.
+- **Production flags stay OFF** — this ships dev-side pending the post-pilot
+  deployment decision.
+
+**DB step**: `npm run db:manifest` + `npm run db:push` for
+`20260101004200_pack_exports.sql` (the `pack_exports` table and the private
+`packs` bucket).
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.
@@ -1222,6 +1411,7 @@ view-only side surface reached from the layout and render steps).
 | `STAGING_ENABLED`                | server — `"true"` turns on P7 furniture staging (render prompt + optional BoQ section) |
 | `PROPERTY_OS_LANDING`             | server — `"true"` makes `/` the Property OS intro page (visitors) and moves the RennovAIte homepage to `/rennovaite`; unset/false = `/` is the homepage (as before) |
 | `TASTE_SEED_ENABLED`              | server — `"true"` lets a project's moodboard condition its renders (B3). Off = renders behave exactly as before |
+| `PACK_EXPORT_ENABLED`             | server — `"true"` **with `DRAWINGS_ENABLED="true"`** shows the in-app "Export pack" action and lets the document routes answer a running pack job (T5). Off = the action is absent and every document route 404s |
 | `TEXTURED_WALKTHROUGH`            | server — `"true"` lets the 3D walkthrough read StyleBoard finishes onto floors and walls (F1). Off = the clay model, unchanged |
 | `PARSE_PROVIDER`                  | server — optional; which floorplan parser to use. Only `"inhouse"` (the default) is configured; any other value throws rather than silently mis-parsing |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |

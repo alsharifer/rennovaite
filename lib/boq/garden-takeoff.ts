@@ -1,9 +1,10 @@
 // =============================================================================
 // lib/boq/garden-takeoff.ts — deterministic landscape take-off (garden pilot G2).
 //
-// Zones, runs, discrete units and points → priced ScopeItems, using the Villa 94
-// net rates in lib/ground-truth/villa94-garden.ts. Pure: same input → identical
-// output, no LLM, no I/O.
+// Zones, runs, discrete units and points → priced ScopeItems, priced at the
+// landscape rate book passed in (rate_book rows at runtime — see
+// lib/boq/garden-rates.ts). Pure: same input + same book → identical output, no
+// LLM, no I/O.
 //
 // This is a SEPARATE take-off from lib/boq/takeoff.ts rather than more branches
 // inside it. The interior take-off's rules are F-xx formulas over rooms with
@@ -12,11 +13,18 @@
 // their own bucket (lib/boq/rules.ts LANDSCAPE_TYPES) precisely so a lawn could
 // not be priced as a terrace floor.
 //
-// Rates come from the ground-truth module, NOT from lib/boq/rates.ts. The
-// RateResolver is driven by RATE_RULES over labour_rates + pricing_skus and
-// throws on an unknown item_key, so routing garden keys through it would have
-// meant either inventing labour_rates rows or editing interior rules. Neither
-// is acceptable when the requirement is that zero interior rows move.
+// Rates come from a GardenRateBook (lib/boq/garden-rates.ts), NOT from
+// lib/boq/rates.ts. The RateResolver is driven by RATE_RULES over labour_rates +
+// pricing_skus and throws on an unknown item_key, so routing garden keys through
+// it would have meant either inventing labour_rates rows or editing interior
+// rules. Neither is acceptable when the requirement is that zero interior rows
+// move.
+//
+// T1.0: until then the rates were read straight off the ground-truth module's
+// constants. They are now `rate_book` rows, and the book is a parameter: the
+// runtime passes the book read from the database, the offline calibration passes
+// the transcription. The ground-truth module still supplies each key's label and
+// unit — vocabulary, not price.
 // =============================================================================
 
 import {
@@ -24,7 +32,6 @@ import {
   INCLUSIVE_SCOPE,
   ABSORBED_SCOPE,
   PERGOLA_INCLUDED_DOWNLIGHTS,
-  PUBLIC_SOURCE_LABEL,
   QUANTITY_INCLUSIONS,
   getGardenRate,
 } from "@/lib/ground-truth/villa94-garden";
@@ -33,6 +40,9 @@ import { DERIVED_QTY_NOTE, isDemolished, isNewWork, isUndecided, type Dispositio
 
 export { DERIVED_QTY_NOTE };
 
+import { isFirmTier, type RateTier } from "@/lib/rates/tiers";
+
+import { GARDEN_TIER_LABEL, type GardenRateBook } from "./garden-rates";
 import type { PomiSection, ScopeItem } from "./schema";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -245,10 +255,14 @@ const IRRIGATION_BANDS: readonly { max_driver: number; factor: number; label: st
 
 // --- Rules -------------------------------------------------------------------
 
-function rate(item_key: string): number {
-  const g = getGardenRate(item_key);
-  if (!g) throw new Error(`No garden rate for "${item_key}".`);
-  return g.net_rate;
+/**
+ * THE garden rate choke point: every priced garden figure comes through here.
+ * Throws on a key the book does not carry — never an invented rate.
+ */
+function rate(book: GardenRateBook, item_key: string): number {
+  const r = book.resolve(item_key);
+  if (!r) throw new Error(`No garden rate for "${item_key}" in the landscape rate book.`);
+  return r.rate_aed;
 }
 
 function label(item_key: string): string {
@@ -286,7 +300,7 @@ function item(
  * Every emitted line is a quantity the drawing supports. Where a quantity is
  * inferred rather than measured (the irrigation lump), the line says so.
  */
-export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
+export function computeGardenTakeoff(input: GardenTakeoffInput, book: GardenRateBook): GardenTakeoff {
   const allZones = input.zones ?? [];
   const allRuns = input.runs ?? [];
   const allUnits = input.units ?? [];
@@ -513,13 +527,15 @@ export function computeGardenTakeoff(input: GardenTakeoffInput): GardenTakeoff {
   if (irrigationDriver > 0) {
     const band = IRRIGATION_BANDS.find((b) => irrigationDriver <= b.max_driver)!;
     // G5c: ONE allowance line — quantity 1, the band carried by the rate factor.
-    const reference = rate("garden.irrigation");
+    const reference = rate(book, "garden.irrigation");
+    // L1: say whose lump it is. Unchanged wording for the reference book.
+    const whose = isFirmTier(book.resolve("garden.irrigation", "lump")?.tier) ? "contractor's" : "reference";
     items.push(
       item(
         "GL-15",
         "garden.irrigation",
         1,
-        `allowance, ${band.label} band = ${band.factor} × the reference irrigation lump (AED ${reference.toLocaleString("en-US")}) = AED ${Math.round(reference * band.factor).toLocaleString("en-US")}; band set by planting ${plantingAreaM2} m² + planter ${planterLm} lm (small ≤ 4, comparable ≤ 16, large above). Sized against one comparable project, NOT measured; confirm on site.`,
+        `allowance, ${band.label} band = ${band.factor} × the ${whose} irrigation lump (AED ${reference.toLocaleString("en-US")}) = AED ${Math.round(reference * band.factor).toLocaleString("en-US")}; band set by planting ${plantingAreaM2} m² + planter ${planterLm} lm (small ≤ 4, comparable ≤ 16, large above). Sized against one comparable project, NOT measured; confirm on site.`,
         {
           rate_factor: band.factor,
           // Both flags, and they say different things. The rate was paid on a
@@ -610,26 +626,43 @@ export interface GardenPricedLine extends ScopeItem {
   rate_aed: number;
   total_aed: number;
   vendor_or_source: string;
+  /** L1: which tier of the resolution order answered (lib/rates/tiers.ts). */
+  rate_tier: RateTier;
 }
 
-/** Price a take-off at the Villa 94 net rates. Deterministic. */
-export function priceGardenTakeoff(items: readonly ScopeItem[]): GardenPricedLine[] {
+/**
+ * Price a take-off at the landscape rate book. Deterministic for a given book.
+ *
+ * L1: the book may carry a firm overlay (withFirmOverlay). A firm's own rate is
+ * the one thing that can price an item the reference book has no rate for — a
+ * deck or a tree is QS-to-price for the market, but a firm that builds decks
+ * knows its deck rate.
+ */
+export function priceGardenTakeoff(items: readonly ScopeItem[], book: GardenRateBook): GardenPricedLine[] {
   return items.map((i) => {
+    const hit = book.resolve(i.item_key, i.unit);
+    const firmPriced = hit != null && isFirmTier(hit.tier);
     // G5: a line with no reference rate goes to the QS at 0 — never at an
     // invented rate, and never under the market-reference label.
-    if (UNPRICED_GARDEN_ITEMS[i.item_key]) {
-      return { ...i, rate_aed: 0, total_aed: 0, vendor_or_source: UNPRICED_SOURCE_LABEL };
+    if (UNPRICED_GARDEN_ITEMS[i.item_key] && !firmPriced) {
+      return { ...i, rate_aed: 0, total_aed: 0, vendor_or_source: UNPRICED_SOURCE_LABEL, rate_tier: "unpriced" as const };
     }
-    // A banded allowance (G5c) is one lump at the reference rate × its band factor.
-    const r = i.rate_factor == null ? rate(i.item_key) : Math.round(rate(i.item_key) * i.rate_factor * 100) / 100;
-    return {
+    if (!hit) throw new Error(`No garden rate for "${i.item_key}" in the landscape rate book.`);
+    // A banded allowance (G5c) is one lump at the book rate × its band factor.
+    const r = i.rate_factor == null ? hit.rate_aed : Math.round(hit.rate_aed * i.rate_factor * 100) / 100;
+    const priced: GardenPricedLine = {
       ...i,
       rate_aed: r,
       total_aed: Math.round(i.quantity * r * 100) / 100,
       // Never the contractor's name. See the identity rule in the ground-truth
-      // module: this string reaches the BoQ, and the BoQ reaches the client.
-      vendor_or_source: PUBLIC_SOURCE_LABEL,
+      // module: this string reaches the BoQ, and the BoQ reaches the client. The
+      // label is a constant per tier (GARDEN_TIER_LABEL), never a database string.
+      vendor_or_source: GARDEN_TIER_LABEL[hit.tier],
+      rate_tier: hit.tier,
     };
+    // A firm rate on a QS-to-price item has been priced: the needs_qs flag goes.
+    if (firmPriced && priced.rate_status === "needs_qs") delete priced.rate_status;
+    return priced;
   });
 }
 

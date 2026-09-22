@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { StoreError, assignProjectFirm } from "@/lib/firms/store";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -62,9 +63,18 @@ export async function DELETE(
 
 // G5: `display_name` (migration 038) is the name client-facing documents print;
 // null clears it back to the working name.
+// L1: `firm_id` (migration 041) — the firm whose private rate book prices this
+// project. null = the reference book only.
 const PatchSchema = z
-  .object({ archived: z.boolean().optional(), display_name: z.string().trim().min(1).max(200).nullable().optional() })
-  .refine((b) => b.archived !== undefined || b.display_name !== undefined, "Body needs archived or display_name.");
+  .object({
+    archived: z.boolean().optional(),
+    display_name: z.string().trim().min(1).max(200).nullable().optional(),
+    firm_id: z.string().uuid().nullable().optional(),
+  })
+  .refine(
+    (b) => b.archived !== undefined || b.display_name !== undefined || b.firm_id !== undefined,
+    "Body needs archived, display_name or firm_id.",
+  );
 
 // PATCH /api/projects/:id — archive or un-archive. The counterpart to DELETE,
 // and the one that should be reached for first: a parsed plan with renders and
@@ -92,12 +102,23 @@ export async function PATCH(
     const body = PatchSchema.safeParse(await request.json());
     if (!body.success) {
       return NextResponse.json(
-        { success: false, error: "Body must be { archived?: boolean, display_name?: string | null }." },
+        { success: false, error: "Body must be { archived?: boolean, display_name?: string | null, firm_id?: uuid | null }." },
         { status: 400 },
       );
     }
 
     const supabase = getSupabaseAdmin();
+    if (body.data.firm_id !== undefined) {
+      try {
+        await assignProjectFirm(supabase as unknown as import("@supabase/supabase-js").SupabaseClient, parsedId.data, body.data.firm_id);
+      } catch (e) {
+        if (e instanceof StoreError) return NextResponse.json({ success: false, error: e.message, code: e.code }, { status: e.status });
+        throw e;
+      }
+      if (body.data.display_name === undefined && body.data.archived === undefined) {
+        return NextResponse.json({ success: true, firm_id: body.data.firm_id });
+      }
+    }
     if (body.data.display_name !== undefined && body.data.archived === undefined) {
       const { data, error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
         .from("projects")

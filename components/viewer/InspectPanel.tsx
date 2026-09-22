@@ -18,10 +18,8 @@ import {
   type InspectBoq,
   type InspectTarget,
 } from "@/lib/viewer/inspect";
+import { formatAed } from "@/lib/format/aed";
 
-function formatAed(n: number): string {
-  return `AED ${Math.round(n).toLocaleString("en-US")}`;
-}
 
 export function InspectPanel({
   target,

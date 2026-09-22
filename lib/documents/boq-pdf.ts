@@ -12,9 +12,15 @@
 // alongside the PDF so the identity assertion can scan exactly what was printed.
 // =============================================================================
 
+import { stampPdfDay } from "@/lib/documents/pdf-date";
 import { esc } from "@/lib/drawings/sheet";
 
+import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
+
+import { assignRefs, refMigration } from "@/lib/boq/refs";
+
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "./boq-derived";
+import { formatAed } from "@/lib/format/aed";
 
 export const BOQ_PAGE_W = 210;
 export const BOQ_PAGE_H = 297;
@@ -54,6 +60,9 @@ export interface BoqPdfInput {
     vat_pct: number;
     vat_aed: number;
     grand_total_aed: number;
+    /** L1: the firm's OH&P — printed as its own summary row, never folded into a rate. */
+    ohp_pct?: number;
+    ohp_aed?: number;
     garden?: {
       draft?: { draft?: boolean; statement?: string | null; note?: string | null } | null;
       derived_lines?: number;
@@ -75,7 +84,7 @@ const STATUS_MARK: Record<string, { mark: string; label: string }> = {
   priced: { mark: "P", label: "catalogue price" },
 };
 
-const aed = (n: number) => Math.round(n).toLocaleString("en-US");
+const aed = (n: number) => formatAed(n, "amount");
 const f1 = (n: number) => (Math.round(n * 10) / 10).toString();
 
 /**
@@ -105,7 +114,7 @@ function wrap(text: string, max: number): string[] {
 
 type Row =
   | { kind: "section"; title: string }
-  | { kind: "line"; line: BoqPdfLine; desc: string[]; sub: string[] }
+  | { kind: "line"; line: BoqPdfLine; desc: string[]; sub: string[]; ref: string }
   | { kind: "section_total"; title: string; total: number };
 
 /** Build the BoQ pages. Deterministic. */
@@ -115,13 +124,15 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   const total = derivedTotal(boq.grand_total_aed, info);
   const statement = info.draft ? info.statement : null;
 
+  // D5: the same unique REF the screen shows — screen and paper reconcile line by line.
+  const refs = assignRefs(boq.sections);
   const rows: Row[] = [];
   for (const s of boq.sections) {
     rows.push({ kind: "section", title: s.work_section });
-    for (const l of s.lines) {
-      const sub = [derivedLineNote(l), l.vendor_or_source ? `Source: ${l.vendor_or_source}` : null].filter((x): x is string => !!x).flatMap((x) => wrap(x, 72));
-      rows.push({ kind: "line", line: l, desc: wrap(l.description, 48).slice(0, 4), sub });
-    }
+    s.lines.forEach((l, idx) => {
+      const sub = [derivedLineNote(l), l.vendor_or_source ? `Source: ${l.vendor_or_source}` : null].filter((x): x is string => !!x).flatMap((x) => wrap(x, 64));
+      rows.push({ kind: "line", line: l, desc: wrap(l.description, 42).slice(0, 4), sub, ref: refs[`${s.work_section}-${idx}`]! });
+    });
     rows.push({ kind: "section_total", title: s.work_section, total: s.section_total_aed });
   }
   const DESC_H = 3.4 * K;
@@ -146,7 +157,8 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   };
 
   const colHead = (y: number) =>
-    t(M, y, "DESCRIPTION", { size: 2.1, fill: INK_500, spacing: "0.06em" }) +
+    t(M + 4, y, "REF", { size: 2.1, fill: INK_500, spacing: "0.06em" }) +
+    t(M + 18, y, "DESCRIPTION", { size: 2.1, fill: INK_500, spacing: "0.06em" }) +
     t(128, y, "QTY", { size: 2.1, fill: INK_500, anchor: "end" }) +
     t(131, y, "UNIT", { size: 2.1, fill: INK_500 }) +
     t(162, y, "RATE", { size: 2.1, fill: INK_500, anchor: "end" }) +
@@ -162,7 +174,9 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   svg += t(M, y + 19, `${input.projectName} · ${input.community}`, { size: 3.2, fill: INK_700 });
   svg += t(BOQ_PAGE_W - M, y + 12, total.text, { size: 7.5, font: FONT_MONO, anchor: "end" });
   svg += t(BOQ_PAGE_W - M, y + 19, "grand total incl. contingency and VAT", { size: 2.4, fill: INK_500, anchor: "end" });
-  y += 24;
+  // D4: a total never silently counts a to-be-priced line at zero.
+  if (total.excludes) svg += t(BOQ_PAGE_W - M, y + 23, total.excludes, { size: 2.6, fill: TERRACOTTA, anchor: "end", weight: 700 }).replace("<text ", '<text data-headline-excludes="true" ');
+  y += total.excludes ? 28 : 24;
   if (total.footnote) {
     for (const line of wrap(total.footnote, 88)) {
       svg += t(M, y, line, { size: 2.4, fill: TERRACOTTA });
@@ -211,8 +225,9 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
     } else {
       const l = r.line;
       const status = STATUS_MARK[l.rate_status ?? ""];
+      svg += t(M + 4, y + 2.6, r.ref, { size: 2.2, fill: INK_500, font: FONT_MONO }).replace("<text ", `<text data-ref="${esc(r.ref)}" `);
       r.desc.forEach((d, i) => {
-        svg += t(M + 4, y + 2.6 + i * DESC_H, d, { size: 2.55 });
+        svg += t(M + 18, y + 2.6 + i * DESC_H, d, { size: 2.55 });
       });
       if (status) svg += t(M, y + 2.6, status.mark, { size: 2.2, fill: status.mark === "A" ? BRASS : TERRACOTTA, font: FONT_MONO, weight: 700 });
       const qty = `${l.qty_derived ? "≈ " : ""}${l.quantity}`;
@@ -222,7 +237,7 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
       svg += t(BOQ_PAGE_W - M, y + 2.6, aed(l.total_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
       let sy = y + 2.6 + r.desc.length * DESC_H;
       for (const s of r.sub) {
-        svg += t(M + 4, sy - 0.4, s, { size: 2.1, fill: s.startsWith("≈") || s.startsWith("Quantity") ? TERRACOTTA : INK_500 });
+        svg += t(M + 18, sy - 0.4, s, { size: 2.1, fill: s.startsWith("≈") || s.startsWith("Quantity") ? TERRACOTTA : INK_500 });
         sy += SUB_H;
       }
       y += rowH(r);
@@ -239,9 +254,21 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   };
   svg += `<line x1="110" y1="${f1(y - 3)}" x2="${BOQ_PAGE_W - M}" y2="${f1(y - 3)}" stroke="${INK_900}" stroke-width="0.35"/>`;
   sumRow("Subtotal", aed(boq.subtotal_aed));
+  if (boq.ohp_aed && boq.ohp_aed > 0) sumRow(`${OHP_LINE_LABEL} ${boq.ohp_pct}%`, aed(boq.ohp_aed));
   sumRow(`Contingency ${boq.contingency_pct}%`, aed(boq.contingency_aed));
   sumRow(`VAT ${boq.vat_pct}%`, aed(boq.vat_aed));
   sumRow("Grand total", total.text, true);
+  // D4: excluded lines, named, directly under the figure they are not in.
+  if (total.excludes) {
+    svg += t(BOQ_PAGE_W - M, y - 1.5, total.excludes, { size: 2.5, fill: TERRACOTTA, anchor: "end", weight: 700 });
+    y += 3;
+    const named = total.excluded.map((x) => `${x.description} (${x.work_section})`).join(" · ");
+    for (const line of wrap(`Not in the total — to be priced: ${named}`, 88)) {
+      svg += t(M, y, line, { size: 2.3, fill: TERRACOTTA });
+      y += 3.2 * K;
+    }
+    y += 1.5;
+  }
   if (total.footnote) {
     for (const line of wrap(total.footnote, 88)) {
       svg += t(M, y, line, { size: 2.4, fill: TERRACOTTA });
@@ -287,6 +314,39 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
     }
   }
   pages.push(page(svg));
+
+  // D5: REF changes — so a partner holding a screen reference in the old scheme
+  // ("P-01", ambiguous across Plaster / Plumbing / Preliminaries) can find the
+  // line. The old code is only meaningful with its section, so both are printed.
+  const migration = refMigration(boq.sections).filter((m) => m.legacy_ref !== m.ref);
+  if (migration.length > 0) {
+    n += 1;
+    let { svg: s2, y: y2 } = header(n);
+    const head = (yy: number) =>
+      t(M, yy, "REF CHANGES — OLD CODE → NEW CODE", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" }) +
+      t(M, yy + 5, "Before 22 Sep 2026 a REF was its section's initials + line number, so different sections could share a code. Read the old code together with its section.", { size: 2.2, fill: INK_700 }) +
+      t(M, yy + 11, "SECTION", { size: 2.1, fill: INK_500 }) +
+      t(76, yy + 11, "OLD", { size: 2.1, fill: INK_500 }) +
+      t(96, yy + 11, "NEW", { size: 2.1, fill: INK_500 }) +
+      t(118, yy + 11, "LINE", { size: 2.1, fill: INK_500 });
+    s2 += head(y2 + 4);
+    y2 += 19;
+    for (const m of migration) {
+      if (y2 + 5 > bottom) {
+        pages.push(page(s2));
+        n += 1;
+        ({ svg: s2, y: y2 } = header(n));
+        s2 += head(y2 + 4);
+        y2 += 19;
+      }
+      s2 += t(M, y2, m.work_section, { size: 2.3, fill: INK_700 });
+      s2 += t(76, y2, m.legacy_ref, { size: 2.3, font: FONT_MONO, fill: INK_500 });
+      s2 += t(96, y2, m.ref, { size: 2.3, font: FONT_MONO, fill: INK_900 }).replace("<text ", `<text data-ref-map="${esc(m.legacy_ref)}→${esc(m.ref)}" `);
+      s2 += t(118, y2, m.description.length > 60 ? `${m.description.slice(0, 59)}…` : m.description, { size: 2.3, fill: INK_900 });
+      y2 += 4.4;
+    }
+    pages.push(page(s2));
+  }
   return pages;
 }
 
@@ -299,7 +359,7 @@ export async function renderBoqPdf(input: BoqPdfInput): Promise<{ pdf: Uint8Arra
   const pages = buildBoqPdfPages(input);
   const { Resvg } = await import("@resvg/resvg-js");
   const { PDFDocument } = await import("pdf-lib");
-  const pdf = await PDFDocument.create();
+  const pdf = stampPdfDay(await PDFDocument.create());
   pdf.setTitle(`${input.projectName} — Bill of Quantities`);
   pdf.setAuthor("RennovAIte");
   pdf.setCreator("RennovAIte");

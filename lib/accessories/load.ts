@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { AccessoryOverride } from "@/lib/boq/rates";
+import { curateText } from "@/lib/identity/curation";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import type { AccessoryItem, AccessorySelections } from "./types";
@@ -33,7 +34,8 @@ function toItem(r: Record<string, unknown>): AccessoryItem {
     unit: String(r.unit ?? "no"),
     scope: r.scope as AccessoryItem["scope"],
     provenance: r.provenance as AccessoryItem["provenance"],
-    source: (r.source as string) ?? null,
+    // T3b: catalogue rows seeded before the rulings name the supplier; curated on read.
+    source: r.source == null ? null : curateText(String(r.source)),
     rate_book_item_key: (r.rate_book_item_key as string) ?? null,
     qs_validated: r.qs_validated === true,
     attributes: (r.attributes as AccessoryItem["attributes"]) ?? {},

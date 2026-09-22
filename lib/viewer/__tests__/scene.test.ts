@@ -11,7 +11,9 @@ describe("buildScene — Mudon", () => {
 
   it("reports the source wall count and one box per wall (no openings)", () => {
     expect(scene.wallCount).toBe(graph.walls.length);
-    expect(scene.wallCount).toBe(59);
+    // T3b: 63 (was 59) — the fixture now holds the overlap-repaired outlines, whose
+    // notches add shared-edge wall segments the overlapping rectangles hid.
+    expect(scene.wallCount).toBe(63);
     // Mudon has no openings → exactly one box per wall.
     expect(scene.walls).toHaveLength(graph.walls.length);
     expect(scene.isEmpty).toBe(false);

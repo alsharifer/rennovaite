@@ -14,6 +14,7 @@ import { AssetPicker } from "@/components/assets/AssetPicker";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import type { AssetLite } from "@/lib/assets/types";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
+import { formatAed } from "@/lib/format/aed";
 import { cn } from "@/lib/utils";
 import { MATERIALS, SURFACE_SPECS, type Material } from "@/lib/materials";
 import { roomTypeFromDb } from "@/lib/render-prompts";
@@ -531,7 +532,7 @@ export function RenderInteractive({
               </span>
               This room on your BoQ ·{" "}
               <span className="font-mono tabular-nums">
-                AED {(roomBoqTotals[selectedRoom.id] ?? 0).toLocaleString("en-US")}
+                {formatAed(roomBoqTotals[selectedRoom.id] ?? 0)}
               </span>
             </Link>
           )}

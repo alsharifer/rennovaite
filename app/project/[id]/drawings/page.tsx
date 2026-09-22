@@ -1,7 +1,10 @@
+import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app/AppShell";
+import { PackExport } from "@/components/documents/PackExport";
+import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { PlanLayers, type PlanInspectData } from "@/app/project/[id]/plan/_components/plan-layers";
 import { generateDrawingSet } from "@/lib/drawings/export";
@@ -43,13 +46,18 @@ const SHEET_BLURB: Record<string, string> = {
 
 export default async function DrawingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ export?: string }>;
 }) {
   // Whole surface is gated by DRAWINGS_ENABLED — invisible (404) when off.
   if (process.env.DRAWINGS_ENABLED !== "true") notFound();
 
   const { id: projectId } = await params;
+  const exportOpen = (await searchParams).export === "1";
+  // T5: documents leave the app only through Export pack (every gate on).
+  const canExport = packExportEnabled();
 
   let set: Awaited<ReturnType<typeof generateDrawingSet>> | null = null;
   let error: string | null = null;
@@ -92,7 +100,7 @@ export default async function DrawingsPage({
         const rawSections = boqRows?.[0]?.sections;
         const boq: InspectBoq =
           rawSections && typeof rawSections === "object" && "sections" in rawSections
-            ? (rawSections as unknown as InspectBoq)
+            ? curateBoq(rawSections as unknown as InspectBoq, await loadWithheldNames(supabase, projectId))
             : { sections: [] };
         const fin = styleFinishes(styleRows?.[0]?.style_key ?? null);
         const wallIdsByRoom = new Map<string, string[]>();
@@ -136,28 +144,12 @@ export default async function DrawingsPage({
           </h1>
           <p className="max-w-[720px] font-body text-body-lg text-on-surface-variant">
             Deterministic, dimensioned drawings derived from your plan geometry —
-            no AI in this output. Download each sheet as a print-ready A3 PDF.
+            no AI in this output.{" "}
+            {canExport && "The print-ready set is released through Export pack."}
           </p>
-          {set && set.sheets.length > 0 && (
-            <div className="mt-lg flex flex-wrap gap-md">
-              <a
-                href={`/api/projects/${projectId}/drawings?format=pdf&sheet=all`}
-                className="focus-ring inline-flex h-10 items-center gap-sm rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
-              >
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                  picture_as_pdf
-                </span>
-                Full drawing set (PDF)
-              </a>
-              <a
-                href={`/api/projects/${projectId}/render-pack`}
-                className="focus-ring inline-flex h-10 items-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
-              >
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                  photo_library
-                </span>
-                Render pack (PDF)
-              </a>
+          {set && set.sheets.length > 0 && canExport && (
+            <div className="mt-lg">
+              <PackExport projectId={projectId} autoOpen={exportOpen} />
             </div>
           )}
         </header>
@@ -215,15 +207,6 @@ export default async function DrawingsPage({
                   <p className="mb-md flex-1 font-body text-body-sm text-on-surface-variant">
                     {SHEET_BLURB[sheet.kind]}
                   </p>
-                  <a
-                    href={`/api/projects/${projectId}/drawings?format=pdf&sheet=${sheet.sheetNumber}`}
-                    className="focus-ring inline-flex h-10 items-center justify-center gap-sm self-start rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
-                  >
-                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                      download
-                    </span>
-                    Download PDF
-                  </a>
                 </article>
               ))}
             </div>

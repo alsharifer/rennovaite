@@ -7,10 +7,39 @@
 // If a labour row is missing the engine THROWS — a silent fallback would make
 // the output non-reproducible. If a SKU pool is empty, the rule's allowance
 // applies (flagged as such on the line, so the QS sees it).
+//
+// L1 — the resolution order (documented in full in lib/rates/tiers.ts):
+//   1 firm_private → 2 firm_correction → 3 reference (actual_transaction) →
+//   4 catalog / allowance / labour_book (the R-xx rules below) → 5 indicative.
+// The firm overlay and the reference book are consulted in resolveBase, at the
+// SAME layer the D1 accessory selection is applied on top of. Every resolved
+// rate carries `rate_tier` saying which tier answered, and its
+// `vendor_or_source` for tiers 1–3 and 5 is a constant label — never a
+// rate_book.source string (those name suppliers and contractors).
 // =============================================================================
 
-import { RATE_RULES, TIER_LABOUR_BAND, TIER_SKU_PERCENTILE } from "./rules";
+import type { FirmOverlay, FirmRateEntry } from "@/lib/rates/firm";
+import {
+  indexReference,
+  lookupCalibrated,
+  lookupIndicative,
+  type RateGrade,
+  type ReferenceIndex,
+  type ReferenceRateRow,
+} from "@/lib/rates/reference";
+import {
+  FIRM_CORRECTION_LABEL,
+  FIRM_RATE_LABEL,
+  INDICATIVE_LABEL,
+  INTERIOR_REFERENCE_LABEL,
+  type RateTier,
+} from "@/lib/rates/tiers";
+
+import { RATE_RULES, TIER_LABOUR_BAND, TIER_SKU_PERCENTILE, type RateRule } from "./rules";
 import type { LabourRate, PricingSku, Tier } from "./schema";
+
+/** Engine tier → rate-book grade. */
+export const TIER_GRADE: Record<Tier, RateGrade> = { value: "economy", mid: "standard", premium: "premium" };
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -18,7 +47,9 @@ export type ResolvedRate = {
   rate_aed: number;
   vendor_or_source: string;
   kind: "labour" | "material" | "supply_and_install" | "lump" | "allowance";
-  rate_band: "low" | "mid" | "high" | "sku" | "allowance";
+  rate_band: "low" | "mid" | "high" | "sku" | "allowance" | "book";
+  /** L1: which tier of the resolution order answered. */
+  rate_tier: RateTier;
   wastage: number;
   notes: string | null;
   /** D1: a selection that could not be applied without deleting install cost. */
@@ -113,11 +144,28 @@ export function applyAccessory(
     wastage: base.wastage,
     notes: `D1/accessory/${chosen.catalog_item_id}: ${chosen.name} (${chosen.spec_class}) — ${basis}${chosen.qs_validated ? "" : "; rate not QS-validated"}`,
     accessory_undecomposable: undecomposable,
+    rate_tier: "selection",
   };
+}
+
+const FIRM_KIND: Record<FirmRateEntry["kind"], ResolvedRate["kind"]> = {
+  labour: "labour",
+  supply: "material",
+  supply_and_install: "supply_and_install",
+  lump: "lump",
+};
+
+/** Books behind the R-xx rules (L1). Both absent = the pre-L1 resolver, exactly. */
+export interface ResolverBooks {
+  reference?: readonly ReferenceRateRow[];
+  firm?: FirmOverlay;
 }
 
 export class RateResolver {
   private labourIndex = new Map<string, LabourRate>();
+
+  private reference: ReferenceIndex | null;
+  private firm: FirmOverlay | null;
 
   constructor(
     labourRates: LabourRate[],
@@ -125,21 +173,90 @@ export class RateResolver {
     private tier: Tier,
     /** item_key → chosen accessory. Absent key = the R-xx rule applies. */
     private accessories: Record<string, AccessoryOverride> = {},
+    books: ResolverBooks = {},
   ) {
     for (const r of labourRates) {
       this.labourIndex.set(`${norm(r.work_section)}|${norm(r.description)}`, r);
     }
+    this.reference = books.reference ? indexReference(books.reference) : null;
+    this.firm = books.firm ?? null;
   }
 
   /** The rate this item_key would take with no user selection — the default. */
   resolveDefault(itemKey: string, unit: string): ResolvedRate {
-    return this.resolveFromRules(itemKey, unit);
+    return this.resolveBase(itemKey, unit);
   }
 
   resolve(itemKey: string, unit: string): ResolvedRate {
-    const base = this.resolveFromRules(itemKey, unit);
+    const base = this.resolveBase(itemKey, unit);
     const chosen = this.accessories[itemKey];
     return chosen ? applyAccessory(base, chosen) : base;
+  }
+
+  /** Tiers 1–5, first answer wins. See the header and lib/rates/tiers.ts. */
+  private resolveBase(itemKey: string, unit: string): ResolvedRate {
+    const rule = RATE_RULES[itemKey];
+    if (!rule) {
+      throw new Error(`No rate rule for item_key "${itemKey}".`);
+    }
+    const grade = TIER_GRADE[this.tier];
+
+    // 1–2. The project's firm: its own rate, then its promoted correction.
+    const hit = this.firm?.lookup(itemKey, grade, unit);
+    if (hit) return this.fromFirm(rule, hit.entry, hit.tier);
+
+    // 3. The calibrated reference book.
+    const ref = this.reference ? lookupCalibrated(this.reference, itemKey, grade) : null;
+    if (ref) return this.fromBook(rule, ref, unit, "reference");
+
+    // 4. The R-xx rules: catalogue pick, allowance, labour book. 5. Indicative,
+    // only when those cannot answer at all (they throw rather than guess).
+    try {
+      return this.resolveFromRules(itemKey, unit);
+    } catch (e) {
+      const ind = this.reference ? lookupIndicative(this.reference, itemKey, grade) : null;
+      if (ind) return this.fromBook(rule, ind, unit, "indicative");
+      throw e;
+    }
+  }
+
+  private fromFirm(rule: RateRule, e: FirmRateEntry, tier: "firm_private" | "firm_correction"): ResolvedRate {
+    return {
+      rate_aed: e.rate_aed,
+      vendor_or_source: tier === "firm_private" ? FIRM_RATE_LABEL : FIRM_CORRECTION_LABEL,
+      kind: FIRM_KIND[e.kind],
+      rate_band: "book",
+      // Wastage is a property of the MEASUREMENT (how much material a m² of
+      // floor consumes), not of whose price it is — it stays the rule's.
+      wastage: rule.material?.wastage ?? 0,
+      notes: `${rule.rule_id}: ${tier === "firm_private" ? "contractor rate book" : "contractor rate book — promoted correction"} (entry ${e.id}${e.grade ? `, ${e.grade}` : ""})`,
+      rate_tier: tier,
+    };
+  }
+
+  private fromBook(rule: RateRule, row: ReferenceRateRow, unit: string, tier: "reference" | "indicative"): ResolvedRate {
+    if (row.unit !== unit) {
+      throw new Error(`rate_book unit drift for ${row.item_key}: row says "${row.unit}", the take-off measures "${unit}".`);
+    }
+    const kind: ResolvedRate["kind"] =
+      row.scope === "supply_only"
+        ? "material"
+        : row.scope === "install_only"
+          ? "labour"
+          : row.scope === "supply_and_install"
+            ? "supply_and_install"
+            : rule.material
+              ? "material"
+              : "labour";
+    return {
+      rate_aed: row.rate_aed,
+      vendor_or_source: tier === "reference" ? INTERIOR_REFERENCE_LABEL : INDICATIVE_LABEL,
+      kind,
+      rate_band: "book",
+      wastage: rule.material?.wastage ?? 0,
+      notes: `${rule.rule_id}: ${tier === "reference" ? "calibrated reference" : "indicative"} rate, ${row.grade}, valid from ${row.valid_from}`,
+      rate_tier: tier,
+    };
   }
 
   private resolveFromRules(itemKey: string, unit: string): ResolvedRate {
@@ -176,6 +293,7 @@ export class RateResolver {
           rate_band: "sku",
           wastage: m.wastage,
           notes: `${rule.rule_id}: ${pick.description_en.slice(0, 90)} (tier ${this.tier}, pick ${idx + 1}/${pool.length} by price)`,
+          rate_tier: "catalog",
         };
       }
       if (rule.allowance_aed != null) {
@@ -186,6 +304,7 @@ export class RateResolver {
           rate_band: "allowance",
           wastage: m.wastage,
           notes: `${rule.rule_id}: ${rule.allowance_note ?? "allowance rate — QS to confirm"}`,
+          rate_tier: "allowance",
         };
       }
       throw new Error(
@@ -220,6 +339,7 @@ export class RateResolver {
         rate_band: band,
         wastage: 0,
         notes: `${rule.rule_id}: ${band} band (tier ${this.tier})`,
+        rate_tier: "labour_book",
       };
     }
 
@@ -231,9 +351,49 @@ export class RateResolver {
         rate_band: "allowance",
         wastage: 0,
         notes: `${rule.rule_id}: ${rule.allowance_note ?? "allowance rate — QS to confirm"}`,
+        rate_tier: "allowance",
       };
     }
 
     throw new Error(`Rate rule "${itemKey}" has no labour, material, or allowance.`);
   }
+}
+
+// --- Element sections (P4 take-off) -------------------------------------------
+
+/**
+ * T3b: the price of a P4 element work item (demolition, wall_plaster,
+ * floor_finish, wet_tiling, ceiling_finish, wall_paint — the six sections the
+ * element take-off rebuilds when the viewer flag is on).
+ *
+ * Before T3b those sections priced ONLY from the constants in
+ * lib/boq/elements.ts, bypassing this resolver — so a firm's private rates never
+ * reached the bulk of an interior BoQ. They now resolve through the SAME firm
+ * overlay as every other line (tiers 1–2, `FirmOverlay.lookup`), and fall back
+ * to the element constant (tier 4) exactly as before.
+ *
+ * The reference book (tier 3) is deliberately NOT consulted for these keys: in
+ * production `rate_book` holds the what-if grade cells under exactly these item
+ * keys (floor_finish, wet_tiling, …), including Mudon's transacted tile rates.
+ * They have never priced an element line; consulting them would silently
+ * re-price every existing interior BoQ with no firm involved.
+ */
+export interface ElementRate {
+  rate_aed: number;
+  vendor_or_source: string;
+  rate_tier: "firm_private" | "firm_correction";
+}
+export type ElementPricer = (workItemKey: string, unit: string) => ElementRate | null;
+
+export function elementPricer(firm: FirmOverlay | null | undefined, tier: Tier): ElementPricer {
+  const grade = TIER_GRADE[tier] ?? "standard";
+  return (key, unit) => {
+    const hit = firm?.lookup(key, grade, unit);
+    if (!hit) return null;
+    return {
+      rate_aed: hit.entry.rate_aed,
+      vendor_or_source: hit.tier === "firm_private" ? FIRM_RATE_LABEL : FIRM_CORRECTION_LABEL,
+      rate_tier: hit.tier,
+    };
+  };
 }

@@ -12,6 +12,8 @@ import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 import { SendModal } from "./send-modal";
+import { chainTotals } from "@/lib/boq/totals";
+import { formatAed } from "@/lib/format/aed";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,6 +47,8 @@ export type BoqMeta = {
   boq_id: string;
   contingency_pct: number;
   vat_pct: number;
+  /** L1/I4: the firm's OH&P, so a swap recomputes the chain the BoQ stores. */
+  ohp_pct?: number;
   base_subtotal_aed: number;
   base_grand_total_aed: number;
   budget_aed: number;
@@ -91,9 +95,6 @@ function metaFor(brand: string | null) {
   return VENDOR_META[brand] ?? DEFAULT_VENDOR_META;
 }
 
-function formatAed(n: number): string {
-  return `AED ${Math.round(n).toLocaleString("en-US")}`;
-}
 
 // ---------------------------------------------------------------------------
 
@@ -113,8 +114,9 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
     boqMeta.base_grand_total_aed,
   );
 
-  // Live total = base subtotal + sum of per-lane deltas, then re-derive
-  // contingency (8 %) and VAT (5 %) per the BoQ spec.
+  // Live total = base subtotal + sum of per-lane deltas, then the SHARED chain
+  // (lib/boq/totals.ts: OH&P → contingency → VAT) — the same arithmetic the
+  // server stores, so this figure cannot drift from a regenerated BoQ.
   const totals = useMemo(() => {
     let delta = 0;
     for (const l of lines) {
@@ -122,11 +124,13 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
       const newLineTotal = Math.round(l.quantity * picked.price_aed);
       delta += newLineTotal - l.base_total_aed;
     }
-    const subtotal = boqMeta.base_subtotal_aed + delta;
-    const contingency = Math.round((subtotal * boqMeta.contingency_pct) / 100);
-    const vat = Math.round(((subtotal + contingency) * boqMeta.vat_pct) / 100);
-    const grand = subtotal + contingency + vat;
-    return { delta, subtotal, contingency, vat, grand };
+    const c = chainTotals({
+      subtotal_aed: boqMeta.base_subtotal_aed + delta,
+      contingency_pct: boqMeta.contingency_pct,
+      vat_pct: boqMeta.vat_pct,
+      ohp_pct: boqMeta.ohp_pct,
+    });
+    return { delta, subtotal: c.subtotal_aed, ohp: c.ohp_aed, contingency: c.contingency_aed, vat: c.vat_aed, grand: c.grand_total_aed };
   }, [selection, lines, boqMeta]);
 
   function pick(lineKey: string, opt: VendorOption) {
@@ -426,7 +430,7 @@ function VendorCard({
       <div className="flex flex-1 items-center justify-between gap-sm px-md py-sm">
         <div className="min-w-0">
           <p className="font-mono text-body-md tabular-nums text-ink-900">
-            AED {option.price_aed.toLocaleString("en-US")}
+            AED {formatAed(option.price_aed, "rate")}
             <span className="text-ink-500">/{unit}</span>
           </p>
           <p className="truncate font-body-sm text-[12px] text-on-surface-variant">
@@ -539,7 +543,7 @@ function CompareTable({
       label: "Unit price (AED)",
       cell: (o) => (
         <span className="font-mono tabular-nums">
-          AED {o.price_aed.toLocaleString("en-US")}/{line.unit}
+          AED {formatAed(o.price_aed, "rate")}/{line.unit}
         </span>
       ),
     },

@@ -114,7 +114,7 @@ export const SANITARY_SPEC_CLASSES: Record<SanitaryClass, Record<Grade, Sanitary
     economy: null,
     // standard = Eurosmart (actual project spec), NOT Eurocube — the seed had
     // Eurocube in standard, which was the spec-class error. // pending partner review
-    standard: { spec: "GROHE Eurosmart basin mixer (332652433)", rate_aed: 400, source: "Laspinas quotation 46703 — actual project spec", pending_partner_review: true },
+    standard: { spec: "GROHE Eurosmart basin mixer (332652433)", rate_aed: 400, source: "sanitaryware supplier quotation — actual project spec", pending_partner_review: true },
     // Eurocube (the old seed's "standard") is really the premium tier. // pending partner review
     premium: { spec: "GROHE Eurocube basin mixer", rate_aed: 675, source: "seed rate reclassified to premium per Rate Calibration", pending_partner_review: true },
   },
@@ -124,7 +124,7 @@ export const SANITARY_SPEC_CLASSES: Record<SanitaryClass, Record<Grade, Sanitary
     // standard = exposed Tempesta set (the old seed). // pending partner review
     standard: { spec: "GROHE Tempesta exposed shower set", rate_aed: 500, source: "seed rate — exposed spec class", pending_partner_review: true },
     // premium = concealed Tempesta 250 system (the actual project spec). // pending partner review
-    premium: { spec: "GROHE concealed shower Tempesta 250, matt black (1053362430)", rate_aed: 1_750, source: "Laspinas quotation 46703 — actual concealed system", pending_partner_review: true },
+    premium: { spec: "GROHE concealed shower Tempesta 250, matt black (1053362430)", rate_aed: 1_750, source: "sanitaryware supplier quotation — actual concealed system", pending_partner_review: true },
   },
 };
 

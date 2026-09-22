@@ -1,3 +1,4 @@
+import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -121,7 +122,7 @@ export default async function ViewerPage({
   const rawSections = boqRows?.[0]?.sections;
   const boq: InspectBoq =
     rawSections && typeof rawSections === "object" && "sections" in rawSections
-      ? (rawSections as unknown as InspectBoq)
+      ? curateBoq(rawSections as unknown as InspectBoq, await loadWithheldNames(supabase, projectId))
       : { sections: [] };
 
   const fin = styleFinishes(styleKey);

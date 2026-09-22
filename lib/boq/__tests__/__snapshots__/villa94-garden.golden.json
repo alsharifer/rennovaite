@@ -1,0 +1,401 @@
+{
+  "sections": [
+    {
+      "work_section": "Demolition",
+      "lines": [
+        {
+          "description": "Garden demolition & strip-out",
+          "quantity": 1,
+          "unit": "lump",
+          "rate_aed": 4400,
+          "total_aed": 4400,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "per project — strip-out of 110.69 m² existing hardscape and grass (lump for a garden this size, not scaled)",
+          "rule_id": "GL-03",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction"
+        }
+      ],
+      "section_total_aed": 4400
+    },
+    {
+      "work_section": "Preliminaries",
+      "lines": [
+        {
+          "description": "Garden preliminaries & approvals",
+          "quantity": 1,
+          "unit": "lump",
+          "rate_aed": 3520,
+          "total_aed": 3520,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "per project — approvals, admin, shop drawings",
+          "rule_id": "GL-01",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction"
+        },
+        {
+          "description": "Garden mobilization & site management",
+          "quantity": 1,
+          "unit": "lump",
+          "rate_aed": 4400,
+          "total_aed": 4400,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "per project — debris removal, setting out, protection, supervision",
+          "rule_id": "GL-02",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction"
+        }
+      ],
+      "section_total_aed": 7920
+    },
+    {
+      "work_section": "Hardscape & Structures",
+      "lines": [
+        {
+          "description": "PCC base under paving",
+          "quantity": 63.3,
+          "unit": "m2",
+          "rate_aed": 105.6,
+          "total_aed": 6684.48,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "51.05 m² paved zones + 12.25 m² under structures (PCC and paving measured off the same drawn area; the reference project quoted 75 m² PCC against 87 m² paving)",
+          "rule_id": "GL-04",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "z-paving-bench-court",
+            "z-paving-courtyard",
+            "z-paving-front-lower",
+            "z-paving-front-upper",
+            "z-paving-pergola-court",
+            "z-paving-wall-feature",
+            "z-pergola"
+          ]
+        },
+        {
+          "description": "Porcelain paving installation",
+          "quantity": 63.3,
+          "unit": "m2",
+          "rate_aed": 70.4,
+          "total_aed": 4456.32,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "51.05 m² paved zones + 12.25 m² under structures",
+          "rule_id": "GL-05",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "z-paving-bench-court",
+            "z-paving-courtyard",
+            "z-paving-front-lower",
+            "z-paving-front-upper",
+            "z-paving-pergola-court",
+            "z-paving-wall-feature",
+            "z-pergola"
+          ]
+        },
+        {
+          "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+          "quantity": 63.3,
+          "unit": "m2",
+          "rate_aed": 128.1,
+          "total_aed": 8108.73,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "51.05 m² paved zones + 12.25 m² under structures; tile is bought per m² PURCHASED, which site setting-out usually reduces",
+          "rule_id": "GL-06",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "site_assessment",
+          "element_refs": [
+            "z-paving-bench-court",
+            "z-paving-courtyard",
+            "z-paving-front-lower",
+            "z-paving-front-upper",
+            "z-paving-pergola-court",
+            "z-paving-wall-feature",
+            "z-pergola"
+          ]
+        },
+        {
+          "description": "Seating bench, L-shape (0.7x0.6 section)",
+          "quantity": 7.5,
+          "unit": "lm",
+          "rate_aed": 1320,
+          "total_aed": 9900,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "Σ bench run length = 7.5 lm",
+          "rule_id": "GL-09",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "r-bench-l"
+          ]
+        },
+        {
+          "description": "Planter + bench combo (0.7x0.6)",
+          "quantity": 7.8,
+          "unit": "lm",
+          "rate_aed": 1012,
+          "total_aed": 7893.6,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "Σ planter run length = 7.8 lm",
+          "rule_id": "GL-10",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "r-planter-l"
+          ]
+        },
+        {
+          "description": "BBQ counter (blockwork, clad, sink+MEP+sockets)",
+          "quantity": 3,
+          "unit": "lm",
+          "rate_aed": 5280,
+          "total_aed": 15840,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "Σ BBQ counter length = 3 lm (incl. sink, water, drainage and sockets)",
+          "rule_id": "GL-11a",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "r-counter-bbq"
+          ]
+        },
+        {
+          "description": "Bar counter (blockwork, clad)",
+          "quantity": 3.4,
+          "unit": "lm",
+          "rate_aed": 4312,
+          "total_aed": 14660.8,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "Σ bar counter length = 3.4 lm",
+          "rule_id": "GL-11b",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "r-counter-bar"
+          ]
+        },
+        {
+          "description": "Planter box, standalone (per unit ~1.8x1.8x0.45)",
+          "quantity": 1,
+          "unit": "no",
+          "rate_aed": 3421.44,
+          "total_aed": 3421.44,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "1 standalone planter box",
+          "rule_id": "GL-12",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "u-planter-olive"
+          ]
+        },
+        {
+          "description": "Wall feature with bench (arch, per unit ~2.5m w)",
+          "quantity": 1,
+          "unit": "no",
+          "rate_aed": 6600,
+          "total_aed": 6600,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "1 wall feature with bench",
+          "rule_id": "GL-13",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "u-wall-feature"
+          ]
+        },
+        {
+          "description": "Motorized louvered pergola (alum, LED, coated)",
+          "quantity": 12.25,
+          "unit": "m2 plan",
+          "rate_aed": 1366.6928,
+          "total_aed": 16741.99,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "Σ structure zone plan area = 12.25 m² (all-in rate: structure, coating and its 8 recessed downlights)",
+          "rule_id": "GL-14",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "z-pergola"
+          ]
+        },
+        {
+          "description": "BBQ grill, built-in (client-supplied equipment class)",
+          "quantity": 1,
+          "unit": "no",
+          "rate_aed": 5427.66,
+          "total_aed": 5427.66,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "1 built-in BBQ grill (client-supplied equipment)",
+          "rule_id": "GL-19",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "u-bbq-grill"
+          ]
+        }
+      ],
+      "section_total_aed": 99735.02
+    },
+    {
+      "work_section": "Soft Landscaping",
+      "lines": [
+        {
+          "description": "Artificial grass supply",
+          "quantity": 59.64,
+          "unit": "m2",
+          "rate_aed": 26.4,
+          "total_aed": 1574.5,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "artificial grass zone area = 59.64 m²",
+          "rule_id": "GL-07",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "z-lawn-back",
+            "z-lawn-front-north",
+            "z-lawn-front-south"
+          ]
+        },
+        {
+          "description": "Artificial grass installation (base+sand+borders)",
+          "quantity": 59.64,
+          "unit": "m2",
+          "rate_aed": 70.4,
+          "total_aed": 4198.66,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "artificial grass zone area = 59.64 m² (incl. base prep, sand bed and borders)",
+          "rule_id": "GL-08",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction",
+          "element_refs": [
+            "z-lawn-back",
+            "z-lawn-front-north",
+            "z-lawn-front-south"
+          ]
+        },
+        {
+          "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+          "quantity": 5.01,
+          "unit": "m2",
+          "rate_aed": 0,
+          "total_aed": 0,
+          "vendor_or_source": "rate to be confirmed — not in the landscape rate book",
+          "notes": "Σ planting bed area = 5.01 m² (soil preparation, planting; plant schedule to follow)",
+          "rule_id": "GL-25",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "needs_qs",
+          "element_refs": [
+            "z-planting-north",
+            "z-planting-west"
+          ]
+        }
+      ],
+      "section_total_aed": 5773.16
+    },
+    {
+      "work_section": "Irrigation",
+      "lines": [
+        {
+          "description": "Irrigation system (drip, pump, valves)",
+          "quantity": 1,
+          "unit": "lump",
+          "rate_aed": 11000,
+          "total_aed": 11000,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "allowance, comparable band = 1 × the reference irrigation lump (AED 11,000) = AED 11,000; band set by planting 5.01 m² + planter 7.8 lm (small ≤ 4, comparable ≤ 16, large above). Sized against one comparable project, NOT measured; confirm on site.",
+          "rule_id": "GL-15",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "site_assessment",
+          "qty_derived": true
+        }
+      ],
+      "section_total_aed": 11000
+    },
+    {
+      "work_section": "Electrical & Lighting",
+      "lines": [
+        {
+          "description": "Garden lighting cabling",
+          "quantity": 28,
+          "unit": "point",
+          "rate_aed": 264,
+          "total_aed": 7392,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "28 garden light point(s)",
+          "rule_id": "GL-16",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction"
+        },
+        {
+          "description": "Garden light fittings (blended LUMO class)",
+          "quantity": 28,
+          "unit": "point",
+          "rate_aed": 308,
+          "total_aed": 8624,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "28 garden light point(s)",
+          "rule_id": "GL-17",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction"
+        },
+        {
+          "description": "Boundary wall lights (supply+install)",
+          "quantity": 9,
+          "unit": "point",
+          "rate_aed": 315,
+          "total_aed": 2835,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "9 boundary wall light point(s)",
+          "rule_id": "GL-18",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction"
+        }
+      ],
+      "section_total_aed": 18851
+    }
+  ],
+  "total_aed": 147679.18
+}

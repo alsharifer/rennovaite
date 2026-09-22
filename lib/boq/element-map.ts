@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { assembleMappedSections, MAPPED_SECTIONS } from "./elements";
 import type { TakeoffItem } from "./quantify";
+import type { ElementPricer } from "./rates";
 
 // POMI display order for a clean merged document.
 const POMI_ORDER = [
@@ -58,10 +59,12 @@ function orderIndex(section: string): number {
  * element_refs) and recompute the contingency/VAT/grand-total chain. Returns the
  * same object shape. No-op when there are no take-off items.
  */
-export function applyElementMapping<T extends BoqLike>(boq: T, items: TakeoffItem[]): T {
+export function applyElementMapping<T extends BoqLike>(boq: T, items: TakeoffItem[], price?: ElementPricer): T {
   if (items.length === 0) return boq;
 
-  const mapped = assembleMappedSections(items);
+  // T3b: the rebuilt sections price through the rate resolver's element hook
+  // (firm tiers first, element constant otherwise).
+  const mapped = assembleMappedSections(items, price);
 
   // P8b: the staircase tile (engine rule Q-11b) lives in Floor Finishes, a
   // MAPPED section — so P4 mapping would drop it. Preserve it by re-appending it

@@ -20,6 +20,7 @@ import {
   type PortfolioProject,
   type SortKey,
 } from "./portfolio-types";
+import { formatAed } from "@/lib/format/aed";
 
 const PAGE_SIZE = 12;
 
@@ -660,7 +661,7 @@ function GridCard({
           <div>
             <p className="label-caps text-ink-500">Budget</p>
             <p className="font-mono text-body-sm tabular-nums text-ink-900">
-              {formatAedShort(project.budget_aed)}
+              {formatAed(project.budget_aed, "short")}
             </p>
           </div>
           <div>
@@ -1449,17 +1450,7 @@ function EmptyState() {
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-function formatAed(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return `AED ${Math.round(n).toLocaleString("en-US")}`;
-}
 
-function formatAedShort(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
-  if (n >= 1_000_000) return `AED ${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `AED ${Math.round(n / 1_000)}k`;
-  return `AED ${Math.round(n)}`;
-}
 
 function relativeTime(iso: string | null | undefined): string {
   if (!iso) return "—";
