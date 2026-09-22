@@ -3,8 +3,10 @@
 //
 // Uploads each sheet (SVG + PDF) to the PRIVATE Supabase Storage bucket
 // `drawings` under projects/{id}/drawings/ and records a drawing_sets row.
-// Because the bucket is private, sheet_urls hold long-lived SIGNED URLs (not
-// public URLs). Entirely best-effort: if the bucket or the drawing_sets table
+// The bucket is private and this is an ARCHIVE of the set at design lock, not a
+// release: since T5 no client document leaves the app except through Export pack
+// (lib/documents/pack-export), so sheet_urls record storage PATHS and no signed
+// URL is minted here (it used to mint year-long ones). Entirely best-effort: if the bucket or the drawing_sets table
 // (migration 014) don't exist yet, this logs and returns null without breaking
 // the caller (e.g. the design-lock flow). The Drawings UI itself generates live
 // and does not depend on this.
@@ -17,15 +19,14 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { generateDrawingSet, renderSheetPdf, type SheetKind } from "./export";
 
 const BUCKET = "drawings";
-// Private bucket → signed URLs. ~1 year is plenty for a PoC demo asset.
-const SIGNED_URL_TTL_S = 60 * 60 * 24 * 365;
 
 export interface PersistedSheet {
   kind: SheetKind;
   title: string;
   sheet_number: string;
-  svg_url: string | null;
-  pdf_url: string | null;
+  /** Storage path in the private `drawings` bucket (never a URL — see header). */
+  svg_path: string | null;
+  pdf_path: string | null;
 }
 
 export async function persistDrawingSet(
@@ -39,15 +40,14 @@ export async function persistDrawingSet(
 
     for (const s of set.sheets) {
       const base = `projects/${projectId}/drawings/${s.kind}`;
-      let svg_url: string | null = null;
-      let pdf_url: string | null = null;
+      let svg_path: string | null = null;
+      let pdf_path: string | null = null;
       try {
         await storage.upload(`${base}.svg`, new Blob([s.svg], { type: "image/svg+xml" }), {
           upsert: true,
           contentType: "image/svg+xml",
         });
-        svg_url =
-          (await storage.createSignedUrl(`${base}.svg`, SIGNED_URL_TTL_S)).data?.signedUrl ?? null;
+        svg_path = `${base}.svg`;
       } catch (e) {
         console.warn(`[drawings/persist] svg upload skipped (${s.kind}):`, e instanceof Error ? e.message : e);
       }
@@ -57,12 +57,11 @@ export async function persistDrawingSet(
           upsert: true,
           contentType: "application/pdf",
         });
-        pdf_url =
-          (await storage.createSignedUrl(`${base}.pdf`, SIGNED_URL_TTL_S)).data?.signedUrl ?? null;
+        pdf_path = `${base}.pdf`;
       } catch (e) {
         console.warn(`[drawings/persist] pdf upload skipped (${s.kind}):`, e instanceof Error ? e.message : e);
       }
-      sheets.push({ kind: s.kind, title: s.title, sheet_number: s.sheetNumber, svg_url, pdf_url });
+      sheets.push({ kind: s.kind, title: s.title, sheet_number: s.sheetNumber, svg_path, pdf_path });
     }
 
     const untyped = supabase as unknown as SupabaseClient;

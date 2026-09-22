@@ -248,6 +248,12 @@
       "version": "20260101004100",
       "name": "firm_rate_books",
       "sha256": "65afa12ddac0c8c97652513b68d629f511835eb562e32186838d288cd820866a"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004200",
+      "name": "pack_exports",
+      "sha256": "eece3568c3d16d08bf52fb84d2d91bba6f30711df9572e220ebbf4de12398a53"
     }
   ]
 }

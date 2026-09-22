@@ -11,6 +11,7 @@
 //   TODO(P-later): DXF via dxf-writer
 // =============================================================================
 
+import { stampPdfDay } from "@/lib/documents/pdf-date";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadDocumentProject } from "@/lib/documents/project-name";
@@ -412,7 +413,7 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
 export async function renderSetPdf(svgs: readonly string[]): Promise<Uint8Array> {
   const { Resvg } = await import("@resvg/resvg-js");
   const { PDFDocument } = await import("pdf-lib");
-  const pdf = await PDFDocument.create();
+  const pdf = stampPdfDay(await PDFDocument.create());
   for (const svg of svgs) {
     // 250 dpi keeps a 20-sheet set openable while text stays crisp.
     const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4134 } });
@@ -439,7 +440,7 @@ export async function renderSheetPdf(svg: string): Promise<Uint8Array> {
   const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4961 } });
   const png = resvg.render().asPng();
 
-  const pdf = await PDFDocument.create();
+  const pdf = stampPdfDay(await PDFDocument.create());
   const page = pdf.addPage([420 * MM_TO_PT, 297 * MM_TO_PT]);
   const img = await pdf.embedPng(png);
   page.drawImage(img, { x: 0, y: 0, width: 420 * MM_TO_PT, height: 297 * MM_TO_PT });

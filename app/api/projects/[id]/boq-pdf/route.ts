@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
+
 import { renderBoqPdf, type BoqPdfInput } from "@/lib/documents/boq-pdf";
 import { loadPackReadiness, readinessMessage } from "@/lib/documents/pack-readiness";
 import { loadParity } from "@/lib/documents/parity-load";
@@ -28,6 +30,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const projectId = parsed.data;
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
+  const format = new URL(request.url).searchParams.get("format");
+  // T5: a BoQ PDF (or its printed pages) goes only to a running pack export —
+  // the readiness-only JSON (no document content) stays open.
+  if (format !== "json") {
+    const denied = await guardDocumentRoute(request, projectId);
+    if (denied) return denied;
+  }
 
   try {
     const [project, boq, readiness] = await Promise.all([
@@ -36,7 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       loadPackReadiness(sb, projectId),
     ]);
     if (!boq.data) return NextResponse.json({ error: "No BoQ has been generated for this project." }, { status: 404 });
-    const json = new URL(request.url).searchParams.get("format") === "json";
+    const json = format === "json";
     if (!readiness.ready && !json) {
       return NextResponse.json({ error: readinessMessage(readiness), code: "pack_not_ready", readiness }, { status: 409 });
     }
@@ -54,6 +63,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       boq: curateBoq(boq.data.sections, await loadWithheldNames(sb, projectId)),
     });
     if (json) return NextResponse.json({ readiness, pages: pages.length, bytes: pdf.byteLength, boq_id: boq.data.id });
+    // T5: exactly the pages this PDF printed, for the pack's printed-content checks.
+    if (format === "pages") return NextResponse.json({ readiness, pages, boq_id: boq.data.id });
     await recordPilotEvent(sb, projectId, "pack_exported", { document: "boq_pdf", boq_id: boq.data.id, pages: pages.length });
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,

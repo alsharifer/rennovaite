@@ -15,6 +15,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
+import { verificationJobs } from "./lib/verification-job.mjs";
 
 const args = process.argv.slice(2);
 const port = /^\d+$/.test(args[0] ?? "") ? args.shift() : "3098";
@@ -26,6 +27,8 @@ const WITHHELD = ["KAME", "Atrium", "QTN20261407", "Global Creation", "3936/R1",
 const { url, key } = resolveTarget({ script: "document-identity-scan", writes: false });
 const sb = createClient(url, key);
 const firms = (await sb.from("firms").select("id, name")).data ?? [];
+// T5: the document routes answer only a pack job; this READ opens one per project and releases nothing.
+const vj = verificationJobs(sb, "document-identity-scan");
 
 let hits = 0;
 for (const id of args) {
@@ -34,10 +37,11 @@ for (const id of args) {
   console.log(`\n${id}  (${p?.name ?? "?"}; own firm: ${firms.find((f) => f.id === p?.firm_id)?.name ?? "none"})`);
 
   const surfaces = [];
-  const d = await fetch(`${base}/api/projects/${id}/drawings`);
+  const headers = await vj.headers(id);
+  const d = await fetch(`${base}/api/projects/${id}/drawings`, { headers });
   if (d.ok) for (const s of (await d.json()).sheets ?? []) surfaces.push([`sheet ${s.sheetNumber} (${s.kind})`, s.svg]);
   else console.log(`  drawings: HTTP ${d.status}`);
-  const r = await fetch(`${base}/api/projects/${id}/render-pack?format=pages`);
+  const r = await fetch(`${base}/api/projects/${id}/render-pack?format=pages`, { headers });
   if (r.ok) (await r.json()).pages?.forEach((pg, i) => surfaces.push([`pack page ${i + 1}`, typeof pg === "string" ? pg : JSON.stringify(pg)]));
   else console.log(`  render pack: HTTP ${r.status}`);
   const b = await fetch(`${base}/project/${id}/boq`);
@@ -55,4 +59,5 @@ for (const id of args) {
   }
   if (!hits) console.log("  clean");
 }
+await vj.close();
 process.exit(hits ? 1 : 0);

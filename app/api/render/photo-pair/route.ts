@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { NotCachedError } from "@/lib/scene-render/pipeline";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -18,6 +19,8 @@ const PostSchema = z.object({
   zone_id: z.string().uuid(),
   /** The existing items this photo shows (zones, runs, trees) — the pair's manifest. */
   item_ids: z.array(z.string().uuid()).max(30).default([]),
+  /** T5: answer from cache only; never render. */
+  cache_only: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -25,9 +28,10 @@ export async function POST(request: NextRequest) {
   const parsed = PostSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   try {
-    const r = await renderPhotoPair({ projectId: parsed.data.project_id, assetId: parsed.data.asset_id, zoneId: parsed.data.zone_id, itemIds: parsed.data.item_ids });
+    const r = await renderPhotoPair({ projectId: parsed.data.project_id, assetId: parsed.data.asset_id, zoneId: parsed.data.zone_id, itemIds: parsed.data.item_ids, cacheOnly: parsed.data.cache_only === true });
     return NextResponse.json(r);
   } catch (err) {
+    if (err instanceof NotCachedError) return NextResponse.json({ outcome: "not_cached", cached: false, render_id: null, attempts: [] });
     return NextResponse.json({ error: err instanceof Error ? err.message : "Photo pair failed." }, { status: 500 });
   }
 }

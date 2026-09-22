@@ -32,6 +32,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { verificationJobs } from "./lib/verification-job.mjs";
+
+// T5: the document routes answer only a pack job; this check READS documents, so it
+// opens one per project (released nothing) — set in main().
+let VJ: ReturnType<typeof verificationJobs>;
+const docHeaders = async (projectId: string) => VJ.headers(projectId);
+
 import { seedVilla94Garden } from "./lib/garden-seed.ts";
 
 const ROOT = "C:/dev/rennovaite";
@@ -165,9 +172,9 @@ async function regeneratePack(projectId: string, tag: string, render = true): Pr
   // BoQ (and its take-off rows) and the drawing set are part of the pack.
   const gen = (await (await fetch(`${BASE}/api/generate-boq`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId }) })).json()) as { error?: string };
   console.log(`  [${tag}] BoQ regenerated${gen.error ? ` — ERROR ${gen.error}` : ""}`);
-  await fetch(`${BASE}/api/projects/${projectId}/drawings`);
+  await fetch(`${BASE}/api/projects/${projectId}/drawings`, { headers: await docHeaders(projectId) });
   if (!render) {
-    const summary = (await (await fetch(`${BASE}/api/projects/${projectId}/render-pack?format=json`)).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
+    const summary = (await (await fetch(`${BASE}/api/projects/${projectId}/render-pack?format=json`, { headers: await docHeaders(projectId) })).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
     return { gate: summary.gate ?? [], packBytes: summary.bytes ?? 0, pages: summary.pages?.length ?? 0 };
   }
   const cams = (await (await fetch(`${BASE}/api/render/scene?project_id=${projectId}`)).json()) as { cameras: { id: string; label: string; lit: boolean }[]; error?: string };
@@ -186,7 +193,7 @@ async function regeneratePack(projectId: string, tag: string, render = true): Pr
   };
   await run(cams.cameras.map((c) => ({ id: c.id, view: "day" as const })));
   await run(cams.cameras.filter((c) => c.lit).map((c) => ({ id: c.id, view: "evening" as const })));
-  const summary = (await (await fetch(`${BASE}/api/projects/${projectId}/render-pack?format=json`)).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
+  const summary = (await (await fetch(`${BASE}/api/projects/${projectId}/render-pack?format=json`, { headers: await docHeaders(projectId) })).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
   if (!summary.gate) throw new Error(`render pack: ${summary.error}`);
   return { gate: summary.gate, packBytes: summary.bytes, pages: summary.pages.length };
 }
@@ -220,7 +227,7 @@ async function endToEnd(db: SupabaseClient, projectId: string, otherId: string, 
     check(`[${tag}] every photo pair carries this project — manifest, restyle and source photo`, pairs.every((r) => r.gate?.manifest?.projectId === projectId && String(r.source_image_url).includes(`/${projectId}/`) && !String(r.image_url).includes(otherId)), `${pairs.length} pairs`);
   }
 
-  const drawings = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`)).json()) as { sheets?: { svg: string }[] };
+  const drawings = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`, { headers: await docHeaders(projectId) })).json()) as { sheets?: { svg: string }[] };
   check(`[${tag}] every drawing sheet carries this project`, (drawings.sheets ?? []).length > 0 && (drawings.sheets ?? []).every((s) => s.svg.includes(`data-project-id="${projectId}"`) && !s.svg.includes(otherId)), `${drawings.sheets?.length} sheets`);
 
   const { data: plan } = await db.from("plans").select("id").eq("project_id", projectId).maybeSingle<{ id: string }>();
@@ -244,6 +251,7 @@ const RUN_STARTED = new Date().toISOString();
 async function main() {
   const env = await loadEnv();
   const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } }) as SupabaseClient;
+  VJ = verificationJobs(db, "garden-isolation-check");
   const projectsBefore = (await db.from("projects").select("id", { count: "exact", head: true })).count ?? 0;
 
   const { data: ref } = await db.from("projects").select("id").eq("name", REFERENCE).maybeSingle<{ id: string }>();
@@ -308,6 +316,7 @@ async function main() {
   );
   const failed = results.filter((r) => r.startsWith("FAIL")).length;
   console.log(`\n${results.length - failed} passed, ${failed} failed`);
+  await VJ.close();
   if (failed) process.exitCode = 1;
 }
 

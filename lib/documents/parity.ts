@@ -48,6 +48,20 @@ export interface ParityInput {
   pairBeforeIds?: string[];
   /** G5d: overlay sheet numbers (L-401 lighting, L-402 irrigation & drainage) — their symbols are counted. */
   overlaySheets?: string[];
+  /**
+   * T5: the INTERIOR scope of the plan. Interior rooms are not priced per
+   * element: the interior take-off prices them by area-driven rules (floor,
+   * walls, ceiling across the rooms), and the P4 element lines name the rooms
+   * they measured. So a room passes whenever the BoQ carries interior work, and
+   * fails only when it is drawn and NO interior work is priced — genuinely
+   * unpriced scope. Before T5 every interior room was checked against garden
+   * (GL-) lines only, and every interior BoQ PDF was refused.
+   */
+  interior?: {
+    rooms: { id: string; name: string; kind: string }[];
+    /** Priced interior BoQ lines (any rule id that is not a GL- garden line). */
+    lines: { rule_id: string; element_refs?: string[] | null; total_aed: number }[];
+  };
 }
 
 /** G5d: one overlay symbol type, counted on the overlay sheets and in its BoQ line. */
@@ -176,8 +190,23 @@ export function buildParity(input: ParityInput): ParityResult {
       return { id: e.id, name: e.name, kind: e.kind, lines: [], status: "fail", reason: e.status === "removed" ? "taken out on the plan but not in the demolition line" : "drawn with a cost impact but no BoQ line prices it" };
     });
 
+  elements.push(...interiorRows(input.interior));
   const overlays = overlayCounts(input);
   return { clean: lines.every((r) => r.status !== "fail") && elements.every((r) => r.status !== "fail") && overlays.every((r) => r.status !== "fail"), lines, elements, overlays };
+}
+
+/** T5: interior rooms against the interior take-off (see ParityInput.interior). */
+export function interiorRows(interior: ParityInput["interior"]): ParityElementRow[] {
+  if (!interior || interior.rooms.length === 0) return [];
+  const priced = interior.lines.filter((l) => l.total_aed > 0);
+  return interior.rooms.map((r) => {
+    const naming = priced.filter((l) => (l.element_refs ?? []).includes(r.id)).map((l) => l.rule_id);
+    if (naming.length) return { id: r.id, name: r.name, kind: r.kind, lines: [...new Set(naming)], status: "ok" as const, reason: null };
+    if (priced.length) {
+      return { id: r.id, name: r.name, kind: r.kind, lines: [], status: "exempt" as const, reason: `interior room — priced by the interior take-off's area-driven rules (${priced.length} interior line${priced.length === 1 ? "" : "s"}), not by element` };
+    }
+    return { id: r.id, name: r.name, kind: r.kind, lines: [], status: "fail" as const, reason: "interior room drawn, but the BoQ prices no interior work" };
+  });
 }
 
 /**

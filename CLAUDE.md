@@ -1292,6 +1292,62 @@ resolved line carries **`rate_tier`**.
   (`WHATIF_INCL_MARKUPS` / `WHATIF_BEFORE_MARKUPS`, `lib/whatif/engine.ts`)
   until they are applied consistently.
 
+## One gated pack export, in the app and on the CLI (T5)
+
+The pilot's script assembled and checked the client pack; the UI's own links
+(drawing set, render pack, BoQ PDF) went straight to the routes — no consistency
+anchors, no photo pairs, no printed-content or identity-leak checks, no
+display-name check, outputs not saved together. There is now ONE path.
+
+- **`lib/documents/pack-export/run.ts`** is the export: BoQ regeneration → the
+  export gate → renders (anchor first, faithfulness + consistency) → before/after
+  pairs → the documents through their routes → the printed-content checks
+  (`checks.ts`, the script's assertions made generic) → outputs + manifest saved
+  together. `scripts/garden-draft-pack.ts` and the in-app **Export pack** action
+  both call it and differ ONLY in transport (which origin the routes are on) and
+  sink (a local folder, or the private `packs` bucket). Verified on the same
+  project state: the CLI's and the button's three PDFs are **byte-identical**
+  (equal sha256) — PDF dates are pinned to the UTC day (`lib/documents/pdf-date.ts`)
+  so a run is reproducible.
+- **No ungated output path.** Every document route calls `guardDocumentRoute`,
+  which serves a document only to a RUNNING `pack_exports` job (migration 042,
+  header `x-pack-export-job`, 3 h TTL, project-scoped). A browser navigation is
+  redirected to the Export pack panel; anything else gets `403 use_pack_export`.
+  The design-lock archive (`lib/drawings/persist.ts`) no longer mints year-long
+  signed URLs — it records storage paths. `ungated-paths.test.ts` scans the app
+  for a direct link to a document route and for a route that produces a PDF
+  without the guard. Internal verification scripts READ documents through
+  `scripts/lib/verification-job.mjs`, which opens a job and releases nothing.
+- **The gate is a checklist, not a 409.** `checklist.ts` names what is open —
+  untyped counters, undecided existing items, a stale BoQ, unpriced drawn scope,
+  lines nothing shows, overlay counts, and a working name — with the page to fix
+  each on. A blocked run stops BEFORE producing a document; a run whose printed
+  checks fail releases nothing but its manifest.
+- **The gate is SCOPE-AWARE** (the T4 finding): interior rooms are priced by the
+  interior take-off's area-driven rules, so `parity.interiorRows` passes a room
+  the element lines name, EXEMPTS the rest when interior work is priced, and
+  fails only when rooms are drawn and no interior work is priced at all. Before
+  this every interior room read as "drawn with cost impact, no BoQ line" and
+  every interior BoQ PDF 409'd.
+- **One visibility rule** fixes the 404 bug: `packExportEnabled()` is
+  `PACK_EXPORT_ENABLED && DRAWINGS_ENABLED`, and it governs the button AND the
+  routes — the BoQ PDF button used to show on any garden BoQ while its route
+  required `DRAWINGS_ENABLED`. Flag off = the action is absent from both pages,
+  the prose does not mention it, and every document route 404s (`/boq-pdf?format=json`,
+  which carries no document content, stays open).
+- **Options**: renders `full | cached | skip` (`cached` spends no render —
+  `cache_only` on the scene and photo-pair routes returns `not_cached`), pairs,
+  `regenerateBoq`, `boqPdf` (false only for the CLI reference pack: negotiated
+  prices never leave as a document), and `stage` for the pilot events the run
+  causes. A CLI `--stage verification` run never overwrites the tracked pilot
+  records.
+- **Production flags stay OFF** — this ships dev-side pending the post-pilot
+  deployment decision.
+
+**DB step**: `npm run db:manifest` + `npm run db:push` for
+`20260101004200_pack_exports.sql` (the `pack_exports` table and the private
+`packs` bucket).
+
 ## The journey — nine steps, one definition (B1/B2/B3)
 
 `lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.
@@ -1355,6 +1411,7 @@ view-only side surface reached from the layout and render steps).
 | `STAGING_ENABLED`                | server — `"true"` turns on P7 furniture staging (render prompt + optional BoQ section) |
 | `PROPERTY_OS_LANDING`             | server — `"true"` makes `/` the Property OS intro page (visitors) and moves the RennovAIte homepage to `/rennovaite`; unset/false = `/` is the homepage (as before) |
 | `TASTE_SEED_ENABLED`              | server — `"true"` lets a project's moodboard condition its renders (B3). Off = renders behave exactly as before |
+| `PACK_EXPORT_ENABLED`             | server — `"true"` **with `DRAWINGS_ENABLED="true"`** shows the in-app "Export pack" action and lets the document routes answer a running pack job (T5). Off = the action is absent and every document route 404s |
 | `TEXTURED_WALKTHROUGH`            | server — `"true"` lets the 3D walkthrough read StyleBoard finishes onto floors and walls (F1). Off = the clay model, unchanged |
 | `PARSE_PROVIDER`                  | server — optional; which floorplan parser to use. Only `"inhouse"` (the default) is configured; any other value throws rather than silently mis-parsing |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |

@@ -22,6 +22,8 @@
 import { readFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { verificationJobs } from "./lib/verification-job.mjs";
+
 import { computeGardenTakeoff, priceGardenTakeoff } from "../lib/boq/garden-takeoff.ts";
 import { transcriptionGardenBook } from "../lib/boq/garden-rates.ts";
 import { buildElevationSheets } from "../lib/drawings/garden-elevations.ts";
@@ -162,7 +164,9 @@ async function main() {
   }
 
   // --- The live drawing set prints the pure sheets' figures ------------------------------
-  const liveSet = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`)).json().catch(() => ({}))) as { sheets?: { sheetNumber: string; kind: string; svg: string }[]; error?: string };
+  // T5: the drawings route answers only a pack job; this read opens one and releases nothing.
+  const vj = verificationJobs(db, "garden-dry-run-live");
+  const liveSet = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`, { headers: await vj.headers(projectId) })).json().catch(() => ({}))) as { sheets?: { sheetNumber: string; kind: string; svg: string }[]; error?: string };
   const graph = buildPlanGraph({
     projectId,
     planId,
@@ -209,6 +213,7 @@ async function main() {
   for (const line of results) console.log(line);
   const failed = results.filter((r) => r.startsWith("FAIL")).length;
   console.log(`\n${results.length - failed} passed, ${failed} failed`);
+  await vj.close();
   if (failed) process.exitCode = 1;
 }
 

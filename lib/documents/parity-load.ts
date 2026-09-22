@@ -12,6 +12,7 @@ import { generateDrawingSet } from "@/lib/drawings/export";
 import { LINEAR_ELEMENT_META } from "@/lib/plan/elements";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { isInDesign, isNewWork, isUndecided } from "@/lib/plan/site-reference";
+import { isOutdoorType } from "@/lib/plan/zones";
 import { buildManifest } from "@/lib/scene/cameras";
 import { renderScene } from "@/lib/scene/raster";
 import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
@@ -23,12 +24,18 @@ const COSTED_FIXTURES = new Set(["garden_light", "boundary_light", "water_tap", 
 
 export async function loadParity(sb: SupabaseClient, projectId: string): Promise<ParityResult> {
   const [boqRes, graph, ctx, set] = await Promise.all([
-    sb.from("boqs").select("sections").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ sections: { sections: { lines: (ParityBoqLine & { measurement?: string })[] }[] } }>(),
+    sb.from("boqs").select("sections").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ sections: { sections: { work_section: string; lines: (ParityBoqLine & { measurement?: string })[] }[] } }>(),
     derivePlanGraph(projectId),
     loadGardenSceneContext(projectId).catch(() => null),
     generateDrawingSet(projectId),
   ]);
-  const lines = (boqRes.data?.sections.sections ?? []).flatMap((s) => s.lines).filter((l) => /^GL-/.test(l.rule_id));
+  const allLines = (boqRes.data?.sections.sections ?? []).flatMap((s) => s.lines);
+  const lines = allLines.filter((l) => /^GL-/.test(l.rule_id));
+  // T5: scope-aware. Garden zones are elements the GL- lines price; interior rooms
+  // are priced by the interior take-off, so they are checked against it instead.
+  const gardenRooms = graph.rooms.filter((r) => isOutdoorType(r.type ?? ""));
+  const interiorRooms = graph.rooms.filter((r) => !isOutdoorType(r.type ?? ""));
+  const interiorLines = allLines.filter((l) => l.rule_id && !/^GL-/.test(l.rule_id)).map((l) => ({ rule_id: l.rule_id, element_refs: l.element_refs ?? null, total_aed: Number(l.total_aed) || 0 }));
 
   const { data: fx } = await sb.from("plan_fixtures").select("id, type, spec, site_reference, disposition").eq("project_id", projectId);
   const status = (t: { site_reference?: boolean | null; disposition?: string | null; spec?: Record<string, unknown> | null }): ParityElement["status"] => {
@@ -40,7 +47,7 @@ export async function loadParity(sb: SupabaseClient, projectId: string): Promise
   };
 
   const elements: ParityElement[] = [
-    ...graph.rooms.map((r) => ({ id: r.id, name: r.name_en, table: "zone", kind: r.type ?? "zone", status: status(r) })),
+    ...gardenRooms.map((r) => ({ id: r.id, name: r.name_en, table: "zone", kind: r.type ?? "zone", status: status(r) })),
     ...graph.elements
       .filter((e) => e.kind !== "boundary_wall")
       .map((e) => ({ id: e.id, name: (typeof e.spec?.name === "string" ? e.spec.name : LINEAR_ELEMENT_META[e.kind].label), table: "run", kind: e.kind, status: status(e) })),
@@ -81,5 +88,13 @@ export async function loadParity(sb: SupabaseClient, projectId: string): Promise
   // A pair names items by noun; match them back to the elements they are.
   const pairBeforeIds = elements.filter((e) => e.status === "removed" && [...pairNouns].some((n) => n.includes(e.name.toLowerCase().split(" (")[0]!) || e.name.toLowerCase().includes(n.replace(/^the /, "")))).map((e) => e.id);
 
-  return buildParity({ lines, elements, sheets, views, pairBeforeIds, overlaySheets });
+  return buildParity({
+    lines,
+    elements,
+    sheets,
+    views,
+    pairBeforeIds,
+    overlaySheets,
+    interior: { rooms: interiorRooms.map((r) => ({ id: r.id, name: r.name_en, kind: r.type ?? "room" })), lines: interiorLines },
+  });
 }

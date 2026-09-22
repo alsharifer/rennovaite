@@ -12,6 +12,7 @@
 // alongside the PDF so the identity assertion can scan exactly what was printed.
 // =============================================================================
 
+import { stampPdfDay } from "@/lib/documents/pdf-date";
 import { esc } from "@/lib/drawings/sheet";
 
 import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
@@ -358,7 +359,7 @@ export async function renderBoqPdf(input: BoqPdfInput): Promise<{ pdf: Uint8Arra
   const pages = buildBoqPdfPages(input);
   const { Resvg } = await import("@resvg/resvg-js");
   const { PDFDocument } = await import("pdf-lib");
-  const pdf = await PDFDocument.create();
+  const pdf = stampPdfDay(await PDFDocument.create());
   pdf.setTitle(`${input.projectName} — Bill of Quantities`);
   pdf.setAuthor("RennovAIte");
   pdf.setCreator("RennovAIte");

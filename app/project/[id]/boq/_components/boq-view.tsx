@@ -121,6 +121,8 @@ type Props = {
   furnitureSection?: FurnitureSection | null;
   /** I4: the source chain behind every figure, built on the server from the stored BoQ + plan. */
   provenance?: BoqProvenance | null;
+  /** T5: show the Export pack entry (packExportEnabled(), decided on the server). */
+  packExport?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -246,6 +248,7 @@ export function BoqView({
   initialSelections = {},
   furnitureSection = null,
   provenance = null,
+  packExport = false,
 }: Props) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   // P7: furniture is included in the display total by default; toggling it off
@@ -626,35 +629,20 @@ export function BoqView({
 
         {/* Right: actions */}
         <div className="col-span-12 flex items-center justify-end gap-md lg:col-span-4">
-          {/* Icon-only at this density — "Export PDF" + "Continue to
-              vendors" both with text was 390px in a 336px column. The
-              icon is universally read; title attribute carries the
-              label for screen readers and tooltips. */}
-          {/* G5: a garden BoQ exports as a PDF (draft header, derived total). */}
-          {boq.garden ? (
-            <a
-              href={`/api/projects/${projectId}/boq-pdf`}
-              target="_blank"
-              rel="noopener"
-              title="Export PDF"
-              aria-label="Export PDF"
+          {/* T5: the BoQ PDF is released only by Export pack, with every gate on —
+              for interior and garden BoQs alike. Icon-only at this density;
+              the title carries the label. Hidden when the flag is off. */}
+          {packExport && (
+            <Link
+              href={`/project/${projectId}/drawings?export=1`}
+              title="Export pack"
+              aria-label="Export pack"
               className="focus-ring flex size-12 items-center justify-center rounded-lg border border-ink-100 text-ink-900 transition-colors hover:bg-surface-container-low"
             >
               <span className="material-symbols-outlined" aria-hidden="true">
-                picture_as_pdf
+                inventory_2
               </span>
-            </a>
-          ) : (
-          <button
-            type="button"
-            title="Export PDF"
-            aria-label="Export PDF"
-            className="focus-ring flex size-12 items-center justify-center rounded-lg border border-ink-100 text-ink-900 transition-colors hover:bg-surface-container-low"
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">
-              picture_as_pdf
-            </span>
-          </button>
+            </Link>
           )}
           <Link
             href={`/project/${projectId}/vendors`}
@@ -754,7 +742,7 @@ export function BoqView({
               {chain.ohp_aed > 0 && (
                 <SummaryRow
                   label={`${OHP_LINE_LABEL} ${chain.ohp_pct}%`}
-                  note="the contractor's markup, applied once here and never inside a rate"
+                  note="the contractor's overheads and profit, applied once here and never inside a rate"
                   value={chain.ohp_aed}
                   provenance={scenarioMoved ? computedProvenance("OH&P — scenario", [scenarioStep("OH&P", boq.ohp_aed ?? 0, chain.ohp_aed)], ["not the stored figure"]) : summaryProv?.ohp ?? null}
                   dataAttr="ohp"

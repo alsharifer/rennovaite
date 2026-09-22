@@ -35,6 +35,8 @@ import {
   type RoomRollupView,
   type VendorOption,
 } from "./_components/boq-view";
+import { packExportEnabled } from "@/lib/documents/pack-export/guard";
+
 import { GenerateBoqButton } from "./_components/generate-boq-button";
 import { ReviewCorrections } from "./_components/review-corrections";
 
@@ -360,6 +362,7 @@ export default async function BoqPage({
             initialSelections={initialSelections}
             furnitureSection={furnitureSection}
             provenance={provenance}
+            packExport={packExportEnabled()}
           />
         ) : (
           <EmptyState projectId={id} />

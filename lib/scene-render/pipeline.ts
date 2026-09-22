@@ -248,7 +248,18 @@ async function latestPassedDay(ctx: GardenSceneContext, cameraId: string): Promi
  * Render one camera/view through the ladder and persist the result. Returns
  * the cached result when this project already has one for the same key.
  */
-export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: string, view: SceneView, opts: { anchorRenderId?: string | null } = {}): Promise<SceneRenderResult> {
+/**
+ * T5: thrown by a cache-only call when the view would have to be rendered.
+ * A pack export run with "use existing renders" never spends a render.
+ */
+export class NotCachedError extends Error {
+  constructor(what: string) {
+    super(`${what} is not cached and cache_only was requested`);
+    this.name = "NotCachedError";
+  }
+}
+
+export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: string, view: SceneView, opts: { anchorRenderId?: string | null; cacheOnly?: boolean } = {}): Promise<SceneRenderResult> {
   const cam = ctx.cameras.find((c) => c.id === cameraId);
   if (!cam) throw new Error(`Unknown camera '${cameraId}' for this plan.`);
   const sb = db();
@@ -305,6 +316,7 @@ export async function renderGardenCamera(ctx: GardenSceneContext, cameraId: stri
       return { render_id: row.id, image_url: reused.image_url, view, camera_id: cameraId, outcome: gate.outcome, design_view_reason: gate.design_view_reason ?? null, cached: true, attempts: gate.attempts };
     }
   }
+  if (opts.cacheOnly) throw new NotCachedError(`camera ${cameraId} (${view})`);
   const flatUrl = await uploadRenderBytes(`${base}-day-flat.png`, encodePng(flat.rgb, flat.width, flat.height, 3), "image/png");
   const day = renderScene(ctx.scene, cam, RENDER_W, RENDER_H, { lighting: "day", textured: true });
   const dayPng = encodePng(day.rgb, day.width, day.height, 3);

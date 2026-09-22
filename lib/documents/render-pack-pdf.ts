@@ -9,6 +9,7 @@
 // their own resolution.
 // =============================================================================
 
+import { stampPdfDay } from "@/lib/documents/pdf-date";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { generateDrawingSet } from "@/lib/drawings/export";
@@ -297,7 +298,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
 
   const { Resvg } = await import("@resvg/resvg-js");
   const { PDFDocument } = await import("pdf-lib");
-  const pdf = await PDFDocument.create();
+  const pdf = stampPdfDay(await PDFDocument.create());
   pdf.setTitle(curateText(`${projectRes.name} — render pack`, withheld));
   pdf.setAuthor("RennovAIte");
   pdf.setCreator("RennovAIte");

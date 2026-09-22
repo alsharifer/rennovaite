@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadPackReadiness, readinessMessage } from "@/lib/documents/pack-readiness";
@@ -30,6 +32,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   }
+  // T5: the render pack (PDF, pages or manifest) goes only to a running pack export.
+  const denied = await guardDocumentRoute(request, parsed.data);
+  if (denied) return denied;
   try {
     // G5: a pack that still carries an unmade decision does not export. The JSON
     // manifest stays available, with the readiness verdict in it.
