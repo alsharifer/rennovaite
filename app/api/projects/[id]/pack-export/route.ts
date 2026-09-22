@@ -12,7 +12,10 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 800;
+// The job runs in after(), i.e. within this route's budget — 300 s is the
+// platform ceiling (every long route here uses it). A garden that needs longer
+// than that is exported from the CLI, which has no such limit.
+export const maxDuration = 300;
 
 // T5 — the in-app "Export pack" action.
 //
