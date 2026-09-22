@@ -103,3 +103,89 @@ export function checkMigrations(root = process.cwd()): HistoryReport {
     untracked: onDisk.filter((f) => !known.has(f)),
   };
 }
+
+// ---------------------------------------------------------------------------
+// The frozen mirror (T6)
+//
+// `scripts/migrations/` holds the thirty migrations that were applied BY HAND
+// before the CLI runner existed. It is a historical record, formally RETIRED:
+// the live directory is `supabase/migrations/`, applied with `npm run db:push`.
+// The mirror stopping at 030 is therefore correct, not drift — but only while
+// three things hold, which is what this checks:
+//   1. the mirror is exactly those thirty files plus its README (nothing added,
+//      nothing deleted — an addition here would be a migration nothing runs);
+//   2. every one of them is mapped into the live directory by the manifest's
+//      `legacy` field, and every `legacy` mapping points at a file that exists;
+//   3. nothing in the repo still TELLS a reader to run one of them.
+// ---------------------------------------------------------------------------
+
+export const FROZEN_DIR = "scripts/migrations";
+/** The mirror was frozen after 030 (I7); the live set continues as timestamps. */
+export const FROZEN_COUNT = 30;
+
+export interface MirrorReport {
+  frozen: string[];
+  errors: string[];
+}
+
+/** Files that legitimately DESCRIBE the frozen mirror rather than instruct its use. */
+const MIRROR_PROSE_ALLOWED = [
+  "scripts/migrations/README.md",
+  "docs/MIGRATIONS.md",
+  "docs/DEV_PROD_SEPARATION.md",
+  "docs/RENDER_UPGRADE_PLAYBOOK.md",
+  "lib/migrations/history.ts",
+  "supabase/migrations.manifest.json",
+];
+
+export function checkFrozenMirror(root = process.cwd()): MirrorReport {
+  const errors: string[] = [];
+  const dir = path.join(root, FROZEN_DIR);
+  const entries = fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [];
+  const frozen = entries.filter((f) => /^\d{3}_.*\.sql$/.test(f));
+  const strays = entries.filter((f) => !/^\d{3}_.*\.sql$/.test(f) && f !== "README.md");
+
+  if (frozen.length !== FROZEN_COUNT) {
+    errors.push(
+      `MIRROR: ${FROZEN_DIR} holds ${frozen.length} numbered migrations, expected ${FROZEN_COUNT}. ` +
+        `The mirror is a frozen record — a new migration belongs in ${MIGRATIONS_DIR} only.`,
+    );
+  }
+  if (strays.length > 0) errors.push(`MIRROR: unexpected file(s) in ${FROZEN_DIR}: ${strays.join(", ")}`);
+  if (!entries.includes("README.md")) errors.push(`MIRROR: ${FROZEN_DIR}/README.md is missing — it is what says the directory is frozen.`);
+
+  // Every frozen file is mapped into the live directory, and every mapping resolves.
+  const manifest = readManifest(root);
+  const legacy = new Map(manifest.migrations.filter((m) => m.legacy).map((m) => [m.legacy!, m]));
+  for (const f of frozen) {
+    const entry = legacy.get(f);
+    if (!entry) errors.push(`MIRROR: ${f} has no live counterpart in the manifest — the historical record and ${MIGRATIONS_DIR} disagree.`);
+    else if (!fs.existsSync(path.join(root, MIGRATIONS_DIR, `${entry.version}_${entry.name}.sql`))) {
+      errors.push(`MIRROR: ${f} maps to ${entry.version}_${entry.name}.sql, which is not in ${MIGRATIONS_DIR}.`);
+    }
+  }
+  for (const name of legacy.keys()) {
+    if (!frozen.includes(name)) errors.push(`MIRROR: the manifest maps a legacy file ${name} that is not in ${FROZEN_DIR}.`);
+  }
+  return { frozen, errors };
+}
+
+/**
+ * Prose that still sends a reader to the frozen mirror. Returns "<file>:<line>"
+ * for each instruction to apply / run / paste one of those files.
+ */
+export function mirrorInstructions(root = process.cwd(), files: string[]): string[] {
+  const hits: string[] = [];
+  const instruct = /(apply|run|paste|execute)[^.\n]{0,80}scripts\/migrations\/|scripts\/migrations\/[^\s`)]*\.sql[^.\n]{0,60}(in the Supabase SQL editor|sql editor)/i;
+  for (const rel of files) {
+    if (MIRROR_PROSE_ALLOWED.includes(rel)) continue;
+    const full = path.join(root, rel);
+    if (!fs.existsSync(full)) continue;
+    fs.readFileSync(full, "utf8")
+      .split(/\r?\n/)
+      .forEach((line, i) => {
+        if (instruct.test(line)) hits.push(`${rel}:${i + 1}`);
+      });
+  }
+  return hits;
+}

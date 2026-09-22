@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           ok: true,
           table_missing: true,
-          hint: "Run scripts/migrations/009_feedback_events.sql in the Supabase SQL editor.",
+          hint: "The feedback_events migration has not been applied to this database — npm run db:push.",
           bundles: [],
         });
       }

@@ -80,11 +80,24 @@ from here. It needs `pg_dump --schema-only`, which needs the database password
 (see I9). Anything created ad hoc in the dashboard over the past thirty
 migrations would be invisible to this check.
 
-## The historical files
+## One source of truth
 
-`scripts/migrations/001…030.sql` are **frozen**. They are the record of what was
-applied by hand and are not read by any tool. Do not edit them, do not add to
-them. `supabase/migrations/` is the live directory.
+**`supabase/migrations/` is the only live migration directory**, applied with
+`npm run db:manifest` + `npm run db:push`. Nothing else applies schema.
+
+## The historical files — formally retired
+
+`scripts/migrations/001…030.sql` are **frozen**: the record of what was applied
+by hand before the runner existed (I7). They are read by no tool, and the
+numbering **stops at 030 by design** — the live set continues as timestamped
+files, so the mirror falling behind is the expected state, not drift. Do not
+edit them, do not add to them, and never apply one directly.
+
+`checkFrozenMirror` (`lib/migrations/history.ts`, run by `npm run db:check` and
+by `lib/__tests__/migrations.test.ts`) keeps that true: the mirror must hold
+exactly those thirty files plus its README, each mapped by the manifest's
+`legacy` field to a file that exists in the live directory — and no document,
+route or script may tell anyone to run one of them.
 
 The converted filenames carry synthetic timestamps (`20260101HHMMSS`) derived
 from the original 001–030 index. They are deliberately not invented calendar

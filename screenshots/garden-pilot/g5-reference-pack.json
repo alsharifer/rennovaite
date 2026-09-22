@@ -1,7 +1,231 @@
 {
-  "project_id": "8d460645-9450-4072-af41-b37adf8512a0",
+  "job_id": "eae8bc75-2fb8-4181-8d81-d47c0cfd86b8",
   "display_name": "Contemporary Villa Garden — Completed Renovation",
-  "generated_at": "2026-09-19T07:34:50.616Z",
+  "project_id": "8d460645-9450-4072-af41-b37adf8512a0",
+  "scope": "garden",
+  "document_name": "Contemporary Villa Garden — Completed Renovation",
+  "source": "cli",
+  "options": {
+    "renders": "cached",
+    "pairs": 0,
+    "regenerateBoq": false,
+    "boqPdf": false,
+    "stage": "reference_pack"
+  },
+  "generated_at": "2026-09-22T21:22:04.506Z",
+  "status": "passed",
+  "boq": {
+    "id": "c07539bd-f660-4e2e-ae37-a1a94253d802",
+    "grand_total_aed": 167468.18
+  },
+  "checklist": [
+    {
+      "key": "counters",
+      "ok": true,
+      "title": "Every new counter has a type",
+      "detail": "All counters are typed.",
+      "items": [],
+      "fix": null
+    },
+    {
+      "key": "undecided",
+      "ok": true,
+      "title": "Every existing item is decided (keep / remove / replace)",
+      "detail": "Every existing item has a decision.",
+      "items": [],
+      "fix": null
+    },
+    {
+      "key": "boq",
+      "ok": true,
+      "title": "The BoQ is generated and current",
+      "detail": "The latest BoQ matches the plan.",
+      "items": [],
+      "fix": null
+    },
+    {
+      "key": "priced",
+      "ok": true,
+      "title": "Everything drawn with a cost is priced",
+      "detail": "Every drawn cost is on a BoQ line.",
+      "items": [],
+      "fix": null
+    },
+    {
+      "key": "shown",
+      "ok": true,
+      "title": "Every BoQ line is drawn and shown",
+      "detail": "Every line is on a drawing and in a view.",
+      "items": [],
+      "fix": null
+    },
+    {
+      "key": "overlays",
+      "ok": true,
+      "title": "Services symbols match their BoQ quantities",
+      "detail": "Every symbol is counted once.",
+      "items": [],
+      "fix": null
+    },
+    {
+      "key": "name",
+      "ok": true,
+      "title": "The documents carry a client-facing name",
+      "detail": "Covers print \"Contemporary Villa Garden — Completed Renovation\".",
+      "items": [],
+      "fix": null
+    }
+  ],
+  "checks": [
+    {
+      "label": "drawing set, render pack export as PDFs",
+      "ok": true,
+      "detail": "contemporary-villa-garden-completed-renovation-drawing-set.pdf: 200 · 4585152 bytes; contemporary-villa-garden-completed-renovation-render-pack.pdf: 200 · 7289719 bytes"
+    },
+    {
+      "label": "needs_selection is empty on the BoQ",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "boundary-dependent quantities carry the derived flag and a note",
+      "ok": true,
+      "detail": "1 derived lines"
+    },
+    {
+      "label": "every priced landscape line carries the market-reference source label",
+      "ok": true,
+      "detail": "20 priced lines"
+    },
+    {
+      "label": "the drawing set has sheets",
+      "ok": true,
+      "detail": "L-000 L-100 L-101 L-102 L-103 L-104 L-105 L-106 L-107 L-108 L-109 L-110 L-111 L-112 L-201 L-301 L-302 L-303 L-304 L-305 L-306 L-307 L-401 L-402 L-501"
+    },
+    {
+      "label": "drawings: cover, site plan, a sheet per zone, finish schedule",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "drawings: a sectional elevation for the designed structures",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "drawings: electrical + irrigation/drainage overlays",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "L-201 title block says ground (external works), not an interior level",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "pergola elevation: posts on the graph and dimensioned",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "the render pack has pages",
+      "ok": true,
+      "detail": "18 pages"
+    },
+    {
+      "label": "client-safe captions: no QA text in the pack",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "legibility: no text in the render pack under 3.1 mm",
+      "ok": true,
+      "detail": "min 3.1 mm"
+    },
+    {
+      "label": "extended gate: every passed render checked built-feature placement against the scene",
+      "ok": true,
+      "detail": "12 passed render(s)"
+    },
+    {
+      "label": "no render that disagrees with the anchor view enters the pack (cross-view consistency)",
+      "ok": true,
+      "detail": "8 views checked against garden:garden-1"
+    },
+    {
+      "label": "parity counts overlay symbols against their lines",
+      "ok": true,
+      "detail": "garden_light 28/28, boundary_light 9/9"
+    },
+    {
+      "label": "parity: every BoQ line is drawn and shown, every drawn cost is priced",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "zero contractor / supplier / firm identity across drawings, pack, BoQ PDF, BoQ data and BoQ page",
+      "ok": true,
+      "detail": "45 documents scanned"
+    },
+    {
+      "label": "no internal sales or commercial language on any client-facing page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "the display name is what the documents print",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "no \"ground truth\" on any page or in the PDF metadata",
+      "ok": true,
+      "detail": "45 documents"
+    },
+    {
+      "label": "no house number on any page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "no draft watermark — a built garden, not a proposal",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "no price or rate in the render pack",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "label": "no design-assumptions page (nothing proposed on a completed garden)",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "contemporary-villa-garden-completed-renovation-drawing-set.pdf",
+      "path": "C:/dev/rennovaite/data/garden pilot/g5-draft-pack/contemporary-villa-garden-completed-renovation-drawing-set.pdf",
+      "bytes": 4585152,
+      "sha256": "878ac3ace8788da622000aedf0d00725e566c2b52c6400a8d6a8a522da393b71",
+      "content_type": "application/pdf"
+    },
+    {
+      "name": "contemporary-villa-garden-completed-renovation-render-pack.pdf",
+      "path": "C:/dev/rennovaite/data/garden pilot/g5-draft-pack/contemporary-villa-garden-completed-renovation-render-pack.pdf",
+      "bytes": 7289719,
+      "sha256": "cdb7784073d1e935b2d39b190f70c6bfebcf6c0717d8415b4ae16facd6454bab",
+      "content_type": "application/pdf"
+    },
+    {
+      "name": "pack-manifest.json",
+      "path": "C:/dev/rennovaite/data/garden pilot/g5-draft-pack/reference-pack-manifest.json",
+      "bytes": 75983,
+      "sha256": "3588ad730ce0bb7f832ea68a4875fad12ffabbf0c085524b158caaca4f02932c",
+      "content_type": "application/json"
+    }
+  ],
   "drawings": [
     "L-000 Cover & Sheet Index",
     "L-100 Site Plan — Garden",
@@ -29,101 +253,6 @@
     "L-402 Irrigation & Drainage Overlay",
     "L-501 Garden Elevations — Boundary Lines"
   ],
-  "pack": {
-    "pages": [
-      {
-        "kind": "cover",
-        "title": "Cover",
-        "images": 1
-      },
-      {
-        "kind": "plan_overview",
-        "title": "Plan overview",
-        "images": 0
-      },
-      {
-        "kind": "garden_view",
-        "title": "Whole garden — aerial",
-        "images": 1
-      },
-      {
-        "kind": "garden_view",
-        "title": "Whole garden — view 1",
-        "images": 2
-      },
-      {
-        "kind": "garden_view",
-        "title": "Whole garden — view 2",
-        "images": 1
-      },
-      {
-        "kind": "zone",
-        "title": "Z01 North planting strip",
-        "images": 3
-      },
-      {
-        "kind": "zone",
-        "title": "Z02 Pergola court paving",
-        "images": 1
-      },
-      {
-        "kind": "zone",
-        "title": "Z03 Wall-feature terrace",
-        "images": 1
-      },
-      {
-        "kind": "zone",
-        "title": "Z04 Seating-bench court",
-        "images": 1
-      },
-      {
-        "kind": "zone",
-        "title": "Z05 Aluminium pergola",
-        "images": 1
-      },
-      {
-        "kind": "zone",
-        "title": "Z06 Backyard lawn",
-        "images": 3
-      },
-      {
-        "kind": "zone",
-        "title": "Z07 West planting strip",
-        "images": 1
-      },
-      {
-        "kind": "zone",
-        "title": "Z08 Side courtyard",
-        "images": 1
-      },
-      {
-        "kind": "zone",
-        "title": "Z09 Front lawn — north",
-        "images": 3
-      },
-      {
-        "kind": "zone",
-        "title": "Z10 Front approach — upper",
-        "images": 2
-      },
-      {
-        "kind": "zone",
-        "title": "Z11 Front approach — lower",
-        "images": 2
-      },
-      {
-        "kind": "zone",
-        "title": "Z12 Front lawn — south",
-        "images": 3
-      },
-      {
-        "kind": "materials",
-        "title": "Materials & finishes",
-        "images": 0
-      }
-    ],
-    "missing_images": []
-  },
   "gate": [
     {
       "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
@@ -754,6 +883,7 @@
     "styled_renders": 11,
     "missing": 0
   },
+  "missing_images": [],
   "parity": {
     "clean": true,
     "lines": [
@@ -1912,7 +2042,7 @@
       "camera": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
       "passed": true,
       "failures": [],
-      "status": "ran"
+      "status": "cached"
     },
     {
       "render_id": "d07299ae-c45c-4796-9dab-e43a1c93171c",
@@ -1921,42 +2051,42 @@
       "failures": [
         "inconsistent pergola design with the anchor view (Image 1 shows a roof of widely spaced deep dark-bronze beams/rafters with large gaps casting broad stripe shadows, while Image 2 shows a dense flat roof of fine parallel louvre blades in a bronze frame — different roof construction.)"
       ],
-      "status": "ran"
+      "status": "cached"
     },
     {
       "render_id": "5f02278f-d814-48c8-9ba0-9ecf365c5d6a",
       "camera": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
       "passed": true,
       "failures": [],
-      "status": "ran"
+      "status": "cached"
     },
     {
       "render_id": "43e39663-afec-4727-8a11-ddccec049e20",
       "camera": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
       "passed": true,
       "failures": [],
-      "status": "ran"
+      "status": "cached"
     },
     {
       "render_id": "6d876a4e-68c3-45ab-9497-2b7c77a4b72c",
       "camera": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
       "passed": true,
       "failures": [],
-      "status": "ran"
+      "status": "cached"
     },
     {
       "render_id": "1da4231b-043f-4b39-87a8-fc207917259a",
       "camera": "zone:e15d5e11-f020-477c-930e-ebd1d633535e",
       "passed": true,
       "failures": [],
-      "status": "ran"
+      "status": "cached"
     },
     {
       "render_id": "426eaa91-a680-4759-bde3-df3853426fff",
       "camera": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
       "passed": true,
       "failures": [],
-      "status": "ran"
+      "status": "cached"
     },
     {
       "render_id": "bb3907d4-48e1-4875-8fc6-ec2fd3bd2366",
@@ -1966,27 +2096,582 @@
       "status": "anchor"
     }
   ],
-  "gate_summary": {
-    "scene_views": 29,
-    "passed": 11,
-    "substituted_by_3d_view": 18,
-    "missing": 0
+  "anchor": {
+    "camera": "garden:garden-1",
+    "render_id": "bb3907d4-48e1-4875-8fc6-ec2fd3bd2366",
+    "outcome": "passed",
+    "candidates": [
+      "Pergola court paving",
+      "Aluminium pergola",
+      "Whole garden — aerial",
+      "Whole garden — view 1"
+    ]
   },
-  "pilot_events_tagged": 1,
-  "results": [
-    "PASS  display name set through the project route — Contemporary Villa Garden — Completed Renovation",
-    "PASS  render pack and drawing set export as PDFs — {\"pack\":7289605,\"drawings\":4583286}",
-    "PASS  the display name is what the documents print",
-    "PASS  no \"ground truth\" on any page or in the PDF metadata — 45 documents",
-    "PASS  no house number on any page",
-    "PASS  zero contractor-identity leakage across drawings and pack — 2 identity tokens × 45 documents",
-    "PASS  no draft watermark — a built garden, not a proposal",
-    "PASS  no price or rate in the render pack",
-    "PASS  no design-assumptions page (nothing proposed on a completed garden)",
-    "PASS  client-safe captions: no QA text in the pack",
-    "PASS  legibility: no text in the render pack under 3.1 mm — min 3.1 mm",
-    "PASS  extended gate: every passed render checked built-feature placement against the scene — 12 passed render(s)",
-    "PASS  no render that disagrees with the anchor view enters the pack — 8 views checked; 1 demoted to design views: inconsistent pergola design with the anchor view (Image 1 shows a roof of widely spaced deep dark-bronze beams/rafters with large gaps casting broad stripe shadows, while Image 2 shows a dense flat roof of fine parallel louvre blades in a bronze frame — different roof construction.)",
-    "PASS  parity: every BoQ line is drawn and shown, every drawn cost is priced"
-  ]
+  "cameras": [
+    {
+      "id": "zone:9a496cc5-ef64-487e-bdfd-86fe718bc014",
+      "label": "North planting strip",
+      "mode": "eye",
+      "clean": false
+    },
+    {
+      "id": "zone:48f355d1-f925-4b63-90dc-969d0cab42a2",
+      "label": "Pergola court paving",
+      "mode": "eye",
+      "clean": true
+    },
+    {
+      "id": "zone:20e35059-522e-4626-a900-b35fae80a2f0",
+      "label": "Wall-feature terrace",
+      "mode": "eye",
+      "clean": true
+    },
+    {
+      "id": "zone:f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+      "label": "Seating-bench court",
+      "mode": "eye",
+      "clean": true
+    },
+    {
+      "id": "zone:a0a733df-87a1-4f46-894e-14a8ae98aa30",
+      "label": "Aluminium pergola",
+      "mode": "elevated",
+      "clean": true
+    },
+    {
+      "id": "zone:e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+      "label": "Backyard lawn",
+      "mode": "eye",
+      "clean": true
+    },
+    {
+      "id": "zone:1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
+      "label": "West planting strip",
+      "mode": "eye",
+      "clean": true
+    },
+    {
+      "id": "zone:4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+      "label": "Side courtyard",
+      "mode": "eye",
+      "clean": false
+    },
+    {
+      "id": "zone:35920676-03f1-4feb-947b-b95ce97381cd",
+      "label": "Front lawn — north",
+      "mode": "eye",
+      "clean": false
+    },
+    {
+      "id": "zone:d0ff704d-bc71-43a9-99bd-92be290ab810",
+      "label": "Front approach — upper",
+      "mode": "eye",
+      "clean": false
+    },
+    {
+      "id": "zone:e15d5e11-f020-477c-930e-ebd1d633535e",
+      "label": "Front approach — lower",
+      "mode": "eye",
+      "clean": false
+    },
+    {
+      "id": "zone:64cf731c-3000-468e-9f91-25f2756f0c54",
+      "label": "Front lawn — south",
+      "mode": "eye",
+      "clean": false
+    },
+    {
+      "id": "garden:aerial",
+      "label": "Whole garden — aerial",
+      "mode": "aerial",
+      "clean": true
+    },
+    {
+      "id": "garden:garden-1",
+      "label": "Whole garden — view 1",
+      "mode": "eye",
+      "clean": true
+    },
+    {
+      "id": "garden:garden-2",
+      "label": "Whole garden — view 2",
+      "mode": "eye",
+      "clean": false
+    }
+  ],
+  "photo_pairs": [],
+  "decisions": [],
+  "layout_assumptions": [
+    "Front east boundary wall: Front walls assumed to match.",
+    "Front south boundary wall: Front walls assumed to match."
+  ],
+  "baseline": {
+    "captured_at": "2026-09-22T21:22:00.681Z",
+    "boq_id": "c07539bd-f660-4e2e-ae37-a1a94253d802",
+    "draft": false,
+    "derived": [],
+    "grand_total_aed": 167468.18,
+    "lines": [
+      {
+        "key": "Demolition|GL-03",
+        "section": "Demolition",
+        "description": "Garden demolition & strip-out",
+        "quantity": 1,
+        "unit": "lump",
+        "rate_aed": 4400,
+        "total_aed": 4400,
+        "qty_derived": false
+      },
+      {
+        "key": "Preliminaries|GL-01",
+        "section": "Preliminaries",
+        "description": "Garden preliminaries & approvals",
+        "quantity": 1,
+        "unit": "lump",
+        "rate_aed": 3520,
+        "total_aed": 3520,
+        "qty_derived": false
+      },
+      {
+        "key": "Preliminaries|GL-02",
+        "section": "Preliminaries",
+        "description": "Garden mobilization & site management",
+        "quantity": 1,
+        "unit": "lump",
+        "rate_aed": 4400,
+        "total_aed": 4400,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-04",
+        "section": "Hardscape & Structures",
+        "description": "PCC base under paving",
+        "quantity": 63.3,
+        "unit": "m2",
+        "rate_aed": 105.6,
+        "total_aed": 6684.48,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-05",
+        "section": "Hardscape & Structures",
+        "description": "Porcelain paving installation",
+        "quantity": 63.3,
+        "unit": "m2",
+        "rate_aed": 70.4,
+        "total_aed": 4456.32,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-06",
+        "section": "Hardscape & Structures",
+        "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+        "quantity": 63.3,
+        "unit": "m2",
+        "rate_aed": 128.1,
+        "total_aed": 8108.73,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-09",
+        "section": "Hardscape & Structures",
+        "description": "Seating bench, L-shape (0.7x0.6 section)",
+        "quantity": 7.5,
+        "unit": "lm",
+        "rate_aed": 1320,
+        "total_aed": 9900,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-10",
+        "section": "Hardscape & Structures",
+        "description": "Planter + bench combo (0.7x0.6)",
+        "quantity": 7.8,
+        "unit": "lm",
+        "rate_aed": 1012,
+        "total_aed": 7893.6,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-11a",
+        "section": "Hardscape & Structures",
+        "description": "BBQ counter (blockwork, clad, sink+MEP+sockets)",
+        "quantity": 3,
+        "unit": "lm",
+        "rate_aed": 5280,
+        "total_aed": 15840,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-11b",
+        "section": "Hardscape & Structures",
+        "description": "Bar counter (blockwork, clad)",
+        "quantity": 3.4,
+        "unit": "lm",
+        "rate_aed": 4312,
+        "total_aed": 14660.8,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-12",
+        "section": "Hardscape & Structures",
+        "description": "Planter box, standalone (per unit ~1.8x1.8x0.45)",
+        "quantity": 1,
+        "unit": "no",
+        "rate_aed": 3421.44,
+        "total_aed": 3421.44,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-13",
+        "section": "Hardscape & Structures",
+        "description": "Wall feature with bench (arch, per unit ~2.5m w)",
+        "quantity": 1,
+        "unit": "no",
+        "rate_aed": 6600,
+        "total_aed": 6600,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-14",
+        "section": "Hardscape & Structures",
+        "description": "Motorized louvered pergola (alum, LED, coated)",
+        "quantity": 12.25,
+        "unit": "m2 plan",
+        "rate_aed": 1366.6928,
+        "total_aed": 16741.99,
+        "qty_derived": false
+      },
+      {
+        "key": "Hardscape & Structures|GL-19",
+        "section": "Hardscape & Structures",
+        "description": "BBQ grill, built-in (client-supplied equipment class)",
+        "quantity": 1,
+        "unit": "no",
+        "rate_aed": 5427.66,
+        "total_aed": 5427.66,
+        "qty_derived": false
+      },
+      {
+        "key": "Soft Landscaping|GL-07",
+        "section": "Soft Landscaping",
+        "description": "Artificial grass supply",
+        "quantity": 59.64,
+        "unit": "m2",
+        "rate_aed": 26.4,
+        "total_aed": 1574.5,
+        "qty_derived": false
+      },
+      {
+        "key": "Soft Landscaping|GL-08",
+        "section": "Soft Landscaping",
+        "description": "Artificial grass installation (base+sand+borders)",
+        "quantity": 59.64,
+        "unit": "m2",
+        "rate_aed": 70.4,
+        "total_aed": 4198.66,
+        "qty_derived": false
+      },
+      {
+        "key": "Soft Landscaping|GL-25",
+        "section": "Soft Landscaping",
+        "description": "Planting beds — soil preparation and planting (no reference rate — QS to price)",
+        "quantity": 5.01,
+        "unit": "m2",
+        "rate_aed": 0,
+        "total_aed": 0,
+        "qty_derived": false
+      },
+      {
+        "key": "Irrigation|GL-15",
+        "section": "Irrigation",
+        "description": "Irrigation system (drip, pump, valves)",
+        "quantity": 1,
+        "unit": "lump",
+        "rate_aed": 11000,
+        "total_aed": 11000,
+        "qty_derived": true
+      },
+      {
+        "key": "Electrical & Lighting|GL-16",
+        "section": "Electrical & Lighting",
+        "description": "Garden lighting cabling",
+        "quantity": 28,
+        "unit": "point",
+        "rate_aed": 264,
+        "total_aed": 7392,
+        "qty_derived": false
+      },
+      {
+        "key": "Electrical & Lighting|GL-17",
+        "section": "Electrical & Lighting",
+        "description": "Garden light fittings (blended LUMO class)",
+        "quantity": 28,
+        "unit": "point",
+        "rate_aed": 308,
+        "total_aed": 8624,
+        "qty_derived": false
+      },
+      {
+        "key": "Electrical & Lighting|GL-18",
+        "section": "Electrical & Lighting",
+        "description": "Boundary wall lights (supply+install)",
+        "quantity": 9,
+        "unit": "point",
+        "rate_aed": 315,
+        "total_aed": 2835,
+        "qty_derived": false
+      }
+    ],
+    "takeoff": [
+      {
+        "work_item_key": "garden.bbq_grill",
+        "element_id": "5439aa87-f498-4c21-8d6b-fbefaef2b253",
+        "qty": 1,
+        "unit": "no"
+      },
+      {
+        "work_item_key": "garden.bench_run",
+        "element_id": "de965212-d3a4-4e68-822a-820ad01ea243",
+        "qty": 7.5,
+        "unit": "lm"
+      },
+      {
+        "work_item_key": "garden.counter_bar",
+        "element_id": "188627a4-a7cf-4373-b3d7-ed3f71dc04a4",
+        "qty": 3.4,
+        "unit": "lm"
+      },
+      {
+        "work_item_key": "garden.counter_bbq",
+        "element_id": "2d7de189-b8b4-4204-8457-94c355c8506f",
+        "qty": 3,
+        "unit": "lm"
+      },
+      {
+        "work_item_key": "garden.grass_install",
+        "element_id": "35920676-03f1-4feb-947b-b95ce97381cd",
+        "qty": 9.55,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.grass_install",
+        "element_id": "64cf731c-3000-468e-9f91-25f2756f0c54",
+        "qty": 5.84,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.grass_install",
+        "element_id": "e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+        "qty": 44.25,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.grass_supply",
+        "element_id": "35920676-03f1-4feb-947b-b95ce97381cd",
+        "qty": 9.55,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.grass_supply",
+        "element_id": "64cf731c-3000-468e-9f91-25f2756f0c54",
+        "qty": 5.84,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.grass_supply",
+        "element_id": "e5e678a3-c3de-47a6-965b-3d6233bc7f07",
+        "qty": 44.25,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.paving_install",
+        "element_id": "20e35059-522e-4626-a900-b35fae80a2f0",
+        "qty": 6.32,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.paving_install",
+        "element_id": "4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+        "qty": 10.47,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.paving_install",
+        "element_id": "48f355d1-f925-4b63-90dc-969d0cab42a2",
+        "qty": 5.18,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.paving_install",
+        "element_id": "a0a733df-87a1-4f46-894e-14a8ae98aa30",
+        "qty": 12.25,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.paving_install",
+        "element_id": "d0ff704d-bc71-43a9-99bd-92be290ab810",
+        "qty": 3.62,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.paving_install",
+        "element_id": "e15d5e11-f020-477c-930e-ebd1d633535e",
+        "qty": 5.64,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.paving_install",
+        "element_id": "f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+        "qty": 19.82,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.pcc_base",
+        "element_id": "20e35059-522e-4626-a900-b35fae80a2f0",
+        "qty": 6.32,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.pcc_base",
+        "element_id": "4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+        "qty": 10.47,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.pcc_base",
+        "element_id": "48f355d1-f925-4b63-90dc-969d0cab42a2",
+        "qty": 5.18,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.pcc_base",
+        "element_id": "a0a733df-87a1-4f46-894e-14a8ae98aa30",
+        "qty": 12.25,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.pcc_base",
+        "element_id": "d0ff704d-bc71-43a9-99bd-92be290ab810",
+        "qty": 3.62,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.pcc_base",
+        "element_id": "e15d5e11-f020-477c-930e-ebd1d633535e",
+        "qty": 5.64,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.pcc_base",
+        "element_id": "f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+        "qty": 19.82,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.pergola",
+        "element_id": "a0a733df-87a1-4f46-894e-14a8ae98aa30",
+        "qty": 12.25,
+        "unit": "m2 plan"
+      },
+      {
+        "work_item_key": "garden.planter_bench_run",
+        "element_id": "2fbf1369-5f69-43da-8645-c1b1a379db59",
+        "qty": 7.8,
+        "unit": "lm"
+      },
+      {
+        "work_item_key": "garden.planter_box",
+        "element_id": "be53c4f9-18f6-4eaf-bbf3-ec701f32934d",
+        "qty": 1,
+        "unit": "no"
+      },
+      {
+        "work_item_key": "garden.planting_bed",
+        "element_id": "1b8ffd29-99f6-4aed-aa0d-d31e1d5c7958",
+        "qty": 2.91,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.planting_bed",
+        "element_id": "9a496cc5-ef64-487e-bdfd-86fe718bc014",
+        "qty": 2.1,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.tile_supply",
+        "element_id": "20e35059-522e-4626-a900-b35fae80a2f0",
+        "qty": 6.32,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.tile_supply",
+        "element_id": "4678d6e8-5f31-4f1e-8d63-b89010f47a84",
+        "qty": 10.47,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.tile_supply",
+        "element_id": "48f355d1-f925-4b63-90dc-969d0cab42a2",
+        "qty": 5.18,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.tile_supply",
+        "element_id": "a0a733df-87a1-4f46-894e-14a8ae98aa30",
+        "qty": 12.25,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.tile_supply",
+        "element_id": "d0ff704d-bc71-43a9-99bd-92be290ab810",
+        "qty": 3.62,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.tile_supply",
+        "element_id": "e15d5e11-f020-477c-930e-ebd1d633535e",
+        "qty": 5.64,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.tile_supply",
+        "element_id": "f0cd18ae-1a5d-4349-a367-52f507a2ff4d",
+        "qty": 19.82,
+        "unit": "m2"
+      },
+      {
+        "work_item_key": "garden.wall_feature",
+        "element_id": "130d3e94-e76b-41a0-8ecc-80bdd0218d6c",
+        "qty": 1,
+        "unit": "no"
+      }
+    ]
+  },
+  "metrics": {
+    "time_to_draw_plan_min": null,
+    "active_design_min": null,
+    "time_to_first_full_boq_min": null,
+    "first_full_boq_at": null,
+    "boq_generations": 0,
+    "render_gate": {
+      "renders": 150,
+      "passed": 59,
+      "substituted": 91,
+      "pass_rate": 0.393,
+      "attempt_pass_rate": 0.378
+    },
+    "friction": [],
+    "corrections": {
+      "total": 0,
+      "by_type": {
+        "rate": 0,
+        "quantity": 0,
+        "scope": 0,
+        "design": 0,
+        "confirm": 0
+      }
+    },
+    "sessions": []
+  }
 }

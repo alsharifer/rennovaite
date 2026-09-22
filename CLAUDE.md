@@ -303,9 +303,9 @@ unchanged.
   uploads to a **private** Storage bucket named **`drawings`** and stores
   long-lived **signed** URLs in `sheet_urls` (the bucket is private, so public
   URLs would not resolve).
-- **DB steps** (`supabase db push` — see `docs/MIGRATIONS.md`) : apply
-  `scripts/migrations/013…` and `014…`, and create a **private** Storage bucket
-  named `drawings`. Live generation + PDF download work without them.
+- **DB steps** (`npm run db:push` — see `docs/MIGRATIONS.md`): apply the
+  migrations, and create a **private** Storage bucket named `drawings`. Live
+  generation + PDF download work without them.
 
 ## Overlays — electrical + plumbing (P2)
 
@@ -411,8 +411,8 @@ Two compounding pieces off one staging vocabulary, gated by `STAGING_ENABLED`.
   construction. Rendered visually apart with an `OPTIONAL — NOT IN CONTRACTOR
   SCOPE` eyebrow; toggling it off (what-if panel or the section header) subtracts
   its total exactly, restoring the prior figure.
-- **DB step** (`supabase db push` — see `docs/MIGRATIONS.md`): apply `scripts/migrations/021_staging.sql` (Supabase SQL
-  editor) — adds `renders.staging_set`, `furniture_opt_ins`, and the optional
+- **DB step** (`npm run db:push` — see `docs/MIGRATIONS.md`): the staging
+  migration adds `renders.staging_set`, `furniture_opt_ins`, and the optional
   `furniture_prices` table. Unit tests + flag-off/degraded behaviour work without
   it; opt-in persistence + the live BoQ section + `staging_set` tracing activate
   once it's applied. Optional: `node scripts/seed-furniture-prices.ts` to seed
@@ -1387,8 +1387,9 @@ view-only side surface reached from the layout and render steps).
   is LLM-writable. Like every prompt block it only appends, so flag-off and
   flag-on are two cache entries. `renders.reference_refs` records the lineage —
   `null` = seeding did not run, `[]` = ran against an empty board.
-- **DB step** (`supabase db push` — see `docs/MIGRATIONS.md`): apply `scripts/migrations/027_ideation.sql`. Everything
-  degrades gracefully until then (the questionnaire runs locally and says so).
+- **DB step** (`npm run db:push` — see `docs/MIGRATIONS.md`): the ideation
+  migration. Everything degrades gracefully until then (the questionnaire runs
+  locally and says so).
 
 ## Env vars
 

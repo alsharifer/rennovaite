@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
           {
             success: false,
             error:
-              "vendor_selections table is missing. Run scripts/migrations/007_vendor_selections.sql in the Supabase SQL editor first.",
+              "vendor_selections table is missing — the migrations have not been applied to this database (npm run db:push).",
           },
           { status: 500 },
         );
