@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Figure } from "@/components/figures/Figure";
 import { formatAed } from "@/lib/format/aed";
+import { WHATIF_BEFORE_MARKUPS, WHATIF_INCL_MARKUPS } from "@/lib/whatif/engine";
 import { cn } from "@/lib/utils";
 import type { Grade, GradeableItem } from "@/lib/whatif/grades";
 
@@ -73,7 +74,10 @@ export function WhatIfSidebar({
       {/* Delta vs baseline */}
       <div className="rounded-md border border-ink-100 bg-canvas p-md">
         <div className="flex items-baseline justify-between">
-          <span className="label-caps text-ink-500">vs QS baseline</span>
+          <span className="flex flex-col">
+            <span className="label-caps text-ink-500">vs QS baseline</span>
+            <span className="font-body text-[11px] text-ink-500" data-markup-basis="incl">{WHATIF_INCL_MARKUPS}</span>
+          </span>
           <span
             className={cn(
               "font-mono text-body-md tabular-nums",
@@ -88,6 +92,7 @@ export function WhatIfSidebar({
                 steps: [
                   { kind: "arith", label: "Project total", detail: `${formatAed(scenarioTotal)} − ${formatAed(baselineTotal)} = ${formatAed(delta, "signed")}` },
                   { kind: "arith", label: "How", detail: "Σ (grade rate − stored rate) × stored quantity, then OH&P, contingency and VAT recomputed with the stored percentages — the figure a regenerated BoQ would store." },
+                  { kind: "flag", label: "Basis", detail: `This figure is ${WHATIF_INCL_MARKUPS}. The per-grade and per-line changes below are ${WHATIF_BEFORE_MARKUPS}.` },
                 ],
                 flags: ["scenario — not stored"],
                 traceable: true,
@@ -101,6 +106,9 @@ export function WhatIfSidebar({
       </div>
 
       {/* Grade toggle rows */}
+      <p className="font-body text-[11px] text-ink-500" data-markup-basis="before">
+        Grade changes below are line changes, {WHATIF_BEFORE_MARKUPS}.
+      </p>
       <div className="flex flex-col gap-md">
         {rows.map((row) => (
           <div key={row.item_key} className="flex flex-col gap-xs">
@@ -161,7 +169,7 @@ export function WhatIfSidebar({
                         { kind: "tier", label: "What-if rate book", detail: sel.spec },
                         { kind: "source", label: "Source", detail: sel.source },
                         { kind: "qs", label: "QS validation", detail: sel.qs_validated ? "QS-validated: yes." : "QS-validated: no — indicative." },
-                        { kind: "arith", label: "Change on this line", detail: `${formatAed(sel.delta, "signed")} over ${Math.round(row.qty)} m²` },
+                        { kind: "arith", label: "Change on this line", detail: `${formatAed(sel.delta, "signed")} over ${Math.round(row.qty)} m² — ${WHATIF_BEFORE_MARKUPS}` },
                       ],
                       flags: sel.qs_validated ? [] : ["indicative"],
                       traceable: true,

@@ -1274,6 +1274,23 @@ resolved line carries **`rate_tier`**.
   counts, gaps, summary rows, identity scan of the full page payload) and
   `scripts/figure-popover-sweep.mjs <url> [--shots=dir]` (headless Chrome over
   CDP: hovers every figure, one tap, screenshots).
+- **D4 — unpriced lines out of the headline.** A QS-to-price line at rate 0
+  (`isUnpricedLine`, `lib/documents/boq-derived.ts`) is never silently inside
+  a total: `derivedTotal` returns `headline` =
+  `≈ AED N* · excludes K lines to be priced` plus the lines, named. The BoQ
+  page (headline + Project total row) and the BoQ PDF (title block + grand
+  total) print both. A needs_qs line WITH a rate is priced, not excluded.
+- **D5 — REF codes.** `lib/boq/refs.ts`: one unique code per section
+  (`SECTION_REF_CODES` — PLA / PLB / PRE, not three "P"s), `assignRefs`
+  suffixes any in-BoQ collision, so a REF is unique in a BoQ. The screen, the
+  PDF (new REF column) and 3D tap-to-inspect links use the same codes. Old
+  codes: `legacyRef` reproduces them, `resolveRef` accepts one in a deep link
+  only when unambiguous, and the migration table is the PDF's "REF changes"
+  page and `GET /api/projects/:id/boq-refs[?format=csv]`.
+- **What-if basis labels.** The scenario TOTAL runs the shared chain; per-grade
+  and per-line deltas and the accessory re-pricing do not. Displays say which
+  (`WHATIF_INCL_MARKUPS` / `WHATIF_BEFORE_MARKUPS`, `lib/whatif/engine.ts`)
+  until they are applied consistently.
 
 ## The journey — nine steps, one definition (B1/B2/B3)
 

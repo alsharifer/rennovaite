@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Figure, FigureProvenanceProvider } from "@/components/figures/Figure";
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "@/lib/documents/boq-derived";
 import { formatAed } from "@/lib/format/aed";
+import { assignRefs, resolveRef } from "@/lib/boq/refs";
 import type { BoqProvenance, FigureProvenance, LineProvenance } from "@/lib/provenance/types";
 import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
 import { cn } from "@/lib/utils";
@@ -154,16 +155,6 @@ function computedProvenance(title: string, steps: FigureProvenance["steps"], fla
   return { title, steps, flags, traceable: true };
 }
 
-function sectionRef(work_section: string, idx: number): string {
-  // Section prefix: first letters of each capitalised word, up to 4 chars.
-  const initials = work_section
-    .split(/[\s&/]+/)
-    .filter(Boolean)
-    .map((w) => w[0]!.toUpperCase())
-    .join("")
-    .slice(0, 4);
-  return `${initials}-${String(idx + 1).padStart(2, "0")}`;
-}
 
 function sensitivityFor(
   workSection: string,
@@ -336,12 +327,20 @@ export function BoqView({
     if (rateBook) setSelections(suggestForBudget(scenarioBoq, rateBook, target));
   };
 
+  // D5: one unique REF per line (lib/boq/refs.ts). A deep link may carry a
+  // pre-D5 code; it resolves only when unambiguous in this BoQ — never a guess.
+  const refs = useMemo(() => assignRefs(boq.sections), [boq.sections]);
+  const resolvedHighlight = useMemo(
+    () => (highlightRef ? resolveRef(boq.sections, highlightRef) : null),
+    [boq.sections, highlightRef],
+  );
+
   // Deep link ?highlight=REF → scroll the row into view + flash a brass ring.
   useEffect(() => {
-    if (!highlightRef || view !== "sections") return;
-    const el = document.getElementById(`boq-row-${highlightRef}`);
+    if (!resolvedHighlight || view !== "sections") return;
+    const el = document.getElementById(`boq-row-${resolvedHighlight}`);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [highlightRef, view]);
+  }, [resolvedHighlight, view]);
 
   const baseTotal = boq.grand_total_aed;
 
@@ -366,7 +365,8 @@ export function BoqView({
   const displayTotal = scopeTotal + furnitureIncluded;
   // G5: a total resting on derived quantities never prints as a bare number.
   const derivedInfo = boqDerivedInfo(boq);
-  const totalFootnote = derivedTotal(displayTotal, derivedInfo).footnote;
+  const headline = derivedTotal(displayTotal, derivedInfo);
+  const totalFootnote = headline.footnote;
   const headroom = budgetAed - displayTotal;
 
   // I4: the summary chain the table shows — the stored one, or the scenario's
@@ -543,8 +543,23 @@ export function BoqView({
             transition={{ duration: 0.24, ease: "easeOut" }}
             className="font-display text-headline-lg tabular-nums text-ink-900"
           >
-            <Figure value={displayTotal} text={derivedTotal(displayTotal, derivedInfo).text} provenance={totalProv} />
+            <Figure value={displayTotal} text={headline.text} provenance={totalProv} />
+            {/* D4: a to-be-priced line is never silently inside the headline. */}
+            {headline.excludes && (
+              <span className="ml-sm align-middle font-body text-body-sm font-semibold text-[#9d3e1d]" data-headline-excludes="true">
+                · {headline.excludes}
+              </span>
+            )}
           </motion.h2>
+          {headline.excluded.length > 0 && (
+            <ul className="font-body-sm text-[12px] leading-4 text-[#9d3e1d]" data-unpriced-lines="true">
+              {headline.excluded.map((x, i) => (
+                <li key={i}>
+                  Not in the total — {x.description} ({x.work_section})
+                </li>
+              ))}
+            </ul>
+          )}
           {totalFootnote && (
             <p className="font-body-sm text-[12px] leading-4 text-[#9A3412]" data-derived-total="true">
               {totalFootnote}
@@ -697,7 +712,7 @@ export function BoqView({
                 2 lines via the cell's line-clamp. Chevron column 48px
                 fits the 32px button + 8px each side. */}
             <colgroup>
-              <col className="w-[56px]" />
+              <col className="w-[84px]" />
               <col />
               <col className="w-[52px]" />
               <col className="w-[56px]" />
@@ -728,9 +743,10 @@ export function BoqView({
                     setExpandedKey((cur) => (cur === k ? null : k))
                   }
                   lineOptions={lineOptions}
-                  highlightRef={highlightRef}
+                  highlightRef={resolvedHighlight}
                   changedItems={changedItems}
                   provenance={provenance}
+                  refs={refs}
                 />
               ))}
               {/* I4: the same summary the PDF prints — screen and paper agree. */}
@@ -765,6 +781,11 @@ export function BoqView({
                   <span className="label-caps text-brass-600">
                     Project total
                   </span>
+                  {headline.excludes && (
+                    <span className="ml-sm font-body text-[12px] font-semibold text-[#9d3e1d]" data-headline-excludes="true">
+                      · {headline.excludes}
+                    </span>
+                  )}
                 </td>
                 <td className="px-md py-md text-right">
                   <motion.span
@@ -1208,6 +1229,7 @@ function SectionGroup({
   highlightRef,
   changedItems,
   provenance,
+  refs,
 }: {
   section: BoqSection;
   expandedKey: string | null;
@@ -1216,6 +1238,7 @@ function SectionGroup({
   highlightRef: string | null;
   changedItems: Set<GradeableItem>;
   provenance: BoqProvenance | null;
+  refs: Record<string, string>;
 }) {
   return (
     <>
@@ -1234,7 +1257,7 @@ function SectionGroup({
       </tr>
       {section.lines.map((line, idx) => {
         const key = `${section.work_section}-${idx}`;
-        const ref = sectionRef(section.work_section, idx);
+        const ref = refs[key]!;
         const expanded = expandedKey === key;
         const gi = itemKeyFromRuleId(line.rule_id);
         return (
@@ -1292,7 +1315,7 @@ function LineRow({
           highlighted && "bg-primary-fixed/40 ring-2 ring-inset ring-brass-600",
         )}
       >
-        <td className="px-md py-sm font-mono text-[12px] tabular-nums text-ink-500">
+        <td className="whitespace-nowrap px-md py-sm font-mono text-[12px] tabular-nums text-ink-500" data-ref-cell="">
           {ref_}
         </td>
         <td className="px-md py-sm">

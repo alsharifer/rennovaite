@@ -209,3 +209,13 @@ export function suggestForBudget(
   }
   return selections;
 }
+
+/**
+ * What a what-if figure includes. The scenario TOTAL (`recalc().total`,
+ * `scenarioTotal`) runs the shared chain — OH&P, contingency and VAT move with
+ * the lines. The per-grade and per-line deltas (`perChange[].delta`, option
+ * deltas, accessory re-pricing) are raw line changes and do NOT. Every display
+ * says which it is until they are applied consistently.
+ */
+export const WHATIF_BEFORE_MARKUPS = "before OH&P, contingency and VAT";
+export const WHATIF_INCL_MARKUPS = "incl. OH&P, contingency and VAT";
