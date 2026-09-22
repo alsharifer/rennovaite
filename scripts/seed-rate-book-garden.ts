@@ -18,8 +18,13 @@
 // Run: node scripts/seed-rate-book-garden.ts   (after migrations 022 + 032)
 // =============================================================================
 
-import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
+
+// The shared target guard: honours variables set in the shell over .env.local,
+// prints which database it is about to write, and refuses production unless
+// ALLOW_PROD_WRITE=1. (This script used to read .env.local directly, so a
+// production URL set in the shell was silently ignored and dev was seeded.)
+import { resolveTarget } from "./_target-guard.mjs";
 
 import {
   GARDEN_RATES,
@@ -31,20 +36,6 @@ import {
 // priced fields come from transcriptionGardenRows() — the SAME rows the offline
 // book prices from. The seed and the pure dry-run cannot disagree on a rate.
 import { transcriptionGardenRows } from "../lib/boq/garden-rates.ts";
-
-const ROOT = "C:/dev/rennovaite";
-
-async function loadEnvLocal(): Promise<Record<string, string>> {
-  const env: Record<string, string> = {};
-  const raw = await readFile(`${ROOT}/.env.local`, "utf8").catch(() => "");
-  for (const line of raw.split(/\r?\n/)) {
-    const t = line.trim();
-    if (!t || t.startsWith("#")) continue;
-    const eq = t.indexOf("=");
-    if (eq !== -1) env[t.slice(0, eq).trim()] = t.slice(eq + 1).trim();
-  }
-  return env;
-}
 
 function buildRows() {
   const priced = new Map(transcriptionGardenRows().map((r) => [r.item_key, r] as const));
@@ -69,10 +60,7 @@ async function main() {
     );
   }
 
-  const env = await loadEnvLocal();
-  const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Missing Supabase env in .env.local");
+  const { url, key } = resolveTarget({ script: "seed-rate-book-garden", writes: true });
   const supabase = createClient(url, key);
 
   // Blast radius, counted before and after — nothing outside 'garden.%' may move.
