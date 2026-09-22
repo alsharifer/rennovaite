@@ -16,6 +16,35 @@ running database are marked **[DB]**; facts read from source are marked
 
 ---
 
+## Since the pre-flight (updated 2026-09-22, after T3b)
+
+Branch `feat/firm-rate-books` (not pushed): `f15b657` T1.0 · `2b4aaec` L1 ·
+`4ed9b49` I4 · T3b. These supersede the matching facts further down.
+
+- **Migrations: high-water mark 041** (`firm_rate_books`), applied to **dev
+  only** [DB]. Production still needs `npm run db:push` for 031–041.
+- **`rate_book` is now on a pricing path.** The garden take-off reads it
+  (T1.0). The interior resolver reads it as tier 3. §3.3 below ("not on either
+  path") is superseded. The full resolution order is in `lib/rates/tiers.ts`.
+- **Firms** [DB, dev]: one firm (`Newspace`, backfilled by 041), no books, no
+  project has a `firm_id`. Every BoQ therefore regenerates unchanged.
+- **Element sections** (Demolition, Plaster, Floor / Wall Finishes, Ceilings,
+  Painting) resolve through the firm overlay on the viewer-flag (P4) path (T3b).
+- **Identity rulings** (`NAME_RULINGS` in `lib/identity/curation.ts`):
+  - Laspinas → "sanitaryware supplier".
+  - "Villa 94" → "reference project".
+  - RAK tiles quotation → "client-supplied tile package"; RAK Ceramics stays as a catalogue brand.
+  - A firm's name appears only on its own projects.
+- **Dev demo villa** (`6b5fda9d`) [DB, dev]:
+  - Seeded by `scripts/seed-dev-demo.mjs` from the repaired fixture: 13 rooms, zero overlaps.
+  - It has one legitimately generated BoQ (AED 498,824, 2026-09-22).
+  - It is the live interior target for UI checks; Mudon's commercial data stays in production.
+- **Tests: 71 files / 769 tests** (was 61 / 694 at the pre-flight).
+- **A stale `.next` cache** after a `next build` made nested API routes 404 in
+  `next dev`. Delete `.next` if a known route suddenly 404s with an HTML page.
+
+---
+
 ## 00. Standing rules — verification hygiene
 
 Two rules that hold for every sprint, every phase, and every agent working in

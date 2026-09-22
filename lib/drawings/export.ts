@@ -18,6 +18,7 @@ import { derivePlanGraph } from "@/lib/plan/derive";
 import type { PlanGraph, Room } from "@/lib/plan/geometry";
 import { zoneSurface } from "@/lib/plan/zones";
 import { getStyleByKey } from "@/lib/styles";
+import { curateText, loadWithheldNames } from "@/lib/identity/curation";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { renderDemoSheet } from "./demo-sheet";
@@ -392,7 +393,15 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
     sheets.push(...buildElevationSheets(asBuilt, gardenFixtures, gardenMeta, await loadElementVariants(asBuilt.planId)));
   }
 
-  return { projectId, planId: asBuilt.planId, sheets, derivedNotes: asBuilt.notes };
+  // T3b: every printed string passes identity curation, with THIS project's
+  // withheld firm names (a firm may appear only on its own projects' sheets).
+  const withheld = await loadWithheldNames(getSupabaseAdmin(), projectId);
+  return {
+    projectId,
+    planId: asBuilt.planId,
+    sheets: sheets.map((s) => ({ ...s, svg: curateText(s.svg, withheld) })),
+    derivedNotes: asBuilt.notes.map((n) => curateText(n, withheld)),
+  };
 }
 
 /**

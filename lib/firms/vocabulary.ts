@@ -14,6 +14,7 @@
 // =============================================================================
 
 import { UNPRICED_GARDEN_ITEMS } from "@/lib/boq/garden-takeoff";
+import { WORK_ITEM_DEF } from "@/lib/boq/elements";
 import { RATE_RULES } from "@/lib/boq/rules";
 import { getGardenRate } from "@/lib/ground-truth/villa94-garden";
 import { FIRM_ENTRY_KINDS, type FirmEntryKind } from "@/lib/rates/firm";
@@ -46,6 +47,13 @@ export function itemVocabulary(item_key: string): ItemVocabulary | null {
   const u = UNPRICED_GARDEN_ITEMS[item_key];
   if (u) {
     return { item_key, path: "garden", label: u.label, unit: u.unit, kinds: ["supply_and_install", "supply", "labour", "lump"], default_kind: "supply_and_install" };
+  }
+  // T3b: the six P4 element work items (Demolition, Plaster, Floor / Wall
+  // Finishes, Ceilings, Painting). With the viewer flag on these lines replace
+  // the engine's, so a firm prices plaster as wall_plaster, not plaster.make_good.
+  const el = (WORK_ITEM_DEF as Record<string, { description: string } | undefined>)[item_key];
+  if (el) {
+    return { item_key, path: "interior", label: `P4 ${item_key} — ${el.description}`, unit: "m2", kinds: ["supply_and_install", "labour", "lump"], default_kind: "supply_and_install" };
   }
   const r = RATE_RULES[item_key];
   if (r) {

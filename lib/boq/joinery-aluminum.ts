@@ -166,7 +166,7 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
         slabs.quantity,
         "no",
         RATE_RULES["join.vanity_slab"]!.allowance_aed!,
-        "S6-pre G19 — excluded from the RAK tiles quotation; indicative allowance",
+        "S6-pre G19 — excluded from the client-supplied tile package; indicative allowance",
         "site_assessment",
         slabs.measurement,
       ),

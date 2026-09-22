@@ -1178,9 +1178,18 @@ answer). `unpriced` (a garden QS-to-price line at 0) and `selection` (a D1
 accessory laid over whichever tier answered) complete the vocabulary. Every
 resolved line carries **`rate_tier`**.
 
-- **Hooks** — exactly two, at the accessory layer: `RateResolver.resolveBase`
-  (`lib/boq/rates.ts`) and the garden `rate()` / `priceGardenTakeoff`
-  (`lib/boq/garden-takeoff.ts`, via `withFirmOverlay`). No interior `rate_book`
+- **Hooks** — at the accessory layer: `RateResolver.resolveBase`
+  (`lib/boq/rates.ts`), the garden `rate()` / `priceGardenTakeoff`
+  (`lib/boq/garden-takeoff.ts`, via `withFirmOverlay`), and — since T3b — the
+  six P4 element sections (Demolition, Plaster, Floor / Wall Finishes,
+  Ceilings, Painting), which the viewer flag rebuilds from the element
+  take-off: `elementPricer(firm, tier)` → `applyElementMapping` /
+  `roomRollup`. Firm tiers answer there; otherwise the `WORK_ITEM_DEF`
+  constant (byte-identical, `element-mapping.golden.json`). The reference
+  book is deliberately NOT consulted for element keys — production
+  `rate_book` holds what-if grade cells under the same keys. A firm prices
+  plaster on this path as `wall_plaster` (the element keys are in the
+  firm-entry vocabulary). No interior `rate_book`
   row shares a key with a `RATE_RULES` item today, so tier 3 answers only for
   garden keys and every pre-L1 BoQ regenerates unchanged
   (`lib/boq/__tests__/pricing-golden.test.ts` + `scripts/boq-regen-check.mjs`).
@@ -1251,10 +1260,16 @@ resolved line carries **`rate_tier`**.
   from `firms`) never reach BoQ text: emitted as role labels at source
   (`joinery-aluminum.ts`, R-43 note) and `curateBoq` on every read path (BoQ
   page, vendors, drawings, viewer, BoQ PDF, vendor-options, dry-run). Brands
-  that are specifications stay. **Ambiguous names are listed in
-  `AMBIGUOUS_NAMES`, not scrubbed** (Laspinas R-40–43, "Villa 94", RAK, Newspace)
-  pending a ruling. What-if never selects `rate_book.source`
-  (`RATE_BOOK_LABEL`).
+  that are specifications stay. **T3b rulings** (`NAME_RULINGS`): Laspinas →
+  "sanitaryware supplier"; "Villa 94" → "reference project" on every
+  firm-facing surface; the vanity slab is "excluded from the client-supplied
+  tile package"; RAK stays as a catalogue brand. **Firm names**: a firm's name
+  may appear only on its OWN projects (`projects.firm_id`) —
+  `loadWithheldNames(sb, projectId)` withholds every other firm, and it is
+  applied to BoQ reads, the drawing set (`generateDrawingSet`) and the render
+  pack. What-if never selects `rate_book.source` (`RATE_BOOK_LABEL`).
+  `scripts/document-identity-scan.mjs [port] <ids>` scans every sheet, pack
+  page and BoQ page payload of a project.
 - **Checks:** `scripts/provenance-check.mjs [port] <ids>` (read-only: figure
   counts, gaps, summary rows, identity scan of the full page payload) and
   `scripts/figure-popover-sweep.mjs <url> [--shots=dir]` (headless Chrome over

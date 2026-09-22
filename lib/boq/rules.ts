@@ -292,22 +292,22 @@ export const RATE_RULES: Record<string, RateRule> = {
   "san.shattaf": {
     rule_id: "R-40",
     allowance_aed: 250,
-    allowance_note: "GROHE shattaf, matt black — Laspinas 46703 line 1025302431 (supply)",
+    allowance_note: "GROHE shattaf, matt black — sanitaryware supplier (supply)",
   },
   "san.paper_holder": {
     rule_id: "R-41",
     allowance_aed: 210,
-    allowance_note: "GROHE Essentials paper holder, matt black — Laspinas 46703 line 1024652430",
+    allowance_note: "GROHE Essentials paper holder, matt black — sanitaryware supplier",
   },
   "san.towel_rail": {
     rule_id: "R-42",
     allowance_aed: 260,
-    allowance_note: "GROHE Essentials towel rail, matt black — Laspinas 46703 line 1022512430",
+    allowance_note: "GROHE Essentials towel rail, matt black — sanitaryware supplier",
   },
   "san.actuator": {
     rule_id: "R-43",
     allowance_aed: 450,
-    allowance_note: "GROHE actuator plate, vertical square — Laspinas 46703 line 38732KF0",
+    allowance_note: "GROHE actuator plate, vertical square — sanitaryware supplier",
   },
   // P8b: staircase tile — 144×305 slab format, developed tread/riser surface.
   "floor.stair_tile": {
@@ -377,7 +377,7 @@ export const RATE_RULES: Record<string, RateRule> = {
     rule_id: "R-30",
     allowance_aed: 125,
     allowance_note:
-      "Gypsum false ceiling incl. plastering + painting, AED 125/m² (Villa 94: AED 21k ÷ 130 m² + 120 lm cove). No labour-rates row yet — QS to confirm.",
+      "Gypsum false ceiling incl. plastering + painting, AED 125/m² (reference project: AED 21k ÷ 130 m² + 120 lm cove). No labour-rates row yet — QS to confirm.",
   },
   "ceiling.led_cove": {
     rule_id: "R-31",
@@ -409,14 +409,14 @@ export const RATE_RULES: Record<string, RateRule> = {
     rule_id: "R-35",
     allowance_aed: 15000,
     allowance_note:
-      "Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (Villa 94 §2: AED 15k). Design-dependent; QS to re-measure per project.",
+      "Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (reference project §2: AED 15k). Design-dependent; QS to re-measure per project.",
   },
   "stairs.renovation": {
     rule_id: "R-36",
     allowance_aed: 6000,
     allowance_note:
-      "Staircase renovation allowance — LABOUR ONLY: tread/riser preparation, tile fixing labour and LED nosing circuit, excl. handrail (Villa 94 §5: AED 6k). " +
-      "Delta Log G15 (\"Only labor\") confirms the Villa 94 staircase line carried no material. The tile MATERIAL comes solely from Q-11b/R-44 floor.stair_tile — this note previously read \"tread tiling\", which would have described the same material twice. Rate unchanged. QS to confirm.",
+      "Staircase renovation allowance — LABOUR ONLY: tread/riser preparation, tile fixing labour and LED nosing circuit, excl. handrail (reference project §5: AED 6k). " +
+      "Delta Log G15 (\"Only labor\") confirms the reference project's staircase line carried no material. The tile MATERIAL comes solely from Q-11b/R-44 floor.stair_tile — this note previously read \"tread tiling\", which would have described the same material twice. Rate unchanged. QS to confirm.",
   },
   "prelim.floor_protection": {
     rule_id: "R-37",
@@ -453,7 +453,7 @@ export const RATE_RULES: Record<string, RateRule> = {
     rule_id: "R-46",
     allowance_aed: 1450,
     allowance_note:
-      "G19 — vanity counter slab, AED 1,450/no ALLOWANCE (engineered quartz ~1.5 lm incl. cut-out, edge and fixing). The RAK tiles quotation excludes these. Dimensions unknown, so this is an allowance requiring site measurement, deliberately NOT folded into tile area. QS to confirm.",
+      "G19 — vanity counter slab, AED 1,450/no ALLOWANCE (engineered quartz ~1.5 lm incl. cut-out, edge and fixing). The client-supplied tile package excludes these. Dimensions unknown, so this is an allowance requiring site measurement, deliberately NOT folded into tile area. QS to confirm.",
   },
   "alum.shower_glass": {
     rule_id: "R-47",

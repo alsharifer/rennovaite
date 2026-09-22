@@ -13,6 +13,7 @@ import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
 import { loadProjectFirmOverlay } from "@/lib/rates/firm";
+import { elementPricer } from "@/lib/boq/rates";
 import { applyOhp } from "@/lib/rates/ohp";
 import { loadReferenceRows } from "@/lib/rates/reference";
 import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
@@ -816,7 +817,8 @@ export async function POST(request: NextRequest) {
 
       // P4: rebuild mapped POMI sections from the take-off (element_refs + true
       // per-room quantities). No-op when there are no take-off items.
-      const mappedBoq = applyElementMapping(engineBoq, takeoffItems);
+      // T3b: the element sections resolve through the same firm overlay.
+      const mappedBoq = applyElementMapping(engineBoq, takeoffItems, elementPricer(firm, engineBoq.engine.tier));
       // P2: append Electrical Installations + Plumbing & Sanitary sections from
       // plan_fixtures counts (flagged, best-effort, no-op when off/empty).
       const overlaid = await appendOverlaySections(
@@ -836,7 +838,7 @@ export async function POST(request: NextRequest) {
       const boq = applyOhp(gardened, firm.ohpPct);
 
       if (dryRun) {
-        return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq: curateBoq(boq, await loadWithheldNames(supabaseUntyped)) });
+        return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq: curateBoq(boq, await loadWithheldNames(supabaseUntyped, projectId)) });
       }
 
       const { data: inserted, error: insertErr } = await supabase
@@ -948,7 +950,7 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
 
     // P4: rebuild mapped sections from the take-off, then P2 overlays, then the
     // ground-truth Joinery + Aluminum & Glass sections.
-    const mappedLlm = applyElementMapping(llmBoq, takeoffItems);
+    const mappedLlm = applyElementMapping(llmBoq, takeoffItems, elementPricer(firm, "mid"));
     const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
     const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabaseUntyped, { firm });
     const boq = applyOhp(appendJoineryAluminumSections(gardenedLlm, rooms), firm.ohpPct);

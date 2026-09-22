@@ -252,7 +252,7 @@ export function estimateTimeline(input: EstimateInput): TimelineEstimate {
     total_weeks_high: Math.ceil(high / 7),
     excluded,
     derived: true,
-    basis: `Scaled from one calibrated project — Mudon Villa 94, ${MUDON_TOTAL_DAYS} days over ${PHASE_ANCHORS.length} phases (15 Jul – 5 Oct 2026, signed contract). Estimated, not measured: refined as more projects complete.`,
+    basis: `Scaled from one calibrated reference project — ${MUDON_TOTAL_DAYS} days over ${PHASE_ANCHORS.length} phases (15 Jul – 5 Oct 2026, signed contract). Estimated, not measured: refined as more projects complete.`,
   };
 }
 

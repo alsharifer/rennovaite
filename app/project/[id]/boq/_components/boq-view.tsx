@@ -1021,7 +1021,7 @@ function ByRoomView({
                       title: `Room total — ${r.roomName}`,
                       steps: [
                         { kind: "geometry", label: "Element take-off", detail: `Σ ${r.items.length} take-off item${r.items.length === 1 ? "" : "s"} measured in this room (takeoff_items)` },
-                        { kind: "tier", label: "Fallback — take-off constant", detail: "Each item at the representative rate in lib/boq/elements.ts. Excludes OH&P, contingency and VAT, and lines not attributable to a room." },
+                        { kind: "tier", label: "Element rate", detail: "Each item at the same rate as its BoQ line — the project's contractor rate book where it has one, otherwise the representative element rate. Excludes OH&P, contingency and VAT, and lines not attributable to a room." },
                       ],
                       flags: ["excl. contingency & VAT"],
                       traceable: true,
@@ -1047,7 +1047,7 @@ function ByRoomView({
                               title: `${w.description} — ${r.roomName}`,
                               steps: [
                                 { kind: "geometry", label: "Measured", detail: `${fmtQty(w.qty)} ${w.unit} in this room (takeoff_items)` },
-                                { kind: "tier", label: "Fallback — take-off constant", detail: "At the representative rate in lib/boq/elements.ts." },
+                                { kind: "tier", label: "Element rate", detail: "The same rate as this item's BoQ line (contractor rate book where the project has one, otherwise the representative element rate)." },
                               ],
                               flags: [],
                               traceable: true,

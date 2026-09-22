@@ -51,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       community: project.city,
       dateISO: new Date().toISOString().slice(0, 10),
       // I4: curated — a stored BoQ may predate the source scrub.
-      boq: curateBoq(boq.data.sections, await loadWithheldNames(sb)),
+      boq: curateBoq(boq.data.sections, await loadWithheldNames(sb, projectId)),
     });
     if (json) return NextResponse.json({ readiness, pages: pages.length, bytes: pdf.byteLength, boq_id: boq.data.id });
     await recordPilotEvent(sb, projectId, "pack_exported", { document: "boq_pdf", boq_id: boq.data.id, pages: pages.length });

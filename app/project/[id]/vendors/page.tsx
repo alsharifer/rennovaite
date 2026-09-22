@@ -151,7 +151,7 @@ export default async function VendorsPage({
 
   const project = projectRes.data;
   // I4: curated on its way to the browser — a stored BoQ may predate the source scrub.
-  const boqPayload = curateBoq(latestBoq.sections, await loadWithheldNames(sb as unknown as Parameters<typeof loadWithheldNames>[0]));
+  const boqPayload = curateBoq(latestBoq.sections, await loadWithheldNames(sb, id));
   const boqId = latestBoq.id;
   const budgetAed = project.budget_aed ?? FALLBACK_BUDGET_AED;
 

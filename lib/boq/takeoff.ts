@@ -527,7 +527,7 @@ export function computeTakeoff(
       description: "Concealed water heater — supply and install",
       quantity: baths.length,
       unit: "no",
-      measurement: `1 per bathroom × ${baths.length} (Villa 94 retained existing heaters — QS to confirm inclusion)`,
+      measurement: `1 per bathroom × ${baths.length} (reference project retained existing heaters — QS to confirm inclusion)`,
     },
     {
       rule_id: "Q-21",
@@ -574,7 +574,7 @@ export function computeTakeoff(
       description: "Shattaf (health faucet), matt black — supply",
       quantity: baths.length,
       unit: "no",
-      measurement: `1 per wet room × ${baths.length} (Laspinas)`,
+      measurement: `1 per wet room × ${baths.length} (sanitaryware supplier)`,
     },
     {
       rule_id: "Q-24b",
@@ -583,7 +583,7 @@ export function computeTakeoff(
       description: "Paper holder, matt black — supply",
       quantity: baths.length,
       unit: "no",
-      measurement: `1 per wet room × ${baths.length} (Laspinas)`,
+      measurement: `1 per wet room × ${baths.length} (sanitaryware supplier)`,
     },
     {
       rule_id: "Q-24c",
@@ -592,7 +592,7 @@ export function computeTakeoff(
       description: "Towel rail, matt black — supply",
       quantity: baths.length,
       unit: "no",
-      measurement: `1 per wet room × ${baths.length} (Laspinas)`,
+      measurement: `1 per wet room × ${baths.length} (sanitaryware supplier)`,
     },
     {
       rule_id: "Q-24d",
@@ -601,7 +601,7 @@ export function computeTakeoff(
       description: "WC actuator plate, vertical square — supply",
       quantity: baths.length,
       unit: "no",
-      measurement: `1 per wet room × ${baths.length} (Laspinas)`,
+      measurement: `1 per wet room × ${baths.length} (sanitaryware supplier)`,
     },
     {
       rule_id: "Q-25",

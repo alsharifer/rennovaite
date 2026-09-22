@@ -26,7 +26,8 @@ const ids = args;
 
 // Mirrors lib/identity/curation.ts WITHHELD_IDENTITIES (kept literal here so the
 // check cannot be weakened by editing the module it checks).
-const WITHHELD = [/KAME/, /Atrium/, /QTN20261407/, /Global Creation/, /3936\/R1/, /Agreement A00074/];
+// T3b rulings added: Laspinas, its quotation number, Villa 94 / V94, the RAK tiles quotation.
+const WITHHELD = [/KAME/, /Atrium/, /QTN20261407/, /Global Creation/, /3936\/R1/, /Agreement A00074/, /Laspinas/, /\b46703\b/, /Villa ?94/i, /\bV94\b/, /RAK tiles quotation/i];
 
 const { url, key } = resolveTarget({ script: "provenance-check", writes: false });
 const sb = createClient(url, key);

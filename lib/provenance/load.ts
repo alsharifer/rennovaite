@@ -6,10 +6,13 @@
 // rather than inventing a name.
 //
 // Reads from `rate_book` ONLY the `qs_validated` boolean per item_key — never
-// `source` or `internal_ref`. Reads firm NAMES only to withhold them.
+// `source` or `internal_ref`. Reads firm NAMES only to withhold them — every
+// firm except the project's own (lib/identity/curation.ts).
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { withheldFirmNames } from "@/lib/identity/curation";
 
 import type { ProvElement, ProvenanceContext } from "./boq";
 
@@ -36,8 +39,11 @@ export async function loadProvenanceContext(sb: SupabaseClient, projectId: strin
     rows(sb.from("plan_fixtures").select("id, layer, type, dims_derived, derived_note").eq("project_id", projectId)),
     planId ? rows(sb.from("plan_context").select("id, kind, name, dims_derived, derived, note").eq("plan_id", planId)) : Promise.resolve([]),
     rows(sb.from("rate_book").select("item_key, qs_validated").eq("city", "Dubai")),
-    rows(sb.from("firms").select("name")),
+    rows(sb.from("firms").select("id, name")),
   ]);
+  // T3b: a firm's name may appear on its OWN project only.
+  const own = await rows(sb.from("projects").select("firm_id").eq("id", projectId).limit(1));
+  const ownFirm = (own[0]?.firm_id as string | null | undefined) ?? null;
 
   const elements: Record<string, ProvElement> = {};
   for (const r of rooms) {
@@ -61,5 +67,5 @@ export async function loadProvenanceContext(sb: SupabaseClient, projectId: strin
     qsValidated[k] = (qsValidated[k] ?? false) || r.qs_validated === true;
   }
 
-  return { elements, qsValidated, withheldNames: firms.map((f) => String(f.name)).filter((n) => n.trim().length >= 3) };
+  return { elements, qsValidated, withheldNames: withheldFirmNames(firms.map((f) => ({ id: String(f.id), name: String(f.name) })), ownFirm) };
 }

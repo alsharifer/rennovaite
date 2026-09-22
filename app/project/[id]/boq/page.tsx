@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app/AppShell";
 import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { roomRollup } from "@/lib/boq/elements";
+import { elementPricer } from "@/lib/boq/rates";
+import { loadProjectFirmOverlay } from "@/lib/rates/firm";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { DRAFT_STATEMENT } from "@/lib/plan/site-reference";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -204,7 +206,10 @@ export default async function BoqPage({
       wet_area: !!r.wet_area,
     }));
     if (items.length > 0) {
-      const rollups = roomRollup(items);
+      // T3b: room totals price each element item the way its BoQ line does.
+      const firm = await loadProjectFirmOverlay(sb, id);
+      const tier = (boqPayload as { engine?: { tier?: "value" | "mid" | "premium" } } | null)?.engine?.tier ?? "mid";
+      const rollups = roomRollup(items, elementPricer(firm, tier));
       const { data: roomRows } = await supabase
         .from("rooms")
         .select("id, name_en")

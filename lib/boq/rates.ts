@@ -358,3 +358,42 @@ export class RateResolver {
     throw new Error(`Rate rule "${itemKey}" has no labour, material, or allowance.`);
   }
 }
+
+// --- Element sections (P4 take-off) -------------------------------------------
+
+/**
+ * T3b: the price of a P4 element work item (demolition, wall_plaster,
+ * floor_finish, wet_tiling, ceiling_finish, wall_paint — the six sections the
+ * element take-off rebuilds when the viewer flag is on).
+ *
+ * Before T3b those sections priced ONLY from the constants in
+ * lib/boq/elements.ts, bypassing this resolver — so a firm's private rates never
+ * reached the bulk of an interior BoQ. They now resolve through the SAME firm
+ * overlay as every other line (tiers 1–2, `FirmOverlay.lookup`), and fall back
+ * to the element constant (tier 4) exactly as before.
+ *
+ * The reference book (tier 3) is deliberately NOT consulted for these keys: in
+ * production `rate_book` holds the what-if grade cells under exactly these item
+ * keys (floor_finish, wet_tiling, …), including Mudon's transacted tile rates.
+ * They have never priced an element line; consulting them would silently
+ * re-price every existing interior BoQ with no firm involved.
+ */
+export interface ElementRate {
+  rate_aed: number;
+  vendor_or_source: string;
+  rate_tier: "firm_private" | "firm_correction";
+}
+export type ElementPricer = (workItemKey: string, unit: string) => ElementRate | null;
+
+export function elementPricer(firm: FirmOverlay | null | undefined, tier: Tier): ElementPricer {
+  const grade = TIER_GRADE[tier] ?? "standard";
+  return (key, unit) => {
+    const hit = firm?.lookup(key, grade, unit);
+    if (!hit) return null;
+    return {
+      rate_aed: hit.entry.rate_aed,
+      vendor_or_source: hit.tier === "firm_private" ? FIRM_RATE_LABEL : FIRM_CORRECTION_LABEL,
+      rate_tier: hit.tier,
+    };
+  };
+}

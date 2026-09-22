@@ -8,6 +8,7 @@
 // Aggregation happens here, at line-assembly time — never before persistence.
 // =============================================================================
 
+import type { ElementPricer } from "./rates";
 import type { TakeoffItem, WorkItemKey } from "./quantify";
 
 export interface WorkItemDef {
@@ -41,11 +42,13 @@ export interface MappedLine {
   notes: string | null;
   rule_id: string;
   kind: "supply_and_install";
-  rate_band: "mid";
+  rate_band: "mid" | "book";
   wastage_pct: number;
   element_refs: string[];
   rate_status: "priced";
   work_item_key: WorkItemKey;
+  /** T3b: present only when a book tier (the project's firm) answered. */
+  rate_tier?: "firm_private" | "firm_correction";
 }
 
 export interface MappedSection {
@@ -57,8 +60,14 @@ export interface MappedSection {
 const r0 = (n: number) => Math.round(n);
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Build the element-mapped POMI sections from the take-off items. */
-export function assembleMappedSections(items: TakeoffItem[]): MappedSection[] {
+/**
+ * Build the element-mapped POMI sections from the take-off items.
+ *
+ * T3b: `price` is the rate resolver's element hook (lib/boq/rates.ts
+ * elementPricer). A key it answers is priced at that tier; otherwise the
+ * WORK_ITEM_DEF constant applies and the line is byte-identical to before.
+ */
+export function assembleMappedSections(items: TakeoffItem[], price?: ElementPricer): MappedSection[] {
   const byKey = new Map<WorkItemKey, TakeoffItem[]>();
   for (const it of items) {
     (byKey.get(it.work_item_key) ?? byKey.set(it.work_item_key, []).get(it.work_item_key)!).push(it);
@@ -87,21 +96,25 @@ export function assembleMappedSections(items: TakeoffItem[]): MappedSection[] {
         ? `Aggregated from ${its.length} element take-off items. NET of ${openingRefs.length} opening${openingRefs.length === 1 ? "" : "s"}: gross ${grossTotal} m² − ${deducted} m² (doors/windows) = ${quantity} m², floored at 0 per element.`
         : `Aggregated from ${its.length} element take-off items.`;
 
+    const unit = its[0]!.unit;
+    const book = price?.(key, unit) ?? null;
+    const rate = book?.rate_aed ?? def.rate_aed;
     lines.push({
       description: def.description,
       quantity,
-      unit: its[0]!.unit,
-      rate_aed: def.rate_aed,
-      total_aed: r0(quantity * def.rate_aed),
-      vendor_or_source: "Deterministic take-off (P4)",
+      unit,
+      rate_aed: rate,
+      total_aed: r0(quantity * rate),
+      vendor_or_source: book?.vendor_or_source ?? "Deterministic take-off (P4)",
       notes,
       rule_id: `P4/quantify/${key}`,
       kind: "supply_and_install",
-      rate_band: "mid",
+      rate_band: book ? "book" : "mid",
       wastage_pct: 0,
       element_refs: [...its.map((i) => i.element_id), ...openingRefs],
       rate_status: "priced",
       work_item_key: key,
+      ...(book ? { rate_tier: book.rate_tier } : {}),
     });
   }
 
@@ -137,7 +150,7 @@ export interface RoomRollup {
  * and sorted descending. Wall items are attributed to their `room_id`. Items
  * with no room (should be none) are dropped from the room view.
  */
-export function roomRollup(items: TakeoffItem[]): RoomRollup[] {
+export function roomRollup(items: TakeoffItem[], price?: ElementPricer): RoomRollup[] {
   const byRoom = new Map<string, TakeoffItem[]>();
   for (const it of items) {
     if (!it.room_id) continue;
@@ -155,7 +168,10 @@ export function roomRollup(items: TakeoffItem[]): RoomRollup[] {
     const workItems: RoomRollupWorkItem[] = [];
     for (const [key, { qty, unit }] of byKey) {
       const def = WORK_ITEM_DEF[key];
-      workItems.push({ work_item_key: key, description: def.description, qty: r2(qty), unit, total_aed: r0(qty * def.rate_aed) });
+      // T3b: the same element price the mapped line uses, so a room total and
+      // its BoQ line cannot disagree.
+      const rate = price?.(key, unit)?.rate_aed ?? def.rate_aed;
+      workItems.push({ work_item_key: key, description: def.description, qty: r2(qty), unit, total_aed: r0(qty * rate) });
     }
     workItems.sort((a, b) => b.total_aed - a.total_aed);
     rollups.push({ room_id, total_aed: workItems.reduce((s, w) => s + w.total_aed, 0), items: workItems });

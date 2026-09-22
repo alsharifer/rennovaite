@@ -178,7 +178,9 @@ describe("ranges are never false precision", () => {
     const e = estimateTimeline({ drivers: mudonDrivers(), sectionTotals: ALL });
     expect(e.derived).toBe(true);
     for (const p of e.phases) expect(p.derived).toBe(true);
-    expect(e.basis).toMatch(/one calibrated project/i);
+    expect(e.basis).toMatch(/one calibrated reference project/i);
+    // T3b ruling: the reference property is never named.
+    expect(e.basis).not.toMatch(/Villa ?94|Mudon/i);
   });
 });
 

@@ -122,7 +122,7 @@ export default async function ViewerPage({
   const rawSections = boqRows?.[0]?.sections;
   const boq: InspectBoq =
     rawSections && typeof rawSections === "object" && "sections" in rawSections
-      ? curateBoq(rawSections as unknown as InspectBoq, await loadWithheldNames(supabase as unknown as Parameters<typeof loadWithheldNames>[0]))
+      ? curateBoq(rawSections as unknown as InspectBoq, await loadWithheldNames(supabase, projectId))
       : { sections: [] };
 
   const fin = styleFinishes(styleKey);
