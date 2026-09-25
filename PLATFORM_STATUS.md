@@ -169,6 +169,11 @@ restore into the dev project from I8, which does not exist. The per-run
 container restore proves the dump is readable and complete; it is not the same
 as proving it restores into a live Supabase project.
 
+> **Update, O2 (2026-09-25):** the schedule and the offsite location moved off
+> the PC — nightly GitHub Actions → encrypted → Backblaze B2, restore-tested
+> from the bucket every run. OneDrive holds only the 2026-09-11 manual dump.
+> See `docs/OPS_RUNBOOK.md` §2.
+
 ## O4 — Route boundaries ✅
 
 One shared implementation, `components/app/boundaries.tsx`; every boundary file

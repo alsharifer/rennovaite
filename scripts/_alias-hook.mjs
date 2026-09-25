@@ -40,8 +40,15 @@ registerHooks({
       const resolved = withExtension(path.join(ROOT, specifier.slice(2)));
       if (resolved) return { url: pathToFileURL(resolved).href, shortCircuit: true };
     }
-    // Relative specifiers that omit the .ts extension.
-    if (specifier.startsWith(".") && context.parentURL?.startsWith("file:")) {
+    // Relative specifiers that omit the .ts extension — in THIS repo's files
+    // only. A package's own internal requires (neo4j-driver-core's "./result"
+    // beside a "result/" directory, say) must reach node's resolver untouched,
+    // or the hook hands node a directory to read as a file (EISDIR).
+    if (
+      specifier.startsWith(".") &&
+      context.parentURL?.startsWith("file:") &&
+      !context.parentURL.includes("/node_modules/")
+    ) {
       const base = path.dirname(fileURLToPath(context.parentURL));
       const resolved = withExtension(path.resolve(base, specifier));
       if (resolved) return { url: pathToFileURL(resolved).href, shortCircuit: true };

@@ -1449,12 +1449,25 @@ the app falls back to its pre-KG behaviour with no error — but note the
 fallback costs a **10 s timeout per call**, so turn `KG_ENABLED` off rather
 than leaving it on against a stopped database.
 
-**Starting Neo4j:** `docker start rennovaite-neo4j` (allow ~40 s to reach
-`healthy`). The container and its named volumes `kg_neo4j_data` /
-`kg_neo4j_logs` already exist and persist the seed, so this needs no compose
-file and works from any directory. **`cd kg && docker compose up -d` does NOT
-work from this repo** — `kg/` here holds only the vendored consumer copy
-`kg/retrieval/agent.ts`; the seed, loader, and `docker-compose.yml` live in the
-separate KG module (its own git repo) at
+**Where Neo4j lives (O1):** the KG is moving to **Neo4j AuraDB** —
+`NEO4J_URI=neo4j+s://<id>.databases.neo4j.io`, no code change, the driver
+takes the encrypted scheme from the URI. `docs/OPS_RUNBOOK.md` has the
+cut-over, the migration tooling (`scripts/kg/`: export → import → verify →
+equivalence check against the app's own queries) and the rollback. The local
+container `rennovaite-neo4j` is the **rollback for one week of clean Aura
+operation** — stopped, not deleted, until Abdallah confirms that week. To use
+it locally: `docker start rennovaite-neo4j` (allow ~40 s to reach `healthy`;
+its named volumes `kg_neo4j_data` / `kg_neo4j_logs` persist the seed) and
+point `NEO4J_URI` at `bolt://localhost:7687`. **`cd kg && docker compose up -d`
+does NOT work from this repo** — `kg/` here holds only the vendored consumer
+copy `kg/retrieval/agent.ts`; the seed, loader, and `docker-compose.yml` live
+in the separate KG module (its own git repo) at
 `C:\Users\alsha\OneDrive\Desktop\RennovAIte\RennovAIte\kg`. Use compose only
 from that directory.
+
+**Backups (O2):** nightly `.github/workflows/backup.yml` (03:00 Dubai) wraps
+`scripts/backup-production.sh` unchanged, encrypts the dump and uploads it to
+Backblaze B2, prunes (daily 14 d / weekly 56 d), then **restores it from the
+bucket** and compares every table's row count. A failed run opens an issue
+labelled `backup-failure`. Secrets, restore commands and retention are in
+`docs/OPS_RUNBOOK.md`.
