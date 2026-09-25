@@ -93,15 +93,26 @@ retry() {
 # RLS policies, sequences, functions and triggers come with the schema dump for
 # the same reason: they are schema, and the REST export was never able to see
 # them either.
-log "dumping (custom format, all schemas incl. auth + storage)"
+#
+# --schema='*' also matches pg_catalog and information_schema, and pg_dump
+# obligingly emits them — including TABLE DATA for pg_catalog.pg_event_trigger.
+# A superuser restore then COPYs production's event-trigger rows into the
+# target catalog with function OIDs that mean something else there, and every
+# DDL statement after that fails: the O2 bring-up (2026-09-25) saw 2,981 restore
+# errors and all 25 ENABLE ROW LEVEL SECURITY statements silently dropped. The
+# two --exclude-schema flags keep the system schemas out at dump time, so the
+# archive restores clean without anyone remembering to filter its TOC.
+log "dumping (custom format, all schemas incl. auth + storage; system schemas excluded)"
 retry docker_run run --rm -e PGURL="$SUPABASE_DB_URL" -v "$(host_path "$DEST"):/out" "$PG_IMAGE" \
   sh -c 'pg_dump "$PGURL" --format=custom --no-owner --no-privileges \
-           --schema="*" -f /out/full.dump'
+           --schema="*" --exclude-schema="pg_*" --exclude-schema=information_schema \
+           -f /out/full.dump'
 
 log "dumping (schema only, for diffing)"
 retry docker_run run --rm -e PGURL="$SUPABASE_DB_URL" -v "$(host_path "$DEST"):/out" "$PG_IMAGE" \
   sh -c 'pg_dump "$PGURL" --schema-only --no-owner --no-privileges \
-           --schema="*" -f /out/schema.sql'
+           --schema="*" --exclude-schema="pg_*" --exclude-schema=information_schema \
+           -f /out/schema.sql'
 
 # --- 2. verify by restoring ---------------------------------------------------
 # A dump nobody has restored is a hope. This restores every backup into a

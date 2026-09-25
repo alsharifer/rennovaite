@@ -39,6 +39,13 @@ docker cp "$(host_path "$HERE/counts.sql")" "$CHECK:/tmp/counts.sql"
 # the unfiltered restore reported 2,981 errors and zero RLS state; with the
 # system schemas left out of the TOC it reports 45 (pg_temp_* schemas, vault)
 # and the RLS state comes back exactly as the I9 rehearsal saw it.
+#
+# Since the dump-time fix (--exclude-schema on backup-production.sh) the archive
+# must carry NO system-schema entries; that is asserted below and fails the run
+# if a regression ever puts them back. The TOC filter stays as a second line of
+# defence so an old archive still restores, but it is no longer what makes the
+# RLS state come back.
+SYSTEM_ENTRIES="$(docker exec "$CHECK" sh -c "pg_restore -l /tmp/full.dump | grep -cE ' (pg_catalog|information_schema) ' || true")"
 docker exec "$CHECK" sh -c "pg_restore -l /tmp/full.dump | grep -vE ' (pg_catalog|information_schema) ' > /tmp/toc.list"
 docker exec "$CHECK" pg_restore -U postgres -d postgres --no-owner --no-privileges -L /tmp/toc.list /tmp/full.dump 2> "$DIR/cloud-restore.log" || true
 docker exec "$CHECK" psql -U postgres -v ON_ERROR_STOP=1 -At -F '|' -f /tmp/counts.sql > "$DIR/counts.restored.txt"
@@ -47,7 +54,8 @@ REPORT="$DIR/RESTORE-TEST.txt"
 fail=0
 {
   echo "object_dir=$(basename "$DIR")"
-  echo "restore_errors_logged=$(grep -c 'ERROR' "$DIR/cloud-restore.log" || true)   (expected ~45: pg_temp_* schema names, vault; NOT thousands — that means system-schema entries were restored)"
+  echo "restore_errors_logged=$(grep -c 'ERROR' "$DIR/cloud-restore.log" || true)   (expected a handful: vault; NOT thousands — that means system-schema entries were restored)"
+  echo "system_schema_toc_entries=${SYSTEM_ENTRIES:-?}   (must be 0 since the dump-time --exclude-schema fix)"
   echo
   printf '%-34s %12s %12s  %s\n' "check" "source" "restored" "verdict"
 } > "$REPORT"
@@ -73,6 +81,7 @@ floor() { # kind min
   floor auth_users 1
   floor rls_enabled_auth 1
   floor rls_enabled_storage 1
+  if [ "${SYSTEM_ENTRIES:-1}" = "0" ]; then echo "dump carries no pg_catalog/information_schema entries: ok"; else echo "dump carries ${SYSTEM_ENTRIES:-?} system-schema TOC entries: FAILED (dump-time --exclude-schema regressed)"; fail=1; fi
   echo
   echo "restored_at=$(date -u +%FT%TZ)"
   echo "verdict=$([ "$fail" = 0 ] && echo PASSED || echo FAILED)"
