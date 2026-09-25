@@ -59,7 +59,9 @@ jobs:
   backup:
     if: ${{ !inputs.restore_only }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # Run #3 (2026-09-25): the two pg_dumps through the session pooler took
+    # 26 minutes on their own. 40 was one slow night away from a timeout.
+    timeout-minutes: 75
     outputs:
       object_key: ${{ steps.upload.outputs.object_key }}
       sha256: ${{ steps.package.outputs.sha256 }}

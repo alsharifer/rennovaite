@@ -12,13 +12,22 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=s3env.sh
 . "$HERE/s3env.sh"
 
+# B2's S3 lifecycle dialect (run #3, 2026-09-25): an Expiration rule on a prefix
+# must be accompanied by a SEPARATE rule on the exact same prefix carrying
+# ExpiredObjectDeleteMarker — "daily/ has an Expiration rule but there is no
+# ExpiredObjectDeleteMarker rule with the exact same prefix". S3 proper forbids
+# combining the two in one Expiration element, hence four rules for two windows.
 cat > /tmp/lifecycle.json <<'JSON'
 {
   "Rules": [
     { "ID": "daily-14d",  "Status": "Enabled", "Filter": { "Prefix": "daily/" },
       "Expiration": { "Days": 14 }, "NoncurrentVersionExpiration": { "NoncurrentDays": 1 } },
+    { "ID": "daily-markers",  "Status": "Enabled", "Filter": { "Prefix": "daily/" },
+      "Expiration": { "ExpiredObjectDeleteMarker": true } },
     { "ID": "weekly-56d", "Status": "Enabled", "Filter": { "Prefix": "weekly/" },
-      "Expiration": { "Days": 56 }, "NoncurrentVersionExpiration": { "NoncurrentDays": 1 } }
+      "Expiration": { "Days": 56 }, "NoncurrentVersionExpiration": { "NoncurrentDays": 1 } },
+    { "ID": "weekly-markers", "Status": "Enabled", "Filter": { "Prefix": "weekly/" },
+      "Expiration": { "ExpiredObjectDeleteMarker": true } }
   ]
 }
 JSON
