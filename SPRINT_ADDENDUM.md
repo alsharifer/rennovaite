@@ -48,8 +48,12 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
   IPv6 address; GitHub runners have no IPv6 (`Network is unreachable` ×3).
   Fix is the pooler URL from `~/backups/rennovaite/.db-url`
   (`gh secret set BACKUP_DB_URL < …`, runbook §2) — a secret Abdallah sets,
-  then re-dispatch with `prune_probe` + `configure_lifecycle`. No cloud
-  restore test has passed yet; the acceptance criterion is still open.
+  then re-dispatch with `prune_probe` + `configure_lifecycle`. **Run #2
+  (36145453268) reproduced it** — the secret had not been changed (issue #65
+  opened) — and exposed a second defect: `BACKUP_STORAGE_ENDPOINT` is stored
+  as a bare hostname and aws-cli refused it; `s3env.sh` now normalises the
+  scheme (PR #64). No cloud restore test has passed yet; the acceptance
+  criterion is still open.
 - **Finding — the dump carries `pg_catalog` and it corrupts a superuser
   restore.** `--schema='*'` includes `pg_catalog.pg_event_trigger` TABLE
   DATA; restoring it plants production's event-trigger rows with foreign
