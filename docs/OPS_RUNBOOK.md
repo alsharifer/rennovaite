@@ -201,6 +201,34 @@ A run that is green has therefore restored production from the cloud copy
 that night. The Actions step summary shows the counts; the logs mask every
 part of the connection string (the repository is public).
 
+### First green run — #4, 36149806456, 2026-09-25 (the acceptance record)
+
+Three failed dispatches first, each opening its own `backup-failure` issue
+(#63, #65, #66 — the alarm works): #1/#2 `BACKUP_DB_URL` was the IPv6-only
+direct host; #3 the encryption key was under 24 characters (and B2 rejected
+the lifecycle grammar). Run #4, after both secrets were fixed:
+
+```
+[backup 14:47:22] dumping (custom format, all schemas incl. auth + storage)
+[backup 14:59:49] dumping (schema only, for diffing)
+[backup 15:09:52] restored: 36 public tables, 9 projects, 1 auth users, 0 RLS policies
+[counts]  36 tables · auth_users=1 · rls_policies=0
+[package] rennovaite-2026-09-25T14-47-22Z.tar.gpg (1.2M) sha256=6a3911911bf7…
+[upload]  daily/rennovaite-2026-09-25T14-47-22Z.tar.gpg (1172702 bytes) confirmed
+[prune]   planted probe (2 versions) → deleted both (age 9764 d) → self-test passed
+[fetch]   daily/rennovaite-2026-09-25T14-47-22Z.tar.gpg → sha256 OK → decrypted (2.6M dump)
+restore_errors_logged=45     (pg_temp_* schema names, vault — as predicted)
+auth_users 1/1 · public_tables 36/36 · rls_enabled_auth 16/16 · rls_enabled_storage 8/8 · rls_policies 0/0
+36 tables, every row count equal (accessory_catalog 45 … whatif_scenarios 76)
+verdict=PASSED
+```
+
+Lifecycle: B2 accepted the four rules and reports them back as `daily-14d` /
+`daily-14d_marker` / `weekly-56d` / `weekly-56d_marker` (it renames the marker
+rules). Dump budget: 22 minutes for the two pg_dumps through the pooler, hence
+the 75-minute job timeout. `kg-keepalive` still **skipped** — the `NEO4J_*`
+Actions secrets were not yet set.
+
 ### When the workflow fails
 
 An issue labelled **`backup-failure`** is opened automatically with the run

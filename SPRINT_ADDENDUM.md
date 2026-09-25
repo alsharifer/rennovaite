@@ -60,8 +60,17 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
   public-cloud copy of customer data and anyone holding the object). B2 also
   rejected the lifecycle rules (it wants a companion
   `ExpiredObjectDeleteMarker` rule per prefix — fixed in
-  `configure-retention.sh`). No cloud restore test has passed yet; the
-  acceptance criterion is still open.
+  `configure-retention.sh`). **Run #4 (36149806456), after the key was
+  replaced: ALL FOUR JOBS GREEN.** Dump 14:47→15:09 (36 tables, 9 projects,
+  1 auth user), 1.2 MB encrypted object uploaded and size-confirmed, retention
+  probe planted and both versions deleted, lifecycle rules accepted by B2;
+  **restore-test downloaded the object from the bucket, verified the sha256,
+  decrypted, restored into scratch `postgres:17` and matched 41/41 checks —
+  every table's row count, 1 account, RLS auth 16 / storage 8 — verdict
+  PASSED.** The acceptance criterion is met; the nightly cron (`0 23 * * *`)
+  now runs on `master`. Still skipped: `kg-keepalive` (no `NEO4J_*` Actions
+  secrets yet). Issues #63/#65/#66 are the three failed dispatches and can
+  close.
 - **Finding — the dump carries `pg_catalog` and it corrupts a superuser
   restore.** `--schema='*'` includes `pg_catalog.pg_event_trigger` TABLE
   DATA; restoring it plants production's event-trigger rows with foreign
