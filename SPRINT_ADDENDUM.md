@@ -24,11 +24,13 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
   later the same day:** import 204/528 with matching fingerprints; verify
   **IDENTICAL** on all eight checks; equivalence **EQUIVALENT** 6/6 (0 content
   differences); `getKgContext` with `KG_ENABLED=true` → GROUNDED in 3.9 s
-  cold. Pending on Abdallah: Vercel env (Production + Preview), the three
-  `NEO4J_*` Actions secrets for `kg-keepalive`, **then** `docker stop
-  rennovaite-neo4j`, then rotate the Aura password (it passed through a chat
-  window). **Rollback** = the container, stopped not deleted, for one clean
-  week.
+  cold. **Container stopped 2026-09-25 15:22:42 Z** (owner's instruction;
+  volumes intact) — before the env switch, so local dev is un-grounded until
+  `.env.local` carries the Aura variables. Still pending on Abdallah: Vercel
+  env (Production + Preview), the three `NEO4J_*` Actions secrets for
+  `kg-keepalive` (none set as of 15:15 Z), `.env.local`, then rotate the Aura
+  password (it passed through a chat window). **Rollback** = `docker start
+  rennovaite-neo4j`, kept for one clean week from the Vercel switch.
 - **O2 built and proven locally; the first cloud run needs the workflow on
   `master`.** `.github/workflows/backup.yml` + `scripts/backup-cloud/` wrap
   `backup-production.sh` unchanged: 03:00 Dubai · gpg AES-256 · B2 `daily/`
