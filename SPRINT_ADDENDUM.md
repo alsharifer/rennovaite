@@ -20,10 +20,15 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
   that to the planner; consequence: one render-cache miss per room × style
   after cut-over). Export on disk at `~/backups/rennovaite/kg/kg-2026-09-25T13-41-14Z.json`
   (outside the repo). **No code change**: `neo4j-driver` takes `neo4j+s://`
-  from the URI. Aura URI / user / password were not available in this
-  session, so O1 steps 2–5 (import, verify, equivalence against Aura, dev
-  smoke, stop the container) are runnable but not run. **Rollback** = the
-  container, stopped not deleted, for one clean week.
+  from the URI. **Against Aura (`a9bb4074.databases.neo4j.io`, 5.27-aura),
+  later the same day:** import 204/528 with matching fingerprints; verify
+  **IDENTICAL** on all eight checks; equivalence **EQUIVALENT** 6/6 (0 content
+  differences); `getKgContext` with `KG_ENABLED=true` → GROUNDED in 3.9 s
+  cold. Pending on Abdallah: Vercel env (Production + Preview), the three
+  `NEO4J_*` Actions secrets for `kg-keepalive`, **then** `docker stop
+  rennovaite-neo4j`, then rotate the Aura password (it passed through a chat
+  window). **Rollback** = the container, stopped not deleted, for one clean
+  week.
 - **O2 built and proven locally; the first cloud run needs the workflow on
   `master`.** `.github/workflows/backup.yml` + `scripts/backup-cloud/` wrap
   `backup-production.sh` unchanged: 03:00 Dubai · gpg AES-256 · B2 `daily/`
@@ -36,7 +41,15 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
   2026-09-11 production dump: package → sha → decrypt → filtered restore →
   **32/32 checks ok, verdict PASSED** (29 tables, 1 account, RLS auth 16 /
   storage 8). GitHub registers `workflow_dispatch` only from the default
-  branch → the first cloud run + cloud restore test happen after merge.
+  branch → PR #62 merged (`175de65`), workflow registered (id 367010494).
+  **First cloud run (#1, 36144700303) FAILED at the dump step — and the
+  fail-loud path worked: issue #63 opened automatically.** Cause: the
+  `BACKUP_DB_URL` secret points at Supabase's direct host, which has only an
+  IPv6 address; GitHub runners have no IPv6 (`Network is unreachable` ×3).
+  Fix is the pooler URL from `~/backups/rennovaite/.db-url`
+  (`gh secret set BACKUP_DB_URL < …`, runbook §2) — a secret Abdallah sets,
+  then re-dispatch with `prune_probe` + `configure_lifecycle`. No cloud
+  restore test has passed yet; the acceptance criterion is still open.
 - **Finding — the dump carries `pg_catalog` and it corrupts a superuser
   restore.** `--schema='*'` includes `pg_catalog.pg_event_trigger` TABLE
   DATA; restoring it plants production's event-trigger rows with foreign

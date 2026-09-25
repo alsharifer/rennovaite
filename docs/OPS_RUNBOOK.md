@@ -78,7 +78,35 @@ different order. Because the KG context is appended to the render prompt and
 the prompt is the render cache key, the first render of a given room × style
 after the cut-over may miss the cache once. Nothing else changes.
 
-### Cut-over (O1 steps 2–5)
+### Cut-over (O1 steps 2–5) — done 2026-09-25 up to the env switch
+
+Instance: **`neo4j+s://a9bb4074.databases.neo4j.io`** (Aura Free, Neo4j
+5.27-aura, Bolt 6.0, user `neo4j`; the password is in the password manager and
+nowhere in this repo). The app's variable is **`NEO4J_USER`** — Aura's
+credentials file calls it `NEO4J_USERNAME`; rename when pasting.
+
+| Step | Result |
+| --- | --- |
+| 2 export | `kg-2026-09-25T13-41-14Z.json` — 204 / 528 / 14 / 3, no downtime |
+| 3 import | 204 nodes, 528 relationships created; read-back fingerprints match the file |
+| 3 verify | **IDENTICAL** — counts, 15 labels, 17 types, 14 constraints, 3 indexes, every node and relationship fingerprint |
+| 3 equivalence | **EQUIVALENT** — 6/6 briefs, 0 content differences (5 tie-order-only, as expected) |
+| 4 app smoke | `getKgContext` (the routes' entry point) with `KG_ENABLED=true` → GROUNDED, bundle id issued, 3.9 s cold / warm thereafter, inside the 10 s guard |
+| 5 Vercel env | **pending** — Abdallah sets `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` in Production + Preview and redeploys |
+| 6 keepalive secrets | **pending** — same three as GitHub Actions secrets |
+| 7 stop container | **pending** — after step 5, so local dev is not left un-grounded; `docker stop rennovaite-neo4j`, never `rm` until the clean week |
+
+Two things seen on the way: the very first driver connection to a fresh Aura
+instance was reset (`ServiceUnavailable … ECONNRESET`) and every scheme
+connected a minute later — a cold instance, not a config fault; and
+`SHOW CONSTRAINTS` names the same constraint `UNIQUENESS` on 5.26 and
+`NODE_PROPERTY_UNIQUENESS` on 5.27, which `verify-graph.mjs` now normalises.
+
+**Rotate the Aura password** once Vercel is switched: it was supplied through a
+chat window during the cut-over, which by this project's own rule counts as
+disclosed (`docs/BACKUPS.md`, "Password: done").
+
+Original step list, kept for the next instance:
 
 1. Create the Aura Free instance in the Neo4j console; download its credentials
    file (the password is shown once). Put them in the password manager.
@@ -181,6 +209,18 @@ the pooler dropped the connection three times (rerun), the database password
 was rotated (update `BACKUP_DB_URL`), the B2 key was revoked (update
 `BACKUP_STORAGE_*`), or the restore counts diverged (a real finding — read the
 `RESTORE-TEST.txt` block in the summary before touching anything).
+
+**`BACKUP_DB_URL` must be the session-pooler URL, not the direct host.** The
+first run (#1, 2026-09-25, issue #63) failed with `Network is unreachable` on
+an IPv6 address: Supabase's direct host `db.<ref>.supabase.co` has **only an
+AAAA record**, and GitHub-hosted runners have no IPv6. The pooler
+`aws-1-ap-southeast-1.pooler.supabase.com` (user `postgres.<ref>`, port 5432,
+the same string `~/backups/rennovaite/.db-url` holds) resolves to IPv4. Set
+the secret from that file without it touching a terminal or a chat window:
+
+```bash
+gh secret set BACKUP_DB_URL < "$HOME/backups/rennovaite/.db-url"
+```
 
 ### Restore for real
 

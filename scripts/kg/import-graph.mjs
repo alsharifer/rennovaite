@@ -44,7 +44,7 @@ try {
     // Schema first. Names are kept so SHOW CONSTRAINTS / SHOW INDEXES read the
     // same on both sides — verify-graph.mjs compares them by name.
     for (const c of data.constraints) {
-      if (c.type !== "UNIQUENESS") throw new Error(`constraint ${c.name}: type ${c.type} not handled`);
+      if (c.type !== "NODE_PROPERTY_UNIQUENESS") throw new Error(`constraint ${c.name}: type ${c.type} not handled`);
       await session.run(`CREATE CONSTRAINT ${ident(c.name)} IF NOT EXISTS FOR (n:${ident(c.labels[0])}) REQUIRE (${c.properties.map((p) => `n.${ident(p)}`).join(", ")}) IS UNIQUE`);
     }
     for (const i of data.indexes) {
