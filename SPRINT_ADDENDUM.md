@@ -1,3 +1,65 @@
+# Ops addendum — Neo4j off the PC, backups off the PC (O1–O3, 2026-09-25)
+
+_Prepended to the Sprint-4 addendum. Infra only: no Sprint-4 code surface
+(firm tables, auth, UI) was touched — `git status` on `ops/neo4j-aura-cloud-backups`
+names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
+`lib/rates` or `supabase/migrations`. Full detail: `docs/OPS_RUNBOOK.md`._
+
+- **The failure that started this, measured.** `rennovaite-neo4j` exited at
+  **2026-09-21 17:53:21 Z** (the PC shut down; restart policy `no`) and was
+  restarted by the Sprint-4 pre-flight at **2026-09-25 09:49:12 Z** — **3 d
+  15 h 56 m** during which every render / BoQ prompt was silently
+  un-grounded (`lib/kg/context.ts` swallows the error and costs 10 s per call
+  doing so). Nothing alerted. That is the case for O1.
+- **O1 tooling done and proven; cut-over waits on the Aura credentials.**
+  `scripts/kg/{export,import,verify}-graph.mjs` + `equivalence-check.ts`
+  (§1 of the runbook). Round trip local → throwaway container:
+  **204 nodes / 528 relationships / 14 constraints / 3 indexes IDENTICAL** by
+  per-element fingerprint; the app's six briefs **EQUIVALENT** (content
+  identical, tie order differs — the queries' `UNION` / `ORDER BY score` leave
+  that to the planner; consequence: one render-cache miss per room × style
+  after cut-over). Export on disk at `~/backups/rennovaite/kg/kg-2026-09-25T13-41-14Z.json`
+  (outside the repo). **No code change**: `neo4j-driver` takes `neo4j+s://`
+  from the URI. Aura URI / user / password were not available in this
+  session, so O1 steps 2–5 (import, verify, equivalence against Aura, dev
+  smoke, stop the container) are runnable but not run. **Rollback** = the
+  container, stopped not deleted, for one clean week.
+- **O2 built and proven locally; the first cloud run needs the workflow on
+  `master`.** `.github/workflows/backup.yml` + `scripts/backup-cloud/` wrap
+  `backup-production.sh` unchanged: 03:00 Dubai · gpg AES-256 · B2 `daily/`
+  + Sunday `weekly/` · prune every B2 version past 14 d / 56 d (with a
+  `prune_probe` self-test) · **restore-test job that downloads from the
+  bucket**, decrypts, restores into scratch `postgres:17` and compares every
+  table's row count + `auth_users` + `rls_policies` + RLS-enabled counts
+  against the source · a failed job opens a `backup-failure` issue. The six
+  `BACKUP_*` repo secrets exist (set 2026-09-25). Local end-to-end on the real
+  2026-09-11 production dump: package → sha → decrypt → filtered restore →
+  **32/32 checks ok, verdict PASSED** (29 tables, 1 account, RLS auth 16 /
+  storage 8). GitHub registers `workflow_dispatch` only from the default
+  branch → the first cloud run + cloud restore test happen after merge.
+- **Finding — the dump carries `pg_catalog` and it corrupts a superuser
+  restore.** `--schema='*'` includes `pg_catalog.pg_event_trigger` TABLE
+  DATA; restoring it plants production's event-trigger rows with foreign
+  function OIDs and every later DDL fails, silently dropping all 25 `ENABLE
+  ROW LEVEL SECURITY` (2,981 errors, zero RLS state — the I9 rehearsal never
+  saw this because it restored into a full Supabase stack). The cloud restore
+  test and the runbook's real-restore procedure filter
+  `pg_catalog`/`information_schema` from the TOC (45 benign errors, RLS state
+  exact). `backup-production.sh` was left unchanged as instructed; the
+  dump-time fix (`--exclude-schema='pg_*' --exclude-schema=information_schema`)
+  is a follow-up.
+- **There was no PC schedule.** `Get-ScheduledTask` shows no `RennovAIte
+  backup` task; `docs/BACKUPS.md`'s `schtasks /create` was never run. Nothing
+  to disable. OneDrive holds the single 2026-09-11 manual dump.
+- **Still PC-dependent, none load-bearing:** the stopped Neo4j container
+  (rollback), `~/backups/rennovaite/{.db-url,kg/}` (convenience copies), the
+  KG module repo in OneDrive (reseed only — should get a remote), the CLI link.
+- **Baseline after the change:** vitest **822/822**, every new shell script
+  `bash -n` clean, workflow YAML parses; `.env.local` mtime unchanged
+  (2026-09-10); credential scan of the diff clean (placeholders only).
+
+---
+
 # Sprint-4 Addendum — confirmed facts (pre-flight)
 
 _Prepend this block to every Sprint-4 prompt. It **supersedes** the Sprint-3
