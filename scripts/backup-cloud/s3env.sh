@@ -10,6 +10,16 @@
 : "${BACKUP_STORAGE_APP_KEY:?BACKUP_STORAGE_APP_KEY is required}"
 : "${BACKUP_STORAGE_BUCKET:?BACKUP_STORAGE_BUCKET is required}"
 
+# The secret may hold a bare hostname (s3.<region>.backblazeb2.com) — that is
+# how B2's console shows it, and run #2 (2026-09-25) failed on exactly that:
+# aws-cli refuses an --endpoint-url without a scheme. Normalise here rather
+# than asking for the secret to be re-entered.
+case "$BACKUP_STORAGE_ENDPOINT" in
+  http://*|https://*) ;;
+  *) BACKUP_STORAGE_ENDPOINT="https://${BACKUP_STORAGE_ENDPOINT}" ;;
+esac
+BACKUP_STORAGE_ENDPOINT="${BACKUP_STORAGE_ENDPOINT%/}"
+
 export AWS_ACCESS_KEY_ID="$BACKUP_STORAGE_KEY_ID"
 export AWS_SECRET_ACCESS_KEY="$BACKUP_STORAGE_APP_KEY"
 export AWS_EC2_METADATA_DISABLED=true
