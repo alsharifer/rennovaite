@@ -44,7 +44,7 @@ function envOf(prefix) {
 /** Scheme + host only — safe to print. */
 export function describe(uri) {
   if (!uri) return "(unset)";
-  const m = /^([a-z+]+):\/\/(?:[^@/]*@)?([^/?#]+)/i.exec(uri);
+  const m = /^([a-z0-9+]+):\/\/(?:[^@/]*@)?([^/?#]+)/i.exec(uri);
   return m ? `${m[1]}://${m[2]}` : "(unparseable uri)";
 }
 
@@ -147,7 +147,7 @@ export async function readGraph(driver) {
     );
     const rels = relsRes.records.map((r) => ({ type: r.get("type"), start: r.get("start"), end: r.get("end"), props: r.get("props") }));
     const cons = await session.run("SHOW CONSTRAINTS YIELD name, type, labelsOrTypes, properties RETURN name, type, labelsOrTypes, properties ORDER BY name");
-    const constraints = cons.records.map((r) => ({ name: r.get("name"), type: r.get("type"), labels: r.get("labelsOrTypes"), properties: r.get("properties") }));
+    const constraints = cons.records.map((r) => ({ name: r.get("name"), type: constraintType(r.get("type")), labels: r.get("labelsOrTypes"), properties: r.get("properties") }));
     const idx = await session.run(
       "SHOW INDEXES YIELD name, type, labelsOrTypes, properties, owningConstraint WHERE type <> 'LOOKUP' AND owningConstraint IS NULL RETURN name, type, labelsOrTypes, properties ORDER BY name",
     );
@@ -156,6 +156,16 @@ export async function readGraph(driver) {
   } finally {
     await session.close();
   }
+}
+
+/**
+ * Neo4j renamed the constraint types between 5.26 and 5.27: SHOW CONSTRAINTS
+ * says `UNIQUENESS` on the local 5.26 container and `NODE_PROPERTY_UNIQUENESS`
+ * on Aura's 5.27 for the same constraint. Compare on the modern name so a
+ * version label does not read as a schema difference.
+ */
+export function constraintType(t) {
+  return { UNIQUENESS: "NODE_PROPERTY_UNIQUENESS", RELATIONSHIP_UNIQUENESS: "RELATIONSHIP_PROPERTY_UNIQUENESS" }[t] ?? t;
 }
 
 export function summarize(graph) {
