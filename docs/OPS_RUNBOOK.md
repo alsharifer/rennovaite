@@ -42,10 +42,14 @@ database `neo4j`). The app reaches it through the vendored retrieval agent
 `neo4j-driver` handles the `neo4j+s://` scheme (TLS + routing) from the URI
 alone, so the cut-over is three environment variables.
 
-The seed, loader and docker-compose remain in the separate KG module
-(`C:\Users\alsha\OneDrive\Desktop\RennovAIte\RennovAIte\kg`). Reseeding a fresh
-instance is the loader's job; **migrating an existing graph** is the scripts
-below.
+The seed, loader and docker-compose live in the separate KG module — now on a
+**private GitHub remote, `https://github.com/alsharifer/rennovaite-kg`**
+(pushed 2026-09-25; the OneDrive checkout at
+`C:\Users\alsha\OneDrive\Desktop\RennovAIte\RennovAIte\kg` tracks it). The
+seven `seed/**/mudon_*.json` files the loader reads were untracked until that
+push — a reseed from the repository alone would have produced the pre-Mudon
+graph. Reseeding a fresh instance is the loader's job; **migrating an existing
+graph** is the scripts below.
 
 ### Tooling — `scripts/kg/`
 
@@ -92,8 +96,8 @@ credentials file calls it `NEO4J_USERNAME`; rename when pasting.
 | 3 verify | **IDENTICAL** — counts, 15 labels, 17 types, 14 constraints, 3 indexes, every node and relationship fingerprint |
 | 3 equivalence | **EQUIVALENT** — 6/6 briefs, 0 content differences (5 tie-order-only, as expected) |
 | 4 app smoke | `getKgContext` (the routes' entry point) with `KG_ENABLED=true` → GROUNDED, bundle id issued, 3.9 s cold / warm thereafter, inside the 10 s guard |
-| 5 Vercel env | **pending** — Abdallah sets `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` in Production + Preview and redeploys |
-| 6 keepalive secrets | **pending** — same three as GitHub Actions secrets |
+| 5 Vercel env | **done 2026-09-25** (owner's report: Production + Preview, with a rotated password). **`.env.local` was NOT switched** as of 15:46 Z (mtime 2026-09-10, `NEO4J_URI=bolt://localhost`) — local dev stays un-grounded until it is, and no agent edits that file |
+| 6 keepalive secrets | **done 2026-09-25 15:41 Z** — set as `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` (Aura's spelling); the workflow accepts `NEO4J_USER` or `NEO4J_USERNAME`. Run #5's `kg-keepalive` step ran and passed |
 | 7 stop container | **done 2026-09-25 15:22:42 Z** on the owner's instruction, ahead of step 5 — so until `.env.local` points at Aura, LOCAL dev grounding silently falls back (10 s per KG call). Container kept, volumes `kg_neo4j_data` / `kg_neo4j_logs` intact; never `rm` until the clean week (counted from the Vercel switch) |
 
 Two things seen on the way: the very first driver connection to a fresh Aura
@@ -225,9 +229,27 @@ verdict=PASSED
 
 Lifecycle: B2 accepted the four rules and reports them back as `daily-14d` /
 `daily-14d_marker` / `weekly-56d` / `weekly-56d_marker` (it renames the marker
-rules). Dump budget: 22 minutes for the two pg_dumps through the pooler, hence
-the 75-minute job timeout. `kg-keepalive` still **skipped** — the `NEO4J_*`
-Actions secrets were not yet set.
+rules). Dump budget on that run: 22 minutes for the two pg_dumps through the
+pooler, hence the 75-minute job timeout. `kg-keepalive` was still **skipped** —
+the `NEO4J_*` Actions secrets were not yet set.
+
+### Run #5 — 36156648413, same day, with the dump-time fix (PR #70)
+
+```
+[backup 15:48:35] dumping (… system schemas excluded)
+[backup 15:50:20] restored: 36 public tables, 9 projects, 1 auth users, 0 RLS policies
+[package] rennovaite-2026-09-25T15-48-35Z.tar.gpg (284K)   ← was 1.2M
+[upload]  daily/rennovaite-2026-09-25T15-48-35Z.tar.gpg (288939 bytes) confirmed
+restore_errors_logged=2   system_schema_toc_entries=0
+auth_users 1/1 · public_tables 36/36 · rls_enabled_auth 16/16 · rls_enabled_storage 8/8 · verdict=PASSED
+[kg-keepalive] KG reachable — 204 nodes
+```
+
+Excluding `pg_catalog` / `information_schema` cut the dump from **22 minutes
+to under 2** and the object from **1.2 MB to 284 KB** — the system catalogs
+were both the bulk and the slowness. The 75-minute budget stays as headroom.
+Two objects are now in the bucket (`daily/…14-47-22Z` and `…15-48-35Z`), both
+restore-tested from the bucket; the nightly cron adds the third at 23:00 UTC.
 
 ### When the workflow fails
 
@@ -278,11 +300,19 @@ that mean something else there, and from then on **every DDL statement fails**
 all 25 `ENABLE ROW LEVEL SECURITY` statements. Unfiltered: 2,981 errors, zero
 RLS state. Filtered: ~45 benign errors (`pg_temp_*` schema names, `vault`)
 and RLS state exactly as the I9 rehearsal recorded (auth 16/23, storage 8/8,
-public 0/29). The workflow's `restore-check.sh` filters; the dump script's own
-scratch verification does not (it was left unchanged on purpose — it counts
-tables and projects, which survive either way). A dump-time fix would be
-`--exclude-schema='pg_*' --exclude-schema=information_schema`; that is a
-change to `backup-production.sh` and is logged as a follow-up, not made here.
+public 0/29). **Fixed at dump time on 2026-09-25 (PR #70), once a clean cloud
+run existed:** `backup-production.sh` now passes `--exclude-schema='pg_*'
+--exclude-schema=information_schema` to both dumps. Proof, local round trip
+against production the same day: the archive carries **0** system-schema TOC
+entries; an **unfiltered** restore into a bare `postgres:17` logs **2** errors
+(`schema "public" already exists`, `vault`) instead of 2,981, and RLS state
+comes back **auth 16 / storage 8 / public 0** with 36 tables, 9 projects, 1
+account; the dump script's own scratch verification now logs 2 errors too, so
+it is a real check rather than a table count. `restore-check.sh` asserts
+`system_schema_toc_entries=0` (a regression fails the run) and keeps the TOC
+filter only so archives from before the fix still restore. The filter
+command above is therefore no longer required for a current archive — it is
+harmless to keep using.
 
 Judge the restore on `counts.sql` (`psql … -At -F '|' -f scripts/backup-cloud/counts.sql`)
 against the `counts.txt` that travelled with the dump. Storage **objects**
@@ -310,6 +340,6 @@ restore point. If a task named `RennovAIte backup` ever appears:
 | --- | --- |
 | The stopped `rennovaite-neo4j` container + volumes | No — rollback only, deletable after the clean week |
 | `~/backups/rennovaite/.db-url` and `~/backups/rennovaite/kg/*.json` | No — convenience copies; the secrets live in GitHub/Vercel/password manager |
-| The KG module (seed + loader) in OneDrive, its own git repo | No for runtime; **yes for reseeding** — it should be pushed to a remote like every other repo |
+| The KG module (seed + loader) in OneDrive | No — pushed to the private remote `alsharifer/rennovaite-kg` on 2026-09-25; the OneDrive folder is now just a checkout |
 | `.claude/launch.json` `garden` preview entry | No — local dev convenience |
 | Supabase CLI link (`supabase/.temp/project-ref`) | No — `npm run db:push` can run from any machine with the CLI logged in |

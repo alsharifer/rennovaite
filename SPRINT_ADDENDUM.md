@@ -70,9 +70,30 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
   decrypted, restored into scratch `postgres:17` and matched 41/41 checks —
   every table's row count, 1 account, RLS auth 16 / storage 8 — verdict
   PASSED.** The acceptance criterion is met; the nightly cron (`0 23 * * *`)
-  now runs on `master`. Still skipped: `kg-keepalive` (no `NEO4J_*` Actions
-  secrets yet). Issues #63/#65/#66 are the three failed dispatches and can
-  close.
+  now runs on `master`. Issues #63/#65/#66 (the failed dispatches) closed.
+  **Run #5 (36156648413), with the dump-time fix (PR #70) and the `NEO4J_*`
+  secrets in place: green again — dump under 2 min (was 22), object 284 KB
+  (was 1.2 MB), `system_schema_toc_entries=0`, restore-test PASSED, and
+  `kg-keepalive` ran for the first time: "KG reachable — 204 nodes".**
+- **Dump-time fix applied and proven (item 4).** `backup-production.sh` now
+  excludes `pg_*` / `information_schema`; a local round trip against
+  production the same day: 0 system-schema TOC entries, an **unfiltered**
+  restore logs 2 errors instead of 2,981 with RLS state intact (auth 16 /
+  storage 8 / public 0); `restore-check.sh` asserts the zero and keeps the
+  filter only for older archives. Every scratch copy of production data was
+  deleted after the test.
+- **KG module off the laptop (item 5).** Pushed to the private remote
+  `alsharifer/rennovaite-kg` (3 commits), after committing the seven
+  `seed/**/mudon_*.json` files the loader reads but nobody had tracked — a
+  reseed from the repo alone would have rebuilt the pre-Mudon graph.
+- **Not done: the dev-server smoke against Aura (item 3).** `.env.local` was
+  not switched (mtime still 2026-09-10, `bolt://localhost`), and the rotated
+  password is not in this session, so it is on the owner: put the three Aura
+  values in `.env.local` (`NEO4J_USER`, not `NEO4J_USERNAME`), start the dev
+  server, generate a render or BoQ, and confirm no `[lib/kg] KG retrieval
+  failed` line and a `kg_bundle_id` on the row. The app-code-path smoke
+  (`getKgContext` → GROUNDED in 3.9 s) and the Actions keepalive stand in
+  until then.
 - **Finding — the dump carries `pg_catalog` and it corrupts a superuser
   restore.** `--schema='*'` includes `pg_catalog.pg_event_trigger` TABLE
   DATA; restoring it plants production's event-trigger rows with foreign
