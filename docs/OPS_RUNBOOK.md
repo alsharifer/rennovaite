@@ -94,7 +94,7 @@ credentials file calls it `NEO4J_USERNAME`; rename when pasting.
 | 4 app smoke | `getKgContext` (the routes' entry point) with `KG_ENABLED=true` → GROUNDED, bundle id issued, 3.9 s cold / warm thereafter, inside the 10 s guard |
 | 5 Vercel env | **pending** — Abdallah sets `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` in Production + Preview and redeploys |
 | 6 keepalive secrets | **pending** — same three as GitHub Actions secrets |
-| 7 stop container | **pending** — after step 5, so local dev is not left un-grounded; `docker stop rennovaite-neo4j`, never `rm` until the clean week |
+| 7 stop container | **done 2026-09-25 15:22:42 Z** on the owner's instruction, ahead of step 5 — so until `.env.local` points at Aura, LOCAL dev grounding silently falls back (10 s per KG call). Container kept, volumes `kg_neo4j_data` / `kg_neo4j_logs` intact; never `rm` until the clean week (counted from the Vercel switch) |
 
 Two things seen on the way: the very first driver connection to a fresh Aura
 instance was reset (`ServiceUnavailable … ECONNRESET`) and every scheme
