@@ -98,8 +98,12 @@ stateful, and splitting them buys nothing.
 
 ### Migrations
 
-Both databases must receive every `scripts/migrations/*.sql`. With no runner
-this is manual and therefore will drift. Two mitigations, in order of value:
+*(Written before the CLI runner. Since I7 the live directory is
+`supabase/migrations/`, applied with `npm run db:push`; `scripts/migrations/` is
+a frozen record — see `docs/MIGRATIONS.md`.)*
+
+Both databases must receive every migration. With no runner this was manual and
+therefore would drift. Two mitigations, in order of value:
 
 1. **A schema-diff check.** A script that reads `information_schema` from both
    projects and fails when tables or columns differ. Run it in CI or before any
@@ -173,7 +177,7 @@ safe choice.
 ## Order of operations
 
 1. Create the `rennovaite-dev` Supabase project. *(prod untouched)*
-2. Apply `scripts/migrations/001…029` to it, in order.
+2. Apply the migrations to it, in order (`npm run db:push`).
 3. Create the three storage buckets with matching visibility.
 4. Run the seed scripts against dev.
 5. Import the Mudon demo project under its existing id.

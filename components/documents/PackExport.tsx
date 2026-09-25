@@ -107,8 +107,12 @@ export function PackExport({ projectId, autoOpen = false }: { projectId: string;
     setError(null);
     setPreflight(body);
     setName((n) => n || body.documentName || "");
+    // A running export is followed to its end; otherwise the most recent
+    // finished one is shown, so closing the tab mid-export does not lose the
+    // documents it produced (the links are signed at read time).
     const running = body.jobs.find((j) => j.status === "running");
     if (running) void poll(running.id);
+    else if (body.jobs[0]) void poll(body.jobs[0].id);
   }
 
   async function poll(jobId: string) {
