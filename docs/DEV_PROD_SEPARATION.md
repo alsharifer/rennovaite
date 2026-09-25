@@ -207,8 +207,12 @@ production downtime.
   would fill the dev bucket, which is the desired outcome, but the spend is
   shared. A separate Replicate token with its own budget would fix the
   accounting if that becomes a concern.
-- **The KG (Neo4j) is still a single local container** on one machine. Separate
-  issue, tracked in `POST_DEMO_FOLLOWUPS.md`.
-- **No backups are configured** on the production project. Worth doing
-  independently of this work, and arguably more urgent: today a bad development
-  write against production has no undo at all.
+- ~~**The KG (Neo4j) is still a single local container** on one machine.~~
+  *Resolved by O1 (2026-09-25): the KG moves to Neo4j AuraDB; the local
+  container is the one-week rollback. See `docs/OPS_RUNBOOK.md` §1.*
+- ~~**No backups are configured** on the production project.~~ *Resolved by
+  I9 + O2: a nightly GitHub Actions workflow dumps production, encrypts the
+  dump into Backblaze B2 and restore-tests it from the bucket. See
+  `docs/OPS_RUNBOOK.md` §2. A bad development write against production still
+  has no undo finer than the last nightly dump — which is what pointing dev at
+  its own project (done, I8) is for.*

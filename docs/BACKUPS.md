@@ -1,8 +1,17 @@
 # Production backups (I9)
 
+> **Superseded on the schedule question by O2 (2026-09-25).** Backups now run
+> nightly in GitHub Actions, encrypted into Backblaze B2 and restore-tested
+> from the bucket — `.github/workflows/backup.yml`, documented in
+> `docs/OPS_RUNBOOK.md` §2. The `schtasks` step below was **never created**
+> (`Get-ScheduledTask` shows no `RennovAIte backup` task), so there is nothing
+> on the PC to disable. Everything else on this page — what the script dumps,
+> why, and the 2026-09-11 restore rehearsal — still holds and is what the
+> workflow wraps unchanged.
+
 **First real backup taken 2026-09-11, and its restore has been rehearsed into a
-real Supabase Postgres — every row came back.** One item remains: the backup is
-not yet on a schedule.
+real Supabase Postgres — every row came back.** One item remained: the backup
+was not yet on a schedule (now it is — see the note above).
 
 ## The first backup, measured
 

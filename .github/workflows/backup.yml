@@ -1,0 +1,225 @@
+# =============================================================================
+# Scheduled production backup → encrypted → Backblaze B2 → restore-tested (O2).
+#
+# Wraps scripts/backup-production.sh unchanged (schema + data + auth + storage,
+# verified by a scratch restore before it counts). This workflow adds what a
+# laptop schedule could not: a runner that exists every night, an encrypted
+# copy in a bucket, retention, a restore test FROM THE BUCKET, and loud failure.
+#
+# Secrets (repo → Settings → Secrets and variables → Actions):
+#   BACKUP_DB_URL              postgresql://postgres.<ref>:<pw>@<pooler>:5432/postgres
+#   BACKUP_ENCRYPTION_KEY      gpg symmetric passphrase — losing it loses every backup
+#   BACKUP_STORAGE_ENDPOINT    https://s3.<region>.backblazeb2.com
+#   BACKUP_STORAGE_KEY_ID      B2 application key id (scoped to the one bucket)
+#   BACKUP_STORAGE_APP_KEY     B2 application key
+#   BACKUP_STORAGE_BUCKET      bucket name
+#   NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD   optional — AuraDB keepalive (O1)
+#
+# THIS REPOSITORY IS PUBLIC. Nothing here uploads an Actions artifact (anyone
+# could download it), every log line that could carry an identifier is masked,
+# and the step summary prints counts and object names only.
+#
+# Schedule: 23:00 UTC = 03:00 Asia/Dubai (the laptop cadence the docs promised).
+# GitHub runs cron only on the default branch and may delay it by minutes.
+# =============================================================================
+name: backup
+
+on:
+  schedule:
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+    inputs:
+      restore_only:
+        description: "Skip the dump; restore-test the newest object already in the bucket"
+        type: boolean
+        default: false
+      prune_probe:
+        description: "Retention self-test: upload a fake 26-year-old object and require prune to remove every version of it"
+        type: boolean
+        default: false
+      configure_lifecycle:
+        description: "Apply the bucket lifecycle rules (daily/ 14 d, weekly/ 56 d) and print them back"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+env:
+  # aws-cli ≥ 2.23 sends CRC checksums B2 rejects; these restore the pre-2025 behaviour.
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+
+jobs:
+  backup:
+    if: ${{ !inputs.restore_only }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      object_key: ${{ steps.upload.outputs.object_key }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+      stamp: ${{ steps.dump.outputs.stamp }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mask identifiers derived from the connection string
+        env:
+          SUPABASE_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+        run: bash scripts/backup-cloud/mask.sh
+
+      - name: Dump + verify (scripts/backup-production.sh, unchanged)
+        id: dump
+        env:
+          SUPABASE_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+          BACKUP_DIR: ${{ runner.temp }}/rv-backups
+        run: |
+          bash scripts/backup-production.sh
+          DEST="$(ls -d "$BACKUP_DIR"/20* | grep -v FAILED | sort | tail -n1)"
+          echo "dest=$DEST" >> "$GITHUB_OUTPUT"
+          echo "stamp=$(basename "$DEST")" >> "$GITHUB_OUTPUT"
+
+      - name: Record source row counts (compared after the cloud restore)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+        run: bash scripts/backup-cloud/source-counts.sh "${{ steps.dump.outputs.dest }}/counts.txt"
+
+      - name: Package + encrypt
+        id: package
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: bash scripts/backup-cloud/package.sh "${{ steps.dump.outputs.dest }}" "${{ runner.temp }}/rv-out"
+
+      - name: Upload to the bucket (daily/, plus weekly/ on Sundays in Dubai)
+        id: upload
+        env:
+          BACKUP_STORAGE_ENDPOINT: ${{ secrets.BACKUP_STORAGE_ENDPOINT }}
+          BACKUP_STORAGE_KEY_ID: ${{ secrets.BACKUP_STORAGE_KEY_ID }}
+          BACKUP_STORAGE_APP_KEY: ${{ secrets.BACKUP_STORAGE_APP_KEY }}
+          BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
+        run: bash scripts/backup-cloud/upload.sh "${{ steps.package.outputs.file }}" "${{ steps.dump.outputs.stamp }}"
+
+      - name: Retention self-test object (only when asked)
+        if: ${{ inputs.prune_probe }}
+        env:
+          BACKUP_STORAGE_ENDPOINT: ${{ secrets.BACKUP_STORAGE_ENDPOINT }}
+          BACKUP_STORAGE_KEY_ID: ${{ secrets.BACKUP_STORAGE_KEY_ID }}
+          BACKUP_STORAGE_APP_KEY: ${{ secrets.BACKUP_STORAGE_APP_KEY }}
+          BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
+        run: bash scripts/backup-cloud/prune.sh --plant-probe
+
+      - name: Prune (daily > 14 d, weekly > 56 d — every version, B2 keeps versions)
+        env:
+          BACKUP_STORAGE_ENDPOINT: ${{ secrets.BACKUP_STORAGE_ENDPOINT }}
+          BACKUP_STORAGE_KEY_ID: ${{ secrets.BACKUP_STORAGE_KEY_ID }}
+          BACKUP_STORAGE_APP_KEY: ${{ secrets.BACKUP_STORAGE_APP_KEY }}
+          BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
+        run: bash scripts/backup-cloud/prune.sh ${{ inputs.prune_probe && '--expect-probe-gone' || '' }}
+
+      - name: Summary
+        run: |
+          {
+            echo "## Backup ${{ steps.dump.outputs.stamp }}"
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            echo "| object | \`${{ steps.upload.outputs.object_key }}\` |"
+            echo "| sha256 | \`${{ steps.package.outputs.sha256 }}\` |"
+            echo "| encrypted size | ${{ steps.package.outputs.size }} |"
+            echo
+            echo '### Verified by scratch restore (script)'
+            echo '```'
+            cat "${{ steps.dump.outputs.dest }}/VERIFIED.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open an issue on failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/backup-cloud/fail-loud.sh "backup"
+
+  restore-test:
+    # The acceptance criterion: an object nobody has restored FROM THE BUCKET is
+    # not a backup. Runs after every successful dump, or alone via restore_only.
+    needs: backup
+    if: ${{ always() && (needs.backup.result == 'success' || inputs.restore_only) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mask identifiers derived from the connection string
+        env:
+          SUPABASE_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+        run: bash scripts/backup-cloud/mask.sh
+
+      - name: Download from the bucket + verify sha256 + decrypt
+        id: fetch
+        env:
+          BACKUP_STORAGE_ENDPOINT: ${{ secrets.BACKUP_STORAGE_ENDPOINT }}
+          BACKUP_STORAGE_KEY_ID: ${{ secrets.BACKUP_STORAGE_KEY_ID }}
+          BACKUP_STORAGE_APP_KEY: ${{ secrets.BACKUP_STORAGE_APP_KEY }}
+          BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: bash scripts/backup-cloud/fetch.sh "${{ needs.backup.outputs.object_key }}" "${{ runner.temp }}/rv-restore"
+
+      - name: Restore into a scratch Postgres and check (auth, RLS, every table's row count)
+        run: bash scripts/backup-cloud/restore-check.sh "${{ steps.fetch.outputs.dir }}"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Restore test — ${{ steps.fetch.outputs.object_key }}"
+            echo
+            echo '```'
+            cat "${{ steps.fetch.outputs.dir }}/RESTORE-TEST.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open an issue on failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/backup-cloud/fail-loud.sh "restore-test"
+
+  lifecycle:
+    if: ${{ inputs.configure_lifecycle }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply and print the bucket lifecycle rules
+        env:
+          BACKUP_STORAGE_ENDPOINT: ${{ secrets.BACKUP_STORAGE_ENDPOINT }}
+          BACKUP_STORAGE_KEY_ID: ${{ secrets.BACKUP_STORAGE_KEY_ID }}
+          BACKUP_STORAGE_APP_KEY: ${{ secrets.BACKUP_STORAGE_APP_KEY }}
+          BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
+        run: bash scripts/backup-cloud/configure-retention.sh
+
+  kg-keepalive:
+    # AuraDB Free pauses an instance after days without a query and the app
+    # would then fall back to un-grounded prompts silently (lib/kg/context.ts
+    # swallows the error by design). One query a day keeps it awake and, if it
+    # is unreachable, fails RED here where someone sees it. Runs only once the
+    # NEO4J_* secrets exist; until then the step is skipped, not failed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      NEO4J_URI: ${{ secrets.NEO4J_URI }}
+      NEO4J_USER: ${{ secrets.NEO4J_USER }}
+      NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: RETURN 1 against the KG over the Aura Query API
+        if: ${{ env.NEO4J_URI != '' }}
+        run: bash scripts/backup-cloud/kg-keepalive.sh
+      - name: Open an issue on failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/backup-cloud/fail-loud.sh "kg-keepalive"
