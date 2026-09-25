@@ -52,8 +52,16 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
   (36145453268) reproduced it** — the secret had not been changed (issue #65
   opened) — and exposed a second defect: `BACKUP_STORAGE_ENDPOINT` is stored
   as a bare hostname and aws-cli refused it; `s3env.sh` now normalises the
-  scheme (PR #64). No cloud restore test has passed yet; the acceptance
-  criterion is still open.
+  scheme (PR #64). **Run #3 (36146020484), after the pooler secret was set:
+  the dump, the scratch verification and the source counts all succeeded** —
+  the connection string is right — and the run stopped at *Package +
+  encrypt* because `BACKUP_ENCRYPTION_KEY` is **shorter than 24 characters**
+  (the guard did its job; a short passphrase is the only thing between a
+  public-cloud copy of customer data and anyone holding the object). B2 also
+  rejected the lifecycle rules (it wants a companion
+  `ExpiredObjectDeleteMarker` rule per prefix — fixed in
+  `configure-retention.sh`). No cloud restore test has passed yet; the
+  acceptance criterion is still open.
 - **Finding — the dump carries `pg_catalog` and it corrupts a superuser
   restore.** `--schema='*'` includes `pg_catalog.pg_event_trigger` TABLE
   DATA; restoring it plants production's event-trigger rows with foreign

@@ -21,7 +21,7 @@ how to roll back._
 | Secret | Where | Purpose |
 | --- | --- | --- |
 | `BACKUP_DB_URL` | GitHub Actions secret | production Postgres connection string (session pooler, `postgres.<ref>` user) |
-| `BACKUP_ENCRYPTION_KEY` | GitHub Actions secret **and Abdallah's password manager** | gpg symmetric passphrase. **The only way to read a backup.** Not derivable from anything in the repo or the bucket. Losing it loses every backup taken with it. |
+| `BACKUP_ENCRYPTION_KEY` | GitHub Actions secret **and Abdallah's password manager** | gpg symmetric passphrase. **The only way to read a backup.** Not derivable from anything in the repo or the bucket. Losing it loses every backup taken with it. **At least 24 characters, random** — `package.sh` refuses shorter (run #3 was refused on exactly this). Generate in PowerShell, save it to the password manager FIRST, then set the secret: `$k = -join (1..48 \| % { [char](Get-Random -InputObject ([int[]](48..57 + 65..90 + 97..122))) }); $k \| Set-Clipboard; gh secret set BACKUP_ENCRYPTION_KEY --body $k` |
 | `BACKUP_STORAGE_ENDPOINT` / `_KEY_ID` / `_APP_KEY` / `_BUCKET` | GitHub Actions secrets | B2 S3-compatible endpoint + an application key scoped to the one bucket |
 | `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` | Vercel env (app); `.env.local` (dev, never committed); GitHub Actions secrets (keepalive only, optional) | KG connection. Aura's are `neo4j+s://<id>.databases.neo4j.io` |
 | `~/backups/rennovaite/.db-url` | Abdallah's PC, outside the repo | the same production connection string, for hand-run dumps |
