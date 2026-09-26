@@ -53,10 +53,15 @@ export interface Firm {
   created_at: string;
 }
 
+export type BookStatus = "draft" | "reviewed";
+
 export interface FirmSummary extends Firm {
   book_id: string | null;
   ohp_pct: number;
   entry_count: number;
+  /** U2: draft until a member marks it reviewed; any later change returns it to draft. */
+  status: BookStatus;
+  reviewed_at: string | null;
 }
 
 const FIRM_COLUMNS = "id, name, private, created_by, created_at";
@@ -185,20 +190,50 @@ export async function findOrCreateFirmByName(
   }
 }
 
-async function readBook(db: SupabaseClient, firmId: string): Promise<{ id: string; ohp_pct: number } | null> {
-  const { data, error } = await db.from("firm_rate_books").select("id, ohp_pct").eq("firm_id", firmId).maybeSingle();
+interface BookRow {
+  id: string;
+  ohp_pct: number;
+  status: BookStatus;
+  reviewed_at: string | null;
+}
+
+function toBookRow(data: Record<string, unknown>): BookRow {
+  return {
+    id: String(data.id),
+    ohp_pct: Number(data.ohp_pct) || 0,
+    status: data.status === "reviewed" ? "reviewed" : "draft",
+    reviewed_at: (data.reviewed_at as string | null | undefined) ?? null,
+  };
+}
+
+async function readBook(db: SupabaseClient, firmId: string): Promise<BookRow | null> {
+  const { data, error } = await db.from("firm_rate_books").select("id, ohp_pct, status, reviewed_at").eq("firm_id", firmId).maybeSingle();
   if (error) fail(error, "read book");
-  return data ? { id: String((data as { id: string }).id), ohp_pct: Number((data as { ohp_pct: number }).ohp_pct) || 0 } : null;
+  return data ? toBookRow(data as Record<string, unknown>) : null;
+}
+
+/**
+ * U2: a change to the book's CONTENT (an entry or the OH&P) returns it to
+ * draft — a review of a book that has since changed is a review of a
+ * different book. Called after every mutation; a no-op on a draft.
+ */
+async function touchBook(db: SupabaseClient, firmId: string): Promise<void> {
+  const { error } = await db
+    .from("firm_rate_books")
+    .update({ status: "draft", reviewed_at: null, updated_at: new Date().toISOString() })
+    .eq("firm_id", firmId)
+    .eq("status", "reviewed");
+  if (error) fail(error, "return book to draft");
 }
 
 /** A firm's book, created on first use. A firm with no entries and no OH&P has no book at all. */
-export async function ensureBook(db: SupabaseClient, firmId: string): Promise<{ id: string; ohp_pct: number }> {
+export async function ensureBook(db: SupabaseClient, firmId: string): Promise<BookRow> {
   const existing = await readBook(db, firmId);
   if (existing) return existing;
   const { data, error } = await db
     .from("firm_rate_books")
     .insert({ firm_id: firmId, ohp_pct: 0 })
-    .select("id, ohp_pct")
+    .select("id, ohp_pct, status, reviewed_at")
     .single();
   if (error) {
     if (error.code === "23505") {
@@ -207,7 +242,7 @@ export async function ensureBook(db: SupabaseClient, firmId: string): Promise<{ 
     }
     fail(error, "create book");
   }
-  return { id: String((data as { id: string }).id), ohp_pct: Number((data as { ohp_pct: number }).ohp_pct) || 0 };
+  return toBookRow(data as Record<string, unknown>);
 }
 
 export async function getFirmSummary(db: SupabaseClient, firmId: string, caller: Caller | null): Promise<FirmSummary> {
@@ -218,13 +253,20 @@ export async function getFirmSummary(db: SupabaseClient, firmId: string, caller:
     .select("id", { count: "exact", head: true })
     .eq("firm_id", firmId);
   if (error) fail(error, "count entries");
-  return { ...firm, book_id: book?.id ?? null, ohp_pct: book?.ohp_pct ?? 0, entry_count: count ?? 0 };
+  return {
+    ...firm,
+    book_id: book?.id ?? null,
+    ohp_pct: book?.ohp_pct ?? 0,
+    entry_count: count ?? 0,
+    status: book?.status ?? "draft",
+    reviewed_at: book?.reviewed_at ?? null,
+  };
 }
 
 export async function updateFirm(
   db: SupabaseClient,
   firmId: string,
-  patch: { name?: string; private?: boolean; ohp_pct?: number },
+  patch: { name?: string; private?: boolean; ohp_pct?: number; status?: BookStatus },
   caller: Caller | null,
 ): Promise<FirmSummary> {
   await requireFirm(db, firmId, caller);
@@ -238,12 +280,33 @@ export async function updateFirm(
   if (patch.ohp_pct !== undefined) {
     if (!(patch.ohp_pct >= 0 && patch.ohp_pct <= 50)) throw new StoreError(422, "invalid_ohp", "ohp_pct must be between 0 and 50.");
     const book = await ensureBook(db, firmId);
+    const moved = book.ohp_pct !== patch.ohp_pct;
     const { error } = await db
       .from("firm_rate_books")
-      .update({ ohp_pct: patch.ohp_pct, updated_at: new Date().toISOString() })
+      .update({
+        ohp_pct: patch.ohp_pct,
+        updated_at: new Date().toISOString(),
+        // A moved OH&P is a changed book (unless this same call also re-reviews it).
+        ...(moved && patch.status !== "reviewed" ? { status: "draft", reviewed_at: null } : {}),
+      })
       .eq("id", book.id)
       .eq("firm_id", firmId);
     if (error) fail(error, "update OH&P");
+  }
+  if (patch.status !== undefined) {
+    // Marking reviewed is an explicit act; it needs a book to mark (created
+    // empty if the firm has none yet — a reviewed empty book is a statement too).
+    const book = await ensureBook(db, firmId);
+    const { error } = await db
+      .from("firm_rate_books")
+      .update({
+        status: patch.status,
+        reviewed_at: patch.status === "reviewed" ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", book.id)
+      .eq("firm_id", firmId);
+    if (error) fail(error, "update book status");
   }
   return getFirmSummary(db, firmId, caller);
 }
@@ -310,7 +373,9 @@ async function insertEntry(
 
 export async function createEntry(db: SupabaseClient, firmId: string, input: EntryInput, caller: Caller | null): Promise<FirmRateEntry> {
   await requireFirm(db, firmId, caller);
-  return insertEntry(db, firmId, { ...input, origin: "firm_entry" });
+  const entry = await insertEntry(db, firmId, { ...input, origin: "firm_entry" });
+  await touchBook(db, firmId);
+  return entry;
 }
 
 async function readEntry(db: SupabaseClient, firmId: string, entryId: string): Promise<FirmRateEntry> {
@@ -347,6 +412,7 @@ export async function updateEntry(
     .maybeSingle();
   if (error) fail(error, "update entry");
   if (!data) throw new StoreError(404, "entry_not_found", "Rate entry not found in this firm's book.");
+  await touchBook(db, firmId);
   return toFirmEntry(data as Record<string, unknown>);
 }
 
@@ -360,6 +426,7 @@ export async function deleteEntry(db: SupabaseClient, firmId: string, entryId: s
     .select("id");
   if (error) fail(error, "delete entry");
   if (!data || (data as unknown[]).length === 0) throw new StoreError(404, "entry_not_found", "Rate entry not found in this firm's book.");
+  await touchBook(db, firmId);
 }
 
 // --- Promotion ---------------------------------------------------------------
@@ -442,6 +509,7 @@ export async function promoteCorrection(
     await db.from("firm_rate_entries").delete().eq("id", entry.id).eq("firm_id", firmId);
     fail(upd.error, "mark correction promoted");
   }
+  await touchBook(db, firmId);
   return { entry, correction_id: c.id };
 }
 
