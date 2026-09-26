@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getCaller } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { promoteCorrection } from "@/lib/firms/store";
 import { FIRM_ENTRY_KINDS } from "@/lib/rates/firm";
@@ -14,9 +15,9 @@ export const dynamic = "force-dynamic";
 //
 // The explicit act that turns one of THIS firm's market_fair corrections into a
 // rate in its private book (tier 2 — origin promoted_correction). Until it is
-// called, a correction is recorded and never applied. 403 for another firm's
-// correction, 409 if already promoted, 422 unless it is a `rate` correction
-// with an item_key.
+// called, a correction is recorded and never applied. U1: members only (401 /
+// 403 not_a_member / 404). Then 403 for another firm's correction, 409 if
+// already promoted, 422 unless it is a `rate` correction with an item_key.
 
 const PostSchema = z.object({
   correction_id: z.string().uuid(),
@@ -33,7 +34,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ firmId
   const parsed = PostSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    const result = await promoteCorrection(firmDb(), firmId, parsed.data);
+    const caller = await getCaller(request);
+    const result = await promoteCorrection(firmDb(), firmId, parsed.data, caller);
     return NextResponse.json({ success: true, ...result }, { status: 201 });
   } catch (e) {
     return storeErrorResponse(e);

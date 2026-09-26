@@ -1,10 +1,25 @@
+import { signOut } from "@/app/_actions/sign-out";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
+
 import { BackButton } from "./BackButton";
 
 type Props = {
   pageName: string;
 };
 
-export function TopBar({ pageName }: Props) {
+/** The signed-in user's email, or null — read from the cookie session (never throws). */
+async function sessionEmail(): Promise<string | null> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.auth.getUser();
+    return data.user?.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function TopBar({ pageName }: Props) {
+  const email = await sessionEmail();
   return (
     <header className="fixed left-60 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-outline-variant bg-surface-bright px-lg">
       {/* Left: back · wordmark · bone divider · page name */}
@@ -22,7 +37,7 @@ export function TopBar({ pageName }: Props) {
         </span>
       </div>
 
-      {/* Right: search pill · notifications · avatar */}
+      {/* Right: search pill · notifications · avatar · sign out (U1) */}
       <div className="flex items-center gap-lg">
         <div className="hidden items-center gap-sm rounded-full bg-surface-container-low px-md py-xs text-on-surface-variant md:flex">
           <span
@@ -43,9 +58,22 @@ export function TopBar({ pageName }: Props) {
         <div
           className="flex size-8 items-center justify-center rounded-full bg-primary text-on-primary"
           aria-hidden="true"
+          title={email ?? undefined}
         >
           <span className="material-symbols-outlined text-[20px]">person</span>
         </div>
+        {email && (
+          <form action={signOut}>
+            <button
+              type="submit"
+              aria-label={`Sign out ${email}`}
+              title={`Sign out ${email}`}
+              className="material-symbols-outlined text-on-surface-variant transition-colors hover:text-primary focus-ring"
+            >
+              logout
+            </button>
+          </form>
+        )}
       </div>
     </header>
   );

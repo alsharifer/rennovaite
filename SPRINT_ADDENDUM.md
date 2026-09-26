@@ -1,3 +1,45 @@
+# U1 — firm ownership + requireFirm on all firm routes (2026-09-26)
+
+- **Migration 043 `firm_members (firm_id, user_id)`** — applied on dev
+  (`npm run db:push`, 43/43). No teams, no roles: creating a firm makes the
+  creator a member; the Newspace firm 041 backfilled has no member until its
+  account signs in and `scripts/firm-member-add.mjs` adds it. **U6's
+  migration is therefore 044, not 043.**
+- **`requireFirm(db, firmId, caller)`** answers **401 `unauthenticated` → 404
+  `firm_not_found` → 403 `not_a_member`** in that order (an anonymous call
+  learns nothing about which firms exist; cross-firm is refused on
+  authentication grounds, not 404-by-scoping — the L1 scoping still holds
+  underneath). Every store function takes the caller; every handler under
+  `app/api/firms/**` resolves it with `getCaller(request)`
+  (`lib/auth/caller.ts`: Bearer Supabase JWT for scripts, cookie session for
+  the browser, never a request body). Covered too: `GET /api/firms` (the
+  caller's firms only), `PATCH /api/projects/:id { firm_id }` (attach needs
+  membership of that firm; detach, of the one being detached),
+  `POST /api/boq-corrections` with `firm_id` / `attributed_to` (a correction
+  with no firm attribution — what the in-app form sends — is unchanged).
+- **Session plumbing added:** sign-out (`app/_actions/sign-out.ts`, `logout`
+  in the top bar when a session exists). No browser Supabase client — no UI
+  reads firm data yet.
+- **Dev-auth path, not a bypass:** `scripts/lib/dev-auth.mjs` mints a REAL
+  session for `dev-scripts+<tag>@rennovaite.local` (admin createUser →
+  generateLink → anon verifyOtp) and scripts send it as a Bearer token; the
+  routes contain no dev mode. Documented in `docs/AUTH.md`.
+- **Verification:** vitest **839/839** (store tests rewritten with `alice` /
+  `bob` / `nobody`: 401 on all 15 operations, 403 on all 9 cross-firm ones,
+  404 after 401, detach needs membership; `route-auth.test.ts` scans every
+  firm route + the two unscoped paths for `getCaller(request)` and a caller on
+  every store call); `scripts/firm-overlay-check.mjs 3098` through two
+  authenticated dev accounts: **ALL CHECKS PASSED** (401 anonymous, 403
+  `not_a_member` on all seven cross-firm route calls, only-my-firms listing,
+  L1 pricing invariants and `rate_book` unchanged). First run showed six
+  failures that were all the stale-`.next` nested-route 404 (known; `rm -rf
+  .next`) plus a cleanup assertion that assumed zero prior pilot events.
+- **Not fixed, by design — named deployment blocker:** the other ~44 of 49 API
+  route files are still unauthenticated on the service role; pages do not
+  redirect signed-out visitors; no middleware; RLS off. `docs/AUTH.md` states
+  it; the UV report carries it with 042-on-prod and the Mudon
+  `rate_book.source` cleanup.
+
 # Ops addendum — Neo4j off the PC, backups off the PC (O1–O3, 2026-09-25)
 
 _Prepended to the Sprint-4 addendum. Infra only: no Sprint-4 code surface

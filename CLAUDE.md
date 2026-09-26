@@ -1208,9 +1208,22 @@ resolved line carries **`rate_tier`**.
 - **Isolation.** `FirmOverlay.forProject` refuses any book or entry that is not
   the project's firm's (`FirmIsolationError`); every store query is scoped by
   `firm_id` (another firm's entry is 404 through your path); a firm entry in
-  the wrong unit throws at pricing time. **There is no user auth on API routes
-  yet** — isolation is by scoping; the check for "who is asking" belongs in
-  `requireFirm` (`lib/firms/store.ts`) when auth lands.
+  the wrong unit throws at pricing time.
+- **Ownership (U1, migration `043`).** `firm_members (firm_id, user_id)` — no
+  teams, no roles: creating a firm makes you a member, and membership is
+  required for every `/api/firms/:id/*` route, `GET /api/firms` (the caller's
+  firms only), attaching/detaching a firm on a project, and attributing a
+  correction to a firm. `requireFirm(db, firmId, caller)` answers **401
+  `unauthenticated` → 404 `firm_not_found` → 403 `not_a_member`** in that
+  order; the caller comes from `lib/auth/caller.ts` (`Authorization: Bearer
+  <Supabase JWT>` for scripts, the magic-link cookie session for the browser)
+  and never from a request body. Enforced in application code because the
+  routes run on the service role, which RLS never sees. Scripts authenticate
+  through `scripts/lib/dev-auth.mjs` (a real dev account's real session — no
+  bypass); `scripts/firm-member-add.mjs` grants membership with the service
+  role. Sign-out exists (`app/_actions/sign-out.ts`, top bar). **Every other
+  API route is still unauthenticated** — a named deployment blocker, see
+  `docs/AUTH.md`.
 - **Identity.** A firm's rate reaches a line as the constant
   "contractor rate book" — never its name. Pricing paths read `rate_book`
   only through `REFERENCE_COLUMNS` (no `source`, no `internal_ref`) and

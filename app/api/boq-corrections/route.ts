@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller } from "@/lib/auth/caller";
 import { StoreError, findOrCreateFirmByName, requireFirm } from "@/lib/firms/store";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { isMissingSchema } from "@/lib/rates/firm";
@@ -55,14 +56,20 @@ export async function POST(request: NextRequest) {
   let firmId: string | null = b.firm_id ?? null;
   let attributedTo = b.attributed_to ?? null;
   try {
+    // U1: attributing a correction to a firm — by id or by name — needs a
+    // signed-in MEMBER of that firm (401 / 403 / 404). A correction with no
+    // firm attribution (the in-app ReviewCorrections form sends none) is
+    // unchanged: still unauthenticated, recorded in docs/AUTH.md as such.
     if (firmId) {
-      const firm = await requireFirm(db(), firmId);
+      const firm = await requireFirm(db(), firmId, await getCaller(request));
       attributedTo = attributedTo ?? firm.name;
     } else if (attributedTo && attributedTo.trim()) {
-      firmId = (await findOrCreateFirmByName(db(), attributedTo, "boq-corrections")).id;
+      firmId = (await findOrCreateFirmByName(db(), attributedTo, "boq-corrections", await getCaller(request))).id;
     }
   } catch (e) {
-    if (e instanceof StoreError && e.status === 404) return NextResponse.json({ error: e.message, code: e.code }, { status: 404 });
+    if (e instanceof StoreError && (e.status === 401 || e.status === 403 || e.status === 404)) {
+      return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
+    }
     // Pre-041 there is no firms table: keep the free-text attribution only.
     if (!(e instanceof StoreError && /firms/.test(e.message))) throw e;
     firmId = null;

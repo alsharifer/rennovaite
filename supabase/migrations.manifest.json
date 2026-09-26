@@ -254,6 +254,12 @@
       "version": "20260101004200",
       "name": "pack_exports",
       "sha256": "eece3568c3d16d08bf52fb84d2d91bba6f30711df9572e220ebbf4de12398a53"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004300",
+      "name": "firm_members",
+      "sha256": "df49c78bbddc33a983402ee4f902c1cedc9fd971dbdb94e0faab12a0f99d7476"
     }
   ]
 }

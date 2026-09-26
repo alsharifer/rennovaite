@@ -1,5 +1,5 @@
 // =============================================================================
-// lib/firms/store.ts — firms, their private rate books, and promotion (L1).
+// lib/firms/store.ts — firms, their private rate books, and promotion (L1 + U1).
 //
 // Every entry read or write is scoped by `firm_id` IN THE QUERY: an entry id
 // from another firm's book is simply not found through this firm's path, so a
@@ -10,14 +10,20 @@
 // overlays; it is never written by an overlay operation (asserted in
 // lib/firms/__tests__/store.test.ts).
 //
-// There is no user-level auth in this app's API yet (every route runs with the
-// service role), so "firm A cannot see firm B" is enforced by scoping — the id
-// in the path — not by who is asking. When auth lands, the check belongs in
-// `requireFirm` below, the one place every firm route enters through.
+// U1 — who is asking. Every firm-scoped operation takes the `Caller` the route
+// resolved (lib/auth/caller.ts) and enters through `requireFirm`, which answers
+//   401 unauthenticated   nobody is signed in
+//   404 firm_not_found    the firm does not exist
+//   403 not_a_member      it exists and the caller is not one of its members
+// in that order — an anonymous call learns nothing about which firms exist, and
+// a signed-in user of firm A reaching for firm B is refused on AUTHENTICATION
+// grounds, not lost in scoping. The check is application code on purpose: the
+// routes run on the service role, which RLS never sees.
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { Caller } from "@/lib/auth/caller";
 import {
   FIRM_ENTRY_COLUMNS,
   toFirmEntry,
@@ -30,7 +36,7 @@ import { itemVocabulary, validateEntry } from "./vocabulary";
 
 export class StoreError extends Error {
   constructor(
-    readonly status: 400 | 403 | 404 | 409 | 422 | 500,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 422 | 500,
     readonly code: string,
     message: string,
   ) {
@@ -60,51 +66,120 @@ function fail(error: { message: string; code?: string } | null, what: string): n
   throw new StoreError(500, "db_error", `${what}: ${error?.message ?? "unknown error"}`);
 }
 
+// --- Who is asking -------------------------------------------------------------
+
+function requireCaller(caller: Caller | null): Caller {
+  if (!caller) throw new StoreError(401, "unauthenticated", "Sign in to work with a firm.");
+  return caller;
+}
+
+async function isMember(db: SupabaseClient, firmId: string, userId: string): Promise<boolean> {
+  const { data, error } = await db
+    .from("firm_members")
+    .select("firm_id")
+    .eq("firm_id", firmId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) fail(error, "read membership");
+  return !!data;
+}
+
+async function addMember(db: SupabaseClient, firmId: string, userId: string): Promise<void> {
+  const { error } = await db.from("firm_members").insert({ firm_id: firmId, user_id: userId });
+  // Already a member is not an error.
+  if (error && error.code !== "23505") fail(error, "add member");
+}
+
+/** The firm ids the caller belongs to. */
+async function memberFirmIds(db: SupabaseClient, userId: string): Promise<string[]> {
+  const { data, error } = await db.from("firm_members").select("firm_id").eq("user_id", userId);
+  if (error) fail(error, "list memberships");
+  return ((data ?? []) as { firm_id: string }[]).map((r) => r.firm_id);
+}
+
 // --- Firms -------------------------------------------------------------------
 
-export async function listFirms(db: SupabaseClient): Promise<Firm[]> {
-  const { data, error } = await db.from("firms").select(FIRM_COLUMNS).order("name");
+/** The CALLER's firms — never everyone's. */
+export async function listFirms(db: SupabaseClient, caller: Caller | null): Promise<Firm[]> {
+  const who = requireCaller(caller);
+  const ids = await memberFirmIds(db, who.id);
+  if (ids.length === 0) return [];
+  const { data, error } = await db.from("firms").select(FIRM_COLUMNS).in("id", ids).order("name");
   if (error) fail(error, "list firms");
   return (data ?? []) as Firm[];
 }
 
-/** The one entry point for every firm-scoped operation. 404 when the firm does not exist. */
-export async function requireFirm(db: SupabaseClient, firmId: string): Promise<Firm> {
+/**
+ * The one entry point for every firm-scoped operation: 401 nobody signed in,
+ * 404 no such firm, 403 not a member — in that order.
+ */
+export async function requireFirm(db: SupabaseClient, firmId: string, caller: Caller | null): Promise<Firm> {
+  const who = requireCaller(caller);
   const { data, error } = await db.from("firms").select(FIRM_COLUMNS).eq("id", firmId).maybeSingle();
   if (error) fail(error, "read firm");
   if (!data) throw new StoreError(404, "firm_not_found", "Firm not found.");
+  if (!(await isMember(db, firmId, who.id))) {
+    throw new StoreError(403, "not_a_member", "You are not a member of this firm.");
+  }
   return data as Firm;
 }
 
+/** Create a firm; the caller becomes its first member. */
 export async function createFirm(
   db: SupabaseClient,
   input: { name: string; private?: boolean; created_by?: string | null },
+  caller: Caller | null,
 ): Promise<Firm> {
+  const who = requireCaller(caller);
   const { data, error } = await db
     .from("firms")
-    .insert({ name: input.name.trim(), private: input.private ?? true, created_by: input.created_by ?? null })
+    .insert({
+      name: input.name.trim(),
+      private: input.private ?? true,
+      created_by: input.created_by ?? who.email ?? who.id,
+    })
     .select(FIRM_COLUMNS)
     .single();
   if (error) fail(error, `firm "${input.name}"`);
-  return data as Firm;
+  const firm = data as Firm;
+  await addMember(db, firm.id, who.id);
+  return firm;
 }
 
 /**
  * Normalise free-text attribution (040's `boq_corrections.attributed_to`) to a
- * firm row: match case- and whitespace-insensitively, create when absent.
+ * firm row the CALLER belongs to: match case- and whitespace-insensitively (403
+ * if the match is not the caller's firm), create when absent (the caller
+ * becomes a member).
  */
-export async function findOrCreateFirmByName(db: SupabaseClient, name: string, createdBy: string): Promise<Firm> {
+export async function findOrCreateFirmByName(
+  db: SupabaseClient,
+  name: string,
+  createdBy: string,
+  caller: Caller | null,
+): Promise<Firm> {
+  const who = requireCaller(caller);
   const wanted = name.trim().toLowerCase();
-  const all = await listFirms(db);
-  const hit = all.find((f) => f.name.trim().toLowerCase() === wanted);
-  if (hit) return hit;
+  const { data, error } = await db.from("firms").select(FIRM_COLUMNS);
+  if (error) fail(error, "list firms");
+  const hit = ((data ?? []) as Firm[]).find((f) => f.name.trim().toLowerCase() === wanted);
+  if (hit) {
+    if (!(await isMember(db, hit.id, who.id))) {
+      throw new StoreError(403, "not_a_member", `A firm named "${hit.name}" exists and you are not a member of it.`);
+    }
+    return hit;
+  }
   try {
-    return await createFirm(db, { name: name.trim(), private: true, created_by: createdBy });
+    return await createFirm(db, { name: name.trim(), private: true, created_by: createdBy }, who);
   } catch (e) {
-    // Lost a race to another writer: read it back.
+    // Lost a race to another writer: read it back — and it must still be ours.
     if (e instanceof StoreError && e.status === 409) {
-      const again = (await listFirms(db)).find((f) => f.name.trim().toLowerCase() === wanted);
-      if (again) return again;
+      const again = await db.from("firms").select(FIRM_COLUMNS);
+      const f = ((again.data ?? []) as Firm[]).find((x) => x.name.trim().toLowerCase() === wanted);
+      if (f) {
+        if (!(await isMember(db, f.id, who.id))) throw new StoreError(403, "not_a_member", `A firm named "${f.name}" exists and you are not a member of it.`);
+        return f;
+      }
     }
     throw e;
   }
@@ -135,8 +210,8 @@ export async function ensureBook(db: SupabaseClient, firmId: string): Promise<{ 
   return { id: String((data as { id: string }).id), ohp_pct: Number((data as { ohp_pct: number }).ohp_pct) || 0 };
 }
 
-export async function getFirmSummary(db: SupabaseClient, firmId: string): Promise<FirmSummary> {
-  const firm = await requireFirm(db, firmId);
+export async function getFirmSummary(db: SupabaseClient, firmId: string, caller: Caller | null): Promise<FirmSummary> {
+  const firm = await requireFirm(db, firmId, caller);
   const book = await readBook(db, firmId);
   const { count, error } = await db
     .from("firm_rate_entries")
@@ -150,8 +225,9 @@ export async function updateFirm(
   db: SupabaseClient,
   firmId: string,
   patch: { name?: string; private?: boolean; ohp_pct?: number },
+  caller: Caller | null,
 ): Promise<FirmSummary> {
-  await requireFirm(db, firmId);
+  await requireFirm(db, firmId, caller);
   const firmPatch: Record<string, unknown> = {};
   if (patch.name !== undefined) firmPatch.name = patch.name.trim();
   if (patch.private !== undefined) firmPatch.private = patch.private;
@@ -169,11 +245,11 @@ export async function updateFirm(
       .eq("firm_id", firmId);
     if (error) fail(error, "update OH&P");
   }
-  return getFirmSummary(db, firmId);
+  return getFirmSummary(db, firmId, caller);
 }
 
-export async function deleteFirm(db: SupabaseClient, firmId: string): Promise<void> {
-  await requireFirm(db, firmId);
+export async function deleteFirm(db: SupabaseClient, firmId: string, caller: Caller | null): Promise<void> {
+  await requireFirm(db, firmId, caller);
   const { error } = await db.from("firms").delete().eq("id", firmId);
   if (error) fail(error, "delete firm");
 }
@@ -189,8 +265,8 @@ export interface EntryInput {
   note?: string | null;
 }
 
-export async function listEntries(db: SupabaseClient, firmId: string): Promise<FirmRateEntry[]> {
-  await requireFirm(db, firmId);
+export async function listEntries(db: SupabaseClient, firmId: string, caller: Caller | null): Promise<FirmRateEntry[]> {
+  await requireFirm(db, firmId, caller);
   const { data, error } = await db
     .from("firm_rate_entries")
     .select(FIRM_ENTRY_COLUMNS)
@@ -232,8 +308,8 @@ async function insertEntry(
   return toFirmEntry(data as Record<string, unknown>);
 }
 
-export async function createEntry(db: SupabaseClient, firmId: string, input: EntryInput): Promise<FirmRateEntry> {
-  await requireFirm(db, firmId);
+export async function createEntry(db: SupabaseClient, firmId: string, input: EntryInput, caller: Caller | null): Promise<FirmRateEntry> {
+  await requireFirm(db, firmId, caller);
   return insertEntry(db, firmId, { ...input, origin: "firm_entry" });
 }
 
@@ -256,8 +332,9 @@ export async function updateEntry(
   firmId: string,
   entryId: string,
   patch: Partial<Pick<EntryInput, "rate_aed" | "unit" | "kind" | "grade" | "note">>,
+  caller: Caller | null,
 ): Promise<FirmRateEntry> {
-  await requireFirm(db, firmId);
+  await requireFirm(db, firmId, caller);
   const current = await readEntry(db, firmId, entryId);
   const next = { ...current, ...patch };
   assertValid(next);
@@ -273,8 +350,8 @@ export async function updateEntry(
   return toFirmEntry(data as Record<string, unknown>);
 }
 
-export async function deleteEntry(db: SupabaseClient, firmId: string, entryId: string): Promise<void> {
-  await requireFirm(db, firmId);
+export async function deleteEntry(db: SupabaseClient, firmId: string, entryId: string, caller: Caller | null): Promise<void> {
+  await requireFirm(db, firmId, caller);
   const { data, error } = await db
     .from("firm_rate_entries")
     .delete()
@@ -305,14 +382,15 @@ export interface PromoteInput {
  * true since G5 and stays true. Promotion is the explicit act that makes it a
  * rate: tier 2 of the resolution order (origin = promoted_correction), below
  * the firm's own entered rates. Only a `rate` correction with an item_key can
- * be promoted, only by the firm that made it, and only once.
+ * be promoted, only by a member of the firm that made it, and only once.
  */
 export async function promoteCorrection(
   db: SupabaseClient,
   firmId: string,
   input: PromoteInput,
+  caller: Caller | null,
 ): Promise<{ entry: FirmRateEntry; correction_id: string }> {
-  await requireFirm(db, firmId);
+  await requireFirm(db, firmId, caller);
   const { data, error } = await db
     .from("boq_corrections")
     .select("id, firm_id, correction_type, item_key, new_value, promoted_at, line_description")
@@ -369,8 +447,26 @@ export async function promoteCorrection(
 
 // --- Project assignment ------------------------------------------------------
 
-export async function assignProjectFirm(db: SupabaseClient, projectId: string, firmId: string | null): Promise<void> {
-  if (firmId) await requireFirm(db, firmId);
+/**
+ * Attach a firm to a project (membership of that firm required), or detach the
+ * current one (membership of the firm being detached required).
+ */
+export async function assignProjectFirm(
+  db: SupabaseClient,
+  projectId: string,
+  firmId: string | null,
+  caller: Caller | null,
+): Promise<void> {
+  requireCaller(caller);
+  if (firmId) {
+    await requireFirm(db, firmId, caller);
+  } else {
+    const { data: project, error } = await db.from("projects").select("firm_id").eq("id", projectId).maybeSingle();
+    if (error) fail(error, "read project");
+    if (!project) throw new StoreError(404, "project_not_found", "Project not found.");
+    const current = (project as { firm_id: string | null }).firm_id;
+    if (current) await requireFirm(db, current, caller);
+  }
   const { data, error } = await db.from("projects").update({ firm_id: firmId }).eq("id", projectId).select("id");
   if (error) fail(error, "assign project firm");
   if (!data || (data as unknown[]).length === 0) throw new StoreError(404, "project_not_found", "Project not found.");

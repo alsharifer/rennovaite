@@ -26,6 +26,8 @@ const UNIQUE: Record<string, (r: Row) => string> = {
   firms: (r) => String(r.name).trim().toLowerCase(),
   firm_rate_books: (r) => String(r.firm_id),
   firm_rate_entries: (r) => `${r.firm_id}|${r.item_key}|${r.grade ?? "*"}|${r.origin}`,
+  // 043: one membership row per (firm, user).
+  firm_members: (r) => `${r.firm_id}|${r.user_id}`,
 };
 
 const DEFAULTS: Record<string, (r: Row) => Row> = {
@@ -69,6 +71,11 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
   }
   eq(col: string, val: unknown) {
     this.filters.push((r) => r[col] === val);
+    return this;
+  }
+  in(col: string, vals: unknown[]) {
+    const set = new Set(vals);
+    this.filters.push((r) => set.has(r[col]));
     return this;
   }
   like(col: string, pattern: string) {
