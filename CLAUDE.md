@@ -1461,7 +1461,8 @@ its named volumes `kg_neo4j_data` / `kg_neo4j_logs` persist the seed) and
 point `NEO4J_URI` at `bolt://localhost:7687`. **`cd kg && docker compose up -d`
 does NOT work from this repo** — `kg/` here holds only the vendored consumer
 copy `kg/retrieval/agent.ts`; the seed, loader, and `docker-compose.yml` live
-in the separate KG module (its own git repo) at
+in the separate KG module — private remote
+`https://github.com/alsharifer/rennovaite-kg`, local checkout at
 `C:\Users\alsha\OneDrive\Desktop\RennovAIte\RennovAIte\kg`. Use compose only
 from that directory.
 
