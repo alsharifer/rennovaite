@@ -116,6 +116,18 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
 - **Baseline after the change:** vitest **822/822**, every new shell script
   `bash -n` clean, workflow YAML parses; `.env.local` mtime unchanged
   (2026-09-10); credential scan of the diff clean (placeholders only).
+- **Vercel: every production deploy from PR #62 through #71 FAILED** (found
+  2026-09-26 from the failure emails). Cause: `scripts/kg/equivalence-check.ts`
+  indexed the `{}` that the untyped `.mjs` env reader was inferred to return —
+  TS7053 under strict — and `tsconfig` includes `**/*.ts`, so `next build`'s
+  type-check rejects a one-off script the app never imports. vitest was green,
+  and no `tsc`/`next build` was run after the script was added — that is the
+  lesson (memory: *build before push*). Fixed at the source with a JSDoc
+  return type on `readEnvFile` (`scripts/_target-guard.mjs`); `tsc` 0 errors,
+  `next build` exit 0. **Consequence while it lasted:** production stayed on
+  the pre-#62 build, so the Vercel `NEO4J_*` switch to Aura did not reach a
+  running deployment until this fix deployed — production grounding was still
+  in the silent-fallback state the whole time.
 
 ---
 
