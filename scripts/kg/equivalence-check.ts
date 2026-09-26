@@ -29,6 +29,9 @@ import { STYLES } from "@/lib/styles";
 import { readEnvFile } from "../_target-guard.mjs";
 
 const print = process.argv.includes("--print");
+// readEnvFile is plain JS; its JSDoc return type (Record<string, string>) is
+// what lets strict TS index it here — without it `next build` fails on this
+// line, as every Vercel deploy from PR #62 to #71 did.
 const file = readEnvFile();
 const pick = (k: string) => (process.env[k] ?? file[k] ?? "").trim().replace(/^["']|["']$/g, "");
 const A = { uri: pick("NEO4J_URI"), user: pick("NEO4J_USER"), password: pick("NEO4J_PASSWORD") };

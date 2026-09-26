@@ -19,8 +19,15 @@ import path from "node:path";
  *  limit from the environment it is guarding protects nothing. */
 export const PRODUCTION_REF = "efrcgktrlsjnzkzzuhof";
 
+/**
+ * KEY=value pairs from an env file (quotes and whitespace trimmed).
+ * @param {string} [file]
+ * @param {string} [root]
+ * @returns {Record<string, string>}
+ */
 export function readEnvFile(file = ".env.local", root = process.cwd()) {
   const p = path.join(root, file);
+  /** @type {Record<string, string>} */
   const out = {};
   if (!fs.existsSync(p)) return out;
   for (const line of fs.readFileSync(p, "utf8").split(/\r?\n/)) {
