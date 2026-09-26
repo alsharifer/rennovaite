@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getCaller } from "@/lib/auth/caller";
 import { StoreError, assignProjectFirm } from "@/lib/firms/store";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -109,8 +110,13 @@ export async function PATCH(
 
     const supabase = getSupabaseAdmin();
     if (body.data.firm_id !== undefined) {
+      // U1: attaching a firm needs a signed-in member of that firm (detaching,
+      // a member of the firm being detached). The rest of this PATCH is still
+      // unauthenticated like the rest of the PoC — recorded as a deployment
+      // blocker in docs/AUTH.md, not fixed here.
       try {
-        await assignProjectFirm(supabase as unknown as import("@supabase/supabase-js").SupabaseClient, parsedId.data, body.data.firm_id);
+        const caller = await getCaller(request);
+        await assignProjectFirm(supabase as unknown as import("@supabase/supabase-js").SupabaseClient, parsedId.data, body.data.firm_id, caller);
       } catch (e) {
         if (e instanceof StoreError) return NextResponse.json({ success: false, error: e.message, code: e.code }, { status: e.status });
         throw e;

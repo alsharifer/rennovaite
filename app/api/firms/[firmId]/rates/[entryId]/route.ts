@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getCaller } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { deleteEntry, updateEntry } from "@/lib/firms/store";
 import { FIRM_ENTRY_KINDS } from "@/lib/rates/firm";
@@ -9,7 +10,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // L1 — one entry in a firm's book. Both verbs are scoped by BOTH ids: an entry
-// id from another firm's book is 404 through this firm's path.
+// id from another firm's book is 404 through this firm's path. U1 — and the
+// firm's path itself is members only (401 / 403 / 404).
 
 const PatchSchema = z
   .object({
@@ -34,17 +36,19 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   const parsed = PatchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    return NextResponse.json({ success: true, entry: await updateEntry(firmDb(), p.firmId, p.entryId, parsed.data) });
+    const caller = await getCaller(request);
+    return NextResponse.json({ success: true, entry: await updateEntry(firmDb(), p.firmId, p.entryId, parsed.data, caller) });
   } catch (e) {
     return storeErrorResponse(e);
   }
 }
 
-export async function DELETE(_req: NextRequest, ctx: Ctx) {
+export async function DELETE(request: NextRequest, ctx: Ctx) {
   const p = await ids(ctx);
   if (!p) return badRequest("Invalid firm or entry id.");
   try {
-    await deleteEntry(firmDb(), p.firmId, p.entryId);
+    const caller = await getCaller(request);
+    await deleteEntry(firmDb(), p.firmId, p.entryId, caller);
     return NextResponse.json({ success: true });
   } catch (e) {
     return storeErrorResponse(e);
