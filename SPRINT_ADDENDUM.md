@@ -86,14 +86,16 @@ names no file under `lib/firms`, `app/api/firms`, `app/auth`, `components/`,
   `alsharifer/rennovaite-kg` (3 commits), after committing the seven
   `seed/**/mudon_*.json` files the loader reads but nobody had tracked — a
   reseed from the repo alone would have rebuilt the pre-Mudon graph.
-- **Not done: the dev-server smoke against Aura (item 3).** `.env.local` was
-  not switched (mtime still 2026-09-10, `bolt://localhost`), and the rotated
-  password is not in this session, so it is on the owner: put the three Aura
-  values in `.env.local` (`NEO4J_USER`, not `NEO4J_USERNAME`), start the dev
-  server, generate a render or BoQ, and confirm no `[lib/kg] KG retrieval
-  failed` line and a `kg_bundle_id` on the row. The app-code-path smoke
-  (`getKgContext` → GROUNDED in 3.9 s) and the Actions keepalive stand in
-  until then.
+- **Dev-server smoke against Aura (item 3) — done 2026-09-26** once
+  `.env.local` was switched (it had not been on 2026-09-25: mtime 09-10,
+  `bolt://localhost`). `next dev` on 3091 with `KG_ENABLED=true`, one
+  `POST /api/render` on the dev demo villa's living room (a style locked for
+  the test through `/api/style-choice`, removed afterwards): the route logged
+  `[api/render] KG context injected (bundle=bundle:1790397949572:hqcpxc)`
+  with the full grounding block, no `[lib/kg] KG retrieval failed` line, 200
+  in 17.5 s (the render model's time, not the KG's), and render row
+  `e572ad4d` carries the `kg_bundle_id`. Grounding answers from Aura without
+  the timeout.
 - **Finding — the dump carries `pg_catalog` and it corrupts a superuser
   restore.** `--schema='*'` includes `pg_catalog.pg_event_trigger` TABLE
   DATA; restoring it plants production's event-trigger rows with foreign
