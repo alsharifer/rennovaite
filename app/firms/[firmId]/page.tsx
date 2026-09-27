@@ -48,7 +48,7 @@ export default async function FirmBookPage({ params }: { params: Promise<{ firmI
             <section className="rounded-xl border border-ink-100 bg-paper p-lg" aria-label="Not a member">
               <p className="label-caps text-ink-500">Members only</p>
               <h2 className="mt-xs font-display text-headline-md text-ink-900">You are not a member of this firm</h2>
-              <p className="mt-sm max-w-xl text-body-md text-ink-700">
+              <p className="mt-sm max-w-[576px] text-body-md text-ink-700">
                 A rate book is visible to the firm&rsquo;s members and to nobody else. Ask a member to add your account.
               </p>
             </section>

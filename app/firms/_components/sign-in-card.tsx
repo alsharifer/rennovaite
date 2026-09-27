@@ -6,7 +6,7 @@ export function SignInCard({ what }: { what: string }) {
     <section className="rounded-xl border border-ink-100 bg-paper p-lg" aria-label="Sign in required">
       <p className="label-caps text-ink-500">Members only</p>
       <h2 className="mt-xs font-display text-headline-md text-ink-900">Sign in to see {what}</h2>
-      <p className="mt-sm max-w-xl text-body-md text-ink-700">
+      <p className="mt-sm max-w-[576px] text-body-md text-ink-700">
         Rate books belong to firms, and a firm belongs to the accounts that are its members. Sign in with the email that was
         added to the firm.
       </p>

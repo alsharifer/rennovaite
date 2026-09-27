@@ -61,7 +61,7 @@ export function ApprovalsPanel({ projectId, revisions, fromId, toId, firmScoped 
     <section className="mt-xl rounded-xl border border-ink-100 bg-paper p-lg" aria-label="Approvals" data-testid="approvals-panel">
       <p className="label-caps text-ink-500">Approval trail</p>
       <h2 className="mt-xs font-display text-headline-md text-ink-900">Who approved which revision</h2>
-      <p className="mt-sm max-w-2xl text-body-sm text-ink-700">
+      <p className="mt-sm max-w-[672px] text-body-sm text-ink-700">
         {firmScoped ? "A member of this project's firm marks a revision approved. " : "A signed-in account marks a revision approved. "}A client&apos;s approval is recorded by the firm as an event, with the name and date the
         client gave. Every entry stays: the trail is append-only.
       </p>
