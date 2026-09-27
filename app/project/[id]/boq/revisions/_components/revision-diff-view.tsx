@@ -188,8 +188,8 @@ function SectionRows({ section, lines, before, after, prov }: { section: string;
               {l.new ? <Figure value={l.new.quantity} text={String(l.new.quantity)} provenance={pn?.quantity ?? null} /> : "—"} <span className="text-ink-500">{l.unit}</span>
             </td>
             <td className="py-sm pr-sm text-right font-mono tabular-nums">
-              {l.old ? <Figure value={l.old.rate_aed} format="amount" provenance={po?.rate ?? null} /> : "—"} <span className="text-ink-500">→</span>{" "}
-              {l.new ? <Figure value={l.new.rate_aed} format="amount" provenance={pn?.rate ?? null} /> : "—"}
+              {l.old ? <Figure value={l.old.rate_aed} format="rate" provenance={po?.rate ?? null} /> : "—"} <span className="text-ink-500">→</span>{" "}
+              {l.new ? <Figure value={l.new.rate_aed} format="rate" provenance={pn?.rate ?? null} /> : "—"}
             </td>
             <td className="py-sm text-right font-mono font-semibold tabular-nums text-ink-900">
               <Figure value={l.delta_aed} format="signed" provenance={deltaProvenance(l)} />
