@@ -9,7 +9,14 @@
 //
 // Pure: a snapshot is taken from a stored BoQ + take-off rows + draft status, and
 // the report compares two snapshots.
+//
+// U4: the line key is the STABLE identity from lib/boq/line-identity.ts (item
+// key → rule id without the engine's rate-note suffix → description), shared
+// with the in-app revision diff (lib/boq/revision-diff.ts). Before U4 the key
+// was the raw rule_id, which moved with an interior line's rate tier.
 // =============================================================================
+
+import { lineIdentity } from "@/lib/boq/line-identity";
 
 export interface QtyLine {
   key: string;
@@ -34,7 +41,7 @@ export interface QtySnapshot {
 
 interface BoqLike {
   grand_total_aed: number;
-  sections: { work_section: string; lines: { description: string; quantity: number; unit: string; rate_aed: number; total_aed: number; rule_id?: string; qty_derived?: boolean }[] }[];
+  sections: { work_section: string; lines: { description: string; quantity: number; unit: string; rate_aed: number; total_aed: number; rule_id?: string; item_key?: string; qty_derived?: boolean }[] }[];
 }
 
 export function snapshotOf(input: {
@@ -48,7 +55,7 @@ export function snapshotOf(input: {
   const lines: QtyLine[] = [];
   for (const s of input.boq.sections) {
     for (const l of s.lines) {
-      const base = `${s.work_section}|${l.rule_id ?? l.description}`;
+      const base = `${s.work_section}|${lineIdentity(l)}`;
       const n = (seen.get(base) ?? 0) + 1;
       seen.set(base, n);
       lines.push({

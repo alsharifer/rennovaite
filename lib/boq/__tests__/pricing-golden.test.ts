@@ -21,8 +21,9 @@ import { referenceGardenBook } from "./reference-books";
 // `engine.generated_at` is a timestamp and is dropped. `rate_tier` is the one
 // field L1 ADDS to every resolved line; it is stripped here so this file proves
 // the numbers and every pre-existing field are byte-identical, and the tier
-// labels are asserted separately (lib/rates/__tests__). Nothing else may be
-// stripped: if a figure moves, this test fails, and the snapshot is only ever
+// labels are asserted separately (lib/rates/__tests__). `item_key` is the one
+// field U4 ADDS (the stable line identity the revision diff keys on; asserted in
+// lib/boq/__tests__/revision-diff.test.ts). Nothing else may be stripped: if a figure moves, this test fails, and the snapshot is only ever
 // re-recorded by a change whose whole point is to move a price.
 // =============================================================================
 
@@ -31,7 +32,7 @@ function strip(v: unknown): unknown {
   if (v && typeof v === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, x] of Object.entries(v)) {
-      if (k === "generated_at" || k === "rate_tier") continue;
+      if (k === "generated_at" || k === "rate_tier" || k === "item_key") continue;
       out[k] = strip(x);
     }
     return out;

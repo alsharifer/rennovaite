@@ -1283,6 +1283,60 @@ resolved line carries **`rate_tier`**.
 
 **DB step**: `npm run db:push` for `041`.
 
+## Revision diff, approval trail, promotion history (U4 / L3)
+
+- **Every `generate-boq` is a revision** (a `boqs` row; none is ever deleted).
+  `lib/boq/revisions.ts` reads them: `listRevisions` (newest first, with
+  approval status) and **`buildProjectRevisionDiff`** — ONE object the in-app
+  view (`/project/[id]/boq/revisions?from&to`), the JSON route
+  (`GET /api/projects/:id/boq-diff?from&to`) and the PDF (`&format=pdf`,
+  `lib/documents/revision-diff-pdf.ts`) all render. Signed-in callers only.
+- **Stable line identity** (`lib/boq/line-identity.ts`): `item_key` (now
+  written on every engine + garden line — the one additive field the pricing
+  goldens strip) → the item the rule id / description names (`lineItemKey`,
+  shared with the provenance popover, so a pre-U4 BoQ keys the same) → the
+  rule id without the engine's rate-note suffix (`R-12/Catalogue` → `R-12`,
+  the old change-report key, which moved with the tier) → description; repeats
+  numbered `#n`. **Never REF codes** (positional). `lib/pilot/change-report.ts`
+  keys on it too.
+- **`lib/boq/revision-diff.ts`** (pure): classes quantity | rate | both | added
+  | removed, Δ qty / rate / total, the summary chain old → new, and a **cause
+  only where a record names the line** — a `boq_corrections` row, a
+  `firm_rate_entries` row of the project's firm (created or retired), or a
+  pilot event in the (from, to] window (`lib/boq/revision-causes.ts`). A line
+  with none says "no cause recorded"; it is never given a story. Reproduces
+  the Arabella G5d change report stage by stage (fixture
+  `lib/boq/__fixtures__/arabella-g5d-revisions.json`, exported from dev; the
+  live check diffs the real rows).
+- **Approvals** (`boq_approvals`, migration 046; `lib/boq/approvals.ts`):
+  append-only. `firm` = a signed-in MEMBER of the project's firm (any signed-in
+  account when the project has no firm); `client` = an EVENT the firm records
+  with the name + date the client gave. Labels never carry a member identity
+  ("Approved by the firm · date", "Client approval recorded by the firm ·
+  name · date"). Shown on the hub (`components/boq/ApprovalsCard`), the
+  revisions page and the diff PDF. `GET/POST /api/projects/:id/boq-approvals`.
+- **Promotion supersede-with-history** (046): `promote_correction()` is ONE SQL
+  transaction — lock the correction, refuse (not this firm's / not a rate /
+  already promoted), retire the active promotion for the same key/grade
+  (`superseded_at` / `superseded_by` / `retired_by` / `retire_reason` — kept),
+  insert (`created_by`), link the correction, return the book to draft.
+  **Retire, never delete**: `DELETE /rates/:id` sets the retire columns and,
+  for a promotion, clears the correction's `promoted_at` so it is
+  re-promotable; no code path deletes a `firm_rate_entries` row (static
+  test). **Origin guard**: a promoted or imported rate's figures are locked
+  (409 `entry_locked`; only the note may change). `loadFirmBook` orders
+  `created_at desc, id`. Trail: `GET /api/firms/:id/rates/history?item_key=`
+  (members; actor e-mails resolved for the firm's own eyes) and the editor's
+  history row.
+- **Not a pack document**: the diff PDF is firm-facing (sign-in + an identity
+  scan of its printed pages), exempt from the T5 job guard by name in
+  `ungated-paths.test.ts`. Provenance popovers on the diff use each stored
+  revision's own chain; the Δ figure's chain lists the recorded causes
+  (`ChainStepKind` gains `cause`).
+- **Checks**: `scripts/revision-diff-check.mjs [port]` (Arabella read-only
+  reproduction + PDF + identity scan; approvals and promotion history on
+  scratch state, cleaned up).
+
 ## Figures + number provenance, identity curation (I4)
 
 - **One formatter, one component.** `lib/format/aed.ts` (`formatAed(n, format)`:

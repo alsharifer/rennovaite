@@ -1,3 +1,48 @@
+# U4 / L3 — revision diff + approval trail + promotion history (2026-09-27)
+
+Per U0(d) and the Sprint-4 amendment (line-level diff only; stable line
+identity, not REF codes; supersession as ONE transactional RPC; retire never
+delete; origin guard on PATCH; deterministic ordering).
+
+- **Revision diff** — `lib/boq/revision-diff.ts` generalises the garden
+  change-report engine: any two `boqs` rows of a project, every line that
+  moved (old → new qty / rate / total, class), the summary chain, and a cause
+  ONLY where a record in the (from, to] window names the line (corrections,
+  the firm's rate-book entries, pilot events). The **unstable key is fixed**:
+  the engine now writes `item_key` on every line (the goldens strip it, like
+  `rate_tier`), and `lib/boq/line-identity.ts` keys on item → rule id without
+  the rate-note suffix → description. In-app view
+  (`/project/[id]/boq/revisions`, `<Figure>` popovers from each revision's own
+  provenance, Δ popovers listing the causes), JSON route and PDF share
+  `buildProjectRevisionDiff`.
+- **Arabella check**: the diff of the G5d stage BoQs reproduces
+  `screenshots/garden-pilot/g5d-session.json` line for line (unit test on an
+  exported fixture; live check on the real rows: 116,942.01 → 116,216.57,
+  −725.44, 6 lines, same Δ per line). Causes: the session record's stage
+  labels were never stored as events, so the diff reports **none** for those
+  lines — "where recorded" means recorded.
+- **Approval trail** — `boq_approvals` (046), append-only: firm approval by a
+  member (403 for a non-member once the project has a firm), client approval
+  RECORDED with name + date (422 without). On the hub, the revisions page and
+  the diff PDF; no member identity on any surface.
+- **Promotion history** — `promote_correction()` RPC (046): supersede the active
+  promotion for the same key/grade (kept: superseded_at/by, retired_by,
+  retire_reason), insert with created_by, link the correction, book → draft —
+  one transaction. DELETE retires (row kept; a promotion's correction becomes
+  re-promotable); PATCH of a promoted/imported rate's figure → 409
+  `entry_locked`; `loadFirmBook` orders `created_at desc, id`. Trail route +
+  editor history row. The fake db gained an `rpc` double that mirrors the SQL
+  function step for step.
+- **Tests**: promote-over-existing · delete-of-promoted · re-promotion · origin
+  guard · deterministic order (`promotion-history.test.ts`); identity, classes,
+  causes, Arabella reproduction (`revision-diff.test.ts`); approvals; diff PDF
+  pages; route-scan + ungated-paths updated (the diff PDF is a firm-facing
+  working document, exempt by name, behind sign-in + identity scan). Suite
+  934/934. Live: `scripts/revision-diff-check.mjs` 44/44 on dev.
+- **Migration 046** applied on dev; prod pending the merge instruction.
+- **Out (as amended)**: per-element diffs, generic cause attribution, a UI for
+  approvals beyond the trail + two acts, revocation of an approval.
+
 # U3 / L2 — structured quote import with review + quote provenance (2026-09-27)
 
 The T0 gap list, closed deliberately (Sprint-3 spot-check (b) named ten gaps):

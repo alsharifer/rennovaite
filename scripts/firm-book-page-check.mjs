@@ -141,10 +141,12 @@ try {
   check("an edit after review returns the book to Draft", await until(`(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Draft"`));
   await shot("u2-06-edited-back-to-draft");
 
-  console.log("\n5. delete");
+  console.log("\n5. retire (U4: the row stays in the book's history and leaves the active list)");
   await evaluate("window.confirm = () => true");
-  await click('[aria-label="Delete garden.pcc_base"]');
-  check("entry deleted", await until(`!document.querySelector('[data-item-key="garden.pcc_base"]')`));
+  await click('[aria-label="Retire garden.pcc_base"]');
+  check("entry retired — gone from the active list", await until(`!document.querySelector('[data-item-key="garden.pcc_base"]')`));
+  const { data: retiredRows } = await sb.from("firm_rate_entries").select("id, superseded_at, retire_reason").eq("firm_id", firmId).eq("item_key", "garden.pcc_base");
+  check("…and kept as history (retire, never delete)", (retiredRows ?? []).length === 1 && !!retiredRows[0].superseded_at && retiredRows[0].retire_reason === "retired by a member", JSON.stringify(retiredRows));
 
   console.log("\n6. privacy — every request the page made");
   const api = requests.filter((r) => /\/api\//.test(r.url)).map((r) => new URL(r.url).pathname);

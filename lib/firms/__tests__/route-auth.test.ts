@@ -27,16 +27,19 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 const FIRM_ROUTES = walk(path.join(ROOT, "app/api/firms")).map(rel).sort();
-const UNSCOPED_PATHS = ["app/api/projects/[id]/route.ts", "app/api/boq-corrections/route.ts"];
+// U4 adds the approval route: a project with a firm is that firm's to approve.
+const UNSCOPED_PATHS = ["app/api/projects/[id]/route.ts", "app/api/boq-corrections/route.ts", "app/api/projects/[id]/boq-approvals/route.ts"];
 
 // Store functions that take a Caller (last argument) — every call site must pass one.
 const CALLER_TAKING = [
   "listFirms", "createFirm", "findOrCreateFirmByName", "requireFirm", "getFirmSummary", "updateFirm",
   "deleteFirm", "listEntries", "createEntry", "updateEntry", "deleteEntry", "promoteCorrection", "assignProjectFirm",
+  // U4
+  "listEntryHistory", "recordApproval",
 ];
 
 describe("every firm route resolves the caller and passes it to the store", () => {
-  it("scans every firm route file (five from L1/U1, four quote routes from U3)", () => {
+  it("scans every firm route file (five from L1/U1, four quote routes from U3, the history route from U4)", () => {
     expect(FIRM_ROUTES).toEqual([
       "app/api/firms/[firmId]/promote/route.ts",
       "app/api/firms/[firmId]/quotes/[quoteId]/lines/[lineId]/route.ts",
@@ -44,6 +47,7 @@ describe("every firm route resolves the caller and passes it to the store", () =
       "app/api/firms/[firmId]/quotes/route.ts",
       "app/api/firms/[firmId]/quotes/template/route.ts",
       "app/api/firms/[firmId]/rates/[entryId]/route.ts",
+      "app/api/firms/[firmId]/rates/history/route.ts",
       "app/api/firms/[firmId]/rates/route.ts",
       "app/api/firms/[firmId]/route.ts",
       "app/api/firms/route.ts",

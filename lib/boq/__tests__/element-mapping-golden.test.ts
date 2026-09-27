@@ -18,7 +18,9 @@ function strip(v: unknown): unknown {
   if (v && typeof v === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, x] of Object.entries(v)) {
-      if (k === "generated_at") continue;
+      // `item_key` is the one field U4 ADDS to every engine line (the stable identity
+      // the revision diff keys on; asserted in revision-diff.test.ts).
+      if (k === "generated_at" || k === "item_key") continue;
       out[k] = strip(x);
     }
     return out;

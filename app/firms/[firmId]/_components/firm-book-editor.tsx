@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { Figure } from "@/components/figures/Figure";
 import { ENTRY_KINDS, groupBySection, validateDraftAgainst, type EntryKind, type VocabularyItem } from "@/lib/firms/vocabulary-client";
@@ -60,9 +60,33 @@ const BUILTIN_LABEL = { catalog: "built-in — catalogue SKU pick", labour_book:
 
 type ApiError = { error?: string; code?: string };
 
+/** U4: one row of an item's trail (GET /api/firms/:id/rates/history). */
+interface HistoryRow {
+  id: string;
+  grade: Grade | null;
+  unit: string;
+  rate_aed: number;
+  kind: EntryKind;
+  origin: Entry["origin"];
+  correction_id: string | null;
+  quote_id: string | null;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+  superseded_at: string | null;
+  superseded_by: string | null;
+  retired_by: string | null;
+  retire_reason: string | null;
+}
+const ORIGIN_LABEL: Record<Entry["origin"], string> = { firm_entry: "typed", quote_import: "from a quotation", promoted_correction: "promoted correction" };
+/** Only a typed rate's figures may be edited; a promoted or imported rate is its record's figure (U4 origin guard). */
+const isLocked = (e: { origin: Entry["origin"] }) => e.origin !== "firm_entry";
+
 /** Turn an API failure into the inline messages the form shows. */
 function inlineErrors(status: number, body: ApiError): string[] {
   if (status === 422 && body.error) return body.error.split(/;\s*/).filter(Boolean);
+  if (status === 409 && body.code === "entry_locked") return [body.error ?? "This rate's figures come from its record and cannot be edited here."];
+  if (status === 409 && body.code === "entry_retired") return ["This entry is already history."];
   if (status === 409) return ["There is already an entry for this item at this grade — edit that one instead."];
   if (status === 401) return ["Your session has ended — sign in again."];
   if (status === 403) return ["You are no longer a member of this firm."];
@@ -234,8 +258,36 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
       setRowBusy(null);
     }
   }
+  // U4: the trail of one item — every entry ever made for it, active and retired.
+  const [history, setHistory] = useState<Record<string, HistoryRow[] | "loading" | "error">>({});
+  const [actors, setActors] = useState<Record<string, string>>({});
+  async function toggleHistory(itemKey: string) {
+    if (history[itemKey]) {
+      setHistory((h) => {
+        const { [itemKey]: _closed, ...rest } = h;
+        void _closed;
+        return rest;
+      });
+      return;
+    }
+    setHistory((h) => ({ ...h, [itemKey]: "loading" }));
+    try {
+      const res = await fetch(`/api/firms/${firmId}/rates/history?item_key=${encodeURIComponent(itemKey)}`);
+      const body = (await res.json().catch(() => ({}))) as { history?: HistoryRow[]; actors?: Record<string, string> } & ApiError;
+      if (!res.ok || !body.history) {
+        setHistory((h) => ({ ...h, [itemKey]: "error" }));
+        return;
+      }
+      setActors((a) => ({ ...a, ...(body.actors ?? {}) }));
+      setHistory((h) => ({ ...h, [itemKey]: body.history! }));
+    } catch {
+      setHistory((h) => ({ ...h, [itemKey]: "error" }));
+    }
+  }
+
+  // U4: RETIRE, never delete — the entry stays in the book's history and stops pricing.
   async function remove(e: Entry) {
-    if (!window.confirm(`Delete the ${e.item_key}${e.grade ? ` / ${e.grade}` : ""} rate? Projects priced by this book fall back to what it shadows.`)) return;
+    if (!window.confirm(`Retire the ${e.item_key}${e.grade ? ` / ${e.grade}` : ""} rate? It stays in the book's history and stops pricing; projects priced by this book fall back to what it shadows.${e.origin === "promoted_correction" ? " The correction it came from can be promoted again." : ""}`)) return;
     setRowBusy(e.id);
     setBanner(null);
     try {
@@ -353,8 +405,10 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
                 const v = byKey.get(e.item_key);
                 const ref = v?.reference;
                 const isEditing = editing === e.id;
+                const trail = history[e.item_key];
                 return (
-                  <tr key={e.id} data-entry-id={e.id} data-item-key={e.item_key} className="align-top">
+                  <Fragment key={e.id}>
+                  <tr data-entry-id={e.id} data-item-key={e.item_key} className="align-top">
                     <td className="py-sm pr-sm">
                       <div className="text-ink-900">{v?.label ?? e.item_key}</div>
                       <div className="font-mono text-[12px] text-ink-500">
@@ -428,11 +482,20 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
                         </>
                       ) : (
                         <>
-                          <button type="button" onClick={() => startEdit(e)} aria-label={`Edit ${e.item_key}`} className="focus-ring material-symbols-outlined text-[18px] text-ink-500 hover:text-brass-600">
-                            edit
+                          {isLocked(e) ? (
+                            <span className="material-symbols-outlined text-[18px] text-ink-100" aria-label={`${e.item_key} is a ${ORIGIN_LABEL[e.origin]} — its figures cannot be edited`} title="Figures come from the record this rate cites">
+                              lock
+                            </span>
+                          ) : (
+                            <button type="button" onClick={() => startEdit(e)} aria-label={`Edit ${e.item_key}`} className="focus-ring material-symbols-outlined text-[18px] text-ink-500 hover:text-brass-600">
+                              edit
+                            </button>
+                          )}
+                          <button type="button" onClick={() => toggleHistory(e.item_key)} aria-label={`History of ${e.item_key}`} aria-expanded={!!trail} className="focus-ring material-symbols-outlined ml-xs text-[18px] text-ink-500 hover:text-brass-600">
+                            history
                           </button>
-                          <button type="button" onClick={() => remove(e)} disabled={rowBusy === e.id} aria-label={`Delete ${e.item_key}`} className="focus-ring material-symbols-outlined ml-xs text-[18px] text-ink-500 hover:text-error disabled:opacity-50">
-                            delete
+                          <button type="button" onClick={() => remove(e)} disabled={rowBusy === e.id} aria-label={`Retire ${e.item_key}`} title="Retire — kept in the book's history, stops pricing" className="focus-ring material-symbols-outlined ml-xs text-[18px] text-ink-500 hover:text-error disabled:opacity-50">
+                            archive
                           </button>
                         </>
                       )}
@@ -445,6 +508,60 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
                       )}
                     </td>
                   </tr>
+                  {trail && (
+                    <tr data-history-for={e.item_key}>
+                      <td colSpan={6} className="bg-canvas px-sm py-sm">
+                        {trail === "loading" ? (
+                          <p className="text-[12px] text-ink-500">Loading the trail…</p>
+                        ) : trail === "error" ? (
+                          <p role="alert" className="text-[12px] text-error">
+                            The trail could not be loaded.
+                          </p>
+                        ) : (
+                          <table className="w-full text-[12px]" data-testid="entry-history">
+                            <thead>
+                              <tr className="label-caps text-left text-ink-500">
+                                <th className="py-xs pr-sm font-normal">When</th>
+                                <th className="py-xs pr-sm font-normal">Rate</th>
+                                <th className="py-xs pr-sm font-normal">Origin</th>
+                                <th className="py-xs pr-sm font-normal">By</th>
+                                <th className="py-xs font-normal">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-ink-100">
+                              {trail.map((h) => (
+                                <tr key={h.id} data-history-id={h.id} data-active={!h.superseded_at}>
+                                  <td className="py-xs pr-sm font-mono text-ink-700">{h.created_at.slice(0, 16).replace("T", " ")}</td>
+                                  <td className="py-xs pr-sm font-mono tabular-nums text-ink-900">
+                                    <Figure value={h.rate_aed} format="rate" /> / {h.unit}
+                                    {h.grade ? <span className="ml-xs text-ink-500">{h.grade}</span> : null}
+                                  </td>
+                                  <td className="py-xs pr-sm text-ink-700">
+                                    {ORIGIN_LABEL[h.origin]}
+                                    {h.note ? <span className="text-ink-500"> — {h.note}</span> : null}
+                                  </td>
+                                  <td className="py-xs pr-sm text-ink-700">{h.created_by ? actors[h.created_by] ?? "a member" : "—"}</td>
+                                  <td className="py-xs text-ink-700">
+                                    {h.superseded_at ? (
+                                      <>
+                                        retired {h.superseded_at.slice(0, 10)}
+                                        {h.retired_by ? ` by ${actors[h.retired_by] ?? "a member"}` : ""}
+                                        {h.retire_reason ? ` — ${h.retire_reason}` : ""}
+                                        {h.superseded_by ? " · replaced" : ""}
+                                      </>
+                                    ) : (
+                                      <span className="font-semibold text-brass-600">active</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>

@@ -27,7 +27,8 @@ describe("the firm book editor", () => {
 
   it("only to this firm's routes and the vocabulary", () => {
     for (const u of urls) {
-      expect(u, u).toMatch(/^\/api\/firms\/\$\{firmId\}(\/rates(\/\$\{e\.id\})?)?$|^\/api\/rate-vocabulary$/);
+      // U4: the item trail — this firm's history route, keyed by the item (never an id from elsewhere).
+      expect(u, u).toMatch(/^\/api\/firms\/\$\{firmId\}(\/rates(\/\$\{e\.id\}|\/history\?item_key=\$\{encodeURIComponent\(itemKey\)\})?)?$|^\/api\/rate-vocabulary$/);
     }
   });
 
@@ -36,7 +37,7 @@ describe("the firm book editor", () => {
     // No URL is built from anything but firmId and an entry's own id.
     for (const u of urls) expect(u.match(/\$\{[^}]+\}/g) ?? []).toEqual(expect.arrayContaining([]));
     const vars = urls.flatMap((u) => u.match(/\$\{([^}]+)\}/g) ?? []);
-    expect(new Set(vars)).toEqual(new Set(["${firmId}", "${e.id}"].filter((v) => vars.includes(v))));
+    expect(new Set(vars)).toEqual(new Set(["${firmId}", "${e.id}", "${encodeURIComponent(itemKey)}"].filter((v) => vars.includes(v))));
   });
 });
 

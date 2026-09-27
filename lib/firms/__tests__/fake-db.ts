@@ -30,10 +30,15 @@ const UNIQUE: Record<string, (r: Row) => string> = {
   firm_members: (r) => `${r.firm_id}|${r.user_id}`,
 };
 
+let seq = 0; // strictly increasing created_at for rows inserted within one millisecond
+const stamp = () => new Date(Date.now() + seq++).toISOString();
+
 const DEFAULTS: Record<string, (r: Row) => Row> = {
   firms: (r) => ({ private: true, created_by: null, created_at: new Date().toISOString(), ...r }),
   firm_rate_books: (r) => ({ ohp_pct: 0, status: "draft", reviewed_at: null, ...r }),
-  firm_rate_entries: (r) => ({ grade: null, origin: "firm_entry", correction_id: null, note: null, quote_id: null, quote_line_id: null, superseded_at: null, superseded_by: null, ...r }),
+  // 046: created_by / retired_by / retire_reason; created_at drives the loader's order.
+  firm_rate_entries: (r) => ({ grade: null, origin: "firm_entry", correction_id: null, note: null, quote_id: null, quote_line_id: null, superseded_at: null, superseded_by: null, created_by: null, retired_by: null, retire_reason: null, created_at: stamp(), ...r }),
+  boq_approvals: (r) => ({ firm_id: null, approved_by: null, client_name: null, client_date: null, note: null, created_at: stamp(), ...r }),
   // 045: quotes and their lines.
   firm_quotes: (r) => ({ supplier_role: "supplier", quote_ref: null, quote_date: null, valid_until: null, currency: "AED", vat_treatment: "excl", rates_are: "net", discount_pct: 0, source_filename: null, source_sha256: null, status: "review", version: 1, supersedes_quote_id: null, created_by: null, created_at: new Date().toISOString(), accepted_at: null, ...r }),
   firm_quote_lines: (r) => ({ item_key_given: null, suggested_item_key: null, suggestion_score: null, item_key: null, grade: null, kind: null, qty: null, unit: null, rate_raw: null, currency: null, rate_aed: null, status: "unmatched", hold_reason: null, entry_id: null, ...r }),
@@ -47,7 +52,7 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
   private mode: "many" | "single" | "maybe" = "many";
   private head = false;
   private count = false;
-  private orderBy: string | null = null;
+  private orderBy: { col: string; asc: boolean }[] = [];
 
   constructor(private db: FakeDb, private table: string) {}
 
@@ -94,8 +99,8 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
     this.filters.push((r) => re.test(String(r[col])));
     return this;
   }
-  order(col: string) {
-    this.orderBy = col;
+  order(col: string, opts?: { ascending?: boolean }) {
+    this.orderBy.push({ col, asc: opts?.ascending !== false });
     return this;
   }
   private cap: number | null = null;
@@ -129,12 +134,15 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
     let out: Row[] = [];
     if (this.op === "select") {
       out = table.filter((r) => this.match(r));
-      if (this.orderBy) {
-        const k = this.orderBy;
+      if (this.orderBy.length) {
+        const keys = this.orderBy;
         out = out.slice().sort((a, b) => {
-          const x = a[k], y = b[k];
-          if (typeof x === "number" && typeof y === "number") return x - y;
-          return String(x).localeCompare(String(y));
+          for (const { col, asc } of keys) {
+            const x = a[col], y = b[col];
+            const c = typeof x === "number" && typeof y === "number" ? x - y : String(x ?? "").localeCompare(String(y ?? ""));
+            if (c !== 0) return asc ? c : -c;
+          }
+          return 0;
         });
       }
       if (this.cap != null) out = out.slice(0, this.cap);
@@ -183,6 +191,58 @@ export function fakeDb(seed: Record<string, Row[]> = {}): FakeDb {
     ignoreFilters: new Set(),
     client: null as unknown as SupabaseClient,
   };
-  db.client = { from: (t: string) => new Query(db, t) } as unknown as SupabaseClient;
+  db.client = {
+    from: (t: string) => new Query(db, t),
+    rpc: (name: string, params: Record<string, unknown>) => rpc(db, name, params),
+  } as unknown as SupabaseClient;
   return db;
+}
+
+// --- RPC double ---------------------------------------------------------------
+// Mirrors public.promote_correction (migration 046) step for step, so the
+// store's tests exercise the same refusals and the same supersession the
+// database performs — and the same absence of any delete.
+async function rpc(db: FakeDb, name: string, p: Record<string, unknown>): Promise<{ data: unknown; error: Err }> {
+  if (name !== "promote_correction") return { data: null, error: { message: `function ${name} does not exist`, code: "42883" } };
+  const refuse = (m: string) => ({ data: null, error: { message: m, code: "P0001" } });
+  const c = (db.tables.boq_corrections ??= []).find((x) => x.id === p.p_correction_id);
+  if (!c) return refuse("correction_not_found");
+  if (c.firm_id !== p.p_firm_id) return refuse("not_this_firms_correction");
+  if (c.correction_type !== "rate") return refuse("not_a_rate");
+  if (!c.item_key) return refuse("no_item_key");
+  if (c.promoted_at) return refuse("already_promoted");
+  const books = (db.tables.firm_rate_books ??= []);
+  let book = books.find((b) => b.firm_id === p.p_firm_id);
+  if (!book) {
+    book = { id: randomUUID(), ...DEFAULTS.firm_rate_books!({ firm_id: p.p_firm_id }) };
+    books.push(book);
+  }
+  const now = new Date().toISOString();
+  const entries = (db.tables.firm_rate_entries ??= []);
+  const grade = (p.p_grade as string | null) ?? null;
+  const old = entries.find(
+    (e) => e.firm_id === p.p_firm_id && e.item_key === c.item_key && e.origin === "promoted_correction" && (e.grade ?? "*") === (grade ?? "*") && !e.superseded_at,
+  );
+  if (old) Object.assign(old, { superseded_at: now, retired_by: p.p_actor, retire_reason: "superseded by a later promotion", updated_at: now });
+  const row: Row = {
+    id: randomUUID(),
+    ...DEFAULTS.firm_rate_entries!({
+      book_id: book.id,
+      firm_id: p.p_firm_id,
+      item_key: c.item_key,
+      grade,
+      unit: p.p_unit,
+      rate_aed: p.p_rate,
+      kind: p.p_kind,
+      origin: "promoted_correction",
+      correction_id: c.id,
+      note: p.p_note ?? null,
+      created_by: p.p_actor,
+    }),
+  };
+  entries.push(row);
+  if (old) old.superseded_by = row.id;
+  Object.assign(c, { promoted_at: now, promoted_entry_id: row.id });
+  if (book.status === "reviewed") Object.assign(book, { status: "draft", reviewed_at: null });
+  return { data: { entry_id: row.id, superseded_entry_id: old?.id ?? null }, error: null };
 }

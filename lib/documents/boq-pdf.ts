@@ -354,13 +354,18 @@ function page(body: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${BOQ_PAGE_W}mm" height="${BOQ_PAGE_H}mm" viewBox="0 0 ${BOQ_PAGE_W} ${BOQ_PAGE_H}"><rect x="0" y="0" width="${BOQ_PAGE_W}" height="${BOQ_PAGE_H}" fill="#FFFFFF"/>${body}</svg>`;
 }
 
-/** Rasterise the pages into an A4 PDF. Server-only (resvg + pdf-lib). */
-export async function renderBoqPdf(input: BoqPdfInput): Promise<{ pdf: Uint8Array; pages: string[] }> {
-  const pages = buildBoqPdfPages(input);
+// U4: the A4 text/wrap/page primitives and the palette, shared with the revision
+// diff PDF (lib/documents/revision-diff-pdf.ts) so the two documents cannot drift
+// in type size, margins or colour.
+export const A4_PDF = { M, INK_900, INK_700, INK_500, INK_100, BRASS, TERRACOTTA, FONT_UI, FONT_MONO, FONT_DISPLAY, K } as const;
+export { t as a4Text, wrap as a4Wrap, page as a4Page, f1 as a4Num };
+
+/** Rasterise A4 SVG pages into a PDF (resvg → pdf-lib), dated to the UTC day. Server-only. */
+export async function rasteriseA4Pages(pages: readonly string[], title: string): Promise<Uint8Array> {
   const { Resvg } = await import("@resvg/resvg-js");
   const { PDFDocument } = await import("pdf-lib");
   const pdf = stampPdfDay(await PDFDocument.create());
-  pdf.setTitle(`${input.projectName} — Bill of Quantities`);
+  pdf.setTitle(title);
   pdf.setAuthor("RennovAIte");
   pdf.setCreator("RennovAIte");
   pdf.setProducer("RennovAIte");
@@ -370,5 +375,11 @@ export async function renderBoqPdf(input: BoqPdfInput): Promise<{ pdf: Uint8Arra
     const p = pdf.addPage([BOQ_PAGE_W * MM_TO_PT, BOQ_PAGE_H * MM_TO_PT]);
     p.drawImage(await pdf.embedPng(png), { x: 0, y: 0, width: BOQ_PAGE_W * MM_TO_PT, height: BOQ_PAGE_H * MM_TO_PT });
   }
-  return { pdf: await pdf.save(), pages };
+  return pdf.save();
+}
+
+/** Rasterise the pages into an A4 PDF. Server-only (resvg + pdf-lib). */
+export async function renderBoqPdf(input: BoqPdfInput): Promise<{ pdf: Uint8Array; pages: string[] }> {
+  const pages = buildBoqPdfPages(input);
+  return { pdf: await rasteriseA4Pages(pages, `${input.projectName} — Bill of Quantities`), pages };
 }
