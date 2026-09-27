@@ -22,10 +22,10 @@
 // reason, and listed in `findings`.
 // =============================================================================
 
-import { UNPRICED_GARDEN_ITEMS, UNPRICED_SOURCE_LABEL } from "@/lib/boq/garden-takeoff";
-import { RATE_RULES } from "@/lib/boq/rules";
+import { UNPRICED_SOURCE_LABEL } from "@/lib/boq/garden-takeoff";
+import { lineItemKey } from "@/lib/boq/line-identity";
 import { chainTotals } from "@/lib/boq/totals";
-import { GARDEN_RATES, PUBLIC_SOURCE_LABEL } from "@/lib/ground-truth/villa94-garden";
+import { PUBLIC_SOURCE_LABEL } from "@/lib/ground-truth/villa94-garden";
 import { curateText } from "@/lib/identity/curation";
 import { DERIVED_QTY_NOTE } from "@/lib/plan/site-reference";
 import { formatAed } from "@/lib/format/aed";
@@ -116,21 +116,9 @@ const STATUS_FLAG: Record<string, string> = {
 
 // --- Keys --------------------------------------------------------------------
 
-const RULE_ITEM = new Map<string, string>(Object.entries(RATE_RULES).map(([k, r]) => [r.rule_id, k]));
-const GARDEN_LABEL_ITEM = new Map<string, string>([
-  ...GARDEN_RATES.map((g) => [g.label, g.item_key] as const),
-  ...Object.entries(UNPRICED_GARDEN_ITEMS).map(([k, v]) => [v.label, k] as const),
-]);
-
-/** The rate-book item key behind a stored line, when one can be named. */
-export function lineItemKey(line: ProvLine): string | null {
-  const rule = line.rule_id ?? "";
-  const r = rule.split("/").find((p) => /^R-\d+/.test(p));
-  if (r && RULE_ITEM.has(r)) return RULE_ITEM.get(r)!;
-  if (rule.startsWith("GL-")) return GARDEN_LABEL_ITEM.get(line.description) ?? null;
-  if (rule.startsWith("P4/quantify/")) return rule.slice("P4/quantify/".length);
-  return null;
-}
+// U4: the item key behind a line lives with the line-identity module (the
+// revision diff keys on it too, so both surfaces name the same item).
+export { lineItemKey };
 
 /** Which tier answered — stored `rate_tier`, or inferred for a BoQ stored before L1. */
 export function lineTierKey(line: ProvLine, workSection: string): string | null {

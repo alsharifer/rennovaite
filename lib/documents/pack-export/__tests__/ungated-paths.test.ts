@@ -35,12 +35,23 @@ describe("every document route is gated", () => {
     expect(src).toMatch(/guardDocumentRoute\(request, /);
   });
 
+  // U4: the BoQ revision diff PDF is a FIRM-FACING working document (who moved
+  // what between two revisions), not a client pack deliverable: it is behind
+  // sign-in and an identity scan of its printed pages, not behind a pack job.
+  const WORKING_DOCUMENT_ROUTES = ["app/api/projects/[id]/boq-diff/route.ts"];
+
   it("no other route renders a client PDF", () => {
     const producers = walk(path.join(ROOT, "app"))
       .filter((f) => /route\.ts$/.test(f))
-      .filter((f) => /\b(generateDrawingSetPdf|generateRenderPack|renderBoqPdf|renderSheetPdf)\b/.test(readFileSync(f, "utf8")))
+      .filter((f) => /\b(generateDrawingSetPdf|generateRenderPack|renderBoqPdf|renderSheetPdf|renderRevisionDiffPdf|rasteriseA4Pages)\b/.test(readFileSync(f, "utf8")))
       .map(rel);
-    expect(producers.every((f) => DOCUMENT_ROUTES.includes(f))).toBe(true);
+    expect(producers.every((f) => DOCUMENT_ROUTES.includes(f) || WORKING_DOCUMENT_ROUTES.includes(f))).toBe(true);
+  });
+
+  it.each(WORKING_DOCUMENT_ROUTES)("%s requires a signed-in caller and scans its printed pages for withheld identities", (file) => {
+    const src = readFileSync(path.join(ROOT, file), "utf8");
+    expect(src).toMatch(/await getCaller\(request\)/);
+    expect(src).toMatch(/findWithheldIdentities\(pages/);
   });
 
   it("the design-lock archive mints no download URL", () => {

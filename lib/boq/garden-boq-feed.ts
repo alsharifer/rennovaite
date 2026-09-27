@@ -313,6 +313,8 @@ export function buildGardenSections(capture: GardenTakeoffInput, book: GardenRat
       vendor_or_source: l.vendor_or_source,
       notes: l.measurement,
       rule_id: l.rule_id,
+      // U4: the stable identity a revision diff keys on.
+      item_key: l.item_key,
       kind: "supply_and_install",
       rate_band: "sku",
       wastage_pct: 0,

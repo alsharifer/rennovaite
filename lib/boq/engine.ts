@@ -59,6 +59,9 @@ export function generateDeterministicBoq(
           ? `${rate.notes ?? ""}; qty incl. ${Math.round(rate.wastage * 100)}% wastage on ${item.quantity} ${item.unit} net (${item.measurement})`.trim()
           : `${rate.notes ?? ""}; ${item.measurement}`.trim(),
       rule_id: `${item.rule_id}/${rate.notes?.split(":")[0] ?? ""}`,
+      // U4: the stable identity — the rule_id above carries the rate note, which
+      // moves with the tier, so a revision diff must not key on it.
+      item_key: item.item_key,
       kind: rate.kind,
       rate_band: rate.rate_band,
       wastage_pct: Math.round(rate.wastage * 100),

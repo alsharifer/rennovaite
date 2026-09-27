@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import { AppShell } from "@/components/app/AppShell";
 import { ProjectFilesPanel } from "@/components/assets/ProjectFilesPanel";
+import { ApprovalsCard } from "@/components/boq/ApprovalsCard";
+import { listRevisions, type RevisionSummary } from "@/lib/boq/revisions";
 import { PermitsCard } from "@/components/compliance/PermitsCard";
 import { loadProjectAssets, toAssetLite } from "@/lib/assets/load";
 import { runPermitCheck, type PermitCheckResult } from "@/lib/compliance/check";
@@ -192,6 +194,15 @@ export default async function ProjectHubPage({
   const boq = boqRes.data;
   const boqPayload =
     boq && isBoqPayload(boq.sections) ? boq.sections : null;
+  // U4: every regeneration is a revision; the hub shows the approval trail. Best-effort.
+  let revisions: RevisionSummary[] = [];
+  if (boq) {
+    try {
+      revisions = await listRevisions(sb, projectId);
+    } catch {
+      /* the hub never fails on the trail */
+    }
+  }
   const boqLineCount = boqPayload
     ? boqPayload.sections.reduce((n, s) => n + s.lines.length, 0)
     : 0;
@@ -399,6 +410,9 @@ export default async function ProjectHubPage({
           <NextStepsCard steps={nextSteps} />
           <TimelineCard />
         </div>
+
+        {/* BOQ REVISIONS & APPROVALS (U4) — absent until a BoQ exists ---- */}
+        <ApprovalsCard projectId={projectId} revisions={revisions} className="mt-xl" />
 
         {/* PROJECT FILES (asset library) ------------------------------ */}
         <ProjectFilesPanel assets={projectAssets} />

@@ -320,6 +320,19 @@ export default async function BoqPage({
             </span>
             Choose accessories &amp; specs
           </a>
+          {/* U4 — every regeneration is a revision; compare any two, and see who approved which. */}
+          {latestBoq && (
+            <a
+              href={`/project/${id}/boq/revisions`}
+              className="focus-ring ml-sm mt-lg inline-flex h-11 items-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
+              data-testid="revisions-link"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                history
+              </span>
+              Revision history &amp; approvals
+            </a>
+          )}
         </header>
 
         {permitCheck && (

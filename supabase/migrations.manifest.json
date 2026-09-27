@@ -272,6 +272,12 @@
       "version": "20260101004500",
       "name": "firm_quotes",
       "sha256": "03932bfb27a21137afa67a90052528f72fc08dfd610c09471fbe2dfed0122a00"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004600",
+      "name": "promotion_history_approvals",
+      "sha256": "cbf44a094f10c6c05a6249c4b438519e05f690f5c99a2dded14cbccd54bf16a1"
     }
   ]
 }

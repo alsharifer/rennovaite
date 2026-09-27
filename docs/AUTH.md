@@ -16,6 +16,15 @@ on every route._
   which needs membership of the firm being detached), and for attributing a
   BoQ correction to a firm (`POST /api/boq-corrections` with `firm_id` or
   `attributed_to`).
+- **U4 adds** (2026-09-27): `GET /api/firms/:firmId/rates/history` (members);
+  `POST /api/projects/:id/boq-approvals` — a signed-in caller, and a MEMBER of
+  the project's firm when it has one (403 `not_a_member` otherwise);
+  `GET /api/projects/:id/boq-revisions`, `GET …/boq-diff` and `GET
+  …/boq-approvals` require a signed-in caller (401) — a revision history is a
+  price history. The revisions page (`/project/[id]/boq/revisions`) shows a
+  sign-in card to a visitor. Rate entries record `created_by` / `retired_by`
+  (the trail); the history route resolves those ids to e-mails for the firm's
+  own members only.
 - **Answers, in this order** (`lib/firms/store.ts → requireFirm`):
 
   | | code | when |

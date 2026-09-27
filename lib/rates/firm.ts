@@ -188,12 +188,17 @@ export async function loadFirmBook(supabase: SupabaseClient, firmId: string): Pr
   // Active rows only (U3 supersession). A database that predates 045 has neither
   // the column nor any superseded row, so the pre-045 projection is equivalent.
   type EntRes = { data: unknown; error: { code?: string; message?: string } | null };
+  // Deterministic order (U4): newest first, then id — so if two active rows ever
+  // shared a key/grade/origin the pick would be stable, never "whichever the
+  // database returned first".
   let entRes: EntRes = await supabase
     .from("firm_rate_entries")
     .select(FIRM_ENTRY_COLUMNS)
     .eq("firm_id", firmId)
     .eq("book_id", book.id)
-    .is("superseded_at", null);
+    .is("superseded_at", null)
+    .order("created_at", { ascending: false })
+    .order("id");
   if (entRes.error && isMissingSchema(entRes.error)) {
     entRes = await supabase.from("firm_rate_entries").select(FIRM_ENTRY_COLUMNS_PRE045).eq("firm_id", firmId).eq("book_id", book.id);
   }

@@ -359,35 +359,84 @@ function assertValid(d: { item_key: string; unit: string; kind: FirmEntryKind; r
 async function insertEntry(
   db: SupabaseClient,
   firmId: string,
-  input: EntryInput & { origin: "firm_entry" | "promoted_correction"; correction_id?: string | null },
+  input: EntryInput & { origin: "firm_entry"; created_by: string | null },
 ): Promise<FirmRateEntry> {
   assertValid(input);
   const book = await ensureBook(db, firmId);
-  const { data, error } = await db
-    .from("firm_rate_entries")
-    .insert({
-      book_id: book.id,
-      firm_id: firmId,
-      item_key: input.item_key,
-      grade: input.grade ?? null,
-      unit: input.unit,
-      rate_aed: input.rate_aed,
-      kind: input.kind,
-      origin: input.origin,
-      correction_id: input.correction_id ?? null,
-      note: input.note ?? null,
-    })
-    .select(FIRM_ENTRY_COLUMNS)
-    .single();
-  if (error) fail(error, `entry ${input.item_key}${input.grade ? `/${input.grade}` : ""} (${input.origin})`);
-  return toFirmEntry(data as Record<string, unknown>);
+  const row = {
+    book_id: book.id,
+    firm_id: firmId,
+    item_key: input.item_key,
+    grade: input.grade ?? null,
+    unit: input.unit,
+    rate_aed: input.rate_aed,
+    kind: input.kind,
+    origin: input.origin,
+    correction_id: null,
+    note: input.note ?? null,
+    created_by: input.created_by,
+  };
+  let res = await db.from("firm_rate_entries").insert(row).select(FIRM_ENTRY_COLUMNS).single();
+  if (res.error && isMissingSchema(res.error)) {
+    // Pre-046: no created_by column yet.
+    const { created_by: _drop, ...pre046 } = row;
+    void _drop;
+    res = await db.from("firm_rate_entries").insert(pre046).select(FIRM_ENTRY_COLUMNS_PRE045).single();
+  }
+  if (res.error) fail(res.error, `entry ${input.item_key}${input.grade ? `/${input.grade}` : ""} (${input.origin})`);
+  return toFirmEntry(res.data as Record<string, unknown>);
 }
 
 export async function createEntry(db: SupabaseClient, firmId: string, input: EntryInput, caller: Caller | null): Promise<FirmRateEntry> {
   await requireFirm(db, firmId, caller);
-  const entry = await insertEntry(db, firmId, { ...input, origin: "firm_entry" });
+  const entry = await insertEntry(db, firmId, { ...input, origin: "firm_entry", created_by: caller!.id });
   await touchBook(db, firmId);
   return entry;
+}
+
+/** Origins whose figures are DERIVED from another record and must not drift from it (U4). */
+const LOCKED_ORIGINS = new Set(["promoted_correction", "quote_import"]);
+
+export const FIRM_ENTRY_HISTORY_COLUMNS =
+  "id, firm_id, book_id, item_key, grade, unit, rate_aed, kind, origin, correction_id, quote_id, quote_line_id, note, created_by, created_at, updated_at, superseded_at, superseded_by, retired_by, retire_reason";
+
+export interface FirmEntryHistoryRow extends FirmRateEntry {
+  quote_line_id: string | null;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  superseded_by: string | null;
+  retired_by: string | null;
+  retire_reason: string | null;
+}
+
+/**
+ * U4 — the trail for one item: every entry ever made for it in this firm's
+ * book, active first then history, newest first — who made it, who retired it,
+ * what replaced it, and which correction or quotation it came from.
+ */
+export async function listEntryHistory(db: SupabaseClient, firmId: string, itemKey: string, caller: Caller | null): Promise<FirmEntryHistoryRow[]> {
+  await requireFirm(db, firmId, caller);
+  const { data, error } = await db
+    .from("firm_rate_entries")
+    .select(FIRM_ENTRY_HISTORY_COLUMNS)
+    .eq("firm_id", firmId)
+    .eq("item_key", itemKey)
+    .order("created_at", { ascending: false });
+  if (error) fail(error, "read entry history");
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    ...toFirmEntry(r),
+    quote_line_id: (r.quote_line_id ?? null) as string | null,
+    note: (r.note ?? null) as string | null,
+    created_by: (r.created_by ?? null) as string | null,
+    created_at: String(r.created_at),
+    updated_at: String(r.updated_at ?? r.created_at),
+    superseded_by: (r.superseded_by ?? null) as string | null,
+    retired_by: (r.retired_by ?? null) as string | null,
+    retire_reason: (r.retire_reason ?? null) as string | null,
+  }));
+  return rows.sort((a, b) => Number(!!a.superseded_at) - Number(!!b.superseded_at) || b.created_at.localeCompare(a.created_at));
 }
 
 async function readEntry(db: SupabaseClient, firmId: string, entryId: string): Promise<FirmRateEntry> {
@@ -413,6 +462,21 @@ export async function updateEntry(
 ): Promise<FirmRateEntry> {
   await requireFirm(db, firmId, caller);
   const current = await readEntry(db, firmId, entryId);
+  if (current.superseded_at) throw new StoreError(409, "entry_retired", "This entry is history; it cannot be edited.");
+  // U4 origin guard: a promoted rate is its correction's figure and an imported
+  // rate is its quotation's — editing either here would let the book drift from
+  // the record it cites. Only the note may change; a new figure is a new
+  // promotion or a new import.
+  if (LOCKED_ORIGINS.has(current.origin)) {
+    const locked = (["rate_aed", "unit", "kind", "grade"] as const).filter((k) => patch[k] !== undefined && patch[k] !== current[k]);
+    if (locked.length > 0) {
+      throw new StoreError(
+        409,
+        "entry_locked",
+        `A ${current.origin === "promoted_correction" ? "promoted correction's" : "quotation's"} ${locked.join(", ")} cannot be edited — promote a new correction or import a new quotation instead.`,
+      );
+    }
+  }
   const next = { ...current, ...patch };
   assertValid(next);
   const { data, error } = await db
@@ -428,16 +492,34 @@ export async function updateEntry(
   return toFirmEntry(data as Record<string, unknown>);
 }
 
+/**
+ * U4 — RETIRE, never delete. The entry stays with superseded_at / retired_by /
+ * retire_reason set (history), stops pricing, and — when it was a promotion —
+ * its correction's promoted_at is cleared so the correction can be promoted
+ * again. Nothing in this module removes a rate entry row.
+ */
 export async function deleteEntry(db: SupabaseClient, firmId: string, entryId: string, caller: Caller | null): Promise<void> {
   await requireFirm(db, firmId, caller);
+  const current = await readEntry(db, firmId, entryId);
+  if (current.superseded_at) throw new StoreError(409, "entry_retired", "This entry is already history.");
+  const now = new Date().toISOString();
   const { data, error } = await db
     .from("firm_rate_entries")
-    .delete()
+    .update({ superseded_at: now, retired_by: caller!.id, retire_reason: "retired by a member", updated_at: now })
     .eq("id", entryId)
     .eq("firm_id", firmId)
+    .is("superseded_at", null)
     .select("id");
-  if (error) fail(error, "delete entry");
+  if (error) fail(error, "retire entry");
   if (!data || (data as unknown[]).length === 0) throw new StoreError(404, "entry_not_found", "Rate entry not found in this firm's book.");
+  if (current.origin === "promoted_correction" && current.correction_id) {
+    const { error: cerr } = await db
+      .from("boq_corrections")
+      .update({ promoted_at: null, promoted_entry_id: null })
+      .eq("id", current.correction_id)
+      .eq("firm_id", firmId);
+    if (cerr) fail(cerr, "release correction");
+  }
   await touchBook(db, firmId);
 }
 
@@ -463,12 +545,28 @@ export interface PromoteInput {
  * the firm's own entered rates. Only a `rate` correction with an item_key can
  * be promoted, only by a member of the firm that made it, and only once.
  */
+const PROMOTE_ERRORS: Record<string, [401 | 403 | 404 | 409 | 422, string]> = {
+  correction_not_found: [404, "Correction not found."],
+  not_this_firms_correction: [403, "A correction can only be promoted into the book of the firm that made it."],
+  not_a_rate: [422, "Only a rate correction can become a rate."],
+  no_item_key: [422, "The correction names no item_key, so there is nothing for the rate to price."],
+  already_promoted: [409, "This correction has already been promoted (retire its entry to promote it again)."],
+};
+
+/**
+ * U4: promote-over-existing, as ONE transaction. The validation that needs the
+ * vocabulary happens here; everything that must be atomic — refuse the refusable
+ * cases, supersede the active promotion for the same key/grade (kept as
+ * history), insert, link the correction, return the book to draft — is the
+ * `promote_correction` SQL function (migration 046). No promoted record is ever
+ * deleted by this flow.
+ */
 export async function promoteCorrection(
   db: SupabaseClient,
   firmId: string,
   input: PromoteInput,
   caller: Caller | null,
-): Promise<{ entry: FirmRateEntry; correction_id: string }> {
+): Promise<{ entry: FirmRateEntry; correction_id: string; superseded_entry_id: string | null }> {
   await requireFirm(db, firmId, caller);
   const { data, error } = await db
     .from("boq_corrections")
@@ -485,44 +583,40 @@ export async function promoteCorrection(
     promoted_at: string | null;
     line_description: string;
   } | null;
+  // The same refusals the function makes, made early so the message is specific
+  // and no round trip is spent on a case that cannot succeed.
   if (!c) throw new StoreError(404, "correction_not_found", "Correction not found.");
-  if (c.firm_id !== firmId) {
-    throw new StoreError(403, "not_this_firms_correction", "A correction can only be promoted into the book of the firm that made it.");
-  }
-  if (c.promoted_at) throw new StoreError(409, "already_promoted", "This correction has already been promoted.");
-  if (c.correction_type !== "rate") {
-    throw new StoreError(422, "not_a_rate", `Only a rate correction can become a rate (this one is "${c.correction_type}").`);
-  }
-  if (!c.item_key) throw new StoreError(422, "no_item_key", "The correction names no item_key, so there is nothing for the rate to price.");
+  if (c.firm_id !== firmId) throw new StoreError(403, "not_this_firms_correction", PROMOTE_ERRORS.not_this_firms_correction![1]);
+  if (c.promoted_at) throw new StoreError(409, "already_promoted", PROMOTE_ERRORS.already_promoted![1]);
+  if (c.correction_type !== "rate") throw new StoreError(422, "not_a_rate", `Only a rate correction can become a rate (this one is "${c.correction_type}").`);
+  if (!c.item_key) throw new StoreError(422, "no_item_key", PROMOTE_ERRORS.no_item_key![1]);
   const rate = input.rate_aed ?? (c.new_value == null ? null : Number(c.new_value));
   if (rate == null) throw new StoreError(422, "no_rate", "The correction carries no new_value; pass rate_aed.");
   const vocab = itemVocabulary(c.item_key);
   if (!vocab) throw new StoreError(422, "invalid_entry", `"${c.item_key}" is not an item any take-off prices`);
   const unit = input.unit ?? vocab.unit;
   if (!unit) throw new StoreError(422, "unit_required", `${c.item_key} has no fixed unit; pass unit.`);
+  const kind = input.kind ?? vocab.default_kind;
+  assertValid({ item_key: c.item_key, unit, kind, rate_aed: rate });
 
-  const entry = await insertEntry(db, firmId, {
-    item_key: c.item_key,
-    grade: input.grade ?? null,
-    unit,
-    rate_aed: rate,
-    kind: input.kind ?? vocab.default_kind,
-    note: input.note ?? `promoted from correction: ${c.line_description}`,
-    origin: "promoted_correction",
-    correction_id: c.id,
+  const rpc = await db.rpc("promote_correction", {
+    p_firm_id: firmId,
+    p_correction_id: c.id,
+    p_actor: caller!.id,
+    p_rate: rate,
+    p_unit: unit,
+    p_kind: kind,
+    p_grade: input.grade ?? null,
+    p_note: input.note ?? `promoted from correction: ${c.line_description}`,
   });
-  const upd = await db
-    .from("boq_corrections")
-    .update({ promoted_at: new Date().toISOString(), promoted_entry_id: entry.id })
-    .eq("id", c.id)
-    .eq("firm_id", firmId);
-  if (upd.error) {
-    // Keep the two in step: an entry with no marked correction could be promoted twice.
-    await db.from("firm_rate_entries").delete().eq("id", entry.id).eq("firm_id", firmId);
-    fail(upd.error, "mark correction promoted");
+  if (rpc.error) {
+    const code = Object.keys(PROMOTE_ERRORS).find((k) => rpc.error!.message.includes(k));
+    if (code) throw new StoreError(PROMOTE_ERRORS[code]![0], code, PROMOTE_ERRORS[code]![1]);
+    fail(rpc.error, "promote correction");
   }
-  await touchBook(db, firmId);
-  return { entry, correction_id: c.id };
+  const out = rpc.data as { entry_id: string; superseded_entry_id: string | null };
+  const entry = await readEntry(db, firmId, out.entry_id);
+  return { entry, correction_id: c.id, superseded_entry_id: out.superseded_entry_id ?? null };
 }
 
 // --- Project assignment ------------------------------------------------------

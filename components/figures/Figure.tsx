@@ -34,6 +34,7 @@ const KIND_LABEL: Record<ChainStepKind, string> = {
   qs: "QS",
   arith: "Arithmetic",
   flag: "Flag",
+  cause: "Cause",
 };
 
 export function FigureProvenanceProvider({ children }: { children: ReactNode }) {

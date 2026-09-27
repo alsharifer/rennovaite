@@ -32,7 +32,7 @@ import type { Caller } from "@/lib/auth/caller";
 import { StoreError, ensureBook, requireFirm, touchBook } from "@/lib/firms/store";
 import { itemVocabulary, listVocabulary, validateEntry } from "@/lib/firms/vocabulary";
 import type { EntryKind, VocabularyItem } from "@/lib/firms/vocabulary-client";
-import { FIRM_ENTRY_COLUMNS, toFirmEntry, type FirmRateEntry } from "@/lib/rates/firm";
+import { FIRM_ENTRY_COLUMNS, isMissingSchema, toFirmEntry, type FirmRateEntry } from "@/lib/rates/firm";
 import type { RateGrade } from "@/lib/rates/reference";
 
 import { deriveRate, type QuoteTerms } from "./derive";
@@ -357,12 +357,21 @@ export async function acceptQuote(db: SupabaseClient, firmId: string, quoteId: s
       if (row && ((row as { grade: string | null }).grade ?? null) === (l.grade ?? null)) sameGrade.push(id);
     }
     for (const id of sameGrade) {
-      const { error } = await db.from("firm_rate_entries").update({ superseded_at: now, updated_at: now }).eq("id", id).eq("firm_id", firmId);
-      if (error) fail(error, "supersede prior entry");
+      // U4: who retired it and why, alongside when (046 columns; a pre-046 db takes the fallback).
+      let sup = await db
+        .from("firm_rate_entries")
+        .update({ superseded_at: now, updated_at: now, retired_by: caller?.id ?? null, retire_reason: "superseded by a later quotation" })
+        .eq("id", id)
+        .eq("firm_id", firmId);
+      if (sup.error && isMissingSchema(sup.error)) {
+        sup = await db.from("firm_rate_entries").update({ superseded_at: now, updated_at: now }).eq("id", id).eq("firm_id", firmId);
+      }
+      if (sup.error) fail(sup.error, "supersede prior entry");
     }
     const { data: erow, error: eerr } = await db
       .from("firm_rate_entries")
       .insert({
+        created_by: caller?.id ?? null,
         book_id: book.id,
         firm_id: firmId,
         item_key: l.item_key,

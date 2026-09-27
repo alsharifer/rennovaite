@@ -8,7 +8,8 @@
 // raw `rate_book.source`.
 // =============================================================================
 
-export type ChainStepKind = "geometry" | "rule" | "tier" | "source" | "qs" | "arith" | "flag";
+/** `cause` (U4): what moved a figure between two revisions — only where a record says so. */
+export type ChainStepKind = "geometry" | "rule" | "tier" | "source" | "qs" | "arith" | "flag" | "cause";
 
 export interface ChainStep {
   kind: ChainStepKind;

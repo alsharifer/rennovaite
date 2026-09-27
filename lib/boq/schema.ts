@@ -155,6 +155,12 @@ export const BoqLineSchema = z.object({
   notes: z.string().nullable(),
   // -- engine-only additive fields --
   rule_id: z.string(),
+  /**
+   * U4: the rate-book item key the line prices — the STABLE identity a revision
+   * diff keys on (lib/boq/line-identity.ts). Optional so every stored BoQ
+   * validates unchanged.
+   */
+  item_key: z.string().optional(),
   kind: z.enum(["labour", "material", "supply_and_install", "lump", "allowance"]),
   rate_band: z.enum(["low", "mid", "high", "sku", "allowance", "book"]),
   wastage_pct: z.number().nonnegative(),
