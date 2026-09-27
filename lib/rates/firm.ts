@@ -19,7 +19,8 @@ import type { RateGrade } from "./reference";
 
 export const FIRM_ENTRY_KINDS = ["labour", "supply", "supply_and_install", "lump"] as const;
 export type FirmEntryKind = (typeof FIRM_ENTRY_KINDS)[number];
-export const FIRM_ENTRY_ORIGINS = ["firm_entry", "promoted_correction"] as const;
+/** firm_entry (typed by a member) · quote_import (U3, from a supplier quotation) · promoted_correction (L1). */
+export const FIRM_ENTRY_ORIGINS = ["firm_entry", "quote_import", "promoted_correction"] as const;
 export type FirmEntryOrigin = (typeof FIRM_ENTRY_ORIGINS)[number];
 
 export interface FirmRateEntry {
@@ -34,6 +35,10 @@ export interface FirmRateEntry {
   kind: FirmEntryKind;
   origin: FirmEntryOrigin;
   correction_id: string | null;
+  /** U3: the quotation this rate was imported from (origin quote_import). */
+  quote_id?: string | null;
+  /** U3: set when a later import replaced this entry; a superseded entry never prices. */
+  superseded_at?: string | null;
 }
 
 export interface FirmBook {
@@ -93,6 +98,9 @@ export class FirmOverlay {
     }
     const byKey = new Map<string, FirmRateEntry[]>();
     for (const e of book.entries) {
+      // A superseded entry is history, never a price — filtered here as well as
+      // in the loader, so a book handed in from anywhere obeys the same rule.
+      if (e.superseded_at) continue;
       if (e.firm_id !== projectFirmId || e.book_id !== book.book_id) {
         throw new FirmIsolationError(`entry ${e.id} belongs to firm ${e.firm_id} / book ${e.book_id}, not ${projectFirmId} / ${book.book_id}`);
       }
@@ -108,9 +116,11 @@ export class FirmOverlay {
   }
 
   /**
-   * Tiers 1 and 2 of the resolution order (lib/rates/tiers.ts). A firm's own
-   * entry beats its promoted correction; within each, an exact grade beats a
-   * grade-less entry. With `unit`, an entry in a different unit THROWS.
+   * Tiers 1 and 2 of the resolution order (lib/rates/tiers.ts). Within tier 1,
+   * a rate a member TYPED beats one IMPORTED from a quotation (the typed one is
+   * the deliberate override); both beat a promoted correction (tier 2). Within
+   * each, an exact grade beats a grade-less entry. With `unit`, an entry in a
+   * different unit THROWS.
    */
   lookup(item_key: string, grade: RateGrade, unit?: string): FirmHit | null {
     const entries = this.byKey.get(item_key);
@@ -118,7 +128,7 @@ export class FirmOverlay {
     const pick = (origin: FirmEntryOrigin) =>
       entries.find((e) => e.origin === origin && e.grade === grade) ??
       entries.find((e) => e.origin === origin && e.grade === null);
-    const own = pick("firm_entry");
+    const own = pick("firm_entry") ?? pick("quote_import");
     const promoted = own ? null : pick("promoted_correction");
     const entry = own ?? promoted;
     if (!entry) return null;
@@ -130,6 +140,9 @@ export class FirmOverlay {
 // --- Loading -----------------------------------------------------------------
 
 export const FIRM_ENTRY_COLUMNS =
+  "id, firm_id, book_id, item_key, grade, unit, rate_aed, kind, origin, correction_id, quote_id, superseded_at";
+/** The pre-045 projection, for a database that has not run the quotes migration yet. */
+export const FIRM_ENTRY_COLUMNS_PRE045 =
   "id, firm_id, book_id, item_key, grade, unit, rate_aed, kind, origin, correction_id";
 
 /** A missing table / column (pre-041) reads as "no firm", like every other additive migration. */
@@ -157,6 +170,8 @@ export function toFirmEntry(r: Record<string, unknown>): FirmRateEntry {
     kind: r.kind as FirmEntryKind,
     origin: r.origin as FirmEntryOrigin,
     correction_id: (r.correction_id ?? null) as string | null,
+    quote_id: (r.quote_id ?? null) as string | null,
+    superseded_at: (r.superseded_at ?? null) as string | null,
   };
 }
 
@@ -170,11 +185,18 @@ export async function loadFirmBook(supabase: SupabaseClient, firmId: string): Pr
   if (bookRes.error) throw new Error(`firm_rate_books read failed: ${bookRes.error.message}`);
   const book = bookRes.data as { id: string; firm_id: string; ohp_pct: number } | null;
   if (!book) return null;
-  const entRes = await supabase
+  // Active rows only (U3 supersession). A database that predates 045 has neither
+  // the column nor any superseded row, so the pre-045 projection is equivalent.
+  type EntRes = { data: unknown; error: { code?: string; message?: string } | null };
+  let entRes: EntRes = await supabase
     .from("firm_rate_entries")
     .select(FIRM_ENTRY_COLUMNS)
     .eq("firm_id", firmId)
-    .eq("book_id", book.id);
+    .eq("book_id", book.id)
+    .is("superseded_at", null);
+  if (entRes.error && isMissingSchema(entRes.error)) {
+    entRes = await supabase.from("firm_rate_entries").select(FIRM_ENTRY_COLUMNS_PRE045).eq("firm_id", firmId).eq("book_id", book.id);
+  }
   if (entRes.error) throw new Error(`firm_rate_entries read failed: ${entRes.error.message}`);
   return {
     firm_id: String(book.firm_id),

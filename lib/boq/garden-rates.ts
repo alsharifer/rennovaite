@@ -37,6 +37,7 @@ import {
 import type { FirmOverlay } from "@/lib/rates/firm";
 import {
   FIRM_CORRECTION_LABEL,
+  FIRM_QUOTE_LABEL,
   FIRM_RATE_LABEL,
   INDICATIVE_LABEL,
   type RateTier,
@@ -61,6 +62,8 @@ export type GardenRateTier = Extract<RateTier, "firm_private" | "firm_correction
 export interface GardenResolvedRate {
   rate_aed: number;
   tier: GardenRateTier;
+  /** U3: a per-origin public label when the tier's default is not specific enough (still a constant). */
+  label?: string;
 }
 
 export interface GardenRateBook {
@@ -89,7 +92,13 @@ export function withFirmOverlay(book: GardenRateBook, firm: FirmOverlay): Garden
   return {
     resolve(item_key, unit) {
       const hit = firm.lookup(item_key, GARDEN_GRADE, unit);
-      if (hit) return { rate_aed: hit.entry.rate_aed, tier: hit.tier };
+      if (hit) {
+        return {
+          rate_aed: hit.entry.rate_aed,
+          tier: hit.tier,
+          ...(hit.tier === "firm_private" && hit.entry.origin === "quote_import" ? { label: FIRM_QUOTE_LABEL } : {}),
+        };
+      }
       return book.resolve(item_key, unit);
     },
   };

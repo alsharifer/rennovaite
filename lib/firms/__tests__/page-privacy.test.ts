@@ -40,6 +40,19 @@ describe("the firm book editor", () => {
   });
 });
 
+describe("the quotes panel and the review screen (U3)", () => {
+  for (const file of ["app/firms/[firmId]/_components/quotes-panel.tsx", "app/firms/[firmId]/quotes/[quoteId]/_components/quote-review.tsx"]) {
+    it(`${file} fetches only this firm's quote routes and the vocabulary`, () => {
+      const src = read(file);
+      const urls = [...src.matchAll(/fetch\(\s*(`[^`]*`|"[^"]*"|'[^']*')/g)].map((m) => m[1]!.slice(1, -1));
+      expect(urls.length).toBeGreaterThan(0);
+      for (const u of urls) expect(u, u).toMatch(/^\/api\/firms\/\$\{firmId\}\/quotes(\/\$\{quote\.id\}(\/lines\/\$\{line\.id\})?)?$|^\/api\/rate-vocabulary$/);
+      // The template link is a plain anchor to this firm's route, nothing else.
+      for (const m of src.matchAll(/href=\{`([^`]*)`\}/g)) expect(m[1], m[1]).toMatch(/^\/(api\/)?firms\/\$\{firmId\}/);
+    });
+  }
+});
+
 describe("the firm list", () => {
   const src = read("app/firms/_components/firm-list.tsx");
   it("only calls /api/firms (which answers with the caller's firms)", () => {

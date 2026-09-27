@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       return {
         ...v,
         reference: row
-          ? { kind: "market", rate_aed: Number(row.rate_aed), unit: row.unit, grade: row.grade ?? null, provenance: row.provenance }
+          ? { kind: "market", rate_aed: Math.round(Number(row.rate_aed) * 100) / 100, unit: row.unit, grade: row.grade ?? null, provenance: row.provenance }
           : { kind: "none" },
       };
     }

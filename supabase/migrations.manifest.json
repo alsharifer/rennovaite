@@ -266,6 +266,12 @@
       "version": "20260101004400",
       "name": "firm_book_status",
       "sha256": "6a5a174a2960e9c0600f966477e30094f62086d2fac4927c2dd36bb5748b67c2"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004500",
+      "name": "firm_quotes",
+      "sha256": "03932bfb27a21137afa67a90052528f72fc08dfd610c09471fbe2dfed0122a00"
     }
   ]
 }

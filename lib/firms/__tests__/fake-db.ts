@@ -25,7 +25,7 @@ export interface FakeDb {
 const UNIQUE: Record<string, (r: Row) => string> = {
   firms: (r) => String(r.name).trim().toLowerCase(),
   firm_rate_books: (r) => String(r.firm_id),
-  firm_rate_entries: (r) => `${r.firm_id}|${r.item_key}|${r.grade ?? "*"}|${r.origin}`,
+  firm_rate_entries: (r) => (r.superseded_at ? `superseded:${r.id ?? Math.random()}` : `${r.firm_id}|${r.item_key}|${r.grade ?? "*"}|${r.origin}`),
   // 043: one membership row per (firm, user).
   firm_members: (r) => `${r.firm_id}|${r.user_id}`,
 };
@@ -33,7 +33,10 @@ const UNIQUE: Record<string, (r: Row) => string> = {
 const DEFAULTS: Record<string, (r: Row) => Row> = {
   firms: (r) => ({ private: true, created_by: null, created_at: new Date().toISOString(), ...r }),
   firm_rate_books: (r) => ({ ohp_pct: 0, status: "draft", reviewed_at: null, ...r }),
-  firm_rate_entries: (r) => ({ grade: null, origin: "firm_entry", correction_id: null, note: null, ...r }),
+  firm_rate_entries: (r) => ({ grade: null, origin: "firm_entry", correction_id: null, note: null, quote_id: null, quote_line_id: null, superseded_at: null, superseded_by: null, ...r }),
+  // 045: quotes and their lines.
+  firm_quotes: (r) => ({ supplier_role: "supplier", quote_ref: null, quote_date: null, valid_until: null, currency: "AED", vat_treatment: "excl", rates_are: "net", discount_pct: 0, source_filename: null, source_sha256: null, status: "review", version: 1, supersedes_quote_id: null, created_by: null, created_at: new Date().toISOString(), accepted_at: null, ...r }),
+  firm_quote_lines: (r) => ({ item_key_given: null, suggested_item_key: null, suggestion_score: null, item_key: null, grade: null, kind: null, qty: null, unit: null, rate_raw: null, currency: null, rate_aed: null, status: "unmatched", hold_reason: null, entry_id: null, ...r }),
 };
 
 class Query implements PromiseLike<{ data: unknown; error: Err; count?: number | null }> {
@@ -78,6 +81,14 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
     this.filters.push((r) => set.has(r[col]));
     return this;
   }
+  is(col: string, val: null | boolean) {
+    this.filters.push((r) => (val === null ? r[col] === null || r[col] === undefined : r[col] === val));
+    return this;
+  }
+  neq(col: string, val: unknown) {
+    this.filters.push((r) => r[col] !== val);
+    return this;
+  }
   like(col: string, pattern: string) {
     const re = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*")}$`);
     this.filters.push((r) => re.test(String(r[col])));
@@ -120,7 +131,11 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
       out = table.filter((r) => this.match(r));
       if (this.orderBy) {
         const k = this.orderBy;
-        out = out.slice().sort((a, b) => String(a[k]).localeCompare(String(b[k])));
+        out = out.slice().sort((a, b) => {
+          const x = a[k], y = b[k];
+          if (typeof x === "number" && typeof y === "number") return x - y;
+          return String(x).localeCompare(String(y));
+        });
       }
       if (this.cap != null) out = out.slice(0, this.cap);
       if (this.head) return { data: null, error: null, count: this.count ? out.length : null };

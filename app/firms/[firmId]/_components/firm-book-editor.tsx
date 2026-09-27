@@ -39,8 +39,10 @@ interface Entry {
   unit: string;
   rate_aed: number;
   kind: EntryKind;
-  origin: "firm_entry" | "promoted_correction";
+  origin: "firm_entry" | "quote_import" | "promoted_correction";
   note?: string | null;
+  quote_id?: string | null;
+  superseded_at?: string | null;
 }
 
 interface Draft {
@@ -358,6 +360,7 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
                       <div className="font-mono text-[12px] text-ink-500">
                         {e.item_key} · {e.unit}
                         {e.origin === "promoted_correction" && " · promoted correction"}
+                        {e.origin === "quote_import" && " · from a quotation"}
                       </div>
                       {e.note && <div className="text-[12px] text-ink-500">{e.note}</div>}
                     </td>

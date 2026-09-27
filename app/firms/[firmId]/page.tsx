@@ -10,6 +10,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { SignInCard } from "../_components/sign-in-card";
 import { FirmBookEditor } from "./_components/firm-book-editor";
+import { QuotesPanel } from "./_components/quotes-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -59,8 +60,9 @@ export default async function FirmBookPage({ params }: { params: Promise<{ firmI
   }
   return (
     <AppShell pageName="Rate book">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-6xl space-y-lg">
         <FirmBookEditor initialFirm={firm} initialEntries={entries} />
+        <QuotesPanel firmId={firmId} />
       </div>
     </AppShell>
   );
