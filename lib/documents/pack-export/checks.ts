@@ -44,7 +44,12 @@ export interface PrintedInput {
     anchor: string | null;
   } | null;
   pairsWithAdds: { outOfCrop: string[]; caption: string }[];
+  /** L4: present when the run produced the firm's client proposal. */
+  proposal?: { pages: string[]; brand: string; terms: boolean; basis: string | null } | null;
 }
+
+/** Text a client proposal must never print: a rate's provenance is the firm's business, not the client's. */
+const PROVENANCE_WORDS = /market reference|contractor rate book|indicative rate|QS to price|QS to confirm|rate_tier|actual_transaction|supplier quotation/i;
 
 export function printedChecks(i: PrintedInput): PackCheck[] {
   const out: PackCheck[] = [];
@@ -139,11 +144,31 @@ export function printedChecks(i: PrintedInput): PackCheck[] {
     check("parity: every BoQ line is drawn and shown, every drawn cost is priced", i.parity.clean, fails.slice(0, 4).join("; "));
   }
 
+  // --- the client proposal (L4) -------------------------------------------------------
+  if (i.proposal) {
+    const pp = i.proposal.pages;
+    const text = pp.map((s) => s.replace(/<[^>]+>/g, " ")).join(" ");
+    check("the proposal has pages", pp.length >= 2, `${pp.length} pages`);
+    check("the proposal cover carries the firm's brand", !!pp[0]?.includes('data-proposal-cover="true"') && pp[0].includes(`>${i.proposal.brand.replace(/&/g, "&amp;")}<`), i.proposal.brand);
+    check("RennovAIte appears only as the discreet 'prepared with' mark", pp.every((p) => p.includes('data-prepared-with="true"')) && !pp.some((p) => /font-size="(?:[4-9]|\d{2})[\d.]*"[^>]*>[^<]*RennovAIte/.test(p)), `${pp.length} pages`);
+    check("the proposal prints no rate provenance (sources, tiers, QS marks)", !PROVENANCE_WORDS.test(text));
+    check("the proposal's contract sum is the BoQ's grand total", pp.some((p) => p.includes(`data-grand-total="${i.boq.grand_total_aed}"`)), String(i.boq.grand_total_aed));
+    const ohp = (i.boq as { ohp_aed?: number }).ohp_aed ?? 0;
+    if (ohp > 0) check("the proposal shows the firm's overheads & profit as its own row", pp.some((p) => p.includes(`data-ohp="${ohp}"`)), String(ohp));
+    if (draft) check("watermark: every proposal page carries the draft statement", pp.every((p) => p.includes('data-boq-draft="true"') && p.includes(draft)), `${pp.length} pages`);
+    if (i.proposal.terms) check("the proposal carries the firm's terms block", pp.some((p) => p.includes('data-terms="true"')));
+    if (i.boq.programme) check("the proposal carries the indicative programme", pp.some((p) => p.includes("data-programme-phase")));
+    const propFonts = pp.flatMap((s) => [...s.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1])));
+    if (propFonts.length) check("legibility: no text in the proposal under 2.2 mm (the prepared-with mark) and body ≥ 2.6 mm", propFonts.every((f) => f >= 2.2), `min ${Math.min(...propFonts)} mm`);
+    check("the proposal's pricing basis was a stated choice", i.proposal.basis === "firm_basis" || i.proposal.basis === "book_reviewed" || i.proposal.basis === "accepted", String(i.proposal.basis));
+  }
+
   // --- identity and language, across everything printed -----------------------------
   const printed: [string, string][] = [
     ...i.sheets.map((s) => [`drawing ${s.sheetNumber}`, s.svg] as [string, string]),
     ...i.packPages.map((s, n) => [`pack page ${n + 1}`, s] as [string, string]),
     ...boqPages.map((s, n) => [`BoQ page ${n + 1}`, s] as [string, string]),
+    ...(i.proposal?.pages ?? []).map((s, n) => [`proposal page ${n + 1}`, s] as [string, string]),
     ["BoQ data", JSON.stringify(i.boq)],
     ["BoQ page", i.boqHtml],
   ];
@@ -151,7 +176,7 @@ export function printedChecks(i: PrintedInput): PackCheck[] {
     ...i.identityTokens.filter((t) => new RegExp(t, "i").test(text)).map((t) => `${where}: ${t}`),
     ...findWithheldIdentities(text, i.withheldNames).map((n) => `${where}: ${n}`),
   ]);
-  check("zero contractor / supplier / firm identity across drawings, pack, BoQ PDF, BoQ data and BoQ page", leaks.length === 0, leaks.slice(0, 5).join("; ") || `${printed.length} documents scanned`);
+  check(`zero contractor / supplier / firm identity across drawings, pack, BoQ PDF, BoQ data${i.proposal ? ", proposal" : ""} and BoQ page`, leaks.length === 0, leaks.slice(0, 5).join("; ") || `${printed.length} documents scanned`);
   const internal = printed.filter(([where]) => where !== "BoQ data").flatMap(([where, text]) => (/\b(upsell|up-sell|margin|mark-?up|commission)\b/i.test(text.replace(/<[^>]+>/g, " ")) ? [where] : []));
   check("no internal sales or commercial language on any client-facing page", internal.length === 0, internal.slice(0, 5).join("; "));
   return out;

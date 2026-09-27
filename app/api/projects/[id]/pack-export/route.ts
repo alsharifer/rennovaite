@@ -31,6 +31,8 @@ const PostSchema = z.object({
   display_name: z.string().trim().min(1).max(200).nullable().optional(),
   renders: z.enum(["full", "cached"]).optional(),
   pairs: z.number().int().min(0).max(6).optional(),
+  /** L4: also produce the firm's client-facing proposal (gated on the reference basis). */
+  proposal: z.boolean().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -40,12 +42,14 @@ async function projectIdOf(ctx: Ctx): Promise<string | null> {
   return z.string().uuid().safeParse(id).success ? id : null;
 }
 
-export async function GET(_req: NextRequest, ctx: Ctx) {
+export async function GET(req: NextRequest, ctx: Ctx) {
   if (!packExportEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = await projectIdOf(ctx);
   if (!projectId) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
-  const [preflight, jobs] = await Promise.all([preflightChecklist(db, projectId), latestPackJobs(db, projectId)]);
+  // L4: ?proposal=1 adds the client-proposal items to the checklist shown.
+  const proposal = new URL(req.url).searchParams.get("proposal") === "1";
+  const [preflight, jobs] = await Promise.all([preflightChecklist(db, projectId, { proposal }), latestPackJobs(db, projectId)]);
   return NextResponse.json({ ...preflight, jobs: jobs.map((j) => ({ id: j.id, status: j.status, source: j.source, created_at: j.created_at, finished_at: j.finished_at })) });
 }
 
@@ -65,6 +69,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     ...DEFAULT_PACK_OPTIONS,
     renders: parsed.data.renders ?? DEFAULT_PACK_OPTIONS.renders,
     pairs: parsed.data.pairs ?? DEFAULT_PACK_OPTIONS.pairs,
+    proposal: parsed.data.proposal ?? false,
   };
   const job = await createPackJob(db, projectId, "app", options);
   const origin = new URL(request.url).origin;

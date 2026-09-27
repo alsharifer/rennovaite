@@ -54,6 +54,15 @@ describe("the quotes panel and the review screen (U3)", () => {
   }
 });
 
+describe("the branding panel (L4)", () => {
+  const src = read("app/firms/[firmId]/_components/branding-panel.tsx");
+  it("fetches only this firm's branding route", () => {
+    const urls = [...src.matchAll(/fetch\(\s*(`[^`]*`|"[^"]*"|'[^']*')/g)].map((m) => m[1]!.slice(1, -1));
+    expect(urls.length).toBeGreaterThan(0);
+    for (const u of urls) expect(u, u).toBe("/api/firms/${firmId}/branding");
+  });
+});
+
 describe("the firm list", () => {
   const src = read("app/firms/_components/firm-list.tsx");
   it("only calls /api/firms (which answers with the caller's firms)", () => {

@@ -27,6 +27,8 @@ const DOCUMENT_ROUTES = [
   "app/api/projects/[id]/drawings/route.ts",
   "app/api/projects/[id]/render-pack/route.ts",
   "app/api/projects/[id]/boq-pdf/route.ts",
+  // L4: the firm's client proposal — a pack document like the BoQ PDF.
+  "app/api/projects/[id]/proposal/route.ts",
 ];
 
 describe("every document route is gated", () => {
@@ -43,7 +45,7 @@ describe("every document route is gated", () => {
   it("no other route renders a client PDF", () => {
     const producers = walk(path.join(ROOT, "app"))
       .filter((f) => /route\.ts$/.test(f))
-      .filter((f) => /\b(generateDrawingSetPdf|generateRenderPack|renderBoqPdf|renderSheetPdf|renderRevisionDiffPdf|rasteriseA4Pages)\b/.test(readFileSync(f, "utf8")))
+      .filter((f) => /\b(generateDrawingSetPdf|generateRenderPack|renderBoqPdf|renderSheetPdf|renderRevisionDiffPdf|renderProposalPdf|rasteriseA4Pages)\b/.test(readFileSync(f, "utf8")))
       .map(rel);
     expect(producers.every((f) => DOCUMENT_ROUTES.includes(f) || WORKING_DOCUMENT_ROUTES.includes(f))).toBe(true);
   });
@@ -61,7 +63,7 @@ describe("every document route is gated", () => {
 });
 
 describe("the UI has no direct link to a document route", () => {
-  const DIRECT = /\/api\/projects\/\$\{[^}]+\}\/(drawings|render-pack|boq-pdf)\b/;
+  const DIRECT = /\/api\/projects\/\$\{[^}]+\}\/(drawings|render-pack|boq-pdf|proposal)\b/;
   const files = [...walk(path.join(ROOT, "app")), ...walk(path.join(ROOT, "components"))].filter((f) => !/[\\/]api[\\/]/.test(f));
 
   it("scans the app's pages and components", () => {

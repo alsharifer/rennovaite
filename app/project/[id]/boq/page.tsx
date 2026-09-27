@@ -38,7 +38,9 @@ import {
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 
 import { GenerateBoqButton } from "./_components/generate-boq-button";
+import { ReferenceBasisNotice } from "./_components/reference-basis-notice";
 import { ReviewCorrections } from "./_components/review-corrections";
+import { loadProposalGate, type ProposalGate } from "@/lib/documents/proposal-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -177,6 +179,15 @@ export default async function BoqPage({
     : null;
   const skus = skuRes.data ?? [];
   const lineOptions = boqPayload ? buildLineOptions(boqPayload, skus) : {};
+  // L4: where the rates came from, and whether a client proposal may export on them. Best-effort.
+  let proposalGate: ProposalGate | null = null;
+  if (boqPayload) {
+    try {
+      proposalGate = await loadProposalGate(sb, id);
+    } catch {
+      /* the BoQ page never fails on the gate */
+    }
+  }
 
   const lineCount =
     boqPayload?.sections.reduce((n, s) => n + s.lines.length, 0) ?? 0;
@@ -295,6 +306,16 @@ export default async function BoqPage({
                 <span className="text-[#9A3412]"> · {boqPayload.garden.undecided.length} undecided (not in any quantity — decide on the plan)</span>
               )}
             </p>
+          )}
+          {proposalGate?.boq && latestBoq && (
+            <ReferenceBasisNotice
+              projectId={id}
+              boqId={latestBoq.id}
+              basis={proposalGate.boq.basis}
+              firm={proposalGate.firm ? { brand: proposalGate.firm.brand, book_status: proposalGate.firm.book_status } : null}
+              acceptance={proposalGate.acceptance}
+              verdict={proposalGate.verdict}
+            />
           )}
           {boqPayload ? (
             <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">

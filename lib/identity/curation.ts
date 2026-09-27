@@ -74,7 +74,8 @@ export function curateText(s: string, extraNames: readonly string[] = []): strin
   for (const name of extraNames) {
     const n = name.trim();
     if (n.length < 3) continue;
-    out = out.replace(new RegExp(`\\b${escape(n)}\\b`, "gi"), "contractor");
+    // Not \b: a name ending in "." or "&" has no word boundary after it.
+    out = out.replace(new RegExp(`(?<!\\w)${escape(n)}(?!\\w)`, "gi"), "contractor");
   }
   return out;
 }
@@ -96,14 +97,16 @@ export function curateBoq<T>(value: T, extraNames: readonly string[] = []): T {
 
 /** Every withheld identity still present in a payload — the leak assertion's core. */
 export function findWithheldIdentities(payload: unknown, extraNames: readonly string[] = []): string[] {
-  const text = typeof payload === "string" ? payload : JSON.stringify(payload);
+  // L4: printed pages are SVG, where "&" is "&amp;" — a name like "X & Y" must
+  // still be found. The basic XML entities are decoded before matching.
+  const text = (typeof payload === "string" ? payload : JSON.stringify(payload)).replace(/&(amp|lt|gt|quot|apos|#39);/g, (_, e: string) => ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", "#39": "'" })[e]!);
   const hits = new Set<string>();
   for (const w of WITHHELD_IDENTITIES) {
     const m = text.match(new RegExp(w.pattern.source, w.pattern.flags.includes("i") ? "i" : ""));
     if (m) hits.add(m[0]);
   }
   for (const name of extraNames) {
-    if (name.trim().length >= 3 && new RegExp(`\\b${escape(name.trim())}\\b`, "i").test(text)) hits.add(name);
+    if (name.trim().length >= 3 && new RegExp(`(?<!\\w)${escape(name.trim())}(?!\\w)`, "i").test(text)) hits.add(name);
   }
   return [...hits];
 }

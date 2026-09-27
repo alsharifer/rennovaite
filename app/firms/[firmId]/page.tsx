@@ -9,6 +9,7 @@ import type { FirmRateEntry } from "@/lib/rates/firm";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { SignInCard } from "../_components/sign-in-card";
+import { BrandingPanel } from "./_components/branding-panel";
 import { FirmBookEditor } from "./_components/firm-book-editor";
 import { QuotesPanel } from "./_components/quotes-panel";
 
@@ -63,6 +64,7 @@ export default async function FirmBookPage({ params }: { params: Promise<{ firmI
       <div className="mx-auto max-w-6xl space-y-lg">
         <FirmBookEditor initialFirm={firm} initialEntries={entries} />
         <QuotesPanel firmId={firmId} />
+        <BrandingPanel firmId={firmId} />
       </div>
     </AppShell>
   );

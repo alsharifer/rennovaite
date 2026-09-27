@@ -32,7 +32,7 @@ import type { ParityResult } from "@/lib/documents/parity";
 import { loadWithheldNames } from "@/lib/identity/curation";
 import { isOutdoorType } from "@/lib/plan/zones";
 
-import { buildChecklist, checklistReady } from "./checklist";
+import { buildChecklist, checklistReady, proposalChecklistItems } from "./checklist";
 import { printedChecks } from "./checks";
 import { photoCoverage } from "./coverage";
 import { renderAllViews, type RenderRunResult, type CameraRow } from "./renders";
@@ -98,6 +98,14 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
     parity,
     documentName,
   });
+  // L4: a client proposal adds the firm + reference-basis items — the fallback
+  // to market rates becomes a stated choice before any document is made.
+  let proposalGate: Awaited<ReturnType<typeof import("@/lib/documents/proposal-gate").loadProposalGate>> | null = null;
+  if (options.proposal) {
+    const { loadProposalGate } = await import("@/lib/documents/proposal-gate");
+    proposalGate = await loadProposalGate(db, P);
+    checklist.push(...proposalChecklistItems(P, proposalGate));
+  }
   if (checks.some((c) => !c.ok) || !checklistReady(checklist)) {
     await progress("done", 100, "blocked by the export gate");
     await tagEvents(db, P, started, options.stage, ctx.source);
@@ -141,6 +149,7 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
     { name: `${base}-drawing-set.pdf`, path: `/api/projects/${P}/drawings?format=pdf&sheet=all`, type: "application/pdf" },
     ...(garden ? [{ name: `${base}-render-pack.pdf`, path: `/api/projects/${P}/render-pack`, type: "application/pdf" }] : []),
     ...(options.boqPdf ? [{ name: `${base}-boq.pdf`, path: `/api/projects/${P}/boq-pdf`, type: "application/pdf" }] : []),
+    ...(options.proposal ? [{ name: `${base}-proposal.pdf`, path: `/api/projects/${P}/proposal`, type: "application/pdf" }] : []),
   ];
   const produced: { name: string; bytes: Uint8Array; type: string; status: number }[] = [];
   for (const d of docs) {
@@ -148,7 +157,7 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
     produced.push({ name: d.name, bytes: r.bytes, type: d.type, status: r.status });
   }
   check(
-    `${["drawing set", ...(garden ? ["render pack"] : []), ...(options.boqPdf ? ["BoQ"] : [])].join(", ")} export as PDFs`,
+    `${["drawing set", ...(garden ? ["render pack"] : []), ...(options.boqPdf ? ["BoQ"] : []), ...(options.proposal ? ["proposal"] : [])].join(", ")} export as PDFs`,
     produced.every((p) => p.status === 200 && p.bytes.byteLength > 10_000),
     produced.map((p) => `${p.name}: ${p.status} · ${p.bytes.byteLength} bytes`).join("; "),
   );
@@ -161,6 +170,7 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
     ? (await t.get<{ gate?: { camera: string; label: string; view: string; outcome: string; reason?: string | null; consistency?: { passed: boolean; failures: string[]; anchor: boolean } | null; attempts: { attempt: number; passed: boolean }[] }[]; pages?: { kind?: string }[]; mix?: Record<string, number>; missing_images?: string[] }>(`/api/projects/${P}/render-pack?format=json`)).body
     : null;
   const boqPages = options.boqPdf ? (await t.get<{ pages?: string[] }>(`/api/projects/${P}/boq-pdf?format=pages`)).body.pages ?? [] : null;
+  const proposalPages = options.proposal ? (await t.get<{ pages?: string[] }>(`/api/projects/${P}/proposal?format=pages`)).body.pages ?? [] : null;
   const { data: boqRow } = await db.from("boqs").select("id, sections").eq("project_id", P).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; sections: Parameters<typeof printedChecks>[0]["boq"] & { garden?: { draft?: { draft?: boolean; statement?: string | null; derived?: string[] } } } }>();
   const boq = boqRow!.sections;
   const draftStatement = boq.garden?.draft?.draft ? boq.garden.draft.statement ?? null : null;
@@ -210,6 +220,7 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
       publicSourceLabel: PUBLIC_SOURCE_LABEL,
       renders: renderInfo,
       pairsWithAdds,
+      proposal: proposalPages && proposalGate?.firm ? { pages: proposalPages, brand: proposalGate.firm.brand, terms: !!proposalGate.firm.terms_text, basis: proposalGate.verdict.reason } : null,
     }),
   );
 
@@ -252,6 +263,7 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
     generated_at: new Date().toISOString(),
     status: passed ? "passed" : "failed",
     boq: { id: boqRow!.id, grand_total_aed: boq.grand_total_aed },
+    proposal: proposalGate ? { brand: proposalGate.firm?.brand ?? null, basis: proposalGate.boq?.basis ?? null, verdict: proposalGate.verdict, acceptance_at: proposalGate.acceptance?.created_at ?? null } : null,
     checklist,
     checks,
     outputs,

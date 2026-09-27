@@ -50,9 +50,16 @@ export interface PackExportOptions {
   boqPdf: boolean;
   /** Pilot-event stage for what this run causes ("verification" is excluded from metrics). */
   stage?: string | null;
+  /**
+   * L4: also produce the firm's client-facing proposal (branding, the BoQ at
+   * the firm's rates + OH&P, terms, programme). Needs a firm on the project and
+   * the reference-basis gate: the firm's book reviewed, or the reference basis
+   * accepted for this BoQ revision. Off by default.
+   */
+  proposal?: boolean;
 }
 
-export const DEFAULT_PACK_OPTIONS: PackExportOptions = { renders: "full", pairs: 3, regenerateBoq: true, boqPdf: true, stage: null };
+export const DEFAULT_PACK_OPTIONS: PackExportOptions = { renders: "full", pairs: 3, regenerateBoq: true, boqPdf: true, stage: null, proposal: false };
 
 export interface PackOutput {
   name: string;

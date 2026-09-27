@@ -1,3 +1,43 @@
+# L4 — client-ready proposal export with the reference-basis gate (2026-09-27)
+
+- **Built on T5, not beside it**: `GET /api/projects/:id/proposal` is a
+  document route (job-guarded, in `DOCUMENT_ROUTES`); the pack run produces
+  `<name>-proposal.pdf` when `options.proposal` is on, checks its printed
+  pages (brand, prepared-with mark, no provenance, contract sum, OH&P row,
+  draft stamp, terms, programme, stated basis) and includes them in the leak
+  scan. The Export pack panel gains "Include the client proposal" (only when
+  the project has a firm) and re-checks the gate with the proposal items.
+- **Branding** (047): `firms.display_name` / `logo_path` / `terms_text`;
+  members-only route + panel on `/firms/:id`. The firm is the brand;
+  RennovAIte is the footer mark.
+- **Reference-basis gate**: `referenceBasisOf` (stored `rate_tier` or the
+  provenance module's inference — Arabella's pre-L1 BoQ reads 15 reference /
+  3 unpriced / 0 firm). Banner on any BoQ with a reference line; a proposal
+  exports only on firm basis, a reviewed book, or an explicit acceptance for
+  THIS BoQ revision (`reference_basis_acceptances`, append-only event).
+  Refusal: 409 `proposal_not_ready` on the route, a blocking
+  `reference_basis` item in the checklist with the fix link.
+- **Found by the live check**: the pack export regenerates the BoQ BEFORE its
+  gate, so an acceptance keyed to a revision id was voided by the export's own
+  regeneration and a proposal could never pass through the in-app pack. An
+  acceptance now covers a revision by its PRICING FINGERPRINT (lines' qty /
+  rate / total + summary chain): an identical regeneration stays accepted; a
+  moved line needs a new acceptance. No schema change (the fingerprint is
+  computed from the accepted revision's stored sections).
+- **Judgement call**: tier 2 (`firm_correction` — the firm's own promoted
+  correction) counts as the FIRM's basis, not the market's; the banner text
+  says "market reference" and a promoted correction is the firm's reviewed
+  figure. Say if U0 meant otherwise.
+- **Scanner fix found by the tests**: `findWithheldIdentities` / `curateText`
+  used `\b` around a name, so "X & Co." (entity-encoded "&amp;" in SVG, "."
+  before "<") was never found on a printed page. Entities are decoded and the
+  boundary is `(?<!\w)…(?!\w)`.
+- **Verified**: unit (reference basis, gate + acceptance on the fake db,
+  proposal pages, printed checks, checklist items; route-scan / ungated /
+  page-privacy updated); `scripts/proposal-export-check.mjs` live on the
+  stand-in with a scratch firm; tsc + eslint clean.
+- **Migration 047** on dev; prod after merge on instruction. **U6 is now 048.**
+
 # U4 / L3 — revision diff + approval trail + promotion history (2026-09-27)
 
 Per U0(d) and the Sprint-4 amendment (line-level diff only; stable line
