@@ -260,6 +260,12 @@
       "version": "20260101004300",
       "name": "firm_members",
       "sha256": "df49c78bbddc33a983402ee4f902c1cedc9fd971dbdb94e0faab12a0f99d7476"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004400",
+      "name": "firm_book_status",
+      "sha256": "6a5a174a2960e9c0600f966477e30094f62086d2fac4927c2dd36bb5748b67c2"
     }
   ]
 }

@@ -15,6 +15,8 @@ const PRIMARY: NavItem[] = [
   // Dashboard now hosts the portfolio grid too (My Projects was merged in, G1).
   { label: "Dashboard", href: "/dashboard", icon: "dashboard", match: ["/dashboard"] },
   { label: "AI Designer", href: "/project", icon: "magic_button", match: ["/project"] },
+  // U2: a firm's private rate books (members only).
+  { label: "Rate books", href: "/firms", icon: "menu_book", match: ["/firms"] },
   {
     label: "Marketplace",
     href: "/marketplace",

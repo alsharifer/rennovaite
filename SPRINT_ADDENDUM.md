@@ -1,3 +1,46 @@
+# U2 — rate book management UI + vocabulary endpoint (2026-09-26)
+
+- **`GET /api/rate-vocabulary`** (signed-in callers): every item_key a firm may
+  price — **84** today — with label, unit, POMI section, accepted kinds, and
+  what an entry for it SHADOWS: a `market` reference rate where the resolver
+  reads one (tier 3, the garden keys, read through `REFERENCE_COLUMNS` so no
+  source/identity is in the payload), or the `builtin` interior pricing it
+  falls through to (catalogue pick / labour book / allowance / P4 element
+  rate) — interior keys carry **no single reference figure**, and the page says
+  so rather than inventing one. `listVocabulary()` enumerates the same four
+  sources `itemVocabulary` resolves from; a test holds them equal.
+- **Pages** `/firms` (the caller's firms only, create) and `/firms/:firmId`
+  (the book): first render reads through the SAME store functions with the
+  same caller — a non-member gets the 403 card and never a byte of the book;
+  the editor then talks only to `/api/firms/:firmId/*` and the vocabulary
+  (`page-privacy.test.ts` scans every `fetch(` URL; the live check records
+  the browser's request log). OH&P 0–50, add/edit/delete entries, **inline
+  validation = the API's four rules** (`lib/firms/vocabulary-client.ts`, held
+  equal to `validateEntry` over the whole vocabulary by test); an API 422/409
+  that slips past is shown inline too. Each entry sits beside what it shadows.
+  Sidebar gains "Rate books".
+- **Book status (migration 044, applied on dev)**: `firm_rate_books.status`
+  draft | reviewed + `reviewed_at`. A member marks it reviewed; **any later
+  change — entry added/edited/deleted, OH&P moved, a promotion — returns it to
+  draft** (a review of a book that has since changed is a review of a
+  different book). Resolution is untouched (tested). U5's gate reads it.
+  **U6's migration is now 045.**
+- **Verification:** vitest firm + rates suites 92/92 (book-status,
+  vocabulary parity, page-privacy added); `scripts/firm-book-page-check.mjs
+  3098 --shots=screenshots/u2` — headless Chrome signed in as a dev account
+  via the real session cookie — **24/24**: create firm → book → OH&P 12.5 →
+  80 refused inline → wrong unit and wrong kind refused inline before any
+  request → valid entry beside its market reference → reviewed → negative
+  edit refused → edit saved → back to draft → delete; **12 API requests, all
+  to this firm / `/api/firms` / vocabulary**, the other account 403 on this
+  book, this member gets the not-a-member card on the other firm. Seven
+  screenshots in `screenshots/u2/` (README). Popover and BoQ behaviour
+  unchanged — no resolution change.
+- **Environment note:** `next/font`'s fetch of `fonts.gstatic.com` is
+  intermittent from this machine (it failed the local `next build` and, once,
+  a fresh dev server's layout); Node's fetch of the same URL succeeds on
+  retry. Vercel's Preview build is the build verdict.
+
 # U1 — firm ownership + requireFirm on all firm routes (2026-09-26)
 
 - **Migration 043 `firm_members (firm_id, user_id)`** — applied on dev

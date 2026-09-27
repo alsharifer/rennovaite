@@ -1237,10 +1237,23 @@ resolved line carries **`rate_tier`**.
   `ohp_aed` — subtotal → + OH&P → contingency on both → VAT → total. Never in
   a rate. Shown as its own row on the BoQ page and PDF. 0% / no firm adds no
   field.
-- **Routes**: `GET/POST /api/firms`, `GET/PATCH/DELETE /api/firms/:firmId`,
-  `GET/POST /api/firms/:firmId/rates`, `PATCH/DELETE
-  /api/firms/:firmId/rates/:entryId`, `POST /api/firms/:firmId/promote`,
-  `PATCH /api/projects/:id { firm_id }`. No UI page yet.
+- **Routes**: `GET/POST /api/firms`, `GET/PATCH/DELETE /api/firms/:firmId`
+  (PATCH takes `status` too), `GET/POST /api/firms/:firmId/rates`,
+  `PATCH/DELETE /api/firms/:firmId/rates/:entryId`,
+  `POST /api/firms/:firmId/promote`, `PATCH /api/projects/:id { firm_id }`,
+  and **`GET /api/rate-vocabulary`** (U2, signed-in): every priceable
+  `item_key` with label, unit, section, kinds and what an entry shadows
+  (`market` reference rate for garden keys; `builtin` interior pricing
+  otherwise — interior keys have no single reference figure).
+- **UI (U2)**: `/firms` (the caller's firms, create) and `/firms/:firmId`
+  (the book: OH&P, status, entries beside what they shadow). The client
+  validates with `lib/firms/vocabulary-client.ts` — the same four rules as
+  `validateEntry`, held equal by test — and fetches only this firm's routes
+  and the vocabulary (`page-privacy.test.ts`).
+- **Book status (U2, migration `044`)**: `firm_rate_books.status` draft |
+  reviewed + `reviewed_at`. Marked reviewed by a member; any content change
+  (entry, OH&P, promotion) returns it to draft. Resolution ignores it; the
+  export gate (U5) reads it.
 - **`generate-boq { dry_run: true }`** assembles the BoQ through the real
   pipeline and writes nothing (no boqs row, takeoff_items or pilot event).
   `scripts/firm-overlay-check.mjs [port]` runs the whole L1 flow live on scratch

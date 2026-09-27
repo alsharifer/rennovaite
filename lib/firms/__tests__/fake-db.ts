@@ -32,7 +32,7 @@ const UNIQUE: Record<string, (r: Row) => string> = {
 
 const DEFAULTS: Record<string, (r: Row) => Row> = {
   firms: (r) => ({ private: true, created_by: null, created_at: new Date().toISOString(), ...r }),
-  firm_rate_books: (r) => ({ ohp_pct: 0, ...r }),
+  firm_rate_books: (r) => ({ ohp_pct: 0, status: "draft", reviewed_at: null, ...r }),
   firm_rate_entries: (r) => ({ grade: null, origin: "firm_entry", correction_id: null, note: null, ...r }),
 };
 

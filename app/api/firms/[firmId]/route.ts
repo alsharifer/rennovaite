@@ -12,8 +12,10 @@ export const dynamic = "force-dynamic";
 // such firm (lib/firms/store.ts → requireFirm).
 //
 //   GET    /api/firms/:firmId   the firm + its book header (OH&P, entry count)
-//   PATCH  /api/firms/:firmId   { name?, private?, ohp_pct? } — OH&P is applied at
-//                               BoQ assembly as its own line, never in a rate
+//   PATCH  /api/firms/:firmId   { name?, private?, ohp_pct?, status? } — OH&P is
+//                               applied at BoQ assembly as its own line, never
+//                               in a rate; status (U2) draft | reviewed — any
+//                               later change to the book returns it to draft
 //   DELETE /api/firms/:firmId   the firm, its book and entries (cascade); its
 //                               projects fall back to the reference book
 
@@ -22,8 +24,9 @@ const PatchSchema = z
     name: z.string().trim().min(1).max(120).optional(),
     private: z.boolean().optional(),
     ohp_pct: z.number().finite().min(0).max(50).optional(),
+    status: z.enum(["draft", "reviewed"]).optional(),
   })
-  .refine((b) => Object.keys(b).length > 0, "Body needs name, private or ohp_pct.");
+  .refine((b) => Object.keys(b).length > 0, "Body needs name, private, ohp_pct or status.");
 
 type Ctx = { params: Promise<{ firmId: string }> };
 

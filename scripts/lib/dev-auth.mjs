@@ -55,5 +55,31 @@ export async function devSession(who = "a", { script = "dev-auth" } = {}) {
   if (otpErr) throw otpErr;
   const token = session.session?.access_token;
   if (!token) throw new Error("verifyOtp returned no session");
-  return { email, userId, token, headers: { authorization: `Bearer ${token}` } };
+  const ref = /^https?:\/\/([a-z0-9-]+)\.supabase\./i.exec(url)?.[1] ?? "local";
+  return {
+    email,
+    userId,
+    token,
+    session: session.session,
+    headers: { authorization: `Bearer ${token}` },
+    /**
+     * The same session as the cookies @supabase/ssr 0.10 writes after a
+     * magic-link sign-in: `sb-<ref>-auth-token` = "base64-" + base64url(JSON of
+     * the session), chunked at 3180 characters into `<name>.0`, `<name>.1`, …
+     * A headless browser given these IS signed in, through the cookie path the
+     * real app uses — nothing is mocked.
+     */
+    cookies: sessionCookies(ref, session.session),
+  };
+}
+
+const MAX_CHUNK = 3180;
+
+export function sessionCookies(projectRef, session) {
+  const name = `sb-${projectRef}-auth-token`;
+  const encoded = "base64-" + Buffer.from(JSON.stringify(session), "utf8").toString("base64url");
+  if (encoded.length <= MAX_CHUNK) return [{ name, value: encoded }];
+  const out = [];
+  for (let i = 0, n = 0; i < encoded.length; i += MAX_CHUNK, n++) out.push({ name: `${name}.${n}`, value: encoded.slice(i, i + MAX_CHUNK) });
+  return out;
 }

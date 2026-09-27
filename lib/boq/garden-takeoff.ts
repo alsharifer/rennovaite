@@ -159,7 +159,8 @@ export interface GardenTakeoff {
 
 // --- Section map -------------------------------------------------------------
 
-const SECTION: Record<string, PomiSection> = {
+/** POMI section per garden item key — exported for the vocabulary endpoint (U2). */
+export const GARDEN_ITEM_SECTION: Record<string, PomiSection> = {
   "garden.preliminaries": "Preliminaries",
   "garden.mobilization": "Preliminaries",
   "garden.demolition": "Demolition",
@@ -280,7 +281,7 @@ function item(
   measurement: string,
   extra: Partial<ScopeItem> = {},
 ): ScopeItem {
-  const section = SECTION[item_key];
+  const section = GARDEN_ITEM_SECTION[item_key];
   if (!section) throw new Error(`No POMI section mapped for "${item_key}".`);
   return {
     rule_id,
