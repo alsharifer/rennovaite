@@ -76,10 +76,14 @@ available.
 - **Always use EB Garamond for display, Inter for UI, JetBrains Mono for
   numerics — never hard-code other families.** Use `font-display`/`font-serif`
   (EB Garamond), `font-sans`/`font-body` (Inter), `font-mono`/`font-data`
-  (JetBrains Mono). All three are loaded via `next/font/google` in
-  `app/layout.tsx` and exposed as CSS variables; Arabic fallbacks
-  (IBM Plex Sans Arabic for body, Rubik for display) are appended to each
-  stack so RTL works without rework.
+  (JetBrains Mono). All three are **self-hosted** via `next/font/local` in
+  `app/layout.tsx` from `app/fonts/` (the exact woff2 files Google served for
+  the declared subsets — `app/fonts/SOURCES.json` records each file's origin
+  URL; no build-time fetch from Google Fonts) and exposed as CSS variables;
+  Arabic fallbacks (IBM Plex Sans Arabic for body, Rubik for display) are
+  appended to each stack so RTL works without rework. Material Symbols is the
+  one remaining Google Fonts reference: a runtime `<link>` in the browser,
+  not a build-time fetch.
 - Use the type scale tokens, not raw sizes: `text-display-hero` (64/72),
   `text-headline-lg` (40/48), `text-headline-lg-mobile` (32/40),
   `text-headline-md` (24/32), `text-body-lg` (18/28), `text-body-md` (16/24),
