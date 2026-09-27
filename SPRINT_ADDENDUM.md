@@ -1,3 +1,83 @@
+# U3 / L2 — structured quote import with review + quote provenance (2026-09-27)
+
+The T0 gap list, closed deliberately (Sprint-3 spot-check (b) named ten gaps):
+
+- **Generic extraction (1, 2)**: an xlsx TEMPLATE path first —
+  `lib/quotes/xlsx.ts` (minimal OOXML on `fflate`, the reader the repo's own
+  session script used, lifted into a library; no SheetJS) and
+  `lib/quotes/template.ts` (header synonyms, any column order, numbers with
+  separators, nothing dropped). **PDF extraction: spike only** — see the
+  report; no build.
+- **Line → item_key mapping with review (3)**: `lib/quotes/match.ts` — an
+  idf-weighted coverage/Dice score over the vocabulary's labels and keys, a
+  given key honoured at score 1, unknown words diluting, a token unique to one
+  item earning an identity bonus; threshold 0.45. A suggestion is stored,
+  **never applied on its own**; a member confirms per line or "confirms all
+  suggestions ≥ 0.5" as one explicit act. On the fixture: PCC (key given) 1.0,
+  plaster 1.0, boundary lights 0.96, grass 0.77, irrigation 0.54, pergola
+  0.53 (through "louvred" and "aluminium", which the vocabulary has never
+  seen), sign board → none.
+- **A quote entity (4)**: `firm_quotes` (migration 045) — supplier label +
+  role (the firm's own words; reaches no document), reference, date,
+  validity, currency, VAT treatment, net|list + discount, file name + sha256
+  (the file is not stored), status review|accepted|superseded, version +
+  `supersedes_quote_id`.
+- **Net vs list as data (5)**: `lib/quotes/derive.ts` — list − discount, ÷
+  1.05 when VAT is included; the arithmetic is written on the line and the
+  entry note; VAT "unknown" and a foreign currency HOLD the line rather than
+  guess.
+- **Identity enforced (6)**: the entry carries `origin = quote_import` +
+  `quote_id`; the BoQ line reads the constant `FIRM_QUOTE_LABEL`; a test
+  prices a BoQ through a quote-import entry and asserts the supplier label and
+  quote reference appear nowhere.
+- **Provenance vocabulary (7)**: `quote_import` is a third entry origin (not a
+  `rate_book` provenance — the reference book is untouched, asserted).
+- **Additive persistence (8)**: no delete exists in `lib/quotes` (static
+  test). A replaced entry gets `superseded_at` / `superseded_by` and stays;
+  the unique index on entries is now **partial on active rows**;
+  `loadFirmBook`, `listEntries`, `entry_count` and the overlay read active rows
+  only (pre-045 fallback kept). A re-import of the same reference or file is
+  **version n+1**; accepting it supersedes the earlier import's entries — same
+  active count, history retained (tested: v1 98.5 → v2 88.65 with a 10% list
+  discount, v1 rows kept and linked).
+- **Upload + review surface (9)**: the book page's Quotations panel (template
+  download, upload with terms, list) and `/firms/:id/quotes/:q` (every line:
+  quoted figure, suggestion, confirm/reject, grade/kind, the rate it enters as,
+  what it shadows, status, hold reason; Accept is the only action that creates
+  rates). Members only, same 401/403/404 contract; four new routes under
+  `app/api/firms/**`, all picked up by the route-auth scan.
+- **Inclusions/exclusions/variations (10)**: not modelled — out of this
+  sprint; a quote's exclusions are a review-screen judgement today.
+
+**Verification:** vitest **121/121** across quotes + firms + rates (xlsx round
+trip and fixture sha256; matcher; derivation; import → confirm → accept with
+provenance, held lines, other-origin entries untouched, typed-beats-imported
+precedence, re-import history, leak, no-delete static; page-privacy extended
+to the two new components; route-auth over nine firm routes); tsc 0; eslint 0.
+Live: `scripts/quote-import-check.mjs 3098 --shots=screenshots/u3` through
+two authenticated dev accounts — **27/27**: template 401 anonymous / 403 other
+account / three sheets with 84 vocabulary rows; upload 403 for the other
+account, 201 for the member with 6 lines, 5 suggested, 3 held (USD, "on
+request", sign board) and **no rate in the book**; confirm ≥ 0.5 confirmed 5;
+**accept entered 3, held 3** (a confirmed line with no usable rate stays held);
+every entry `quote_import` + traced; accept twice 409; BoQ dry-run priced PCC
+at 98.5 under `contractor rate book (supplier quotation)` with the supplier's
+label and reference nowhere in the document; re-import → **version 2**, its
+accept superseded v1's PCC entry (active 3, rows 4), BoQ now 101, v1 marked
+superseded with links intact. Three screenshots in `screenshots/u3/`
+(README). Migration 045 applied on dev. **U6's migration is now 046.**
+
+**PDF extraction — spike, no build (item 4).** One synthetic PDF quote
+(pdf-lib: header, a five-column table, totals) → mupdf structured text →
+lines clustered by y (±3 pt) and ordered by x: **the table came back 6/6
+rows, cell-exact**, header and footer lines separated by their cell count.
+Feasible for text-layer PDFs with a regular table. Not exercised, and the
+real risks: wrapped descriptions (a second y-row with one cell), merged or
+spanning cells, right-aligned numerics drifting into the wrong column, and
+scanned PDFs (no text layer — OCR, a different project). The pilot-demand
+rule applies: build when a firm brings a PDF it cannot retype into the
+template, not before. The spike script was not committed.
+
 # U2 — rate book management UI + vocabulary endpoint (2026-09-26)
 
 - **`GET /api/rate-vocabulary`** (signed-in callers): every item_key a firm may

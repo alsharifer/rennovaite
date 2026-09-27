@@ -36,9 +36,13 @@ const CALLER_TAKING = [
 ];
 
 describe("every firm route resolves the caller and passes it to the store", () => {
-  it("scans the five firm route files", () => {
+  it("scans every firm route file (five from L1/U1, four quote routes from U3)", () => {
     expect(FIRM_ROUTES).toEqual([
       "app/api/firms/[firmId]/promote/route.ts",
+      "app/api/firms/[firmId]/quotes/[quoteId]/lines/[lineId]/route.ts",
+      "app/api/firms/[firmId]/quotes/[quoteId]/route.ts",
+      "app/api/firms/[firmId]/quotes/route.ts",
+      "app/api/firms/[firmId]/quotes/template/route.ts",
       "app/api/firms/[firmId]/rates/[entryId]/route.ts",
       "app/api/firms/[firmId]/rates/route.ts",
       "app/api/firms/[firmId]/route.ts",

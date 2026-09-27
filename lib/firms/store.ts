@@ -26,6 +26,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Caller } from "@/lib/auth/caller";
 import {
   FIRM_ENTRY_COLUMNS,
+  FIRM_ENTRY_COLUMNS_PRE045,
+  isMissingSchema,
   toFirmEntry,
   type FirmEntryKind,
   type FirmRateEntry,
@@ -217,7 +219,7 @@ async function readBook(db: SupabaseClient, firmId: string): Promise<BookRow | n
  * draft — a review of a book that has since changed is a review of a
  * different book. Called after every mutation; a no-op on a draft.
  */
-async function touchBook(db: SupabaseClient, firmId: string): Promise<void> {
+export async function touchBook(db: SupabaseClient, firmId: string): Promise<void> {
   const { error } = await db
     .from("firm_rate_books")
     .update({ status: "draft", reviewed_at: null, updated_at: new Date().toISOString() })
@@ -248,10 +250,15 @@ export async function ensureBook(db: SupabaseClient, firmId: string): Promise<Bo
 export async function getFirmSummary(db: SupabaseClient, firmId: string, caller: Caller | null): Promise<FirmSummary> {
   const firm = await requireFirm(db, firmId, caller);
   const book = await readBook(db, firmId);
-  const { count, error } = await db
+  let counted: { count: number | null; error: { code?: string; message: string } | null } = await db
     .from("firm_rate_entries")
     .select("id", { count: "exact", head: true })
-    .eq("firm_id", firmId);
+    .eq("firm_id", firmId)
+    .is("superseded_at", null);
+  if (counted.error && isMissingSchema(counted.error)) {
+    counted = await db.from("firm_rate_entries").select("id", { count: "exact", head: true }).eq("firm_id", firmId);
+  }
+  const { count, error } = counted;
   if (error) fail(error, "count entries");
   return {
     ...firm,
@@ -328,15 +335,20 @@ export interface EntryInput {
   note?: string | null;
 }
 
+/** The firm's ACTIVE entries (U3: a superseded entry is history, listed nowhere the book is edited). */
 export async function listEntries(db: SupabaseClient, firmId: string, caller: Caller | null): Promise<FirmRateEntry[]> {
   await requireFirm(db, firmId, caller);
-  const { data, error } = await db
+  let res: { data: unknown; error: { code?: string; message: string } | null } = await db
     .from("firm_rate_entries")
     .select(FIRM_ENTRY_COLUMNS)
     .eq("firm_id", firmId)
+    .is("superseded_at", null)
     .order("item_key");
-  if (error) fail(error, "list entries");
-  return ((data ?? []) as Record<string, unknown>[]).map(toFirmEntry);
+  if (res.error && isMissingSchema(res.error)) {
+    res = await db.from("firm_rate_entries").select(FIRM_ENTRY_COLUMNS_PRE045).eq("firm_id", firmId).order("item_key");
+  }
+  if (res.error) fail(res.error, "list entries");
+  return ((res.data ?? []) as Record<string, unknown>[]).map(toFirmEntry);
 }
 
 function assertValid(d: { item_key: string; unit: string; kind: FirmEntryKind; rate_aed: number }): void {

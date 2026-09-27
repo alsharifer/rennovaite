@@ -29,6 +29,7 @@ import {
 } from "@/lib/rates/reference";
 import {
   FIRM_CORRECTION_LABEL,
+  FIRM_QUOTE_LABEL,
   FIRM_RATE_LABEL,
   INDICATIVE_LABEL,
   INTERIOR_REFERENCE_LABEL,
@@ -223,7 +224,8 @@ export class RateResolver {
   private fromFirm(rule: RateRule, e: FirmRateEntry, tier: "firm_private" | "firm_correction"): ResolvedRate {
     return {
       rate_aed: e.rate_aed,
-      vendor_or_source: tier === "firm_private" ? FIRM_RATE_LABEL : FIRM_CORRECTION_LABEL,
+      vendor_or_source:
+        tier !== "firm_private" ? FIRM_CORRECTION_LABEL : e.origin === "quote_import" ? FIRM_QUOTE_LABEL : FIRM_RATE_LABEL,
       kind: FIRM_KIND[e.kind],
       rate_band: "book",
       // Wastage is a property of the MEASUREMENT (how much material a m² of
@@ -392,7 +394,8 @@ export function elementPricer(firm: FirmOverlay | null | undefined, tier: Tier):
     if (!hit) return null;
     return {
       rate_aed: hit.entry.rate_aed,
-      vendor_or_source: hit.tier === "firm_private" ? FIRM_RATE_LABEL : FIRM_CORRECTION_LABEL,
+      vendor_or_source:
+        hit.tier !== "firm_private" ? FIRM_CORRECTION_LABEL : hit.entry.origin === "quote_import" ? FIRM_QUOTE_LABEL : FIRM_RATE_LABEL,
       rate_tier: hit.tier,
     };
   };

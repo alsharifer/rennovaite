@@ -658,7 +658,7 @@ export function priceGardenTakeoff(items: readonly ScopeItem[], book: GardenRate
       // Never the contractor's name. See the identity rule in the ground-truth
       // module: this string reaches the BoQ, and the BoQ reaches the client. The
       // label is a constant per tier (GARDEN_TIER_LABEL), never a database string.
-      vendor_or_source: GARDEN_TIER_LABEL[hit.tier],
+      vendor_or_source: hit.label ?? GARDEN_TIER_LABEL[hit.tier],
       rate_tier: hit.tier,
     };
     // A firm rate on a QS-to-price item has been priced: the needs_qs flag goes.

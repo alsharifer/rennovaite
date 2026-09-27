@@ -55,6 +55,8 @@ export const isFirmTier = (t: RateTier | null | undefined): boolean => t === "fi
  */
 export const FIRM_RATE_LABEL = "contractor rate book";
 export const FIRM_CORRECTION_LABEL = "contractor rate book (reviewed correction)";
+/** U3: a rate the firm imported from a supplier / contractor quotation. The supplier is never named on a line. */
+export const FIRM_QUOTE_LABEL = "contractor rate book (supplier quotation)";
 export const INTERIOR_REFERENCE_LABEL = "market reference — Dubai interior (transacted)";
 export const INDICATIVE_LABEL = "indicative rate — QS to confirm";
 

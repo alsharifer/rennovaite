@@ -1252,8 +1252,30 @@ resolved line carries **`rate_tier`**.
   and the vocabulary (`page-privacy.test.ts`).
 - **Book status (U2, migration `044`)**: `firm_rate_books.status` draft |
   reviewed + `reviewed_at`. Marked reviewed by a member; any content change
-  (entry, OH&P, promotion) returns it to draft. Resolution ignores it; the
-  export gate (U5) reads it.
+  (entry, OH&P, promotion, quote accept) returns it to draft. Resolution
+  ignores it; the export gate (U5) reads it.
+- **Quote import (L2 / U3, migration `045`)** — `lib/quotes/`. Template
+  (`GET /api/firms/:id/quotes/template`, xlsx: Quote · How to fill ·
+  Vocabulary) → upload (`POST /api/firms/:id/quotes`, multipart + the quote's
+  terms: supplier label/role, ref, dates, currency, VAT treatment, net|list,
+  discount) → `firm_quotes` record + one `firm_quote_lines` row per sheet row
+  with a **suggested** item_key (`lib/quotes/match.ts`, idf-weighted; never
+  auto-confirmed) and the rate derived to net-excl-VAT AED
+  (`lib/quotes/derive.ts`, arithmetic shown) → review (`/firms/:id/quotes/:q`;
+  confirm/reject per line, "confirm suggestions ≥ 0.5" as one explicit act; a
+  line is `matched` only if the entry it would create passes `validateEntry`)
+  → `accept` creates entries with **`origin = 'quote_import'` + `quote_id`**.
+  **Additive by construction**: no delete anywhere in `lib/quotes` (static
+  test); an earlier quote_import entry for the same key/grade is
+  **superseded** (`superseded_at` / `superseded_by`, kept), the unique index
+  is partial on active rows, and `loadFirmBook` / `listEntries` read active
+  rows only. A re-import of the same reference (or same file sha256) is a new
+  **version** naming the one it replaces. Held lines (no match, foreign
+  currency, unreadable rate, VAT unknown) stay on the record with a reason.
+  Overlay precedence within tier 1: typed `firm_entry` > `quote_import`; the
+  line label is `FIRM_QUOTE_LABEL`. xlsx read/write is `lib/quotes/xlsx.ts`
+  on `fflate` (no SheetJS). One synthetic fixture only (`docs/AUTH.md` →
+  Quotes). **U6's migration is 046.**
 - **`generate-boq { dry_run: true }`** assembles the BoQ through the real
   pipeline and writes nothing (no boqs row, takeoff_items or pilot event).
   `scripts/firm-overlay-check.mjs [port]` runs the whole L1 flow live on scratch
