@@ -122,7 +122,7 @@ export interface FirmMetrics {
     median_time_to_first_boq_min: number | null;
     median_checking_min: number | null;
   };
-  rate_book: { entries: number; promotions: number; retirements: number; quote_accepts: number };
+  rate_book: { entries: number; edits: number; promotions: number; retirements: number; quote_accepts: number };
   gaps: string[];
 }
 
@@ -225,10 +225,11 @@ export function firmRollup(firm: FirmRow, projects: readonly ProjectRow[], event
   const mine = projects.filter((p) => firmOfProject(p, corrections) === firm.id);
   const pm = mine.map((p) => projectMetrics(p, events, corrections, packs));
   const firmEvents = events.filter((e) => e.firm_id === firm.id && e.kind === "rate_book_change");
-  const rb = { entries: 0, promotions: 0, retirements: 0, quote_accepts: 0 };
+  const rb = { entries: 0, edits: 0, promotions: 0, retirements: 0, quote_accepts: 0 };
   for (const e of firmEvents) {
     const a = String(e.detail?.action ?? "");
     if (a === "entry") rb.entries++;
+    else if (a === "edit") rb.edits++;
     else if (a === "promote") rb.promotions++;
     else if (a === "retire") rb.retirements++;
     else if (a === "quote_accept") rb.quote_accepts++;

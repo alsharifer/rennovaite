@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
+import { guardDocumentRoute, packJobActor } from "@/lib/documents/pack-export/guard";
 
 import { renderBoqPdf, type BoqPdfInput } from "@/lib/documents/boq-pdf";
 import { loadPackReadiness, readinessMessage } from "@/lib/documents/pack-readiness";
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (json) return NextResponse.json({ readiness, pages: pages.length, bytes: pdf.byteLength, boq_id: boq.data.id });
     // T5: exactly the pages this PDF printed, for the pack's printed-content checks.
     if (format === "pages") return NextResponse.json({ readiness, pages, boq_id: boq.data.id });
-    await recordPilotEvent(sb, projectId, "pack_exported", { document: "boq_pdf", boq_id: boq.data.id, pages: pages.length });
+    await recordPilotEvent(sb, projectId, "pack_exported", { document: "boq_pdf", boq_id: boq.data.id, pages: pages.length }, { actor: await packJobActor(request) });
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,
       headers: {

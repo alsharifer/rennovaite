@@ -155,7 +155,10 @@ try {
 } finally {
   console.log("\ncleanup");
   await sb.from("projects").update({ firm_id: priorFirm }).eq("id", STAND_IN);
-  if (firmId) await sb.from("firms").delete().eq("id", firmId);
+  if (firmId) {
+    await sb.from("pilot_events").delete().eq("firm_id", firmId); // L5 firm-level events (quote accept)
+    await sb.from("firms").delete().eq("id", firmId);
+  }
   await sb.from("firms").delete().like("name", "U3 quote check%");
   const { count } = await sb.from("firms").select("id", { count: "exact", head: true }).like("name", "U3 quote check%");
   check("scratch firm removed (quotes, lines and entries cascade)", count === 0);

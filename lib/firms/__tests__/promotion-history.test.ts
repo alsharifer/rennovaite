@@ -167,3 +167,30 @@ describe("loader ordering is deterministic", () => {
     expect(book.entries.map((e) => e.id)).toEqual([c.id, b.id, a.id]);
   });
 });
+
+describe("a figure edit supersedes with history (UV)", () => {
+  it("editing a typed rate retires the old row with the figure it carried, inserts the new one, and records the change", async () => {
+    const typed = await createEntry(db.client, A.id, { item_key: "garden.grass_supply", unit: "m2", rate_aed: 20, kind: "supply" }, alice);
+    const edited = await updateEntry(db.client, A.id, typed.id, { rate_aed: 21 }, alice);
+    expect(edited.id).not.toBe(typed.id);
+    expect(edited).toMatchObject({ item_key: "garden.grass_supply", rate_aed: 21, unit: "m2", kind: "supply", origin: "firm_entry", superseded_at: null });
+    expect(rows()).toHaveLength(2); // nothing deleted
+    const old = rows().find((r) => r.id === typed.id)!;
+    expect(old).toMatchObject({ rate_aed: 20, superseded_by: edited.id, retired_by: alice.id, retire_reason: "edited by a member — was 20 per m2" });
+    expect(old.superseded_at).toBeTruthy();
+    // Only the new figure prices; the trail shows both.
+    const hit = (await loadProjectFirmOverlay(db.client, "p1")).lookup("garden.grass_supply", "standard", "m2");
+    expect(hit).toMatchObject({ tier: "firm_private", entry: { id: edited.id, rate_aed: 21 } });
+    const trail = await listEntryHistory(db.client, A.id, "garden.grass_supply", alice);
+    expect(trail.map((t) => t.rate_aed)).toEqual([21, 20]);
+    const events = (db.tables.pilot_events ?? []).filter((e) => e.kind === "rate_book_change" && (e.detail as { action?: string })?.action === "edit");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ firm_id: A.id, actor: alice.id, detail: { item_key: "garden.grass_supply", entry_id: edited.id, superseded_entry_id: typed.id, from_rate_aed: 20, to_rate_aed: 21 } });
+    // A note-only edit stays in place: a note is not a figure.
+    const noted = await updateEntry(db.client, A.id, edited.id, { note: "confirmed" }, alice);
+    expect(noted.id).toBe(edited.id);
+    expect(rows()).toHaveLength(2);
+    // The retired row cannot be edited again.
+    await expectStoreError(updateEntry(db.client, A.id, typed.id, { rate_aed: 22 }, alice), 409, "entry_retired");
+  });
+});

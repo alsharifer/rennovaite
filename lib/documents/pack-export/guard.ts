@@ -32,6 +32,20 @@ export function packExportEnabled(): boolean {
   return process.env.PACK_EXPORT_ENABLED === "true" && process.env.DRAWINGS_ENABLED === "true";
 }
 
+/**
+ * L5: the account that started the pack job a document request belongs to, so
+ * the document's pilot event carries the member's actor rather than none — a
+ * member's export is the firm's release, not ours. null when there is no job
+ * or the job has no actor (a CLI run).
+ */
+export async function packJobActor(request: NextRequest): Promise<string | null> {
+  const jobId = request.headers.get(PACK_JOB_HEADER);
+  if (!jobId || !/^[0-9a-f-]{36}$/.test(jobId)) return null;
+  const db = getSupabaseAdmin() as unknown as SupabaseClient;
+  const { data } = await db.from("pack_exports").select("actor").eq("id", jobId).maybeSingle<{ actor: string | null }>();
+  return data?.actor ?? null;
+}
+
 export async function guardDocumentRoute(request: NextRequest, projectId: string): Promise<NextResponse | null> {
   if (!packExportEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const db = getSupabaseAdmin() as unknown as SupabaseClient;

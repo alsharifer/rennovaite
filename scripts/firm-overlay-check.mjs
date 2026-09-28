@@ -192,6 +192,7 @@ try {
     await sb.from("boq_corrections").delete().eq("id", created.correction);
   }
   for (const [id, who] of created.firms) await api("DELETE", `/api/firms/${id}`, undefined, who);
+  for (const [id] of created.firms) await sb.from("pilot_events").delete().eq("firm_id", id); // L5 firm-level events
   await sb.from("firms").delete().like("name", "L1 check%"); // belt and braces (an anon-create that wrongly succeeded, say)
   const { count: left } = await sb.from("firms").select("id", { count: "exact", head: true }).like("name", "L1 check%");
   const { data: si } = await sb.from("projects").select("firm_id").eq("id", STAND_IN).single();
