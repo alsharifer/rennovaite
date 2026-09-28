@@ -34,7 +34,9 @@ let seq = 0; // strictly increasing created_at for rows inserted within one mill
 const stamp = () => new Date(Date.now() + seq++).toISOString();
 
 const DEFAULTS: Record<string, (r: Row) => Row> = {
-  firms: (r) => ({ private: true, created_by: null, created_at: new Date().toISOString(), ...r }),
+  // 047: branding columns.
+  firms: (r) => ({ private: true, created_by: null, created_at: new Date().toISOString(), display_name: null, logo_path: null, terms_text: null, ...r }),
+  reference_basis_acceptances: (r) => ({ accepted_by: null, reference_lines: 0, note: null, created_at: stamp(), ...r }),
   firm_rate_books: (r) => ({ ohp_pct: 0, status: "draft", reviewed_at: null, ...r }),
   // 046: created_by / retired_by / retire_reason; created_at drives the loader's order.
   firm_rate_entries: (r) => ({ grade: null, origin: "firm_entry", correction_id: null, note: null, quote_id: null, quote_line_id: null, superseded_at: null, superseded_by: null, created_by: null, retired_by: null, retire_reason: null, created_at: stamp(), ...r }),

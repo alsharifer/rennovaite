@@ -15,7 +15,13 @@ import { useEffect, useRef, useState } from "react";
 
 import type { ChecklistItem, PackProgress } from "@/lib/documents/pack-export/types";
 
-type Preflight = { ready: boolean; documentName: string | null; checklist: ChecklistItem[] };
+type Preflight = {
+  ready: boolean;
+  documentName: string | null;
+  checklist: ChecklistItem[];
+  /** L4: the project's firm as a proposal would print it; null = no firm, no proposal. */
+  firm: { brand: string; logo: boolean; terms: boolean; book_status: "draft" | "reviewed" | null } | null;
+};
 type JobView = {
   id: string;
   status: "queued" | "running" | "passed" | "blocked" | "failed";
@@ -90,6 +96,8 @@ export function PackExport({ projectId, autoOpen = false }: { projectId: string;
   const [preflight, setPreflight] = useState<Preflight | null>(null);
   const [name, setName] = useState("");
   const [renders, setRenders] = useState<"full" | "cached">("full");
+  // L4: the firm's client proposal is opt-in; the gate re-checks with its items.
+  const [proposal, setProposal] = useState(false);
   const [job, setJob] = useState<JobView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,8 +105,8 @@ export function PackExport({ projectId, autoOpen = false }: { projectId: string;
   const base = `/api/projects/${projectId}/pack-export`;
 
   // Plain functions (they call each other); state is set only after a fetch resolves.
-  async function loadPreflight() {
-    const res = await fetch(base, { cache: "no-store" });
+  async function loadPreflight(withProposal = proposal) {
+    const res = await fetch(withProposal ? `${base}?proposal=1` : base, { cache: "no-store" });
     if (!res.ok) {
       setError("The export gate could not be checked.");
       return;
@@ -160,7 +168,7 @@ export function PackExport({ projectId, autoOpen = false }: { projectId: string;
       headers: { "Content-Type": "application/json" },
       // The name is sent only when it was edited: re-sending a working name would
       // store it as the display name.
-      body: JSON.stringify({ ...(nameChanged && name.trim() ? { display_name: name.trim() } : {}), renders }),
+      body: JSON.stringify({ ...(nameChanged && name.trim() ? { display_name: name.trim() } : {}), renders, proposal }),
     });
     if (!res.ok) {
       setError("The export could not be started.");
@@ -240,6 +248,20 @@ export function PackExport({ projectId, autoOpen = false }: { projectId: string;
                   />
                   Use existing renders only
                 </label>
+                {preflight.firm && (
+                  <label className="inline-flex items-center gap-xs font-body text-body-sm text-ink-700" data-testid="proposal-toggle">
+                    <input
+                      type="checkbox"
+                      checked={proposal}
+                      onChange={(e) => {
+                        setProposal(e.target.checked);
+                        void loadPreflight(e.target.checked);
+                      }}
+                      disabled={running}
+                    />
+                    Include the client proposal ({preflight.firm.brand})
+                  </label>
+                )}
               </div>
             </>
           )}

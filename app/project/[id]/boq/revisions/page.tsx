@@ -33,7 +33,7 @@ export default async function RevisionsPage({ params, searchParams }: { params: 
           <section className="rounded-xl border border-ink-100 bg-paper p-lg" aria-label="Sign in required">
             <p className="label-caps text-ink-500">Signed-in accounts only</p>
             <h2 className="mt-xs font-display text-headline-md text-ink-900">Sign in to see the revision history</h2>
-            <p className="mt-sm max-w-xl text-body-md text-ink-700">A revision history is a price history. Sign in with the account that works on this project.</p>
+            <p className="mt-sm max-w-[576px] text-body-md text-ink-700">A revision history is a price history. Sign in with the account that works on this project.</p>
             <Link href="/auth" className="focus-ring mt-md inline-flex items-center gap-xs rounded-lg bg-brass-600 px-md py-sm text-body-sm font-semibold text-white">
               <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
                 login

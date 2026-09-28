@@ -25,6 +25,12 @@ on every route._
   sign-in card to a visitor. Rate entries record `created_by` / `retired_by`
   (the trail); the history route resolves those ids to e-mails for the firm's
   own members only.
+- **L4 adds** (2026-09-27): `GET/PATCH/POST /api/firms/:firmId/branding`
+  (members); `POST /api/projects/:id/reference-basis` — a MEMBER of the
+  project's firm accepts the reference basis for one BoQ revision (422 when
+  the project has no firm; 401/404/403 as everywhere); `GET …/reference-basis`
+  requires a signed-in caller. `GET /api/projects/:id/proposal` is a document
+  route behind the pack-job guard (T5), not behind user auth.
 - **Answers, in this order** (`lib/firms/store.ts → requireFirm`):
 
   | | code | when |

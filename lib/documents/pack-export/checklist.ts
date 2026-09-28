@@ -100,3 +100,59 @@ export function buildChecklist(input: {
 }
 
 export const checklistReady = (items: readonly ChecklistItem[]) => items.every((i) => i.ok);
+
+/**
+ * L4: the items a CLIENT PROPOSAL adds to the gate. Pure — takes the loaded
+ * gate (lib/documents/proposal-gate.ts). The reference-basis refusal is the
+ * new reason an export can block, and it names the way out: mark the book
+ * reviewed, or accept the reference basis for this BoQ revision on the BoQ page.
+ */
+export function proposalChecklistItems(
+  projectId: string,
+  gate: {
+    firm: { brand: string; logo_path: string | null; terms_text: string | null; book_status: "draft" | "reviewed" | null } | null;
+    boq: { id: string; basis: { basis: string; reference_lines: number; firm_lines: number; total_lines: number } } | null;
+    acceptance: { created_at: string } | null;
+    verdict: { ok: boolean; reason: string | null; refusal: string | null };
+  },
+): ChecklistItem[] {
+  const boqPage = { label: "Open the BoQ", href: `/project/${projectId}/boq#reference-basis` };
+  const items: ChecklistItem[] = [
+    {
+      key: "proposal_firm",
+      ok: !!gate.firm,
+      title: "A firm sends the proposal",
+      detail: gate.firm ? `The proposal is ${gate.firm.brand}'s document.` : "A client proposal is a firm's document. Attach the firm that will send it to this project.",
+      items: [],
+      fix: null,
+    },
+  ];
+  if (gate.firm) {
+    const b = gate.boq?.basis;
+    const reasonText =
+      gate.verdict.reason === "firm_basis"
+        ? "Every priced line is the firm's own rate."
+        : gate.verdict.reason === "book_reviewed"
+          ? `${b?.reference_lines ?? 0} line(s) are priced from the market reference; the firm's rate book is marked reviewed.`
+          : gate.verdict.reason === "accepted"
+            ? `${b?.reference_lines ?? 0} line(s) are priced from the market reference; the firm accepted this basis for this BoQ revision on ${gate.acceptance?.created_at.slice(0, 10) ?? "record"}.`
+            : gate.verdict.refusal ?? "";
+    items.push({
+      key: "reference_basis",
+      ok: gate.verdict.ok,
+      title: "The pricing basis is the firm's stated choice",
+      detail: reasonText,
+      items: gate.verdict.ok || !b ? [] : [`${b.reference_lines} of ${b.total_lines} lines priced from the market reference`, `${b.firm_lines} from the firm's book`],
+      fix: gate.verdict.ok ? null : boqPage,
+    });
+    items.push({
+      key: "branding",
+      ok: true,
+      title: "The proposal carries the firm's brand",
+      detail: `Cover prints "${gate.firm.brand}"${gate.firm.logo_path ? " with the logo" : " (no logo uploaded)"}${gate.firm.terms_text ? "; the terms block is set" : "; no terms text — the terms page is omitted"}.`,
+      items: [],
+      fix: null,
+    });
+  }
+  return items;
+}

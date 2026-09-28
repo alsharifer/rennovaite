@@ -9,6 +9,7 @@ import type { FirmRateEntry } from "@/lib/rates/firm";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { SignInCard } from "../_components/sign-in-card";
+import { BrandingPanel } from "./_components/branding-panel";
 import { FirmBookEditor } from "./_components/firm-book-editor";
 import { QuotesPanel } from "./_components/quotes-panel";
 
@@ -48,7 +49,7 @@ export default async function FirmBookPage({ params }: { params: Promise<{ firmI
             <section className="rounded-xl border border-ink-100 bg-paper p-lg" aria-label="Not a member">
               <p className="label-caps text-ink-500">Members only</p>
               <h2 className="mt-xs font-display text-headline-md text-ink-900">You are not a member of this firm</h2>
-              <p className="mt-sm max-w-xl text-body-md text-ink-700">
+              <p className="mt-sm max-w-[576px] text-body-md text-ink-700">
                 A rate book is visible to the firm&rsquo;s members and to nobody else. Ask a member to add your account.
               </p>
             </section>
@@ -63,6 +64,7 @@ export default async function FirmBookPage({ params }: { params: Promise<{ firmI
       <div className="mx-auto max-w-6xl space-y-lg">
         <FirmBookEditor initialFirm={firm} initialEntries={entries} />
         <QuotesPanel firmId={firmId} />
+        <BrandingPanel firmId={firmId} />
       </div>
     </AppShell>
   );

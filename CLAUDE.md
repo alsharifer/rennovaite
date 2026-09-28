@@ -1341,6 +1341,66 @@ resolved line carries **`rate_tier`**.
   reproduction + PDF + identity scan; approvals and promotion history on
   scratch state, cleaned up).
 
+## Client-ready proposal with the reference-basis gate (L4)
+
+A branded proposal a firm sends ITS OWN client — the firm's rates, its OH&P,
+its logo. Built on the T5 path, never beside it.
+
+- **Branding** (migration 047: `firms.display_name`, `logo_path`,
+  `terms_text`; `lib/firms/branding.ts`): the firm chooses what its client
+  sees. `GET/PATCH/POST /api/firms/:id/branding` (members; POST = multipart
+  `logo`, PNG/JPG ≤ 1 MB into `plan-uploads` at `firms/<id>/…`), the
+  "Proposal branding" panel on `/firms/:id`. `brand` = display name, else
+  the registered name.
+- **The document** `lib/documents/proposal.ts` (pure pages) +
+  `proposal-pdf.ts` + `GET /api/projects/:id/proposal` (a DOCUMENT route:
+  behind `guardDocumentRoute`, in `DOCUMENT_ROUTES`): cover (logo, brand,
+  project, contract sum in the derived convention + D4 excludes, draft
+  stamp), scope summary, the BoQ at the firm's resolved rates with **OH&P as
+  its own row**, terms (the firm's words, verbatim), indicative programme.
+  **No rate provenance** reaches the client: no source labels, tiers or QS
+  marks, and a description's provenance aside — "(no reference rate — QS to
+  price)" — is dropped (`clientDescription`). RennovAIte is only the footer
+  mark `PREPARED_WITH_MARK`. The draft watermark carries over to every page.
+- **Reference-basis gate** (`lib/documents/reference-basis.ts`,
+  `proposal-gate.ts`): `referenceBasisOf(boq)` counts lines by the tier that
+  answered them (stored `rate_tier`, or inferred exactly as the provenance
+  popover does for a pre-L1 BoQ) — firm_private / firm_correction are the
+  firm's, QS-to-price lines are `unpriced`, everything else is the
+  **reference**. Any BoQ with a reference line shows the in-app banner
+  `REFERENCE_BASIS_BANNER` on the BoQ page (`ReferenceBasisNotice`). A
+  client proposal exports only when: every line is the firm's own
+  (`firm_basis`) · the firm's book is `reviewed` (U2, `book_reviewed`) · the
+  firm **accepted the reference basis for THIS BoQ revision** (`accepted` —
+  `reference_basis_acceptances`, 047, append-only, by a member of the
+  project's firm via `POST /api/projects/:id/reference-basis`). An
+  acceptance covers a revision by **pricing fingerprint**
+  (`boqPricingFingerprint`: every line's description, qty, unit, rate,
+  total + the summary chain): a pack export regenerates the BoQ before its
+  gate, and an identical regeneration is the basis the firm accepted; any
+  moved line is a new basis and needs a new acceptance. Otherwise the
+  proposal route answers **409
+  `proposal_not_ready`** and the Export pack checklist blocks on
+  `reference_basis` with the fix link to the BoQ page's accept control. The
+  fallback to market rates is a stated choice, never a silent default.
+- **In the pack**: `PackExportOptions.proposal` (the "Include the client
+  proposal" toggle, shown only when the project has a firm; `?proposal=1`
+  re-checks the gate with the proposal items); the run adds
+  `<name>-proposal.pdf` and the proposal checks in `checks.ts` (brand on the
+  cover, prepared-with mark on every page, no provenance words, contract sum
+  = BoQ total, OH&P row, draft stamp, terms, programme, basis was a stated
+  choice) and scans the proposal pages in the identity leak check. The
+  scanner now decodes XML entities and does not require a word boundary
+  after a name ending in punctuation ("X & Co.").
+- **Identity composes**: the firm's own name is allowed on its own project
+  (`withheldFirmNames` excludes it); every other firm, contractor and
+  reference-project identity is still withheld and scanned for. A proposal
+  that would print one is refused (500 `identity_leak`), never served.
+- **Checks**: `scripts/proposal-export-check.mjs [port]` (pack config) —
+  branding CRUD, refusal path (route 409, gate blocked, non-member 403),
+  acceptance, the document's printed content, the full pack with the
+  proposal; scratch state only, restored.
+
 ## Figures + number provenance, identity curation (I4)
 
 - **One formatter, one component.** `lib/format/aed.ts` (`formatAed(n, format)`:

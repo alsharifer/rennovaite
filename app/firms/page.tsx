@@ -24,7 +24,7 @@ export default async function FirmsPage() {
         <header className="mb-lg">
           <p className="label-caps text-ink-500">Firms</p>
           <h1 className="font-display text-headline-lg text-ink-900">Rate books</h1>
-          <p className="mt-xs max-w-2xl text-body-md text-ink-700">
+          <p className="mt-xs max-w-[672px] text-body-md text-ink-700">
             A firm&rsquo;s private book shadows the market reference for that firm&rsquo;s projects only. Its rates reach a BoQ line as
             &ldquo;contractor rate book&rdquo; — never as the firm&rsquo;s name — and its overheads &amp; profit are applied once, as a
             visible line, never inside a rate.

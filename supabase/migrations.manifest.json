@@ -278,6 +278,12 @@
       "version": "20260101004600",
       "name": "promotion_history_approvals",
       "sha256": "cbf44a094f10c6c05a6249c4b438519e05f690f5c99a2dded14cbccd54bf16a1"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004700",
+      "name": "firm_branding_reference_basis",
+      "sha256": "c47d3d27a760599867057dd1aa2ed783bd7539bcbab1929b30e940e1f728c08c"
     }
   ]
 }
