@@ -70,7 +70,7 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
       out.push({
         kind: "firm_rate",
         at: str(e.created_at),
-        summary: `contractor rate book: ${str(e.item_key)}${e.grade ? ` / ${str(e.grade)}` : ""} at ${num(e.rate_aed)} per ${str(e.unit)} (${ORIGIN[str(e.origin)] ?? str(e.origin)})`,
+        summary: `${str(e.item_key)}${e.grade ? ` / ${str(e.grade)}` : ""} at ${num(e.rate_aed)} per ${str(e.unit)} (${ORIGIN[str(e.origin)] ?? str(e.origin)})`,
         item_keys: [str(e.item_key)],
       });
     }
@@ -78,7 +78,7 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
       out.push({
         kind: "firm_rate",
         at: str(e.superseded_at),
-        summary: `contractor rate book: ${str(e.item_key)}${e.grade ? ` / ${str(e.grade)}` : ""} retired${e.retire_reason ? ` — ${str(e.retire_reason)}` : ""}`,
+        summary: `${str(e.item_key)}${e.grade ? ` / ${str(e.grade)}` : ""} retired${e.retire_reason ? ` — ${str(e.retire_reason)}` : ""}`,
         item_keys: [str(e.item_key)],
       });
     }

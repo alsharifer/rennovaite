@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
+import { guardDocumentRoute, packJobActor } from "@/lib/documents/pack-export/guard";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (json) {
       return NextResponse.json({ ...summary, readiness, bytes: pdf.byteLength });
     }
-    await recordPilotEvent(sb, parsed.data, "pack_exported", { document: "render_pack", pages: summary.pages.length, gate: summary.gate.map((g) => g.outcome) });
+    await recordPilotEvent(sb, parsed.data, "pack_exported", { document: "render_pack", pages: summary.pages.length, gate: summary.gate.map((g) => g.outcome) }, { actor: await packJobActor(request) });
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,
       headers: {

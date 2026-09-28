@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
+import { guardDocumentRoute, packJobActor } from "@/lib/documents/pack-export/guard";
 import { loadProposalGate } from "@/lib/documents/proposal-gate";
 import { renderProposalPdf } from "@/lib/documents/proposal-pdf";
 import type { ProposalScopeRoom } from "@/lib/documents/proposal";
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "The proposal would print a withheld identity; refused.", code: "identity_leak" }, { status: 500 });
     }
     if (format === "pages") return NextResponse.json({ pages, ...summary, boq_id: boqRow.data.id });
-    await recordPilotEvent(sb, projectId, "pack_exported", { document: "proposal", boq_id: boqRow.data.id, pages: pages.length, basis: gate.verdict.reason });
+    await recordPilotEvent(sb, projectId, "pack_exported", { document: "proposal", boq_id: boqRow.data.id, pages: pages.length, basis: gate.verdict.reason }, { actor: await packJobActor(request) });
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,
       headers: {

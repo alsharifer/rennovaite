@@ -1,0 +1,9 @@
+[three-firms-report] target: dev / non-production (askzyqgcnjmbqegfifxq)
+
+THREE-FIRMS EVIDENCE — 2026-09-28T19:16Z  (times: project start → first BoQ; first BoQ → first release)
+
+▌ Walkthrough Landscapes  (89c1bb8b) — 1 project(s) · 3 BoQ generations · corrections 0 (book 0 / project 0) · support 0 · reviews 1
+  rate book: 5 entries · 1 edits · 0 promotions · 0 retirements · 0 quote accepts · medians: →1st BoQ 1 min · checking 1.2 min
+  project                         scope     →1st BoQ    →1st FULL   checking    gens   corrections (type)                  landed      support   reviews   appr/acc 
+  Walkthrough Villa — Client Pr…  interior  1 min       1 min       1.2 min     3      0: —                                book 0 / …  0         1 / 1     0 / 0    
+

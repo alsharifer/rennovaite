@@ -25,6 +25,48 @@
   (`plaster.make_good`…) stay enterable; they price only a plan with no
   element take-off (no rooms / polygons).
 
+# UV — unified verification + onboarding walkthrough (2026-09-28)
+
+- **Full suite + live chain green together**: unit tests, the upgraded
+  auth/privacy suites, leak scans, the D4/D5 BoQ invariants, the gates, and
+  garden isolation (13 passed, 0 failed, no renders spent). Screenshots and
+  the milestone report in `screenshots/uv/`.
+- **One regression found and fixed at the root (migration 049)**: 048's
+  `pilot_events_scope_chk` (project OR firm not null) combined with
+  `firm_id … on delete set null` made any firm that had a rate-book event
+  undeletable (23514). 049 drops the check; a firm-level event outlives its
+  firm with both keys null and every rollup ignores it. The four live check
+  scripts that create scratch firms now delete the firm's events before the
+  firm. On dev; **prod carries the regression until 049 is pushed**.
+- **Document events carry the member's actor**: the BoQ PDF, proposal and
+  render-pack routes stamp `pack_exported` with the pack job's actor
+  (`packJobActor`), and `generate-boq` takes it as a fallback for the pack's
+  own regeneration, so the milestone report no longer reads a member-started
+  export as "our export" (the L5 gap text stays for CLI runs).
+- **A rate edit now leaves a trail (the walkthrough's step 6 caught it)**: the
+  in-app "edit" of a typed rate updated the row in place — no
+  `rate_book_change` event, no old figure in the history, and therefore no
+  cause on the revision diff. `updateEntry` now supersedes on a figure
+  change (retire with "edited by a member — was …", insert, event
+  `action: "edit"`); the metrics count `edits`; a note-only edit stays in
+  place. Unit-tested against the fake store.
+- **UI gap, named**: the BoQ page offers no regenerate control once a BoQ
+  exists; the walkthrough regenerates through `POST /api/generate-boq` with
+  the page's own session. Likewise there is no UI to attach a firm to a
+  project (`PATCH /api/projects/:id`), and no member invitation.
+- **Onboarding walkthrough** (`scripts/walkthrough-scratch.mjs` seed /
+  teardown / verify + `scripts/onboarding-walkthrough.mjs`, CDP-driven, a
+  screenshot per step): a fresh account → creates its firm in the UI → five
+  entries typed in the UI → reviewed → branded → attached to a fresh scratch
+  villa (API: there is no UI to attach a firm to a project yet) → BoQ
+  (element lines resolve at tier 1, the popover says Private; a line the firm
+  did not price names its own tier) → client proposal through the pack gate
+  → one rate change → revision diff → milestone report. Teardown deletes the
+  firm, the villa, the events and the auth user and `verify` prints
+  REVERSIBLE.
+- **STOP**: no merge until Abdallah reviews; 049 and the prod backfill only on
+  instruction.
+
 # L5 / U6 — per-firm commercial instrumentation + milestone report (2026-09-28)
 
 - **Migration 048** (per U0 spot-check (b)): `firm_id`, `actor`,

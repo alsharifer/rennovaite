@@ -483,17 +483,59 @@ export async function updateEntry(
   }
   const next = { ...current, ...patch };
   assertValid(next);
-  const { data, error } = await db
+  // UV: a FIGURE edit (rate / unit / kind / grade) is a rate movement, and the
+  // revision diff and the history row name a movement only from a record — so
+  // it supersedes like a promotion does: the old row is retired with the
+  // figure it carried, a new row takes the book, and a rate_book_change event
+  // is written. Editing in place had left no trail and no cause. A note-only
+  // edit stays in place (a note is not a figure).
+  const figureKeys = (["rate_aed", "unit", "kind", "grade"] as const).filter((k) => patch[k] !== undefined && patch[k] !== current[k]);
+  if (figureKeys.length === 0) {
+    const { data, error } = await db
+      .from("firm_rate_entries")
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq("id", entryId)
+      .eq("firm_id", firmId)
+      .select(FIRM_ENTRY_COLUMNS)
+      .maybeSingle();
+    if (error) fail(error, "update entry");
+    if (!data) throw new StoreError(404, "entry_not_found", "Rate entry not found in this firm's book.");
+    await touchBook(db, firmId);
+    return toFirmEntry(data as Record<string, unknown>);
+  }
+  const now = new Date().toISOString();
+  const was = `was ${current.rate_aed} per ${current.unit}${current.grade ? ` (${current.grade})` : ""}`;
+  const { data: noteRow } = await db.from("firm_rate_entries").select("note").eq("id", entryId).eq("firm_id", firmId).maybeSingle<{ note: string | null }>();
+  const retired = await db
     .from("firm_rate_entries")
-    .update({ ...patch, updated_at: new Date().toISOString() })
+    .update({ superseded_at: now, retired_by: caller!.id, retire_reason: `edited by a member — ${was}`, updated_at: now })
     .eq("id", entryId)
     .eq("firm_id", firmId)
-    .select(FIRM_ENTRY_COLUMNS)
+    .is("superseded_at", null)
+    .select("id")
     .maybeSingle();
-  if (error) fail(error, "update entry");
-  if (!data) throw new StoreError(404, "entry_not_found", "Rate entry not found in this firm's book.");
+  if (retired.error) fail(retired.error, "retire edited entry");
+  if (!retired.data) throw new StoreError(409, "entry_retired", "This entry was changed by someone else; reload the book.");
+  const entry = await insertEntry(db, firmId, {
+    item_key: current.item_key,
+    grade: next.grade ?? null,
+    unit: next.unit,
+    rate_aed: next.rate_aed,
+    kind: next.kind,
+    note: patch.note !== undefined ? patch.note : (noteRow?.note ?? null),
+    origin: "firm_entry",
+    created_by: caller!.id,
+  });
+  await db.from("firm_rate_entries").update({ superseded_by: entry.id }).eq("id", entryId).eq("firm_id", firmId).then(() => undefined, () => undefined);
   await touchBook(db, firmId);
-  return toFirmEntry(data as Record<string, unknown>);
+  await recordPilotEvent(
+    db,
+    null,
+    "rate_book_change",
+    { action: "edit", item_key: entry.item_key, grade: entry.grade, entry_id: entry.id, superseded_entry_id: entryId, fields: figureKeys, from_rate_aed: current.rate_aed, to_rate_aed: entry.rate_aed },
+    { actor: caller!.id, firmId },
+  );
+  return entry;
 }
 
 /**

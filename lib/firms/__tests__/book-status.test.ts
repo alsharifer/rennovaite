@@ -39,11 +39,12 @@ describe("book status", () => {
     expect((await getFirmSummary(db.client, A.id, alice)).status).toBe("draft");
 
     await updateFirm(db.client, A.id, { status: "reviewed" }, alice);
-    await updateEntry(db.client, A.id, e.id, { rate_aed: 96 }, alice);
+    // UV: a figure edit supersedes — the edited entry is the one that stays active.
+    const edited = await updateEntry(db.client, A.id, e.id, { rate_aed: 96 }, alice);
     expect((await getFirmSummary(db.client, A.id, alice)).status).toBe("draft");
 
     await updateFirm(db.client, A.id, { status: "reviewed" }, alice);
-    await deleteEntry(db.client, A.id, e.id, alice);
+    await deleteEntry(db.client, A.id, edited.id, alice);
     expect((await getFirmSummary(db.client, A.id, alice)).status).toBe("draft");
   });
 

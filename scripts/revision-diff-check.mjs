@@ -185,6 +185,8 @@ try {
     await sb.from("boq_corrections").delete().eq("id", id);
   }
   if (created.approvals.length) await sb.from("boq_approvals").delete().in("id", created.approvals);
+  // L5: each approval also wrote an approval_recorded pilot event.
+  for (const id of created.approvals) await sb.from("pilot_events").delete().eq("project_id", STAND_IN).eq("kind", "approval_recorded").contains("detail", { approval_id: id });
   if (created.firm) await sb.from("firms").delete().eq("id", created.firm); // cascades book, entries, members
   await sb.from("firms").delete().like("name", "U4 check%");
   const { count: evAfter } = await sb.from("pilot_events").select("id", { count: "exact", head: true }).eq("project_id", STAND_IN);

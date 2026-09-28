@@ -87,7 +87,7 @@ describe("firmRollup / threeFirmsEvidence", () => {
     const r = firmRollup({ id: "f1", name: "Firm one" }, [P1, P2, P3], events, corrections, []);
     expect(r.projects.map((p) => p.project_id)).toEqual(["p1", "p2"]);
     expect(r.totals.projects).toBe(2);
-    expect(r.rate_book).toEqual({ entries: 1, promotions: 1, retirements: 0, quote_accepts: 0 });
+    expect(r.rate_book).toEqual({ entries: 1, edits: 0, promotions: 1, retirements: 0, quote_accepts: 0 });
     expect(r.gaps).toContain("1 project(s) attributed only through corrections (projects.firm_id is null)");
   });
 

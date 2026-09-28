@@ -84,7 +84,8 @@ describe("firm rate book CRUD", () => {
     expect(s).toMatchObject({ ohp_pct: 10, entry_count: 1 });
 
     expect(await listEntries(db.client, firm.id, alice)).toHaveLength(1);
-    await deleteEntry(db.client, firm.id, e.id, alice);
+    // UV: the patch superseded `e` — the active row is `patched`, `e` is history.
+    await deleteEntry(db.client, firm.id, patched.id, alice);
     referenceUnchanged();
     expect(await listEntries(db.client, firm.id, alice)).toHaveLength(0);
 

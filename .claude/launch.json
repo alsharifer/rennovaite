@@ -4,8 +4,40 @@
     {
       "name": "dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "--port", "3091"],
+      "runtimeArgs": [
+        "next",
+        "dev",
+        "--port",
+        "3091"
+      ],
       "port": 3091
+    },
+    {
+      "name": "garden",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set GARDEN_PILOT_ENABLED=true&& set DRAWINGS_ENABLED=true&& set OVERLAYS_ENABLED=true&& set KG_ENABLED=false&& npx next dev --port 3098"
+      ],
+      "port": 3098
+    },
+    {
+      "name": "pack",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set GARDEN_PILOT_ENABLED=true&& set DRAWINGS_ENABLED=true&& set OVERLAYS_ENABLED=true&& set PACK_EXPORT_ENABLED=true&& set WHATIF_ENABLED=true&& set VIEWER_3D_ENABLED=true&& set KG_ENABLED=false&& npx next dev --port 3098"
+      ],
+      "port": 3098
+    },
+    {
+      "name": "pack-off",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set GARDEN_PILOT_ENABLED=true&& set DRAWINGS_ENABLED=true&& set OVERLAYS_ENABLED=true&& set KG_ENABLED=false&& npx next dev --port 3097"
+      ],
+      "port": 3097
     }
   ]
 }

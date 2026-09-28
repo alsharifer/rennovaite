@@ -54,7 +54,7 @@ const row = (p: ProjectMetrics) =>
 console.log(`\nTHREE-FIRMS EVIDENCE — ${evidence.generated_at.slice(0, 16)}Z  (times: project start → first BoQ; first BoQ → first release)`);
 for (const f of evidence.firms) {
   console.log(`\n▌ ${f.name}  (${f.firm_id.slice(0, 8)}) — ${f.totals.projects} project(s) · ${f.totals.boq_generations} BoQ generations · corrections ${f.totals.corrections.total} (book ${f.totals.corrections.landed.book} / project ${f.totals.corrections.landed.project}) · support ${f.totals.support_touches} · reviews ${f.totals.reviews}`);
-  console.log(`  rate book: ${f.rate_book.entries} entries · ${f.rate_book.promotions} promotions · ${f.rate_book.retirements} retirements · ${f.rate_book.quote_accepts} quote accepts · medians: →1st BoQ ${min(f.totals.median_time_to_first_boq_min)} · checking ${min(f.totals.median_checking_min)}`);
+  console.log(`  rate book: ${f.rate_book.entries} entries · ${f.rate_book.edits} edits · ${f.rate_book.promotions} promotions · ${f.rate_book.retirements} retirements · ${f.rate_book.quote_accepts} quote accepts · medians: →1st BoQ ${min(f.totals.median_time_to_first_boq_min)} · checking ${min(f.totals.median_checking_min)}`);
   if (Object.keys(f.totals.corrections.by_section).length) console.log(`  corrections by section: ${types(f.totals.corrections.by_section)}`);
   console.log("  " + H.map((h, i) => cell(h, W[i]!)).join("  "));
   for (const p of f.projects) console.log("  " + row(p));

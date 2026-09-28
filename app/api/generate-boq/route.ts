@@ -7,6 +7,7 @@ import { z } from "zod";
 import { generateDeterministicBoq } from "@/lib/boq/engine";
 import { loadAccessoryOverrides } from "@/lib/accessories/load";
 import { getCaller } from "@/lib/auth/caller";
+import { packJobActor } from "@/lib/documents/pack-export/guard";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
@@ -555,7 +556,9 @@ export async function POST(request: NextRequest) {
     const dryRun = parsedBody.data.dry_run === true;
     // L5: the generation's duration and the signed-in actor ride on the pilot event.
     const startedAt = Date.now();
-    const actor = (await getCaller(request))?.id ?? null;
+    // A pack export regenerates through this route with no session of its own;
+    // the job it belongs to knows who started it.
+    const actor = (await getCaller(request))?.id ?? (await packJobActor(request));
     if (dryRun && process.env.BOQ_ENGINE === "llm") {
       return NextResponse.json(
         { success: false, error: "dry_run is only supported on the deterministic engine path." },

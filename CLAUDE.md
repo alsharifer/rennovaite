@@ -1330,7 +1330,13 @@ resolved line carries **`rate_tier`**.
   for a promotion, clears the correction's `promoted_at` so it is
   re-promotable; no code path deletes a `firm_rate_entries` row (static
   test). **Origin guard**: a promoted or imported rate's figures are locked
-  (409 `entry_locked`; only the note may change). `loadFirmBook` orders
+  (409 `entry_locked`; only the note may change). **A figure edit on a typed
+  entry supersedes too (UV)**: `PATCH` with a changed rate / unit / kind /
+  grade retires the old row (`retire_reason: "edited by a member — was N per
+  unit"`, `superseded_by`), inserts the new one (a new id — the editor
+  reloads) and writes a `rate_book_change` event with `action: "edit"`; a
+  note-only patch stays in place. Editing in place had left the revision
+  diff with no cause and the history with no old figure. `loadFirmBook` orders
   `created_at desc, id`. Trail: `GET /api/firms/:id/rates/history?item_key=`
   (members; actor e-mails resolved for the firm's own eyes) and the editor's
   history row.
@@ -1411,7 +1417,14 @@ its logo. Built on the T5 path, never beside it.
   `detail.stage` stays for old readers), `project_id` nullable (a rate-book
   change is a firm event); kinds gain `boq_viewed`, `support_touch`,
   `rate_book_change`, `approval_recorded`, `basis_accepted`; `pack_exports`
-  gains `actor`. Additive: no row changed by DDL.
+  gains `actor`. Additive: no row changed by DDL. **049** dropped 048's
+  scope check (project OR firm not null): with `firm_id` set null on firm
+  deletion it made any firm with a rate-book event undeletable (UV found
+  it). A firm-level event outlives its firm with both keys null; rollups
+  ignore it. The three document routes (BoQ PDF, proposal, render pack)
+  stamp their `pack_exported` event with the pack job's actor
+  (`packJobActor`, `lib/documents/pack-export/guard.ts`), so a member's
+  Export pack is the firm's release, not "our export".
 - **Writer** `recordPilotEvent(db, projectId | null, kind, detail, opts)`
   (`lib/pilot/events.ts`): **every project records** (the G5 authored-plan
   guard is gone — interior firm projects were invisible), the firm is

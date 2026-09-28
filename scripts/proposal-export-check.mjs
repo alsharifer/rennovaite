@@ -168,7 +168,12 @@ try {
   // The verification job rows this run opened (closed as released-nothing) are this run's too.
   await sb.from("pack_exports").delete().eq("project_id", STAND_IN).contains("options", { purpose: "proposal-export-check" });
   if (created.logo) await sb.storage.from("plan-uploads").remove([created.logo]);
-  if (created.firm) await sb.from("firms").delete().eq("id", created.firm);
+  // L5: the acceptance wrote a basis_accepted event on the stand-in; the scratch firm's rate-book events are firm-level.
+  await sb.from("pilot_events").delete().eq("project_id", STAND_IN).eq("kind", "basis_accepted").gte("recorded_at", new Date(Date.now() - 3600_000).toISOString());
+  if (created.firm) {
+    await sb.from("pilot_events").delete().eq("firm_id", created.firm);
+    await sb.from("firms").delete().eq("id", created.firm);
+  }
   await sb.from("firms").delete().like("name", "L4 check%");
   const { data: after } = await sb.from("projects").select("firm_id, display_name").eq("id", STAND_IN).single();
   const { data: jobsAfter } = await sb.from("pack_exports").select("id").eq("project_id", STAND_IN);
