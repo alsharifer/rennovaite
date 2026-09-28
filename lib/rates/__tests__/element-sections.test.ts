@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { applyElementMapping } from "@/lib/boq/element-map";
@@ -100,6 +103,92 @@ describe("element sections resolve through the firm overlay (viewer flag on)", (
   it("a firm can enter a rate for each element work item", () => {
     for (const key of ["demolition", "wall_plaster", "floor_finish", "wet_tiling", "ceiling_finish", "wall_paint"]) {
       expect(validateEntry({ item_key: key, unit: "m2", rate_aed: 50, kind: "supply_and_install" }), key).toEqual([]);
+    }
+  });
+});
+
+// =============================================================================
+// U7 — the same resolution whether the viewer flag is on or off.
+//
+// Before U7 generate-boq gated the element mapping on VIEWER_3D_ENABLED: with
+// the flag ON the six sections priced through elementPricer (a firm's
+// `wall_plaster` rate applied); with it OFF they were the engine's rule lines
+// (`plaster.make_good`…) and the same rate was silently ignored. A UI flag
+// decided a pricing path. The mapping now runs whenever the plan yields a
+// take-off; the flag gates the viewer and inspect UI only.
+// =============================================================================
+
+const SIX: { key: string; section: string; rate: number }[] = [
+  { key: "demolition", section: "Demolition", rate: 77 },
+  { key: "wall_plaster", section: "Plaster", rate: 41.5 },
+  { key: "floor_finish", section: "Floor Finishes", rate: 150 },
+  { key: "wet_tiling", section: "Wall Finishes", rate: 210 },
+  { key: "ceiling_finish", section: "Ceilings", rate: 99 },
+  { key: "wall_paint", section: "Decoration & Painting", rate: 28 },
+];
+const sixEntries = () => SIX.map((s, i) => entry({ id: `e-${i}`, item_key: s.key, rate_aed: s.rate }));
+// Mudon's fixture take-off does not exercise every work item (no ceiling / wet
+// tiling on the first floor as fixtured); one synthetic element per missing key
+// makes all six sections present, so each is asserted, not skipped.
+const sixTakeoff = () => {
+  const items = mudonTakeoff();
+  const present = new Set(items.map((i) => i.work_item_key));
+  for (const s of SIX) {
+    if (!present.has(s.key as (typeof items)[number]["work_item_key"])) {
+      items.push({ work_item_key: s.key as (typeof items)[number]["work_item_key"], room_id: "room-synthetic", element_id: `el-${s.key}`, qty: 12.5, unit: "m2", wet_area: s.key === "wet_tiling" });
+    }
+  }
+  return items;
+};
+const p4Six = (firm: FirmOverlay | null) => {
+  const boq = mudonEngineBoq();
+  return applyElementMapping(boq, sixTakeoff(), elementPricer(firm, boq.engine.tier));
+};
+const p4Line = (boq: ReturnType<typeof p4>, s: (typeof SIX)[number]) =>
+  boq.sections.find((x) => x.work_section === s.section)!.lines.find((l) => (l as { rule_id?: string }).rule_id === `P4/quantify/${s.key}`) as { rate_aed: number; rate_tier?: string; vendor_or_source: string } | undefined;
+
+describe("element-section resolution across viewer flag states (U7)", () => {
+  const withFlag = <T,>(value: string | undefined, f: () => T): T => {
+    const prev = process.env.VIEWER_3D_ENABLED;
+    if (value === undefined) delete process.env.VIEWER_3D_ENABLED;
+    else process.env.VIEWER_3D_ENABLED = value;
+    try {
+      return f();
+    } finally {
+      if (prev === undefined) delete process.env.VIEWER_3D_ENABLED;
+      else process.env.VIEWER_3D_ENABLED = prev;
+    }
+  };
+  const bytes = (b: ReturnType<typeof p4>) => JSON.stringify({ ...b, engine: { ...b.engine, generated_at: "" } });
+
+  it.each([["true"], ["false"], [undefined]])("VIEWER_3D_ENABLED=%s: every one of the six sections resolves the firm's rate at tier 1", (flag) => {
+    const boq = withFlag(flag, () => p4Six(overlay(sixEntries())));
+    for (const s of SIX) {
+      const line = p4Line(boq, s);
+      expect(line, `${s.section} has its P4 line`).toBeDefined();
+      expect(line, s.key).toMatchObject({ rate_aed: s.rate, rate_tier: "firm_private", vendor_or_source: FIRM_RATE_LABEL });
+    }
+  });
+
+  it("the priced document is byte-identical with the flag on, off and unset", () => {
+    const on = withFlag("true", () => bytes(p4Six(overlay(sixEntries()))));
+    const off = withFlag("false", () => bytes(p4Six(overlay(sixEntries()))));
+    const unset = withFlag(undefined, () => bytes(p4Six(overlay(sixEntries()))));
+    expect(off).toBe(on);
+    expect(unset).toBe(on);
+  });
+
+  it("generate-boq no longer gates the element take-off or mapping on the viewer flag", () => {
+    const src = readFileSync(path.resolve(__dirname, "../../../app/api/generate-boq/route.ts"), "utf8");
+    expect(src).not.toMatch(/process\.env\.VIEWER_3D_ENABLED/);
+    // The mapping is applied unconditionally on both engine and LLM paths.
+    expect((src.match(/applyElementMapping\(/g) ?? []).length).toBe(2);
+    expect(src).toMatch(/takeoffItems = quantifyPlan\(graph, \{ proposed \}\);/);
+  });
+
+  it("the resolver modules read no environment at all", () => {
+    for (const f of ["lib/boq/element-map.ts", "lib/boq/elements.ts", "lib/boq/rates.ts", "lib/rates/firm.ts"]) {
+      expect(readFileSync(path.resolve(__dirname, "../../..", f), "utf8"), f).not.toMatch(/process\.env/);
     }
   });
 });

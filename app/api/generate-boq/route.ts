@@ -744,25 +744,28 @@ export async function POST(request: NextRequest) {
     const chosenStyle = chosenStyleKey ? getStyleByKey(chosenStyleKey) : null;
     const approvedCount = approvedRes.data?.length ?? 0;
 
-    // P4: per-element take-off (ground truth for element↔BoQ mapping). Gated
-    // with the viewer/inspect feature; best-effort. When on, the mapped POMI
-    // sections are rebuilt so their quantities = Σ per-room take-off and their
-    // element_refs are real element ids, and takeoff_items persist for the
-    // per-room views + the tap-to-inspect panel.
-    const p4Enabled = process.env.VIEWER_3D_ENABLED === "true";
+    // P4: per-element take-off (ground truth for element↔BoQ mapping);
+    // best-effort. The mapped POMI sections are rebuilt so their quantities =
+    // Σ per-room take-off and their element_refs are real element ids, and
+    // takeoff_items persist for the per-room views + the tap-to-inspect panel.
+    //
+    // U7: this used to be gated on VIEWER_3D_ENABLED, so the six element
+    // sections priced through the element take-off (a firm's `wall_plaster`
+    // rate applied) with the flag ON and through the engine's rule lines
+    // (`plaster.make_good`; the same firm rate ignored) with it OFF — a UI flag
+    // deciding a pricing path. The mapping now runs whenever the plan yields a
+    // take-off; the viewer flag gates only the viewer and inspect UI.
     let takeoffItems: TakeoffItem[] = [];
-    if (p4Enabled) {
-      try {
-        const graph = await derivePlanGraph(projectId);
-        const proposed = await getProposedGraph(projectId);
-        takeoffItems = quantifyPlan(graph, { proposed });
-        if (!dryRun) await persistTakeoffItems(projectId, takeoffItems, supabaseUntyped);
-      } catch (e) {
-        console.warn(
-          "[api/generate-boq] P4 take-off skipped:",
-          e instanceof Error ? e.message : e,
-        );
-      }
+    try {
+      const graph = await derivePlanGraph(projectId);
+      const proposed = await getProposedGraph(projectId);
+      takeoffItems = quantifyPlan(graph, { proposed });
+      if (!dryRun) await persistTakeoffItems(projectId, takeoffItems, supabaseUntyped);
+    } catch (e) {
+      console.warn(
+        "[api/generate-boq] P4 take-off skipped:",
+        e instanceof Error ? e.message : e,
+      );
     }
 
     // L1: the books behind every rate. The project's firm overlay (tiers 1–2 —

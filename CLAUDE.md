@@ -1186,8 +1186,10 @@ resolved line carries **`rate_tier`**.
   (`lib/boq/rates.ts`), the garden `rate()` / `priceGardenTakeoff`
   (`lib/boq/garden-takeoff.ts`, via `withFirmOverlay`), and — since T3b — the
   six P4 element sections (Demolition, Plaster, Floor / Wall Finishes,
-  Ceilings, Painting), which the viewer flag rebuilds from the element
-  take-off: `elementPricer(firm, tier)` → `applyElementMapping` /
+  Ceilings, Painting), rebuilt from the element take-off **whenever the
+  plan yields one — no longer behind `VIEWER_3D_ENABLED` (U7: the flag had
+  decided a pricing path; with it off a firm's `wall_plaster` rate was
+  ignored)**: `elementPricer(firm, tier)` → `applyElementMapping` /
   `roomRollup`. Firm tiers answer there; otherwise the `WORK_ITEM_DEF`
   constant (byte-identical, `element-mapping.golden.json`). The reference
   book is deliberately NOT consulted for element keys — production
@@ -1655,7 +1657,8 @@ auth-aware redirect.
 
 Placeholders for the seven-feature pilot, added to `.env.local.example` by the
 pre-flight (`PILOT_SEVEN_PREFLIGHT.md`). As wired: `DRAWINGS_ENABLED` (P1),
-`OVERLAYS_ENABLED` (P2), `VIEWER_3D_ENABLED` (P3, also gates P4 inspect),
+`OVERLAYS_ENABLED` (P2), `VIEWER_3D_ENABLED` (P3, also gates the P4 inspect
+UI — since U7 it no longer gates the element take-off / mapping in the BoQ),
 `WHATIF_ENABLED` (P5), `PERMIT_CHECK_ENABLED` (P6, renamed from the reserved
 `COMPLIANCE_ENABLED`), `STAGING_ENABLED` (P7). All default off.
 

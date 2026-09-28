@@ -1,3 +1,30 @@
+# U7 — element-section resolution across viewer flag states (2026-09-28)
+
+- **The bug** (TV only evidenced ON): `generate-boq` gated the P4 element
+  take-off + mapping on `VIEWER_3D_ENABLED`. ON: the six sections
+  (Demolition, Plaster, Floor / Wall Finishes, Ceilings, Painting) were
+  element lines priced through `elementPricer` — a firm's `wall_plaster`
+  entry applied. OFF: the engine's rule lines (`plaster.make_good`,
+  `floor.*`, `paint.full`…) priced through `resolveBase` — the same entry was
+  silently ignored, and only the R-xx keys would have applied. A UI flag
+  decided a pricing path, and production runs with the flag off.
+- **The fix**: the take-off + mapping run whenever the plan yields a
+  take-off (best-effort, as before); `VIEWER_3D_ENABLED` gates the viewer
+  page and the inspect UI only. Consequence to know: an interior project on
+  a flag-off deployment now prices those six sections from the element
+  take-off on its next regeneration (stored BoQs are untouched).
+- **Tests** (`lib/rates/__tests__/element-sections.test.ts`): each of the
+  six sections resolves the firm's rate at tier 1 with the flag `true`,
+  `false` and unset; the priced document is byte-identical across the three;
+  the route no longer references the flag; the resolver modules read no
+  environment. Live: `scripts/element-sections-flag-check.mjs 3098 3097`
+  against two dev servers (`pack` = ON, `pack-off` = OFF) — Mudon dry runs
+  byte-identical on the six sections, and a scratch firm's six rates resolve
+  identically on both.
+- **Vocabulary nuance, not changed here**: the R-xx keys for those sections
+  (`plaster.make_good`…) stay enterable; they price only a plan with no
+  element take-off (no rooms / polygons).
+
 # L5 / U6 — per-firm commercial instrumentation + milestone report (2026-09-28)
 
 - **Migration 048** (per U0 spot-check (b)): `firm_id`, `actor`,
