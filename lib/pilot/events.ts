@@ -1,20 +1,49 @@
 // =============================================================================
-// lib/pilot/events.ts — the garden pilot's instrumentation (G5, migration 037).
+// lib/pilot/events.ts — the pilot's instrumentation (G5 → L5).
 //
-// The pilot is measured, not remembered: time to draw a plan, time to the first
-// FULL BoQ, how often a render passes the faithfulness gate, and every point of
-// friction a designer hits. Events are written best-effort by the routes that
-// cause them — a missing table or a failed insert never costs anyone a save — and
-// only for AUTHORED plans, so an interior project's rows are never touched.
+// The pilot is measured, not remembered: time to a first BoQ, time from the
+// first generation to the export (prep + checking), corrections and where they
+// landed, support touches — PER FIRM (migration 048). Events are written
+// best-effort by the routes and stores that cause them — a failed insert never
+// costs anyone a save — for EVERY project (the G5 "authored plans only" guard is
+// gone: an interior firm project that recorded nothing could not be measured).
 //
-// The metrics themselves are computed from the events by a pure function, so the
-// definitions ("first FULL BoQ" = no counter left untyped and no site-reference
-// item left undecided) are reviewable and tested rather than implied by a query.
+// What a row carries beyond kind + detail (048): the firm (the project's, or
+// the firm itself for a rate-book event), the ACTOR (the signed-in account;
+// null = a script or our own run — the distinction the pilot turns on), the
+// session record, a measured duration, and the stage as a column. Before 048
+// the writer falls back to the old shape for the old kinds and drops the rest —
+// it never throws.
+//
+// The per-project metrics (`computePilotMetrics`) are the G5 definitions,
+// unchanged; the per-firm rollups live in lib/pilot/metrics.ts.
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type PilotEventKind = "plan_started" | "plan_saved" | "design_edit" | "boq_generated" | "pack_exported" | "friction" | "session_decision" | "correction";
+export type PilotEventKind =
+  | "plan_started"
+  | "plan_saved"
+  | "design_edit"
+  | "boq_generated"
+  | "pack_exported"
+  | "friction"
+  | "session_decision"
+  | "correction"
+  // L5 (048)
+  | "boq_viewed"
+  | "support_touch"
+  | "rate_book_change"
+  | "approval_recorded"
+  | "basis_accepted";
+
+/** The kinds the pre-048 CHECK accepts — what the fallback may still write. */
+const LEGACY_KINDS: ReadonlySet<string> = new Set(["plan_started", "plan_saved", "design_edit", "boq_generated", "pack_exported", "friction", "session_decision", "correction"]);
+
+/** Stages that are not the pilot: our verification runs and reference packs. */
+export const NON_PILOT_STAGES: ReadonlySet<string> = new Set(["verification", "reference_pack"]);
+/** Stages where a script drew or edited on the firm's behalf — not the firm's own time. */
+export const SCRIPTED_STAGES: ReadonlySet<string> = new Set(["reference_layout", "design_seed", "geometry_fix", "session_apply"]);
 
 export interface PilotEvent {
   kind: PilotEventKind;
@@ -22,23 +51,56 @@ export interface PilotEvent {
   detail: Record<string, unknown> | null;
 }
 
-/** Record an event for an authored (garden pilot) plan. Never throws. */
+export interface PilotEventOptions {
+  /** The signed-in account that caused it; null = a script / our run. */
+  actor?: string | null;
+  /** The firm; defaults to the project's firm when a project is given. */
+  firmId?: string | null;
+  sessionRef?: string | null;
+  durationMs?: number | null;
+  /** The stage column; defaults to detail.stage. */
+  stage?: string | null;
+}
+
+function isMissingSchema(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "42703" || error.code === "PGRST204" || error.code === "23514" || error.code === "23502" || /does not exist|could not find|violates check constraint|null value in column/i.test(error.message ?? "");
+}
+
+/**
+ * Record an event. `projectId` may be null for a firm-level event (a rate-book
+ * change) when `opts.firmId` is given. Never throws.
+ */
 export async function recordPilotEvent(
   supabase: SupabaseClient,
-  projectId: string,
+  projectId: string | null,
   kind: PilotEventKind,
   detail: Record<string, unknown> = {},
+  opts: PilotEventOptions = {},
 ): Promise<void> {
   try {
-    const { data: plan } = await supabase
-      .from("plans")
-      .select("source")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<{ source: string | null }>();
-    if (plan?.source !== "user_drawn") return;
-    await supabase.from("pilot_events").insert({ project_id: projectId, kind, detail });
+    let firmId = opts.firmId ?? null;
+    if (!firmId && projectId) {
+      const { data } = await supabase.from("projects").select("firm_id").eq("id", projectId).maybeSingle<{ firm_id: string | null }>();
+      firmId = data?.firm_id ?? null;
+    }
+    if (!projectId && !firmId) return;
+    const stage = opts.stage ?? (typeof detail.stage === "string" ? detail.stage : null);
+    const row = {
+      project_id: projectId,
+      kind,
+      detail: stage && detail.stage === undefined ? { ...detail, stage } : detail,
+      firm_id: firmId,
+      actor: opts.actor ?? null,
+      session_ref: opts.sessionRef ?? null,
+      duration_ms: opts.durationMs == null ? null : Math.max(0, Math.round(opts.durationMs)),
+      stage,
+    };
+    const { error } = await supabase.from("pilot_events").insert(row);
+    if (error && isMissingSchema(error) && projectId && LEGACY_KINDS.has(kind)) {
+      // Pre-048 table: the old shape, the old kinds only.
+      await supabase.from("pilot_events").insert({ project_id: projectId, kind, detail: row.detail });
+    }
   } catch {
     /* instrumentation is never allowed to break the thing it measures */
   }
@@ -103,12 +165,12 @@ export function computePilotMetrics(
 ): PilotMetrics {
   // Events a verification script caused (stage "verification") or a reference pack
   // exported for another project to show (stage "reference_pack") are not the pilot.
-  const sorted = [...events].filter((e) => e.detail?.stage !== "verification" && e.detail?.stage !== "reference_pack").sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+  const sorted = [...events].filter((e) => !NON_PILOT_STAGES.has(String(e.detail?.stage ?? ""))).sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
   const started = sorted.find((e) => e.kind === "plan_started") ?? sorted.find((e) => e.kind === "plan_saved" || e.kind === "design_edit");
   const boqs = sorted.filter((e) => e.kind === "boq_generated");
   const full = boqs.find((e) => e.detail?.full === true) ?? null;
   // Script-seeded edits (Step 1 layout, a seeded design proposal) are not the designer drawing.
-  const edits = sorted.filter((e) => (e.kind === "plan_saved" || e.kind === "design_edit") && e.detail?.stage !== "reference_layout" && e.detail?.stage !== "design_seed" && e.detail?.stage !== "geometry_fix" && e.detail?.stage !== "session_apply");
+  const edits = sorted.filter((e) => (e.kind === "plan_saved" || e.kind === "design_edit") && !SCRIPTED_STAGES.has(String(e.detail?.stage ?? "")));
   const lastEditBeforeFull = full ? [...edits].reverse().find((e) => e.recorded_at <= full.recorded_at) : edits[edits.length - 1];
   const session = lastEditBeforeFull ? edits.filter((e) => e.recorded_at <= lastEditBeforeFull.recorded_at) : [];
   let active = 0;

@@ -2,15 +2,22 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { computePilotMetrics, type PilotEvent } from "@/lib/pilot/events";
+import { getCaller } from "@/lib/auth/caller";
+import { computePilotMetrics, recordPilotEvent, type PilotEvent } from "@/lib/pilot/events";
+import { loadFirmEvidence } from "@/lib/pilot/load";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Garden pilot instrumentation (G5). POST logs a friction point from the design
-// session — the list is pilot data, so it is captured where it happens rather
-// than remembered afterwards. GET returns the computed metrics.
+// Pilot instrumentation (G5 → L5).
+//
+//   POST  friction { project_id, note, area? }
+//         session_decision { project_id, kind, record, question, answer, applied? }
+//         support_touch { project_id?, firm_id?, kind, channel, note, resolved? }   (L5)
+//   GET   ?project_id=   the G5 per-project metrics
+//         ?firm_id=      the L5 per-firm rollup (signed in)
+// L5 lifted the GARDEN_PILOT_ENABLED gate: interior firm projects record too.
 
 function db(): SupabaseClient {
   return getSupabaseAdmin() as unknown as SupabaseClient;
@@ -33,30 +40,58 @@ const DecisionSchema = z.object({
   applied: z.string().trim().max(500).optional(),
 });
 
+/** L5: a support touch — a help request, an intervention by us, a reported error. */
+const SupportSchema = z
+  .object({
+    kind: z.literal("support_touch"),
+    project_id: z.string().uuid().nullable().optional(),
+    firm_id: z.string().uuid().nullable().optional(),
+    channel: z.enum(["in_app", "call", "chat", "email", "session", "intervention", "error"]),
+    note: z.string().trim().min(3).max(2000),
+    resolved: z.boolean().optional(),
+    session_ref: z.string().trim().max(200).nullable().optional(),
+  })
+  .refine((b) => !!b.project_id || !!b.firm_id, "project_id or firm_id is required.");
+
 export async function POST(request: NextRequest) {
-  if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const body = await request.json().catch(() => null);
-  if (body && typeof body === "object" && (body as { kind?: unknown }).kind === "session_decision") {
+  const kind = body && typeof body === "object" ? (body as { kind?: unknown }).kind : undefined;
+  const actor = (await getCaller(request))?.id ?? null;
+  if (kind === "session_decision") {
     const d = DecisionSchema.safeParse(body);
     if (!d.success) return NextResponse.json({ error: d.error.message }, { status: 400 });
-    const { project_id: pid, kind, ...detail } = d.data;
-    const { error } = await db().from("pilot_events").insert({ project_id: pid, kind, detail: { ...detail, stage: "design_session" } });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const { project_id: pid, kind: k, ...detail } = d.data;
+    await recordPilotEvent(db(), pid, k, { ...detail, stage: "design_session" }, { actor, sessionRef: d.data.record });
+    return NextResponse.json({ success: true });
+  }
+  if (kind === "support_touch") {
+    const s = SupportSchema.safeParse(body);
+    if (!s.success) return NextResponse.json({ error: s.error.message }, { status: 400 });
+    const { project_id: pid, firm_id, kind: k, session_ref, ...detail } = s.data;
+    await recordPilotEvent(db(), pid ?? null, k, { ...detail, resolved: detail.resolved ?? false }, { actor, firmId: firm_id ?? null, sessionRef: session_ref ?? null });
     return NextResponse.json({ success: true });
   }
   const parsed = FrictionSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   const { project_id, note, area } = parsed.data;
-  const { error } = await db().from("pilot_events").insert({ project_id, kind: "friction", detail: { note, area: area ?? null } });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await recordPilotEvent(db(), project_id, "friction", { note, area: area ?? null }, { actor });
   return NextResponse.json({ success: true });
 }
 
 export async function GET(request: NextRequest) {
-  if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
-  const projectId = new URL(request.url).searchParams.get("project_id");
+  const url = new URL(request.url);
+  const firmId = url.searchParams.get("firm_id");
+  if (firmId) {
+    if (!z.string().uuid().safeParse(firmId).success) return NextResponse.json({ error: "firm_id must be a uuid." }, { status: 400 });
+    if (!(await getCaller(request))) return NextResponse.json({ error: "Sign in to read firm metrics.", code: "unauthenticated" }, { status: 401 });
+    const evidence = await loadFirmEvidence(db(), [firmId]);
+    const firm = evidence.firms[0];
+    if (!firm) return NextResponse.json({ error: "Firm not found." }, { status: 404 });
+    return NextResponse.json({ firm });
+  }
+  const projectId = url.searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
-    return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
+    return NextResponse.json({ error: "project_id (uuid) or firm_id (uuid) required." }, { status: 400 });
   }
   const [events, renders, corrections] = await Promise.all([
     db().from("pilot_events").select("kind, recorded_at, detail").eq("project_id", projectId).order("recorded_at"),

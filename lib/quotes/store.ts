@@ -30,6 +30,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Caller } from "@/lib/auth/caller";
 import { StoreError, ensureBook, requireFirm, touchBook } from "@/lib/firms/store";
+import { recordPilotEvent } from "@/lib/pilot/events";
 import { itemVocabulary, listVocabulary, validateEntry } from "@/lib/firms/vocabulary";
 import type { EntryKind, VocabularyItem } from "@/lib/firms/vocabulary-client";
 import { FIRM_ENTRY_COLUMNS, isMissingSchema, toFirmEntry, type FirmRateEntry } from "@/lib/rates/firm";
@@ -401,6 +402,10 @@ export async function acceptQuote(db: SupabaseClient, firmId: string, quoteId: s
   if (quote.supersedes_quote_id) {
     await db.from("firm_quotes").update({ status: "superseded" }).eq("id", quote.supersedes_quote_id).eq("firm_id", firmId);
   }
-  if (result.accepted > 0) await touchBook(db, firmId);
+  if (result.accepted > 0) {
+    await touchBook(db, firmId);
+    // L5: an accepted quotation is a rate-book change (one event, the counts inside).
+    await recordPilotEvent(db, null, "rate_book_change", { action: "quote_accept", quote_id: quote.id, accepted: result.accepted, superseded: result.superseded, held: result.held }, { actor: caller?.id ?? null, firmId });
+  }
   return result;
 }

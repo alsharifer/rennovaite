@@ -20,6 +20,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Caller } from "@/lib/auth/caller";
 import { StoreError, requireFirm } from "@/lib/firms/store";
+import { recordPilotEvent } from "@/lib/pilot/events";
 import { isMissingSchema } from "@/lib/rates/firm";
 
 import { approvalLabel, type ApprovalKind, type BoqApproval } from "./approval-label";
@@ -107,7 +108,10 @@ export async function recordApproval(db: SupabaseClient, projectId: string, inpu
     if (isMissingSchema(error)) throw new StoreError(500, "approvals_unavailable", "The approvals table has not been migrated yet (046).");
     throw new Error(`boq_approvals insert failed: ${error.message}`);
   }
-  return toApproval(data as Record<string, unknown>);
+  const approval = toApproval(data as Record<string, unknown>);
+  // L5: an approval is a pilot milestone (firm and actor on the event, 048).
+  await recordPilotEvent(db, projectId, "approval_recorded", { approval_id: approval.id, boq_id: approval.boq_id, kind: approval.kind, client_date: approval.client_date }, { actor: caller.id, firmId: project.firm_id });
+  return approval;
 }
 
 export interface RevisionApprovalStatus {

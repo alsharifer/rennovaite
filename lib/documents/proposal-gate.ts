@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Caller } from "@/lib/auth/caller";
 import { loadFirmBranding, type FirmBranding } from "@/lib/firms/branding";
 import { StoreError, requireFirm } from "@/lib/firms/store";
+import { recordPilotEvent } from "@/lib/pilot/events";
 import { isMissingSchema } from "@/lib/rates/firm";
 
 import { boqPricingFingerprint, proposalGateVerdict, referenceBasisOf } from "./reference-basis";
@@ -118,5 +119,8 @@ export async function acceptReferenceBasis(db: SupabaseClient, projectId: string
     if (isMissingSchema(error)) throw new StoreError(500, "acceptances_unavailable", "Reference-basis acceptance needs migration 047.");
     throw new Error(`reference_basis_acceptances insert failed: ${error.message}`);
   }
-  return toAcceptance(data as Record<string, unknown>);
+  const acceptance = toAcceptance(data as Record<string, unknown>);
+  // L5: the stated choice is a pilot milestone too (048).
+  await recordPilotEvent(db, projectId, "basis_accepted", { acceptance_id: acceptance.id, boq_id: acceptance.boq_id, reference_lines: acceptance.reference_lines }, { actor: caller.id, firmId: proj.firm_id });
+  return acceptance;
 }

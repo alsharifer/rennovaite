@@ -284,6 +284,12 @@
       "version": "20260101004700",
       "name": "firm_branding_reference_basis",
       "sha256": "c47d3d27a760599867057dd1aa2ed783bd7539bcbab1929b30e940e1f728c08c"
+    },
+    {
+      "legacy": null,
+      "version": "20260101004800",
+      "name": "pilot_events_commercial",
+      "sha256": "38dd189d98992b10d9df832bc346bb56db16b0f5eda9a110f92343b4838625ff"
     }
   ]
 }
