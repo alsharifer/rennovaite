@@ -1401,6 +1401,56 @@ its logo. Built on the T5 path, never beside it.
   acceptance, the document's printed content, the full pack with the
   proposal; scratch state only, restored.
 
+## Per-firm commercial instrumentation + milestone report (L5 / U6)
+
+- **Schema (migration 048)**: `pilot_events` gains `firm_id`, `actor`
+  (the signed-in account; null = a script or our own run — the distinction
+  the pilot turns on), `session_ref`, `duration_ms`, `stage` (a column now;
+  `detail.stage` stays for old readers), `project_id` nullable (a rate-book
+  change is a firm event); kinds gain `boq_viewed`, `support_touch`,
+  `rate_book_change`, `approval_recorded`, `basis_accepted`; `pack_exports`
+  gains `actor`. Additive: no row changed by DDL.
+- **Writer** `recordPilotEvent(db, projectId | null, kind, detail, opts)`
+  (`lib/pilot/events.ts`): **every project records** (the G5 authored-plan
+  guard is gone — interior firm projects were invisible), the firm is
+  resolved from the project unless given, and a pre-048 table gets the old
+  shape for the old kinds. Writers now pass the actor: generate-boq (+ the
+  generation's duration; interior BoQs are `full` by construction),
+  corrections (+ firm + session), the pilot-events route (friction, session
+  decisions, **support touches** — `POST {kind:"support_touch", channel,
+  note}`; the GARDEN_PILOT gate is lifted), approvals, basis acceptances, the
+  firm store (entry / promote / retire) and quote accept (`rate_book_change`
+  on the FIRM, no project), the BoQ page (`boq_viewed`, one per actor per
+  10 min — `lib/pilot/views.ts`), pack-export POST (`pack_exports.actor`).
+  `components/app/SupportTouch.tsx` ("Ask for help") sits on the BoQ page.
+- **Metrics** `lib/pilot/metrics.ts` (pure): per project — time to first
+  BoQ (project start → first pilot-stage generation), time to first FULL
+  BoQ, **checking time** (first generation → first release: a passed app
+  pack, or a BoQ PDF / proposal handed over), corrections by type, by POMI
+  section (`sectionOfItem` over the garden + interior vocabularies) and
+  **where they landed** (promoted into the book vs left on the project),
+  support touches by channel, reviews (`boq_viewed`, distinct actors),
+  approvals / acceptances, packs; per firm — its projects (by
+  `projects.firm_id` OR the single firm its corrections name), sums, medians,
+  rate-book changes, and **gaps in words** (no actor, no release, no firm,
+  scripted release). Not the pilot: stages `verification`, `reference_pack`.
+  `GET /api/pilot-events?firm_id=` (signed in) returns the rollup;
+  `?project_id=` keeps the G5 per-project metrics.
+- **Report** `scripts/three-firms-report.ts [--json] [--firm <id>]` prints
+  the evidence table per firm / project with the gaps beside the numbers;
+  projects with events and no firm are listed, never dropped.
+- **Backfill** `scripts/backfill-pilot-events.ts [--apply]`
+  (`lib/pilot/backfill.ts`, pure, idempotent): recovers `stage` from
+  detail, firm + session from a correction or a session record, firm from
+  `projects.firm_id`. **Cannot recover, and prints so**: actor (no route
+  knew the caller before 043; every pre-048 row stays null — the firm's own
+  time is not separable from a script's or ours), durations, reviews /
+  support / rate-book history, a firm for scripted events, and
+  `projects.firm_id` for Arabella (a pricing + identity decision). Applied
+  on dev 2026-09-28: 288 of 311 rows patched, 0 on the second run.
+- **Checks**: `scripts/pilot-events-check.mjs [port]` (writers + rollup on
+  scratch state).
+
 ## Figures + number provenance, identity curation (I4)
 
 - **One formatter, one component.** `lib/format/aed.ts` (`formatAed(n, format)`:

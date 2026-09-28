@@ -1,3 +1,34 @@
+# L5 / U6 — per-firm commercial instrumentation + milestone report (2026-09-28)
+
+- **Migration 048** (per U0 spot-check (b)): `firm_id`, `actor`,
+  `session_ref`, `duration_ms`, `stage` on `pilot_events`; `project_id`
+  nullable; kinds + `boq_viewed`, `support_touch`, `rate_book_change`,
+  `approval_recorded`, `basis_accepted`; `pack_exports.actor`. The
+  `user_drawn` guard is lifted: interior projects record.
+- **Metrics per firm / project** (`lib/pilot/metrics.ts`): time to first BoQ,
+  time to first full BoQ, checking time (first generation → first release),
+  corrections by type / section / landing (book vs project), support touches,
+  reviews, approvals / acceptances — with the gaps printed beside the numbers.
+  Firm attribution: `projects.firm_id`, else the single firm a project's
+  corrections name (Arabella → Newspace).
+- **Report** `scripts/three-firms-report.ts` — the three-firms evidence table.
+  On dev today it is one firm (Newspace) with one attributed project; the
+  other two firms have no rows yet.
+- **Backfill, honestly** (`scripts/backfill-pilot-events.ts`, applied on dev:
+  288 / 311 rows): `stage` recovered for 288 rows, firm + session for the 3
+  corrections and 4 decisions of the Arabella session. **Cannot**: actor on
+  all 311 (pre-043 nothing knew the caller; the firm's own time is not
+  separable from a script's or ours), durations, reviews / support /
+  rate-book history (the kinds did not exist), a firm for scripted events,
+  Arabella's `projects.firm_id` (a pricing + identity decision, not a repair).
+  So Newspace's "checking time" of 14 min is our draft-pack pipeline, and
+  the report says so.
+- **Closed from L4**: tiers 1–2 are the firm's own basis, the banner from
+  tier 3 down — confirmed 2026-09-28.
+- **Verified**: unit (metrics, backfill planner, writer fallback);
+  `scripts/pilot-events-check.mjs` live; tsc + eslint clean. Migration 048 on
+  dev; prod after merge on instruction.
+
 # L4 — client-ready proposal export with the reference-basis gate (2026-09-27)
 
 - **Built on T5, not beside it**: `GET /api/projects/:id/proposal` is a
@@ -27,7 +58,7 @@
 - **Judgement call**: tier 2 (`firm_correction` — the firm's own promoted
   correction) counts as the FIRM's basis, not the market's; the banner text
   says "market reference" and a promoted correction is the firm's reviewed
-  figure. Say if U0 meant otherwise.
+  figure. Confirmed by the user 2026-09-28.
 - **Scanner fix found by the tests**: `findWithheldIdentities` / `curateText`
   used `\b` around a name, so "X & Co." (entity-encoded "&amp;" in SVG, "."
   before "<") was never found on a printed page. Entities are decoded and the

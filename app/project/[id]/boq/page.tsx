@@ -41,6 +41,9 @@ import { GenerateBoqButton } from "./_components/generate-boq-button";
 import { ReferenceBasisNotice } from "./_components/reference-basis-notice";
 import { ReviewCorrections } from "./_components/review-corrections";
 import { loadProposalGate, type ProposalGate } from "@/lib/documents/proposal-gate";
+import { SupportTouch } from "@/components/app/SupportTouch";
+import { getCaller } from "@/lib/auth/caller";
+import { recordBoqView } from "@/lib/pilot/views";
 
 export const dynamic = "force-dynamic";
 
@@ -187,6 +190,9 @@ export default async function BoqPage({
     } catch {
       /* the BoQ page never fails on the gate */
     }
+    // L5: a signed-in view of the BoQ is the checking signal (deduped per actor per 10 min).
+    const viewer = await getCaller();
+    if (viewer && latestBoq) await recordBoqView(sb, id, latestBoq.id, viewer.id);
   }
 
   const lineCount =
@@ -353,6 +359,12 @@ export default async function BoqPage({
               </span>
               Revision history &amp; approvals
             </a>
+          )}
+          {/* L5 — a support touch is pilot data, captured where checking happens. */}
+          {latestBoq && (
+            <span className="ml-sm mt-lg inline-block align-top">
+              <SupportTouch projectId={id} area="boq" />
+            </span>
           )}
         </header>
 

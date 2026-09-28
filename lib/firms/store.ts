@@ -34,6 +34,8 @@ import {
 } from "@/lib/rates/firm";
 import type { RateGrade } from "@/lib/rates/reference";
 
+import { recordPilotEvent } from "@/lib/pilot/events";
+
 import { itemVocabulary, validateEntry } from "./vocabulary";
 
 export class StoreError extends Error {
@@ -391,6 +393,8 @@ export async function createEntry(db: SupabaseClient, firmId: string, input: Ent
   await requireFirm(db, firmId, caller);
   const entry = await insertEntry(db, firmId, { ...input, origin: "firm_entry", created_by: caller!.id });
   await touchBook(db, firmId);
+  // L5: a rate-book change is a firm event (no project).
+  await recordPilotEvent(db, null, "rate_book_change", { action: "entry", item_key: entry.item_key, grade: entry.grade, entry_id: entry.id }, { actor: caller!.id, firmId });
   return entry;
 }
 
@@ -521,6 +525,7 @@ export async function deleteEntry(db: SupabaseClient, firmId: string, entryId: s
     if (cerr) fail(cerr, "release correction");
   }
   await touchBook(db, firmId);
+  await recordPilotEvent(db, null, "rate_book_change", { action: "retire", item_key: current.item_key, grade: current.grade, entry_id: entryId, origin: current.origin }, { actor: caller!.id, firmId });
 }
 
 // --- Promotion ---------------------------------------------------------------
@@ -616,6 +621,8 @@ export async function promoteCorrection(
   }
   const out = rpc.data as { entry_id: string; superseded_entry_id: string | null };
   const entry = await readEntry(db, firmId, out.entry_id);
+  // L5: a promotion is where a correction LANDS in the book — the event names both.
+  await recordPilotEvent(db, null, "rate_book_change", { action: "promote", item_key: entry.item_key, grade: entry.grade, entry_id: entry.id, correction_id: c.id, superseded_entry_id: out.superseded_entry_id ?? null }, { actor: caller!.id, firmId });
   return { entry, correction_id: c.id, superseded_entry_id: out.superseded_entry_id ?? null };
 }
 

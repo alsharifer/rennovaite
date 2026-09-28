@@ -31,6 +31,12 @@ on every route._
   the project has no firm; 401/404/403 as everywhere); `GET …/reference-basis`
   requires a signed-in caller. `GET /api/projects/:id/proposal` is a document
   route behind the pack-job guard (T5), not behind user auth.
+- **L5 adds** (2026-09-28): `GET /api/pilot-events?firm_id=` requires a
+  signed-in caller (401); `POST /api/pilot-events` (friction, decisions,
+  support touches) stays open but records the caller as `actor` when there is
+  one; the BoQ page records `boq_viewed` only for a signed-in viewer. Every
+  event writer stores the actor it knows; a null actor means a script or our
+  own run — the pilot's metrics say so.
 - **Answers, in this order** (`lib/firms/store.ts → requireFirm`):
 
   | | code | when |

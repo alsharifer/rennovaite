@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { generateDeterministicBoq } from "@/lib/boq/engine";
 import { loadAccessoryOverrides } from "@/lib/accessories/load";
+import { getCaller } from "@/lib/auth/caller";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
@@ -552,6 +553,9 @@ export async function POST(request: NextRequest) {
     }
     const projectId = parsedBody.data.project_id;
     const dryRun = parsedBody.data.dry_run === true;
+    // L5: the generation's duration and the signed-in actor ride on the pilot event.
+    const startedAt = Date.now();
+    const actor = (await getCaller(request))?.id ?? null;
     if (dryRun && process.env.BOQ_ENGINE === "llm") {
       return NextResponse.json(
         { success: false, error: "dry_run is only supported on the deterministic engine path." },
@@ -857,7 +861,7 @@ export async function POST(request: NextRequest) {
       console.log(
         `[api/generate-boq] deterministic engine project=${projectId} grand_total=AED ${boq.grand_total_aed}`,
       );
-      await recordBoqEvent(supabaseUntyped, projectId, inserted.id, boq);
+      await recordBoqEvent(supabaseUntyped, projectId, inserted.id, boq, { startedAt, actor });
       return NextResponse.json({
         success: true,
         boq_id: inserted.id,
@@ -1004,23 +1008,31 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
 /**
  * G5 instrumentation: a BoQ is FULL when no counter is left untyped and no
  * site-reference item is left undecided — the first one is "time to first full
- * BoQ". Authored plans only (recordPilotEvent checks), never throws.
+ * BoQ". L5: every project records (an interior BoQ has no garden gates and is
+ * full by construction), with the generation's duration and the actor. Never throws.
  */
 async function recordBoqEvent(
   supabase: SupabaseClient,
   projectId: string,
   boqId: string,
   boq: { grand_total_aed: number; garden?: { needs_selection: string[]; undecided: unknown[]; draft: { draft: boolean }; derived_lines: number } },
+  opts: { startedAt: number; actor: string | null },
 ): Promise<void> {
   const g = boq.garden;
-  if (!g) return;
-  await recordPilotEvent(supabase, projectId, "boq_generated", {
-    boq_id: boqId,
-    grand_total_aed: boq.grand_total_aed,
-    full: g.needs_selection.length === 0 && g.undecided.length === 0,
-    needs_selection: g.needs_selection.length,
-    undecided: g.undecided.length,
-    draft: g.draft.draft,
-    derived_lines: g.derived_lines,
-  });
+  await recordPilotEvent(
+    supabase,
+    projectId,
+    "boq_generated",
+    {
+      boq_id: boqId,
+      grand_total_aed: boq.grand_total_aed,
+      full: g ? g.needs_selection.length === 0 && g.undecided.length === 0 : true,
+      needs_selection: g?.needs_selection.length ?? 0,
+      undecided: g?.undecided.length ?? 0,
+      draft: g?.draft.draft ?? false,
+      derived_lines: g?.derived_lines ?? 0,
+      scope: g ? "garden" : "interior",
+    },
+    { actor: opts.actor, durationMs: Date.now() - opts.startedAt },
+  );
 }

@@ -2,6 +2,7 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller } from "@/lib/auth/caller";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { createPackJob, finishPackJob, latestPackJobs, progressWriter, storageSink } from "@/lib/documents/pack-export/job";
 import { preflightChecklist } from "@/lib/documents/pack-export/preflight";
@@ -72,6 +73,9 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     proposal: parsed.data.proposal ?? false,
   };
   const job = await createPackJob(db, projectId, "app", options);
+  // L5 (048): who started it — the firm's own export, or ours. Best-effort.
+  const actor = (await getCaller(request))?.id ?? null;
+  if (actor) await db.from("pack_exports").update({ actor }).eq("id", job.id).then(() => undefined, () => undefined);
   const origin = new URL(request.url).origin;
 
   after(async () => {

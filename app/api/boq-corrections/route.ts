@@ -86,11 +86,19 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // G5d: every correction is also a pilot event, so the metrics read corrections by
   // type per session record. A session-captured one is real session data.
-  await recordPilotEvent(db(), b.project_id, "correction", {
-    correction_type: b.correction_type,
-    ...(b.session_ref ? { record: b.session_ref, stage: "design_session" } : {}),
-    correction_id: (data as { id: string }).id,
-  });
+  // L5: the firm, the actor and the session ride on the event itself (048).
+  await recordPilotEvent(
+    db(),
+    b.project_id,
+    "correction",
+    {
+      correction_type: b.correction_type,
+      item_key: b.item_key ?? null,
+      ...(b.session_ref ? { record: b.session_ref, stage: "design_session" } : {}),
+      correction_id: (data as { id: string }).id,
+    },
+    { actor: (await getCaller(request))?.id ?? null, firmId, sessionRef: b.session_ref ?? null },
+  );
   return NextResponse.json({ correction: data });
 }
 
