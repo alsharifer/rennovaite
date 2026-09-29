@@ -314,7 +314,8 @@ unchanged.
 ## Overlays — electrical + plumbing (P2)
 
 Point-based electrical + plumbing layers on the 2D plan whose **counts** feed
-two new BoQ sections deterministically. Gated by `OVERLAYS_ENABLED`.
+two new BoQ sections deterministically. `OVERLAYS_ENABLED` gates the overlay
+UI, rule seeding and the services sheets — since H3, NOT the BoQ feed.
 
 - **Fixtures** live in `plan_fixtures` (migration `015`): `layer`
   (electrical|plumbing), `type`, `room_id`, `position` ([x,y] in **normalised**
@@ -331,7 +332,7 @@ two new BoQ sections deterministically. Gated by `OVERLAYS_ENABLED`.
   `/api/plan-fixtures`, always `source: 'user'`). Flag off → no toggle, plan
   unchanged.
 - **BoQ feed** (`lib/overlays/boq.ts` + `boq-feed.ts`): `appendOverlaySections`
-  adds **"Electrical Installations"** + **"Plumbing & Sanitary"** POMI sections
+  (unconditional since H3 — a flag-off deploy used to drop both sections) adds **"Electrical Installations"** + **"Plumbing & Sanitary"** POMI sections
   to the generated BoQ (both engine + LLM paths) with quantities = fixture
   counts (never the LLM). Each line records `element_refs` (fixture ids) and
   `rate_status`; where the catalog has no default point rate the line is
@@ -1581,6 +1582,39 @@ display-name check, outputs not saved together. There is now ONE path.
 **DB step**: `npm run db:manifest` + `npm run db:push` for
 `20260101004200_pack_exports.sql` (the `pack_exports` table and the private
 `packs` bucket).
+
+## Pricing never depends on a flag (H3)
+
+For a fixed project state no combination of feature flags changes a BoQ.
+Flags gate UI; they do not price. U7 took the viewer flag out of the element
+sections; H3 took `OVERLAYS_ENABLED` out of the P2 overlay feed — a flag-off
+deployment had silently dropped Electrical Installations and Plumbing &
+Sanitary from every BoQ with fixtures (Mudon: ~AED 8,380 + ~6,440).
+
+- **One assembly**: `lib/boq/assemble.ts` — `loadBoqInputs` (both engine
+  paths) + `priceDeterministicBoq`, moved out of the route verbatim. The route,
+  the invariance test and read-only scripts all price through it.
+- **Invariance test** `lib/boq/__tests__/flag-invariance.test.ts`: a static
+  proof (the runtime import graph of `assemble.ts` reads no feature flag; the
+  flag list must cover every `*_ENABLED`-style env the app reads; KG grounding
+  stays on the legacy LLM path) plus all 2^12 flag combinations over a fixed
+  Mudon state with fixtures → one BoQ, Electrical + Plumbing priced. A new flag
+  read anywhere in the pricing graph fails the suite. `BOQ_ENGINE` is an engine
+  selector, not a feature flag.
+- **Measured, read-only**: `scripts/boq-dry-run-diff.ts <project> [--boq id]`
+  regenerates IN-PROCESS under current code (no server, no session, nothing
+  written — a degraded assembly voids the run) and diffs against a stored
+  revision: price moves line by line (revision-diff identity) + every
+  non-price field change. Needs `node --experimental-transform-types --import
+  ./scripts/_alias-hook.mjs` (`lib/boq/rates.ts` uses a parameter property).
+  Prod Mudon, 5 Sep BoQ (AED 723,282) → **738,529 (+15,247)**: the only price
+  movement is the four S6-pre lines added on 8 Sep (`4383c34`: cove LED supply
+  2,745 · vanity counter slab 4,350 · frameless shower glass 4,400 · bathroom
+  mirrors 1,950 = subtotal +13,445, then contingency + VAT). Everything else is
+  additive or text: `item_key` / `rate_tier` added, rule ids on the 15
+  joinery/aluminium lines (identity only — quantities, rates and totals equal),
+  supplier names emitted as role labels at source. Electrical + Plumbing
+  unchanged.
 
 ## Route auth — a session everywhere (H1)
 
