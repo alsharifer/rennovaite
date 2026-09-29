@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { forwardableAuthorization, getCaller, unauthenticated } from "@/lib/auth/caller";
+import { regenerateAuthority } from "@/lib/boq/regenerate";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { createPackJob, finishPackJob, latestPackJobs, progressWriter, storageSink } from "@/lib/documents/pack-export/job";
 import { preflightChecklist } from "@/lib/documents/pack-export/preflight";
@@ -69,6 +70,11 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   const authorization = await forwardableAuthorization(request, maxDuration + 300);
   if (!authorization) return unauthenticated("Sign in again to export — the session could not be carried to the export job.");
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
+  // H4: the export regenerates the BoQ, which is the project's firm's act —
+  // refuse up front with the same answer the route and the page give, rather
+  // than failing inside the job.
+  const block = await regenerateAuthority(db, projectId, caller);
+  if (block) return NextResponse.json({ success: false, error: block.reason, code: block.code }, { status: block.code === "project_not_found" ? 404 : 403 });
 
   // The client-facing name is part of the gate: set it here, the run checks it.
   if (parsed.data.display_name !== undefined) {

@@ -9,6 +9,7 @@ import { PACK_JOB_HEADER, packJobActor } from "@/lib/documents/pack-export/guard
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { applyElementMapping } from "@/lib/boq/element-map";
 import { loadBoqInputs, priceDeterministicBoq, type LabourRateRow, type PricingSkuRow } from "@/lib/boq/assemble";
+import { regenerateAuthority } from "@/lib/boq/regenerate";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
 import { elementPricer } from "@/lib/boq/rates";
@@ -33,6 +34,8 @@ const BodySchema = z.object({
    * adding a BoQ (or a "time to first BoQ" event) to it. Engine path only.
    */
   dry_run: z.boolean().optional(),
+  /** H4: what asked for this revision — "regenerate" is the BoQ page's control. Recorded on the event. */
+  trigger: z.enum(["regenerate"]).optional(),
 });
 
 const POMI_SECTIONS = [
@@ -531,6 +534,15 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
 
+    // H4: storing a revision is the project's firm's act — its members on a firm
+    // project, anyone signed in otherwise (lib/boq/regenerate.ts; the page's
+    // Regenerate control reads the same answer). Checked before anything is
+    // loaded or persisted. A dry run stores nothing and is not gated.
+    if (!dryRun) {
+      const block = await regenerateAuthority(supabase, projectId, caller);
+      if (block) return NextResponse.json({ success: false, error: block.reason, code: block.code }, { status: block.code === "project_not_found" ? 404 : 403 });
+    }
+
     // 1. Everything the BoQ is priced from (lib/boq/assemble.ts — shared with
     // the flag-invariance test and the read-only dry-run scripts). A refusal
     // (no plan, overlapping rooms, empty rate tables…) is answered as-is.
@@ -550,6 +562,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq: curateBoq(boq, await loadWithheldNames(supabase, projectId)) });
       }
 
+      // H4: the revision this one supersedes — the "from" of its diff.
+      const { data: previous } = await supabase
+        .from("boqs")
+        .select("id, total_aed")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<{ id: string; total_aed: number }>();
       const { data: inserted, error: insertErr } = await supabase
         .from("boqs")
         .insert({
@@ -566,11 +586,13 @@ export async function POST(request: NextRequest) {
       console.log(
         `[api/generate-boq] deterministic engine project=${projectId} grand_total=AED ${boq.grand_total_aed}`,
       );
-      await recordBoqEvent(supabase, projectId, inserted.id, boq, { startedAt, actor });
+      await recordBoqEvent(supabase, projectId, inserted.id, boq, { startedAt, actor, previousBoqId: previous?.id ?? null, trigger: parsedBody.data.trigger ?? null });
       return NextResponse.json({
         success: true,
         boq_id: inserted.id,
         grand_total_aed: boq.grand_total_aed,
+        previous_boq_id: previous?.id ?? null,
+        previous_total_aed: previous ? Number(previous.total_aed) : null,
       });
     }
 
@@ -721,7 +743,7 @@ async function recordBoqEvent(
   projectId: string,
   boqId: string,
   boq: { grand_total_aed: number; garden?: { needs_selection: string[]; undecided: unknown[]; draft: { draft: boolean }; derived_lines: number } },
-  opts: { startedAt: number; actor: string | null },
+  opts: { startedAt: number; actor: string | null; previousBoqId?: string | null; trigger?: string | null },
 ): Promise<void> {
   const g = boq.garden;
   await recordPilotEvent(
@@ -730,6 +752,9 @@ async function recordBoqEvent(
     "boq_generated",
     {
       boq_id: boqId,
+      // H4: the revision it supersedes (the diff's "from") and what asked for it.
+      previous_boq_id: opts.previousBoqId ?? null,
+      ...(opts.trigger ? { trigger: opts.trigger } : {}),
       grand_total_aed: boq.grand_total_aed,
       full: g ? g.needs_selection.length === 0 && g.undecided.length === 0 : true,
       needs_selection: g?.needs_selection.length ?? 0,

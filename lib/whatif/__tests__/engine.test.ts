@@ -47,6 +47,25 @@ describe("what-if recalc — Mudon", () => {
     expect(r.changedItemKeys).toHaveLength(0);
   });
 
+  it("H4: a firm-priced BoQ with no grade chosen shows its OWN total — unselected lines keep the rate they were priced at", () => {
+    // The walkthrough's firm prices plaster at 41.5 (tier 1), not the rate-book 55.
+    const firm: ScenarioBoq = {
+      ...MUDON,
+      sections: MUDON.sections.map((s) =>
+        s.work_section === "Plaster" ? { ...s, lines: [{ ...s.lines[0]!, rate_aed: 41.5, total_aed: 18647.61 }] } : s,
+      ),
+    };
+    const r = recalc(firm, rb, {});
+    expect(r.delta).toBe(0);
+    expect(r.total).toBe(firm.grand_total_aed);
+    expect(r.changedItemKeys).toEqual([]);
+    expect(r.perChange.find((c) => c.item_key === "wall_plaster")).toMatchObject({ baseline_rate: 41.5, new_rate: 41.5, delta: 0 });
+    // Choosing a grade still re-prices exactly that line from the firm's rate.
+    const std = recalc(firm, rb, { wall_plaster: "standard" });
+    expect(std.delta).toBeCloseTo((GRADE_SPECS.wall_plaster.standard.rate_aed - 41.5) * 449.34, 2);
+    expect(std.changedItemKeys).toEqual(["wall_plaster"]);
+  });
+
   it("only rates swap — quantities never change; unmapped lines never move", () => {
     const r = recalc(MUDON, rb, { floor_finish: "economy", wet_tiling: "premium" });
     const floor = r.perChange.find((c) => c.item_key === "floor_finish")!;

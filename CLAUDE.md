@@ -1616,6 +1616,39 @@ Sanitary from every BoQ with fixtures (Mudon: ~AED 8,380 + ~6,440).
   supplier names emitted as role labels at source. Electrical + Plumbing
   unchanged.
 
+## Regenerate from the BoQ page (H4)
+
+The payoff loop: change a rate or the plan → **Regenerate BoQ** → the new
+revision's figure and a link to the U4 diff against the revision it superseded
+(`/project/:id/boq/revisions?from=<previous>&to=<new>`).
+
+- **Who** (`lib/boq/regenerate.ts`, ONE answer for route, pack export and page):
+  a firm's project is its members' to regenerate (`requireFirm`: 401/404/403);
+  a project with no firm, any signed-in account — the approvals rule. H5 adds the
+  project owner. `generate-boq` enforces it on every STORING run, before
+  anything is loaded or persisted (a `dry_run` stores nothing and is not
+  gated); in-app Export pack refuses up front with the same answer, since it
+  regenerates inside its job.
+- **Disabled with a reason**: `regenerateReadiness` = authority + the plan
+  refusals generation would answer with (`loadPriceablePlan` in
+  `lib/boq/assemble.ts`: no plan / no area / no rooms / overlapping rooms), each
+  with its fix link. The page passes the server's answer to the control
+  (`RegenerateBoq`), so a grey button never disagrees with the route.
+- **Recorded**: the `boq_generated` event carries the actor, `trigger:
+  "regenerate"` and `previous_boq_id`; the response carries
+  `previous_boq_id` / `previous_total_aed`, so the diff link is the server's own
+  record of what it superseded.
+- **What-if baseline fix (found by the walkthrough)**: `recalc` priced every
+  UNSELECTED gradeable line at the rate-book "standard", so a firm-priced BoQ's
+  page headline and summary showed reference-priced totals (the walkthrough
+  villa: 498,824 on the page vs 477,495 stored) and a regenerated firm-rate
+  change could never move them. An unselected line now keeps the rate it was
+  priced at; only a chosen grade re-prices. The headline carries
+  `data-display-total`.
+- **Live**: the onboarding walkthrough's step 6 now edits a rate, presses
+  Regenerate, checks progress, the stored revision, the page total, the event
+  and the exact diff link, then follows it (`screenshots/h4/`).
+
 ## Route auth — a session everywhere (H1)
 
 Every API route and every app page needs a signed-in caller, except the ONE

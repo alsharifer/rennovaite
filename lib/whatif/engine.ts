@@ -148,10 +148,16 @@ export function recalc(
   const changed: GradeableItem[] = [];
 
   for (const { item_key, work_section, line } of gradeableLines(boq)) {
-    const grade: Grade = selections[item_key] ?? BASELINE_GRADE;
+    const chosen = selections[item_key];
+    const grade: Grade = chosen ?? BASELINE_GRADE;
     const entry = rateBook[item_key][grade];
-    const lineDelta = round2((entry.rate_aed - line.rate_aed) * line.quantity);
-    if (grade !== BASELINE_GRADE) changed.push(item_key);
+    // H4: a line nobody has re-graded keeps the rate it was PRICED at. Since
+    // firm tiers reach the element lines (L1/T3b/U7) that rate may be a firm's
+    // own, not the rate-book standard — snapping unselected lines to "standard"
+    // silently re-priced every firm BoQ on the page at reference rates, and a
+    // regenerated firm-rate change could never move the headline.
+    const lineDelta = chosen ? round2((entry.rate_aed - line.rate_aed) * line.quantity) : 0;
+    if (chosen && (chosen !== BASELINE_GRADE || lineDelta !== 0)) changed.push(item_key);
     delta = round2(delta + lineDelta);
     perChange.push({
       item_key,
@@ -161,7 +167,7 @@ export function recalc(
       unit: "m²",
       baseline_rate: line.rate_aed,
       grade,
-      new_rate: entry.rate_aed,
+      new_rate: chosen ? entry.rate_aed : line.rate_aed,
       delta: lineDelta,
       qs_validated: entry.qs_validated,
       source: entry.source,

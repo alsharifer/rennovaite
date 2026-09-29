@@ -39,6 +39,11 @@ session still does not entitle._
   a signed-in caller like every route); the BoQ page records `boq_viewed` only for a signed-in viewer. Every
   event writer stores the actor it knows; a null actor means a script or our
   own run — the pilot's metrics say so.
+- **H4 adds** (2026-09-30): storing a BoQ revision (`POST /api/generate-boq`
+  without `dry_run`) and starting an in-app Export pack need the regenerate
+  authority (`lib/boq/regenerate.ts`): a MEMBER of the project's firm when it
+  has one (403 `not_a_member`), any signed-in account otherwise. A dry run is
+  not gated. The BoQ page's Regenerate control is disabled with the same reason.
 - **Answers, in this order** (`lib/firms/store.ts → requireFirm`):
 
   | | code | when |

@@ -108,10 +108,16 @@ export type LoadedBoqInputs = { inputs: BoqInputs; refusal?: never } | { inputs?
 
 const refuse = (status: number, body: Record<string, unknown>): LoadedBoqInputs => ({ refusal: { status, body: { success: false, ...body } } });
 
-/** Everything a BoQ is priced from, loaded from the project's stored state. */
-export async function loadBoqInputs(supabase: SupabaseClient, projectId: string, opts: { dryRun: boolean }): Promise<LoadedBoqInputs> {
-  // 1. Load project + plan + rooms in parallel with reference data.
-  const [projectRes, plansRes, labourRes, skuRes, stylesRes, approvedRes] = await Promise.all([
+/**
+ * Whether the project's plan can be priced at all — the refusals every
+ * generation answers with, before any rate is read. Shared with the in-app
+ * regenerate control (H4), which is disabled with the same reason.
+ */
+export async function loadPriceablePlan(
+  supabase: SupabaseClient,
+  projectId: string,
+): Promise<{ project: BoqInputs["project"]; plan: BoqInputs["plan"]; rooms: BoqRoomRow[]; refusal?: never } | { refusal: BoqRefusal }> {
+  const [projectRes, plansRes] = await Promise.all([
     supabase.from("projects").select("id, name, city").eq("id", projectId).single<BoqInputs["project"]>(),
     supabase
       .from("plans")
@@ -120,32 +126,17 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
       .order("created_at", { ascending: false })
       .limit(1)
       .returns<{ id: string; total_area_m2: number | null; parsed_json: unknown }[]>(),
-    supabase
-      .from("labour_rates")
-      .select("work_section, description, unit, rate_low_aed, rate_mid_aed, rate_high_aed")
-      .returns<LabourRateRow[]>(),
-    supabase
-      .from("pricing_skus")
-      .select("sku, brand, category, subcategory, description_en, unit, price_aed, vendor")
-      .in("category", RELEVANT_SKU_CATEGORIES)
-      .returns<PricingSkuRow[]>(),
-    supabase
-      .from("style_choices")
-      .select("style_key, room_id, created_at")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-      .returns<{ style_key: string | null; room_id: string | null; created_at: string | null }[]>(),
-    supabase.from("approved_designs").select("room_id, render_id").eq("project_id", projectId),
   ]);
+  const no = (status: number, body: Record<string, unknown>) => ({ refusal: { status, body: { success: false, ...body } } });
 
-  if (projectRes.error || !projectRes.data) return refuse(404, { error: "Project not found." });
+  if (projectRes.error || !projectRes.data) return no(404, { error: "Project not found.", code: "project_not_found" });
   const project = projectRes.data;
 
   if (plansRes.error || !plansRes.data || plansRes.data.length === 0) {
-    return refuse(400, { error: "Project has no plan yet — run /api/parse-plan first." });
+    return no(400, { error: "Project has no plan yet — run /api/parse-plan first.", code: "no_plan" });
   }
   const planRow = plansRes.data[0]!;
-  if (!planRow.total_area_m2 || planRow.total_area_m2 <= 0) return refuse(400, { error: "Plan has no total_area_m2." });
+  if (!planRow.total_area_m2 || planRow.total_area_m2 <= 0) return no(400, { error: "Plan has no total_area_m2.", code: "no_area" });
   const plan = { ...planRow, total_area_m2: planRow.total_area_m2 };
 
   const { data: rooms, error: roomsErr } = await supabase
@@ -153,7 +144,7 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
     .select("id, name_en, room_type, area_m2, polygon")
     .eq("plan_id", plan.id)
     .returns<BoqRoomRow[]>();
-  if (roomsErr || !rooms || rooms.length === 0) return refuse(400, { error: "Plan has no rooms. Re-run /api/parse-plan." });
+  if (roomsErr || !rooms || rooms.length === 0) return no(400, { error: "Plan has no rooms. Re-run /api/parse-plan.", code: "no_rooms" });
 
   // D3: refuse to price a plan whose rooms overlap.
   //
@@ -186,13 +177,39 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
     rooms.filter((r) => !removedZoneIds.has(r.id)).map((r) => ({ id: r.id, name: r.name_en ?? "Room", polygon: r.polygon })),
   );
   if (overlaps.has_overlaps) {
-    return refuse(409, {
+    return no(409, {
       error: `This plan has ${overlaps.room_names.length} overlapping rooms. Resolve them on the plan before costing — overlapping rooms double-count floor and wall area.`,
       code: "plan_has_overlaps",
       overlap_pairs: overlaps.pairs,
       overlap_room_names: overlaps.room_names,
     });
   }
+  return { project, plan, rooms };
+}
+
+/** Everything a BoQ is priced from, loaded from the project's stored state. */
+export async function loadBoqInputs(supabase: SupabaseClient, projectId: string, opts: { dryRun: boolean }): Promise<LoadedBoqInputs> {
+  const [priceable, labourRes, skuRes, stylesRes, approvedRes] = await Promise.all([
+    loadPriceablePlan(supabase, projectId),
+    supabase
+      .from("labour_rates")
+      .select("work_section, description, unit, rate_low_aed, rate_mid_aed, rate_high_aed")
+      .returns<LabourRateRow[]>(),
+    supabase
+      .from("pricing_skus")
+      .select("sku, brand, category, subcategory, description_en, unit, price_aed, vendor")
+      .in("category", RELEVANT_SKU_CATEGORIES)
+      .returns<PricingSkuRow[]>(),
+    supabase
+      .from("style_choices")
+      .select("style_key, room_id, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .returns<{ style_key: string | null; room_id: string | null; created_at: string | null }[]>(),
+    supabase.from("approved_designs").select("room_id, render_id").eq("project_id", projectId),
+  ]);
+  if (priceable.refusal) return { refusal: priceable.refusal };
+  const { project, plan, rooms } = priceable;
 
   if (labourRes.error || !labourRes.data || labourRes.data.length === 0) {
     return refuse(500, { error: "labour_rates table is empty — run scripts/seed-labour-rates.ts." });
