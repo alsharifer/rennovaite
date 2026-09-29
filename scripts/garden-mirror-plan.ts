@@ -33,7 +33,7 @@ const PORT = args.find((a) => /^\d{2,5}$/.test(a)) ?? "3098";
 const BASE = `http://localhost:${PORT}`;
 // H1: every route needs a signed-in caller — this script calls as the dev
 // "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
-const api = devFetch("pipeline", { script: "garden-mirror-plan" });
+const api = devFetch("pipeline", { script: "garden-mirror-plan", projects: PROJECT ? [PROJECT] : [] });
 if (!PROJECT) {
   console.error("usage: garden-mirror-plan.ts <project-id> [port]");
   process.exit(1);

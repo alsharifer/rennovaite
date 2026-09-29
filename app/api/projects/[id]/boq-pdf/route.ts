@@ -12,6 +12,7 @@ import { loadParity } from "@/lib/documents/parity-load";
 import { loadDocumentProject } from "@/lib/documents/project-name";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const parsed = IdSchema.safeParse((await params).id);
   if (!parsed.success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const projectId = parsed.data;
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
   const format = new URL(request.url).searchParams.get("format");
   // T5: a BoQ PDF (or its printed pages) goes only to a running pack export —

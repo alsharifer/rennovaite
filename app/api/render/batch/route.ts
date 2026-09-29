@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { gardenStyleFor, isGardenStyleKey } from "@/lib/garden-styles";
 import { gardenPresetItems } from "@/lib/moodboard/types";
+import { projectAccess } from "@/lib/projects/http";
 import { loadRenders } from "@/lib/render-batch/load";
 import { planBatch, planSceneBatch, type BatchFixture, type BatchRoom, type SceneRenderRow } from "@/lib/render-batch/plan";
 import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
@@ -48,6 +49,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { project_id } = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id });
+    if (access.denied) return access.denied;
     const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
 
     const { data: project } = await supabase.from("projects").select("id").eq("id", project_id).maybeSingle();

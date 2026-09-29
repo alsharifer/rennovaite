@@ -39,6 +39,8 @@ const round = (n: number) => Math.round(n * 100) / 100;
 const fmt = (n: number) => formatAed(n, "aed");
 
 const { data: projects } = await db.from("projects").select("id, name").order("created_at", { ascending: false });
+// H5: the routes answer members only; the pipeline account reads every project it checks as one.
+await api.grant(((projects ?? []) as { id: string }[]).map((p) => p.id));
 for (const p of (projects ?? []) as { id: string; name: string }[]) {
   const { data: boq } = await db
     .from("boqs")

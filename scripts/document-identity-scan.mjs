@@ -34,6 +34,8 @@ const firms = (await sb.from("firms").select("id, name")).data ?? [];
 // T5: the document routes answer only a pack job; this READ opens one per project and releases nothing.
 const vj = verificationJobs(sb, "document-identity-scan");
 
+// H5: project routes and pages answer members only.
+await api.grant(args);
 let hits = 0;
 for (const id of args) {
   const { data: p } = await sb.from("projects").select("firm_id, name").eq("id", id).maybeSingle();

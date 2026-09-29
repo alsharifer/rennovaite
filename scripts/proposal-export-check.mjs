@@ -28,7 +28,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
-import { devSession } from "./lib/dev-auth.mjs";
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 import { verificationJobs } from "./lib/verification-job.mjs";
 
 const PORT = process.argv[2] ?? "3098";
@@ -61,6 +61,10 @@ const LEAK = ["Newspace", "KAME", "Atrium", "Global Creation", "Laspinas"];
 console.log("\n0. sessions");
 const userA = await devSession("a", { script: "proposal-export-check" });
 const userB = await devSession("b", { script: "proposal-export-check" });
+// H5: the project routes answer members only — this check's accounts are made
+// members of the projects it works on (service role, like project-member-add),
+// and exactly those rows are removed again at cleanup.
+const memberships = [await grantProjectMembership(userA.userId, [STAND_IN], { script: "proposal-export-check" }), await grantProjectMembership(userB.userId, [STAND_IN], { script: "proposal-export-check" })];
 check("two dev sessions", !!userA.token && !!userB.token);
 
 const { data: prior } = await sb.from("projects").select("firm_id, display_name").eq("id", STAND_IN).single();
@@ -158,6 +162,7 @@ try {
     check(`full pack ${job.status} on the stand-in — the proposal gate itself held (blocked by: ${open.join(", ") || job.failed_checks?.map((c) => c.label).join("; ")})`, !open.includes("reference_basis") && !open.includes("proposal_firm"));
   }
 } finally {
+  for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
   await sb.from("projects").update({ firm_id: prior.firm_id ?? null, display_name: prior.display_name ?? null }).eq("id", STAND_IN);
   await jobs.close();

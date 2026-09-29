@@ -7,6 +7,7 @@ import { RevisionNotFound, buildProjectRevisionDiff } from "@/lib/boq/revisions"
 import { renderRevisionDiffPdf } from "@/lib/documents/revision-diff-pdf";
 import { findWithheldIdentities, loadWithheldNames } from "@/lib/identity/curation";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!caller) return unauthenticated("Sign in to read a BoQ revision diff.");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
+  if (access.denied) return access.denied;
   const q = Query.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!q.success) return NextResponse.json({ error: "from and to must be BoQ revision ids (uuid)." }, { status: 400 });
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;

@@ -10,6 +10,7 @@ import {
   styleDescriptor,
   type MoodboardItem,
 } from "@/lib/moodboard/types";
+import { projectAccess } from "@/lib/projects/http";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -37,6 +38,8 @@ export async function GET(request: NextRequest) {
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const items = await loadMoodboard(projectId);
   return NextResponse.json({ items });
 }
@@ -73,6 +76,8 @@ export async function POST(request: NextRequest) {
     }
     const body = parsed.data;
     const supabase = db();
+    const access = await projectAccess(db(), caller, { project_id: body.project_id, ...(body.kind === "asset" ? { asset_id: body.asset_id } : body.kind === "render" ? { render_id: body.render_id } : {}) });
+    if (access.denied) return access.denied;
 
     // Append: one past the current maximum position.
     const { data: last } = await supabase
@@ -160,6 +165,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { project_id, id, to_index } = parsed.data;
+    const access = await projectAccess(db(), caller, { project_id, moodboard_item_id: id });
+    if (access.denied) return access.denied;
     const supabase = db();
 
     const { data, error } = await supabase
@@ -198,6 +205,8 @@ export async function DELETE(request: NextRequest) {
     if (!id.success) {
       return NextResponse.json({ error: "A valid id is required." }, { status: 400 });
     }
+    const access = await projectAccess(db(), caller, { moodboard_item_id: id.data });
+    if (access.denied) return access.denied;
     const { error } = await db().from("moodboard_items").delete().eq("id", id.data);
     if (error) throw error;
     return NextResponse.json({ success: true });

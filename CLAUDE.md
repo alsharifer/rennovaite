@@ -1616,6 +1616,56 @@ Sanitary from every BoQ with fixtures (Mudon: ~AED 8,380 + ~6,440).
   supplier names emitted as role labels at source. Electrical + Plumbing
   unchanged.
 
+## Project ownership + invite-only sign-up (H5)
+
+Route auth stage 2: a session is not an entitlement. Migration **050**
+`project_members (project_id, user_id)` mirrors `firm_members`; creating a
+project (`/api/upload`, `/api/draw-plan`) makes you its member; every
+project-scoped route and page requires membership. Existing projects were
+backfilled to Abdallah's account (by e-mail, where the account exists — prod
+yes, dev no: run `node scripts/project-member-add.mjs <email> --all` once it
+does).
+
+- **One resolver** `lib/projects/access.ts → authorizeProject(db, caller, refs)`
+  (routes: `lib/projects/http.ts → projectAccess`). It takes EVERY id a request
+  carries — project, plan, room, render, prediction, asset, BoQ, fixture,
+  element, opening, context, moodboard item — resolves each to its project, and
+  answers 401 → 404 `<kind>_not_found` → 403 `not_a_project_member` → 400
+  `refs_span_projects`. Checking only the NAMED project would let a caller pass
+  their own project id beside someone else's room or render.
+- **Routes**: every handler outside `NON_PROJECT_ROUTE_FILES` (firm-scoped
+  routes and the vocabulary, in `lib/auth/access.ts`, each with a reason) calls
+  `projectAccess` with all its ids, awaiting nothing but caller, params and body
+  before it (`route-auth.test.ts` scans it). pilot-events is dual: a project
+  event needs the project, a firm event / the firm rollup needs the firm.
+  **A new project route must pass every id it touches.**
+- **Pages**: `proxy.ts` checks membership for `/project/<id>/…` before any page
+  code runs (a page renders in PARALLEL with its layout, so a layout-only check
+  let a non-member's visit run the page's reads and side effects — the BoQ page
+  recorded a view). A non-member gets a plain 404. `app/project/[id]/layout.tsx`
+  checks again; the dashboard lists only member projects.
+- **Firm attach** (`PATCH /api/projects/:id { firm_id }`) needs membership of
+  BOTH the project and the firm. Regenerating (H4) = the project's members.
+- **Invite-only sign-up** (`lib/auth/signup.ts`): the magic link stays; account
+  CREATION needs `AUTH_SIGNUP_ALLOWLIST` (exact addresses or a local-part
+  pattern like `dev-scripts+*@rennovaite.local`; unset = nobody new). The
+  sign-in action creates an invited address's account itself and never lets
+  Supabase create one (`shouldCreateUser: false`); anyone else sees the same
+  invite-only notice whether or not their address has an account. **Supabase's
+  own "Allow new users to sign up" must be OFF** on each project, or the public
+  anon key can still open accounts directly.
+- **Scripts**: dev accounts act on projects as members — `grantProjectMembership`
+  (+ `revoke()`) or `devFetch(who, { projects })` / `.grant(ids)` in
+  `scripts/lib/dev-auth.mjs` (service role, the operator act; no route bypass).
+  Checks revoke what they granted; the pipeline account's grants persist.
+- **Live**: `node scripts/project-isolation-sweep.mjs [port]` — two fresh
+  accounts; every project handler (from the filesystem) as the intruder → 403,
+  mixed-reference attacks → 403, every project page → 404, firm attach both
+  ways, the owner's rows byte-identical after. At H5: 74/74, 13/13 mixed, 13/13
+  pages.
+- **DB step**: `npm run db:push` for 050 **before** deploying the code — the
+  membership read fails closed (500 `migration_required`) without the table.
+
 ## Regenerate from the BoQ page (H4)
 
 The payoff loop: change a rate or the plan → **Regenerate BoQ** → the new
@@ -1679,9 +1729,8 @@ server actions. `docs/AUTH.md` has the full account.
   no bypass, shared secret or dev mode in the routes.
 - **Live check**: `node scripts/route-auth-sweep.mjs [port]` — every handler and
   page derived from the filesystem, anonymous / forged-token / signed-in.
-- **Not done (stage 2)**: anyone with an inbox can get a magic-link session
-  (sign-up is open), and any signed-in account reaches every project — there
-  is no project ownership. RLS is still off.
+- **Stage 2 is H5** (below): project ownership and invite-only sign-up. RLS is
+  still off.
 
 ## The journey — nine steps, one definition (B1/B2/B3)
 
@@ -1750,6 +1799,7 @@ view-only side surface reached from the layout and render steps).
 | `PACK_EXPORT_ENABLED`             | server — `"true"` **with `DRAWINGS_ENABLED="true"`** shows the in-app "Export pack" action and lets the document routes answer a running pack job (T5). Off = the action is absent and every document route 404s |
 | `TEXTURED_WALKTHROUGH`            | server — `"true"` lets the 3D walkthrough read StyleBoard finishes onto floors and walls (F1). Off = the clay model, unchanged |
 | `PARSE_PROVIDER`                  | server — optional; which floorplan parser to use. Only `"inhouse"` (the default) is configured; any other value throws rather than silently mis-parsing |
+| `AUTH_SIGNUP_ALLOWLIST`           | server — H5: who may be GIVEN an account (comma/space separated addresses or `prefix+*@domain` patterns). Unset = nobody new; existing accounts still sign in |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
 
 ### Feature flags — read at server start (flip → restart)

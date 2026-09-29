@@ -27,7 +27,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
-import { devSession } from "./lib/dev-auth.mjs";
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 
 const PORT = process.argv[2] ?? "3098";
 const BASE = `http://localhost:${PORT}`;
@@ -67,6 +67,10 @@ const pccOf = (boq) => lines(boq).find((l) => l.rule_id === "GL-04");
 console.log("\n0. two dev sessions (real Supabase users, Bearer tokens)");
 const userA = await devSession("a", { script: "firm-overlay-check" });
 const userB = await devSession("b", { script: "firm-overlay-check" });
+// H5: the project routes answer members only — this check's accounts are made
+// members of the projects it works on (service role, like project-member-add),
+// and exactly those rows are removed again at cleanup.
+const memberships = [await grantProjectMembership(userA.userId, [STAND_IN, ARABELLA], { script: "firm-overlay-check" }), await grantProjectMembership(userB.userId, [STAND_IN, ARABELLA], { script: "firm-overlay-check" })];
 check("sessions minted for two distinct accounts", !!userA.token && !!userB.token && userA.userId !== userB.userId, `${userA.email} · ${userB.email}`);
 
 const refBefore = await rateBookSnapshot();
@@ -187,6 +191,7 @@ try {
   check("PCC now resolves at firm_correction", after.rate_tier === "firm_correction" && after.rate_aed === 99.99, `${after.rate_aed} · ${after.vendor_or_source}`);
   await refUnchanged("promotion");
 } finally {
+  for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
   await sb.from("projects").update({ firm_id: priorFirm }).eq("id", STAND_IN);
   if (created.correction) {

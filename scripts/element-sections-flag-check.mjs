@@ -29,7 +29,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { MUDON_FIXTURE } from "../lib/plan/__tests__/mudon.fixture.ts";
 import { resolveTarget } from "./_target-guard.mjs";
-import { devSession } from "./lib/dev-auth.mjs";
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 
 const [mode, label, port] = process.argv.slice(2);
 const OUT = path.join(process.env.TEMP ?? process.env.TMP ?? ".", "u7-flag-check");
@@ -102,7 +102,9 @@ if (mode === "capture") {
 
   const mudon = await findMudon();
   if (mudon) {
-    const boq = await dryRun(mudon.id);
+    // H5: read Mudon as a member for the duration of the dry run, then remove exactly that row.
+    const m = await grantProjectMembership(me.userId, [mudon.id], { script: "element-sections-flag-check" });
+    const boq = await dryRun(mudon.id).finally(() => m.revoke());
     snapshot.mudon = { sections: sixOf(boq), grand_total_aed: boq.grand_total_aed };
     check("Mudon dry run (read-only) captured", true, `${p4Lines(snapshot.mudon.sections).length} take-off lines · AED ${boq.grand_total_aed}`);
   } else check("Mudon villa found on this database", false, "not found — that leg skipped");
@@ -112,6 +114,8 @@ if (mode === "capture") {
     let state = fs.existsSync(STATE) ? JSON.parse(fs.readFileSync(STATE, "utf8")) : null;
     if (!state) {
       const villa = await seedScratchVilla();
+      // H5: the check's account owns its scratch villa (the row goes with the villa).
+      await grantProjectMembership(me.userId, [villa.projectId], { script: "element-sections-flag-check" });
       const fa = await api("POST", "/api/firms", { name: FIRM_NAME }, me);
       check("scratch villa seeded from the plan fixture + scratch firm created", fa.status === 201, `${fa.status} ${fa.body.error ?? ""}`);
       for (const s of SIX) {

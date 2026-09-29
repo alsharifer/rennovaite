@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { AnalyticsEvent, trackServer } from "@/lib/analytics";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import {
   buildEveningPrompt,
   currentDayRender,
@@ -49,6 +50,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { project_id, room_id } = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, room_id });
+    if (access.denied) return access.denied;
 
     const apiKey = process.env.REPLICATE_API_TOKEN;
     if (!apiKey) {

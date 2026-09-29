@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { PUBLIC_ROUTE_FILES, PUBLIC_SERVER_ACTION_FILES } from "@/lib/auth/access";
+import { NON_PROJECT_ROUTE_FILES, PUBLIC_ROUTE_FILES, PUBLIC_SERVER_ACTION_FILES } from "@/lib/auth/access";
 
 // =============================================================================
 // H1 (below the U1 blocks) — EVERY route handler outside the public allowlist
@@ -189,7 +189,7 @@ describe("H1: every route outside the public allowlist requires a signed-in call
     // Handlers declared any other way (export const GET = …, re-exports) cannot be scanned.
     expect(src, "handlers are `export async function`").not.toMatch(/export\s+(const|let|var)\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/);
     expect(src, "no re-exported handlers").not.toMatch(/export\s*\{[^}]*\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b[^}]*\}/);
-    expect(src, "imports getCaller + unauthenticated").toMatch(/import \{[^}]*\bgetCaller, [^}]*\bunauthenticated \} from "@\/lib\/auth\/caller"/);
+    expect(src, "imports getCaller + unauthenticated").toMatch(/import \{[^}]*\bgetCaller, [^}]*\bunauthenticated\b[^}]*\} from "@\/lib\/auth\/caller"/);
 
     const handlers = exportedFunctions(src, HTTP_METHODS);
     expect(handlers.length, "handlers").toBeGreaterThan(0);
@@ -235,5 +235,60 @@ describe("H1: every server action outside the public allowlist requires a signed
       expect(m, `${a.name} opens with getCaller()`).not.toBeNull();
       expect(awaitsBefore(a.body, m!.index), `${a.name}: nothing awaited before the caller check`).toEqual([]);
     }
+  });
+});
+
+// =============================================================================
+// H5 — project ownership. Every guarded route that is not in
+// NON_PROJECT_ROUTE_FILES (firm-scoped or global, each with its reason) is
+// project-scoped: each handler reaches projectAccess (lib/projects/http.ts →
+// authorizeProject, which resolves EVERY id the request carries), or — for the
+// two routes that CREATE a project — addProjectMember. Before the project check
+// a handler may await only its caller, its params and its request body: no
+// lookup, no read, no side effect happens for a non-member.
+// =============================================================================
+
+const PROJECT_ROUTES = GUARDED_ROUTES.filter((f) => !(f in NON_PROJECT_ROUTE_FILES));
+const CREATES_PROJECT = new Set(["app/api/upload/route.ts", "app/api/draw-plan/route.ts"]);
+const PRE_CHECK_OK = /^(getCaller\(|(?:\w+\.)?params\b|projectIdOf\(|request\.(json|formData)\(|firmDenied\()/;
+
+describe("H5: every project-scoped route requires membership of the project it touches", () => {
+  it("the non-project list names real route files, each with a reason; it is only firm-scoped routes and the vocabulary", () => {
+    for (const [file, reason] of Object.entries(NON_PROJECT_ROUTE_FILES)) {
+      expect(GUARDED_ROUTES, file).toContain(file);
+      expect(reason.length, file).toBeGreaterThan(8);
+      expect(file.startsWith("app/api/firms/") || file === "app/api/rate-vocabulary/route.ts", file).toBe(true);
+    }
+    // Every firm route is in it — a firm route is never silently project-scoped or unscoped.
+    expect(FIRM_ROUTES.every((f) => f in NON_PROJECT_ROUTE_FILES)).toBe(true);
+  });
+
+  it("scans the project routes (48 files at H5)", () => {
+    expect(PROJECT_ROUTES.length).toBeGreaterThanOrEqual(45);
+  });
+
+  it.each(PROJECT_ROUTES)("%s", (file) => {
+    const src = readFileSync(path.join(ROOT, file), "utf8");
+    for (const h of exportedFunctions(src, HTTP_METHODS)) {
+      const idx = [h.body.indexOf("await projectAccess("), CREATES_PROJECT.has(file) ? h.body.indexOf("await addProjectMember(") : -1].filter((i) => i >= 0);
+      expect(idx.length, `${h.name} reaches projectAccess${CREATES_PROJECT.has(file) ? " or addProjectMember" : ""}`).toBeGreaterThan(0);
+      const first = Math.min(...idx);
+      // The addProjectMember path follows the project INSERT by design; the rule is for the check.
+      if (h.body.indexOf("await projectAccess(") === first) {
+        const before = [...h.body.slice(0, first).matchAll(/\bawait\s+([^;\n]*)/g)].map((a) => a[1]!.trim()).filter((a) => !PRE_CHECK_OK.test(a));
+        expect(before, `${h.name}: nothing but caller, params and body awaited before the project check`).toEqual([]);
+      }
+    }
+  });
+
+  it("the store's own contract: 401, then 404 for a missing id, then 403 for a non-member", () => {
+    const src = readFileSync(path.join(ROOT, "lib/projects/access.ts"), "utf8");
+    const body = src.slice(src.indexOf("export async function authorizeProject"));
+    const i401 = body.indexOf("requireCaller(caller)");
+    const i404 = body.indexOf("new StoreError(404");
+    const i403 = body.indexOf('new StoreError(403, "not_a_project_member"');
+    expect(i401).toBeGreaterThan(-1);
+    expect(i404).toBeGreaterThan(i401);
+    expect(i403).toBeGreaterThan(i404);
   });
 });

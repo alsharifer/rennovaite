@@ -28,6 +28,7 @@ const api = devFetch("pipeline", { script: "boq-regen-check" });
 
 async function capture(dir, port, ids) {
   fs.mkdirSync(dir, { recursive: true });
+  await api.grant(ids); // H5: the pipeline account reads them as a member
   for (const id of ids) {
     const res = await api(`http://localhost:${port}/api/generate-boq`, {
       method: "POST",

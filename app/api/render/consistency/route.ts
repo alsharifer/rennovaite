@@ -1,7 +1,10 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { checkConsistency, loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 
 export const runtime = "nodejs";
@@ -24,6 +27,8 @@ export async function POST(request: NextRequest) {
   if (!caller) return unauthenticated();
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsed.data.project_id, render_id: parsed.data.anchor_render_id });
+  if (access.denied) return access.denied;
   try {
     const ctx = await loadGardenSceneContext(parsed.data.project_id);
     const results = await checkConsistency(ctx, parsed.data.anchor_render_id);

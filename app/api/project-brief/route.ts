@@ -8,6 +8,7 @@ import {
   sanitiseAnswers,
   type BriefAnswers,
 } from "@/lib/ideation/questionnaire";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getStyleByKey } from "@/lib/styles";
 
@@ -38,6 +39,8 @@ export async function GET(request: NextRequest) {
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   try {
     const { data, error } = await db()
       .from("project_briefs")
@@ -83,6 +86,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { project_id, complete } = parsed.data;
+    const access = await projectAccess(db(), caller, { project_id });
+    if (access.denied) return access.denied;
     const supabase = db();
 
     const { data: existing } = await supabase

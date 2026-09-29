@@ -89,6 +89,8 @@ async function main() {
   const db: SupabaseClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const { data: project } = await db.from("projects").select("id").eq("name", WORKING_NAME).single<{ id: string }>();
   const PROJECT = project!.id;
+  // H5: the pipeline account works on this project as its member (scripts/lib/dev-auth.mjs).
+  await api.grant([PROJECT]);
 
   // The client-facing name, through the project route (the export gate checks it).
   const named = await api(`${BASE}/api/projects/${PROJECT}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: DISPLAY_NAME }) });

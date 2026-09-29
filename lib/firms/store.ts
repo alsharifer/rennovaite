@@ -38,16 +38,9 @@ import { recordPilotEvent } from "@/lib/pilot/events";
 
 import { itemVocabulary, validateEntry } from "./vocabulary";
 
-export class StoreError extends Error {
-  constructor(
-    readonly status: 400 | 401 | 403 | 404 | 409 | 422 | 500,
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = "StoreError";
-  }
-}
+import { StoreError } from "@/lib/store-error";
+
+export { StoreError };
 
 export interface Firm {
   id: string;

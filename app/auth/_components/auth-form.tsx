@@ -1,7 +1,6 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import Link from "next/link";
 import { useState } from "react";
 
 import { signInWithEmail } from "@/app/_actions/sign-in-with-email";
@@ -13,6 +12,8 @@ export function AuthForm({ next }: { next?: string }) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submittedTo, setSubmittedTo] = useState<string | null>(null);
+  // H5: an address the invite list does not name gets the invite-only notice.
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -29,6 +30,7 @@ export function AuthForm({ next }: { next?: string }) {
       const res = await signInWithEmail(value, next);
       if (res.success) {
         setSubmittedTo(value);
+        setNotice(res.invited ? null : res.notice);
       } else {
         setError(res.error);
       }
@@ -41,6 +43,7 @@ export function AuthForm({ next }: { next?: string }) {
 
   function reset() {
     setSubmittedTo(null);
+    setNotice(null);
     setError(null);
   }
 
@@ -61,16 +64,29 @@ export function AuthForm({ next }: { next?: string }) {
             transition={FADE}
             className="w-full"
           >
-            <h2 className="mb-md font-display text-headline-lg text-on-surface">
-              Check your inbox.
-            </h2>
-            <p className="mb-xl font-body text-body-md leading-relaxed text-on-surface-variant">
-              We sent a sign-in link to{" "}
-              <span className="font-semibold text-on-surface">
-                {submittedTo}
-              </span>
-              . It expires in 15 minutes.
-            </p>
+            {notice ? (
+              <>
+                <h2 className="mb-md font-display text-headline-lg text-on-surface">
+                  Invite-only, for now.
+                </h2>
+                <p className="mb-xl font-body text-body-md leading-relaxed text-on-surface-variant" data-testid="invite-only">
+                  {notice}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="mb-md font-display text-headline-lg text-on-surface">
+                  Check your inbox.
+                </h2>
+                <p className="mb-xl font-body text-body-md leading-relaxed text-on-surface-variant">
+                  We sent a sign-in link to{" "}
+                  <span className="font-semibold text-on-surface">
+                    {submittedTo}
+                  </span>
+                  . It expires in 15 minutes.
+                </p>
+              </>
+            )}
             <button
               type="button"
               onClick={reset}
@@ -150,14 +166,6 @@ export function AuthForm({ next }: { next?: string }) {
               </p>
             </form>
 
-            <div className="my-xl h-px w-full bg-bone" />
-
-            <Link
-              href="/project"
-              className="focus-ring flex h-12 w-full items-center justify-center rounded-lg border border-ink-100 px-md text-center font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
-            >
-              Continue as a guest — your project will save for 7 days
-            </Link>
           </motion.div>
         )}
       </AnimatePresence>

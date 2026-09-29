@@ -33,6 +33,27 @@ export const PUBLIC_SERVER_ACTION_FILES: Readonly<Record<string, string>> = {
   "app/_actions/sign-out.ts": "sign-out: clearing a session needs none",
 };
 
+/**
+ * H5: signed-in route files that are NOT project-scoped, each with the reason.
+ * Every other guarded route resolves the project it touches and requires
+ * membership (lib/projects/access.ts → authorizeProject); the route-auth scan
+ * holds this list equal to the handlers that skip it.
+ */
+export const NON_PROJECT_ROUTE_FILES: Readonly<Record<string, string>> = {
+  "app/api/firms/route.ts": "firm-scoped: the caller's firms (requireFirm in lib/firms/store.ts)",
+  "app/api/firms/[firmId]/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/branding/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/promote/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/quotes/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/quotes/template/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/quotes/[quoteId]/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/quotes/[quoteId]/lines/[lineId]/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/rates/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/rates/[entryId]/route.ts": "firm-scoped (requireFirm)",
+  "app/api/firms/[firmId]/rates/history/route.ts": "firm-scoped (requireFirm)",
+  "app/api/rate-vocabulary/route.ts": "global: the take-off vocabulary and public reference figures, no project data",
+};
+
 /** URL paths of the public route handlers above (exact match). */
 export const PUBLIC_API_PATHS: readonly string[] = ["/api/health"];
 

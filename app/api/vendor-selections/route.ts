@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { recordFeedback } from "@/lib/analytics";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -40,6 +41,8 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsed.data.project_id, boq_id: parsed.data.boq_id });
+    if (access.denied) return access.denied;
 
     const supabase = getSupabaseAdmin();
     const sb = supabase as unknown as SupabaseClient;
@@ -123,6 +126,8 @@ export async function GET(request: NextRequest) {
         { status: 400 },
       );
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, boq_id });
+    if (access.denied) return access.denied;
 
     const supabase = getSupabaseAdmin();
     const sb = supabase as unknown as SupabaseClient;

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { NotCachedError } from "@/lib/scene-render/pipeline";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest) {
   if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = PostSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsed.data.project_id, asset_id: parsed.data.asset_id, room_id: parsed.data.zone_id });
+  if (access.denied) return access.denied;
   try {
     const r = await renderPhotoPair({ projectId: parsed.data.project_id, assetId: parsed.data.asset_id, zoneId: parsed.data.zone_id, itemIds: parsed.data.item_ids, cacheOnly: parsed.data.cache_only === true });
     return NextResponse.json(r);
@@ -45,6 +48,8 @@ export async function GET(request: NextRequest) {
   if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
   const { data, error } = await sb
     .from("renders")

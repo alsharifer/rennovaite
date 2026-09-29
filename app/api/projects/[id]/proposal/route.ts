@@ -14,6 +14,7 @@ import { curateBoq, findWithheldIdentities, loadWithheldNames } from "@/lib/iden
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { BoqPdfInput } from "@/lib/documents/boq-pdf";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const parsed = z.string().uuid().safeParse((await params).id);
   if (!parsed.success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const projectId = parsed.data;
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const format = new URL(request.url).searchParams.get("format") ?? "pdf";
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
   if (format !== "json") {

@@ -64,6 +64,8 @@ async function main() {
 
   const { data: project } = await db.from("projects").select("id").eq("name", PROJECT_NAME).single<{ id: string }>();
   const projectId = project!.id;
+  // H5: the pipeline account works on this project as its member (scripts/lib/dev-auth.mjs).
+  await api.grant([projectId]);
   const { data: plan } = await db.from("plans").select("id").eq("project_id", projectId).single<{ id: string }>();
   const planId = plan!.id;
   type Room = { id: string; name_en: string; name_ar: string | null; room_type: string | null; area_m2: number; polygon: Pt[]; unroofed: boolean | null; dims_derived: boolean | null; derived_note: string | null; spec: Record<string, unknown> | null };

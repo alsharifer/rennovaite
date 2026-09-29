@@ -1,9 +1,11 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { StoreError, assignProjectFirm } from "@/lib/firms/store";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +36,8 @@ export async function DELETE(
         { status: 400 },
       );
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsed.data });
+    if (access.denied) return access.denied;
 
     const supabase = getSupabaseAdmin();
 
@@ -104,6 +108,8 @@ export async function PATCH(
         { status: 400 },
       );
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsedId.data });
+    if (access.denied) return access.denied;
 
     const body = PatchSchema.safeParse(await request.json());
     if (!body.success) {

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -37,6 +38,8 @@ export async function PATCH(request: NextRequest) {
   const parsed = PatchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   const { id, ...fields } = parsed.data;
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { room_id: id });
+  if (access.denied) return access.denied;
   const patch: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fields)) if (v !== undefined) patch[k] = v;
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "No fields to update." }, { status: 400 });

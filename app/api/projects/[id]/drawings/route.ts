@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -5,6 +6,8 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
 
 import { generateDrawingSet, renderSetPdf, renderSheetPdf, type SheetKind } from "@/lib/drawings/export";
+import { projectAccess } from "@/lib/projects/http";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +56,8 @@ export async function GET(
       return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
     }
     const projectId = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+    if (access.denied) return access.denied;
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format");
     // T5: the sheets (SVG or PDF) go only to a running pack export.

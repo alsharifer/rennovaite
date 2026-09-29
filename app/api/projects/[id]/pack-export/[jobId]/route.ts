@@ -6,6 +6,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { loadPackJob, signedOutputs } from "@/lib/documents/pack-export/job";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   if (!z.string().uuid().safeParse(id).success || !z.string().uuid().safeParse(jobId).success) {
     return NextResponse.json({ error: "Invalid id." }, { status: 400 });
   }
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
+  if (access.denied) return access.denied;
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
   const job = await loadPackJob(db, jobId);
   if (!job || job.project_id !== id) return NextResponse.json({ error: "Not found." }, { status: 404 });

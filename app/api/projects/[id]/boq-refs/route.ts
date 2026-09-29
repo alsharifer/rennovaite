@@ -6,6 +6,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { refMigration, refMigrationCsv } from "@/lib/boq/refs";
 import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!caller) return unauthenticated();
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
+  if (access.denied) return access.denied;
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
   const { data, error } = await sb
     .from("boqs")

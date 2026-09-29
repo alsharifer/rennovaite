@@ -37,6 +37,8 @@ const { url, key } = resolveTarget({ script: "provenance-check", writes: false }
 const sb = createClient(url, key);
 const firmNames = ((await sb.from("firms").select("name")).data ?? []).map((f) => f.name).filter((n) => n && n.trim().length >= 3);
 
+// H5: project pages answer members only.
+await api.grant(ids);
 let failed = false;
 for (const id of ids) {
   const res = await api(`http://localhost:${port}/project/${id}/boq`);

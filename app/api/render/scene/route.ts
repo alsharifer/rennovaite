@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { NotCachedError } from "@/lib/scene-render/pipeline";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -34,6 +35,8 @@ export async function GET(request: NextRequest) {
   if (!z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id is required." }, { status: 400 });
   }
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   try {
     const ctx = await loadGardenSceneContext(projectId);
     const { data } = await (getSupabaseAdmin() as unknown as SupabaseClient)
@@ -61,6 +64,8 @@ export async function POST(request: NextRequest) {
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   const { project_id, camera_id, view, anchor_render_id, cache_only } = parsed.data;
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, render_id: anchor_render_id ?? null });
+  if (access.denied) return access.denied;
   try {
     const ctx = await loadGardenSceneContext(project_id);
     const cam = ctx.cameras.find((c) => c.id === camera_id);

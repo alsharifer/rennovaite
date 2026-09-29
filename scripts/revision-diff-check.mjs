@@ -28,7 +28,7 @@ import fs from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
-import { devSession } from "./lib/dev-auth.mjs";
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 
 const PORT = process.argv[2] ?? "3098";
 const BASE = `http://localhost:${PORT}`;
@@ -55,6 +55,10 @@ async function api(method, path, body, auth, raw = false) {
 console.log("\n0. two dev sessions");
 const userA = await devSession("a", { script: "revision-diff-check" });
 const userB = await devSession("b", { script: "revision-diff-check" });
+// H5: the project routes answer members only — this check's accounts are made
+// members of the projects it works on (service role, like project-member-add),
+// and exactly those rows are removed again at cleanup.
+const memberships = [await grantProjectMembership(userA.userId, [STAND_IN, ARABELLA], { script: "revision-diff-check" }), await grantProjectMembership(userB.userId, [STAND_IN, ARABELLA], { script: "revision-diff-check" })];
 check("sessions minted", !!userA.token && !!userB.token && userA.userId !== userB.userId);
 
 const session = JSON.parse(fs.readFileSync("screenshots/garden-pilot/g5d-session.json", "utf8"));
@@ -178,6 +182,7 @@ try {
   const hist3 = await api("GET", `/api/firms/${F}/rates/history?item_key=garden.pcc_base`, undefined, userA);
   check("history now has 3 rows, one active", hist3.body.history.length === 3 && hist3.body.history.filter((h) => !h.superseded_at).length === 1);
 } finally {
+  for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
   await sb.from("projects").update({ firm_id: priorFirm }).eq("id", STAND_IN);
   for (const id of created.corrections) {

@@ -268,11 +268,13 @@ async function main() {
     const { data, error } = await db.from("projects").insert({ name: STAND_IN, city: "Dubai" }).select("id").single<{ id: string }>();
     if (error || !data) throw error ?? new Error("could not create the stand-in");
     standIn = data;
+    await api.grant([ref.id, standIn.id]); // H5: members of both, before seeding through the routes
     const seedChecks: string[] = [];
     await seedVilla94Garden(db, BASE, standIn.id, (l, ok, d) => seedChecks.push(`${ok ? "PASS" : "FAIL"} ${l} ${d ?? ""}`), { api });
     const gen = await (await api(`${BASE}/api/generate-boq`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: standIn.id }) })).json();
     check("stand-in seeded from the same records, BoQ generated", seedChecks.every((c) => c.startsWith("PASS")) && !gen.error, seedChecks.filter((c) => !c.startsWith("PASS")).join("; "));
   }
+  await api.grant([ref.id, standIn.id]); // H5: the pipeline account reads both as a member
   const A = ref.id;
   const B = standIn.id;
   const otherTag = CLIENT_ID ? "client" : "stand-in";

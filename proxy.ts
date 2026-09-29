@@ -54,16 +54,50 @@ export async function proxy(request: NextRequest) {
   });
 
   const bearer = bearerOf(request);
-  let signedIn = false;
+  let userId: string | null = null;
   try {
     const { data, error } = bearer ? await supabase.auth.getClaims(bearer) : await supabase.auth.getClaims();
-    signedIn = !error && !!data?.claims?.sub && data.claims.is_anonymous !== true;
+    if (!error && data?.claims?.sub && data.claims.is_anonymous !== true) userId = data.claims.sub;
   } catch {
-    signedIn = false;
+    userId = null;
   }
 
-  if (signedIn || kind === "public") return response;
-  return deny(request, kind, response);
+  if (kind === "public") return response;
+  if (!userId) return deny(request, kind, response);
+
+  // H5: a project's pages are its members'. Checked HERE, before any page code
+  // runs: the App Router renders a page in parallel with its layout, so a
+  // layout-only check still let a non-member's visit execute the page's reads
+  // and side effects (the BoQ page records a view). A non-member gets a plain
+  // 404 — the same answer as for a project that does not exist.
+  const project = kind === "page" ? PROJECT_PAGE.exec(request.nextUrl.pathname)?.[1] : undefined;
+  if (project && !(await isProjectMember(url, project, userId))) return notFound(request, response);
+  return response;
+}
+
+const PROJECT_PAGE = /^\/project\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
+
+/** One indexed read of project_members with the service role. Fails closed. */
+async function isProjectMember(supabaseUrl: string, projectId: string, userId: string): Promise<boolean> {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) return false;
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/project_members?select=project_id&project_id=eq.${projectId}&user_id=eq.${userId}&limit=1`, {
+      headers: { apikey: key, authorization: `Bearer ${key}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return false;
+    return ((await res.json()) as unknown[]).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function notFound(request: NextRequest, session: NextResponse): NextResponse {
+  // Rewritten to a path no route serves, so Next renders its not-found page with a 404.
+  const out = NextResponse.rewrite(new URL("/_project-not-found", request.url));
+  for (const c of session.cookies.getAll()) out.cookies.set(c);
+  return out;
 }
 
 function bearerOf(request: NextRequest): string | null {

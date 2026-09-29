@@ -104,3 +104,14 @@ export async function forwardableAuthorization(request: Request, minValiditySec 
     return null;
   }
 }
+
+/**
+ * The caller of a Server Component or layout (H5), which has no Request object:
+ * the same two credentials as getCaller — the Authorization header (scripts
+ * read pages with a Bearer; the proxy accepts it) and the cookie session.
+ */
+export async function getPageCaller(): Promise<Caller | null> {
+  const { headers } = await import("next/headers");
+  const authorization = (await headers()).get("authorization");
+  return getCaller(authorization ? new Request("http://page.local/", { headers: { authorization } }) : undefined);
+}

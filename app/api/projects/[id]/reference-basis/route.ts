@@ -6,6 +6,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { acceptReferenceBasis, loadProposalGate } from "@/lib/documents/proposal-gate";
 import { storeErrorResponse } from "@/lib/firms/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!caller) return unauthenticated("Sign in to read the pricing basis.");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
+  if (access.denied) return access.denied;
   try {
     const gate = await loadProposalGate(db(), id);
     return NextResponse.json({
@@ -49,6 +52,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!caller) return unauthenticated("Sign in to accept the reference basis.");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
+  if (access.denied) return access.denied;
   const parsed = PostSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   try {

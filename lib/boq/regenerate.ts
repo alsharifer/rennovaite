@@ -6,10 +6,11 @@
 // (disabled, with the reason and the fix, when the answer is no). The two can
 // therefore never disagree about why a button is grey.
 //
-// Who: a project WITH a firm is that firm's to price — a signed-in member of it
-// (requireFirm: 401 / 404 / 403, the order every firm surface answers in). A
-// project with no firm: any signed-in account, as approvals already decide.
-// TODO(H5): or the project's owner, once projects have one.
+// Who (H5): a MEMBER of the project (lib/projects/access.ts). H4 asked for "the
+// project's firm's member, or the project's owner once projects have one";
+// with project membership required by every project route, and attaching a
+// firm requiring membership of BOTH the firm and the project, that is exactly
+// the project's members.
 //
 // What: the plan must be priceable — the same refusals the assembly answers
 // with (lib/boq/assemble.ts → loadPriceablePlan), so a disabled button names
@@ -19,11 +20,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Caller } from "@/lib/auth/caller";
-import { StoreError, requireFirm } from "@/lib/firms/store";
+import { isProjectMember } from "@/lib/projects/access";
 
 import { loadPriceablePlan } from "./assemble";
 
-export type RegenerateBlockCode = "unauthenticated" | "not_a_member" | "project_not_found" | "no_plan" | "no_area" | "no_rooms" | "plan_has_overlaps" | "not_priceable";
+export type RegenerateBlockCode = "unauthenticated" | "not_a_project_member" | "project_not_found" | "no_plan" | "no_area" | "no_rooms" | "plan_has_overlaps" | "not_priceable";
 
 export interface RegenerateBlock {
   code: RegenerateBlockCode;
@@ -40,23 +41,14 @@ export interface RegenerateReadiness {
   previous: { id: string; total_aed: number; created_at: string } | null;
 }
 
-/** Who may store a new revision: the firm's members on a firm project, anyone signed in otherwise. */
+/** Who may store a new revision: the project's members. */
 export async function regenerateAuthority(db: SupabaseClient, projectId: string, caller: Caller | null): Promise<RegenerateBlock | null> {
   if (!caller) return { code: "unauthenticated", reason: "Sign in to regenerate the BoQ." };
-  const { data, error } = await db.from("projects").select("id, firm_id").eq("id", projectId).maybeSingle<{ id: string; firm_id: string | null }>();
+  const { data, error } = await db.from("projects").select("id").eq("id", projectId).maybeSingle<{ id: string }>();
   if (error) throw new Error(`project read failed: ${error.message}`);
   if (!data) return { code: "project_not_found", reason: "Project not found." };
-  if (!data.firm_id) return null;
-  try {
-    await requireFirm(db, data.firm_id, caller);
-    return null;
-  } catch (e) {
-    if (e instanceof StoreError && e.status === 403) {
-      return { code: "not_a_member", reason: "This project is priced by a firm you are not a member of — only its members can regenerate the BoQ." };
-    }
-    if (e instanceof StoreError && e.status === 404) return null; // the firm is gone; the project is nobody's to guard
-    throw e;
-  }
+  if (await isProjectMember(db, projectId, caller.id)) return null;
+  return { code: "not_a_project_member", reason: "Only the project's members can regenerate its BoQ." };
 }
 
 function planBlock(refusal: { status: number; body: Record<string, unknown> }, projectId: string): RegenerateBlock {

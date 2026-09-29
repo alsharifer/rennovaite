@@ -193,7 +193,38 @@ it lives outside the tree (`~/backups/rennovaite/quotes/`, say), and what goes
 into a commit message or an issue is its **sha256 only**, never the file, its
 name, or a line from it.
 
-## What H1 does NOT do — stage 2, still a deployment blocker
+## Project ownership + invite-only sign-up (H5, stage 2)
+
+- **`project_members (project_id, user_id)`** (migration 050), mirroring
+  `firm_members`. Creating a project makes you a member; every project-scoped
+  route and page requires membership; existing projects were backfilled to
+  Abdallah's account by e-mail where it exists (production: yes; dev: no — use
+  `scripts/project-member-add.mjs <email> --all`).
+- **Answers** (`lib/projects/access.ts → authorizeProject`), U1's order:
+
+  | | code | when |
+  | --- | --- | --- |
+  | 401 | `unauthenticated` | nobody signed in, before anything is looked up |
+  | 404 | `<kind>_not_found` | an id in the request that does not exist |
+  | 403 | `not_a_project_member` | an id in a project the caller is not a member of |
+  | 400 | `refs_span_projects` | ids from two projects (only reachable by a member of both) |
+
+  EVERY id a request carries is resolved, not just the project it names — so
+  "my project + your room" is a 403, not a write into your project.
+- **Pages**: the proxy checks membership for `/project/<id>/…` before any page
+  code runs (404 for a non-member, as for a project that does not exist); the
+  `[id]` layout checks again; the dashboard lists the caller's projects only.
+- **Firm attach** needs membership of both the project and the firm.
+- **Invite-only sign-up** (`lib/auth/signup.ts`, env `AUTH_SIGNUP_ALLOWLIST`):
+  magic link unchanged; only listed addresses get an account, created by the
+  sign-in action through the admin API; Supabase is never asked to create one.
+  Anyone else sees one invite-only notice, worded the same whether or not the
+  address has an account. **Operator step, per Supabase project: Auth → "Allow
+  new users to sign up" OFF** — otherwise the public anon key can still create
+  accounts by calling Supabase directly.
+- **Live check**: `node scripts/project-isolation-sweep.mjs [port]`.
+
+## What H1 did NOT do — closed by H5 (kept for the record)
 
 _Until U1 no route checked the caller; after U1 ~44 of 49 still did not. Since
 H1 every route and page needs a session._ A session is still not an entitlement:

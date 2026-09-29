@@ -13,6 +13,7 @@ import {
   layerOf,
   type FixtureType,
 } from "@/lib/overlays/types";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -46,6 +47,8 @@ export async function GET(request: NextRequest) {
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const supabase = db();
   try {
     let { data: existing, error } = await supabase
@@ -127,6 +130,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
   const f = parsed.data;
+  const access = await projectAccess(db(), caller, { project_id: f.project_id, room_id: f.room_id ?? null, fixture_id: f.id ?? null });
+  if (access.denied) return access.denied;
   const supabase = db();
   const row: Record<string, unknown> = {
     project_id: f.project_id,
@@ -182,6 +187,8 @@ export async function DELETE(request: NextRequest) {
   if (!id || !z.string().uuid().safeParse(id).success) {
     return NextResponse.json({ error: "id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { fixture_id: id });
+  if (access.denied) return access.denied;
   try {
     const { error } = await db().from("plan_fixtures").delete().eq("id", id);
     if (error) throw error;

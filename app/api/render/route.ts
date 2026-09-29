@@ -6,6 +6,7 @@ import { z } from "zod";
 import { AnalyticsEvent, trackServer } from "@/lib/analytics";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { getKgContext } from "@/lib/kg/context";
+import { projectAccess } from "@/lib/projects/http";
 import {
   buildBaseInput,
   buildEditInput,
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
       );
     }
     const { project_id, room_id, tweak } = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, room_id });
+    if (access.denied) return access.denied;
 
     const apiKey = process.env.REPLICATE_API_TOKEN;
     if (!apiKey) {

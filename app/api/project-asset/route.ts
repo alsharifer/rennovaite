@@ -12,6 +12,7 @@ import {
   type AssetKind,
 } from "@/lib/assets/types";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -57,6 +58,8 @@ export async function POST(request: NextRequest) {
     const source = isAssetSource(sourceRaw) ? sourceRaw : null;
     const roomId =
       typeof roomIdRaw === "string" && Uuid.safeParse(roomIdRaw).success ? roomIdRaw : null;
+    const access = await projectAccess(db(), caller, { project_id: projectId.data, room_id: roomId });
+    if (access.denied) return access.denied;
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file provided." }, { status: 400 });
@@ -158,6 +161,8 @@ export async function PATCH(request: NextRequest) {
         { status: 400 },
       );
     }
+    const access = await projectAccess(db(), caller, { asset_id: assetId.data, room_id: roomId.data });
+    if (access.denied) return access.denied;
 
     const { data: asset, error: getErr } = await db()
       .from("project_assets")

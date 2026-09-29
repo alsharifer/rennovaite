@@ -4,7 +4,6 @@ import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Caller } from "@/lib/auth/caller";
-import { createFirm } from "@/lib/firms/store";
 import { fakeDb, type FakeDb } from "@/lib/firms/__tests__/fake-db";
 
 import { regenerateAuthority, regenerateReadiness } from "../regenerate";
@@ -30,6 +29,7 @@ beforeEach(() => {
       { id: "b2", project_id: "p1", total_aed: 104000, created_at: "2026-09-03T00:00:00Z" },
     ],
     firm_members: [],
+    project_members: [{ project_id: "p1", user_id: alice.id }],
   });
 });
 
@@ -38,17 +38,11 @@ describe("regenerateAuthority", () => {
     expect((await regenerateAuthority(db.client, "p1", null))?.code).toBe("unauthenticated");
   });
 
-  it("a project with no firm: any signed-in account", async () => {
-    expect(await regenerateAuthority(db.client, "p1", bob)).toBeNull();
-  });
-
-  it("a firm's project: its members only — a non-member is refused on membership grounds", async () => {
-    const firm = await createFirm(db.client, { name: "Firm A" }, alice);
-    db.tables.projects![0]!.firm_id = firm.id;
+  it("H5: the project's members — anyone else is refused on membership grounds", async () => {
     expect(await regenerateAuthority(db.client, "p1", alice)).toBeNull();
     const b = await regenerateAuthority(db.client, "p1", bob);
-    expect(b?.code).toBe("not_a_member");
-    expect(b?.reason).toMatch(/only its members can regenerate/);
+    expect(b?.code).toBe("not_a_project_member");
+    expect(b?.reason).toMatch(/Only the project's members can regenerate/);
   });
 
   it("an unknown project → project_not_found", async () => {
@@ -74,10 +68,8 @@ describe("regenerateReadiness", () => {
   });
 
   it("membership is decided before the plan: a non-member sees why they cannot, not a plan problem", async () => {
-    const firm = await createFirm(db.client, { name: "Firm A" }, alice);
-    db.tables.projects![0]!.firm_id = firm.id;
     db.tables.plans = [];
-    expect((await regenerateReadiness(db.client, "p1", bob)).block?.code).toBe("not_a_member");
+    expect((await regenerateReadiness(db.client, "p1", bob)).block?.code).toBe("not_a_project_member");
   });
 });
 

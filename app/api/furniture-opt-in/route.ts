@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -37,6 +38,8 @@ export async function POST(request: NextRequest) {
   const { project_id, room_id } = parsed.data;
 
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
+  const access = await projectAccess(sb, caller, { project_id, room_id });
+  if (access.denied) return access.denied;
   try {
     const { error } = await sb
       .from("furniture_opt_ins")

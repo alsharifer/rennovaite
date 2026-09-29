@@ -6,6 +6,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { loadParity } from "@/lib/documents/parity-load";
 import { parityTableText } from "@/lib/documents/parity";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (process.env.DRAWINGS_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = z.string().uuid().safeParse((await params).id);
   if (!parsed.success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsed.data });
+  if (access.denied) return access.denied;
   try {
     const parity = await loadParity(getSupabaseAdmin() as unknown as SupabaseClient, parsed.data);
     if (new URL(request.url).searchParams.get("format") === "text") {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { listRevisions } from "@/lib/boq/revisions";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!caller) return unauthenticated("Sign in to read BoQ revisions.");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
+  if (access.denied) return access.denied;
   try {
     const revisions = await listRevisions(getSupabaseAdmin() as unknown as SupabaseClient, id);
     return NextResponse.json({ success: true, revisions });

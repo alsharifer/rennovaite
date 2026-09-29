@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { DEFAULT_OPENING_DIMS } from "@/lib/plan/geometry";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -34,6 +35,8 @@ export async function GET(request: NextRequest) {
   if (!planId || !z.string().uuid().safeParse(planId).success) {
     return NextResponse.json({ error: "plan_id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { plan_id: planId });
+  if (access.denied) return access.denied;
   try {
     const { data, error } = await db()
       .from("plan_openings")
@@ -83,6 +86,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const b = parsed.data;
+    const access = await projectAccess(db(), caller, { plan_id: b.plan_id, room_id: b.room_id ?? null, context_id: (b as { context_id?: string | null }).context_id ?? null });
+    if (access.denied) return access.denied;
     const def = DEFAULT_OPENING_DIMS[b.kind];
     const dimsDefaulted = b.width_mm == null || b.height_mm == null;
 
@@ -150,6 +155,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { id, reset_dims, ...fields } = parsed.data;
+    const access = await projectAccess(db(), caller, { opening_id: id, room_id: fields.room_id ?? null, context_id: (fields as { context_id?: string | null }).context_id ?? null });
+    if (access.denied) return access.denied;
 
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(fields)) {
@@ -205,6 +212,8 @@ export async function DELETE(request: NextRequest) {
     if (!id.success) {
       return NextResponse.json({ error: "A valid opening id is required." }, { status: 400 });
     }
+    const access = await projectAccess(db(), caller, { opening_id: id.data });
+    if (access.denied) return access.denied;
     const { error } = await db().from("plan_openings").delete().eq("id", id.data);
     if (error) throw error;
     return NextResponse.json({ success: true });

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { saveScenario } from "@/lib/whatif/rate-book";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   }
   const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
+  const access = await projectAccess(supabase, caller, { project_id: parsed.data.project_id });
+  if (access.denied) return access.denied;
   const ok = await saveScenario(
     supabase,
     parsed.data.project_id,

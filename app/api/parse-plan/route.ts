@@ -5,6 +5,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { LOW_CONFIDENCE_FLAG } from "@/lib/parse/constants";
 import { getParseProvider, type ParseAsset } from "@/lib/parse/providers";
 import { repairOverlaps, toRepairInput } from "@/lib/parse/repair";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -41,6 +42,8 @@ export async function POST(request: NextRequest) {
     if (!planId) {
       return NextResponse.json({ success: false, error: "plan_id is required" }, { status: 400 });
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { plan_id: planId });
+    if (access.denied) return access.denied;
 
     const supabase = getSupabaseAdmin();
     const sb = supabase as unknown as SupabaseClient; // untyped: rooms.confidence + parse_metrics

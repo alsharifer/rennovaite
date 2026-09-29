@@ -49,7 +49,7 @@ const flag = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 
 const PORT = args.find((a) => /^\d{2,5}$/.test(a)) ?? "3098";
 // H1: every route needs a signed-in caller — this script calls as the dev
 // "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
-const api = devFetch("pipeline", { script: "garden-draft-pack" });
+const api = devFetch("pipeline", { script: "garden-draft-pack", projects: [PROJECT] });
 const OUT_DIR = flag("--out-dir") ?? `${ROOT}/data/garden pilot/g5-draft-pack`;
 
 const options: PackExportOptions = {

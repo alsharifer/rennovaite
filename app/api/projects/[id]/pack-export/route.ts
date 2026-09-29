@@ -11,6 +11,7 @@ import { runPackExport } from "@/lib/documents/pack-export/run";
 import { httpTransport } from "@/lib/documents/pack-export/transport";
 import { DEFAULT_PACK_OPTIONS, type PackExportOptions } from "@/lib/documents/pack-export/types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   if (!packExportEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = await projectIdOf(ctx);
   if (!projectId) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
   // L4: ?proposal=1 adds the client-proposal items to the checklist shown.
   const proposal = new URL(request.url).searchParams.get("proposal") === "1";
@@ -63,6 +66,8 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   if (!packExportEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = await projectIdOf(ctx);
   if (!projectId) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const parsed = PostSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   // H1: the job calls this app's routes as the member who started it; its
@@ -70,9 +75,8 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   const authorization = await forwardableAuthorization(request, maxDuration + 300);
   if (!authorization) return unauthenticated("Sign in again to export — the session could not be carried to the export job.");
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
-  // H4: the export regenerates the BoQ, which is the project's firm's act —
-  // refuse up front with the same answer the route and the page give, rather
-  // than failing inside the job.
+  // H4/H5: the export regenerates the BoQ — refuse up front with the same
+  // answer the route and the page give, rather than failing inside the job.
   const block = await regenerateAuthority(db, projectId, caller);
   if (block) return NextResponse.json({ success: false, error: block.reason, code: block.code }, { status: block.code === "project_not_found" ? 404 : 403 });
 

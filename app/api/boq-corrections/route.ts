@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { StoreError, findOrCreateFirmByName, requireFirm } from "@/lib/firms/store";
 import { recordPilotEvent } from "@/lib/pilot/events";
+import { projectAccess } from "@/lib/projects/http";
 import { isMissingSchema } from "@/lib/rates/firm";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -56,6 +57,8 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   const b = parsed.data;
   let firmId: string | null = b.firm_id ?? null;
+  const access = await projectAccess(db(), caller, { project_id: b.project_id, boq_id: b.boq_id ?? null });
+  if (access.denied) return access.denied;
   let attributedTo = b.attributed_to ?? null;
   try {
     // U1: attributing a correction to a firm — by id or by name — needs a
@@ -110,6 +113,8 @@ export async function GET(request: NextRequest) {
   if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
+  const access = await projectAccess(db(), caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const { data, error } = await db()
     .from("boq_corrections")
     .select("*")

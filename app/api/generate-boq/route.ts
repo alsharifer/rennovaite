@@ -10,6 +10,7 @@ import { recordPilotEvent } from "@/lib/pilot/events";
 import { applyElementMapping } from "@/lib/boq/element-map";
 import { loadBoqInputs, priceDeterministicBoq, type LabourRateRow, type PricingSkuRow } from "@/lib/boq/assemble";
 import { regenerateAuthority } from "@/lib/boq/regenerate";
+import { projectAccess } from "@/lib/projects/http";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
 import { elementPricer } from "@/lib/boq/rates";
@@ -509,10 +510,6 @@ export async function POST(request: NextRequest) {
     const dryRun = parsedBody.data.dry_run === true;
     // L5: the generation's duration and the signed-in actor ride on the pilot event.
     const startedAt = Date.now();
-    // A pack export regenerates through this route carrying the session of
-    // whoever started it (H1); inside a job the event is the JOB's — a member's
-    // export is the firm's, a CLI run (a job with no actor) stays ours.
-    const actor = request.headers.has(PACK_JOB_HEADER) ? await packJobActor(request) : caller.id;
     if (dryRun && process.env.BOQ_ENGINE === "llm") {
       return NextResponse.json(
         { success: false, error: "dry_run is only supported on the deterministic engine path." },
@@ -533,11 +530,17 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
+    // H5: every run — a dry run too — is for a member of the project.
+    const access = await projectAccess(supabase, caller, { project_id: projectId });
+    if (access.denied) return access.denied;
+    // A pack export regenerates through this route carrying the session of
+    // whoever started it (H1); inside a job the event is the JOB's — a member's
+    // export is the firm's, a CLI run (a job with no actor) stays ours.
+    const actor = request.headers.has(PACK_JOB_HEADER) ? await packJobActor(request) : caller.id;
 
-    // H4: storing a revision is the project's firm's act — its members on a firm
-    // project, anyone signed in otherwise (lib/boq/regenerate.ts; the page's
-    // Regenerate control reads the same answer). Checked before anything is
-    // loaded or persisted. A dry run stores nothing and is not gated.
+    // H4/H5: storing a revision is for the project's members
+    // (lib/boq/regenerate.ts; the page's Regenerate control reads the same
+    // answer). Checked before anything is loaded or persisted.
     if (!dryRun) {
       const block = await regenerateAuthority(supabase, projectId, caller);
       if (block) return NextResponse.json({ success: false, error: block.reason, code: block.code }, { status: block.code === "project_not_found" ? 404 : 403 });

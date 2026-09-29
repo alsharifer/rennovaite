@@ -1,7 +1,9 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -45,6 +47,8 @@ export async function POST(request: NextRequest) {
       );
     }
     const roomId = parsedRoomId.data;
+    const access = await projectAccess(supabaseAdmin as unknown as SupabaseClient, caller, { room_id: roomId });
+    if (access.denied) return access.denied;
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file provided." }, { status: 400 });

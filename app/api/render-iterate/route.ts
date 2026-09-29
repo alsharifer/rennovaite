@@ -1,9 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { AnalyticsEvent, recordFeedback, trackServer } from "@/lib/analytics";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import {
   buildEditInput,
   createRenderPrediction,
@@ -110,6 +112,8 @@ export async function POST(request: NextRequest) {
       );
     }
     const { project_id, room_id, parent_render_id, tweak } = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, room_id, render_id: parent_render_id });
+    if (access.denied) return access.denied;
 
     const replicateKey = process.env.REPLICATE_API_TOKEN;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;

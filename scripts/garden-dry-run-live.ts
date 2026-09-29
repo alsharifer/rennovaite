@@ -84,6 +84,8 @@ async function main() {
   const { data: proj } = await db.from("projects").select("id").eq("name", PROJECT_NAME).maybeSingle<{ id: string }>();
   if (!proj) throw new Error(`Ground-truth project "${PROJECT_NAME}" not found — run record-garden-outcome first.`);
   const projectId = proj.id;
+  // H5: the pipeline account works on this project as its member (scripts/lib/dev-auth.mjs).
+  await api.grant([projectId]);
   console.log(`ground-truth project ${projectId}\n`);
 
   const { planId, records } = await seedVilla94Garden(db, BASE, projectId, check, { api });

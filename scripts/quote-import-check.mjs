@@ -23,7 +23,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
-import { devSession } from "./lib/dev-auth.mjs";
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 import { readXlsx, writeXlsx } from "../lib/quotes/xlsx.ts";
 
 const PORT = process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : "3098";
@@ -40,6 +40,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const me = await devSession("quote", { script: "quote-import-check" });
 const other = await devSession("other", { script: "quote-import-check" });
+// H5: the project routes answer members only — this check's accounts are made
+// members of the projects it works on (service role, like project-member-add),
+// and exactly those rows are removed again at cleanup.
+const memberships = [await grantProjectMembership(me.userId, [STAND_IN], { script: "quote-import-check" })];
 const api = async (method, p, body, auth = me, raw = false) => {
   const res = await fetch(`${BASE}${p}`, { method, headers: { ...(raw ? {} : { "content-type": "application/json" }), ...(auth?.headers ?? {}) }, body: raw ? body : body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, headers: res.headers, body: raw ? await res.arrayBuffer() : await res.json().catch(() => ({})) };
@@ -153,6 +157,7 @@ try {
   const v1 = await api("GET", `/api/firms/${firmId}/quotes/${quoteId}`);
   check("v1 is marked superseded, its lines and entry links intact", v1.body.quote.status === "superseded" && v1.body.lines.some((l) => l.entry_id));
 } finally {
+  for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
   await sb.from("projects").update({ firm_id: priorFirm }).eq("id", STAND_IN);
   if (firmId) {
