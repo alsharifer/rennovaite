@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { refMigration, refMigrationCsv } from "@/lib/boq/refs";
 import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -18,6 +19,8 @@ export const dynamic = "force-dynamic";
 // documents they already hold.
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;

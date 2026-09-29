@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { listEntryHistory } from "@/lib/firms/store";
 
@@ -19,12 +19,13 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ firmId: string }> };
 
 export async function GET(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   const itemKey = new URL(request.url).searchParams.get("item_key")?.trim() ?? "";
   if (!z.string().min(1).max(120).safeParse(itemKey).success) return badRequest("item_key is required.");
   try {
-    const caller = await getCaller(request);
     const db = firmDb();
     const history = await listEntryHistory(db, firmId, itemKey, caller);
     const ids = [...new Set(history.flatMap((h) => [h.created_by, h.retired_by]).filter((x): x is string => !!x))];

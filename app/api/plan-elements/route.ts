@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
 import { LINEAR_ELEMENT_META, LINEAR_ELEMENT_KINDS } from "@/lib/plan/elements";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -57,6 +58,8 @@ const PolylineSchema = z
  * degrades to an empty layer instead of breaking the plan page.
  */
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const planId = new URL(request.url).searchParams.get("plan_id");
   if (!planId || !z.string().uuid().safeParse(planId).success) {
     return NextResponse.json({ error: "plan_id (uuid) required." }, { status: 400 });
@@ -97,6 +100,8 @@ const CreateSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = CreateSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -157,6 +162,8 @@ const UpdateSchema = z.object({
  * because moving a bench does not measure it.
  */
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = UpdateSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -191,6 +198,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const id = z.string().uuid().safeParse(new URL(request.url).searchParams.get("id"));
     if (!id.success) {

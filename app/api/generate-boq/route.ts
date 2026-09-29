@@ -6,8 +6,8 @@ import { z } from "zod";
 
 import { generateDeterministicBoq } from "@/lib/boq/engine";
 import { loadAccessoryOverrides } from "@/lib/accessories/load";
-import { getCaller } from "@/lib/auth/caller";
-import { packJobActor } from "@/lib/documents/pack-export/guard";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { PACK_JOB_HEADER, packJobActor } from "@/lib/documents/pack-export/guard";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
@@ -540,6 +540,8 @@ function normalizeTotals(boq: BoqResponse): BoqResponse {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as unknown;
     const parsedBody = BodySchema.safeParse(body);
@@ -556,9 +558,10 @@ export async function POST(request: NextRequest) {
     const dryRun = parsedBody.data.dry_run === true;
     // L5: the generation's duration and the signed-in actor ride on the pilot event.
     const startedAt = Date.now();
-    // A pack export regenerates through this route with no session of its own;
-    // the job it belongs to knows who started it.
-    const actor = (await getCaller(request))?.id ?? (await packJobActor(request));
+    // A pack export regenerates through this route carrying the session of
+    // whoever started it (H1); inside a job the event is the JOB's — a member's
+    // export is the firm's, a CLI run (a job with no actor) stays ours.
+    const actor = request.headers.has(PACK_JOB_HEADER) ? await packJobActor(request) : caller.id;
     if (dryRun && process.env.BOQ_ENGINE === "llm") {
       return NextResponse.json(
         { success: false, error: "dry_run is only supported on the deterministic engine path." },

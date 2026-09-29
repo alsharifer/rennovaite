@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { createEntry, listEntries } from "@/lib/firms/store";
 import { FIRM_ENTRY_KINDS } from "@/lib/rates/firm";
@@ -29,10 +29,11 @@ const EntrySchema = z.object({
 type Ctx = { params: Promise<{ firmId: string }> };
 
 export async function GET(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   try {
-    const caller = await getCaller(request);
     return NextResponse.json({ success: true, entries: await listEntries(firmDb(), firmId, caller) });
   } catch (e) {
     return storeErrorResponse(e);
@@ -40,12 +41,13 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 }
 
 export async function POST(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   const parsed = EntrySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    const caller = await getCaller(request);
     const entry = await createEntry(firmDb(), firmId, parsed.data, caller);
     return NextResponse.json({ success: true, entry }, { status: 201 });
   } catch (e) {

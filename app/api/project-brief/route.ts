@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import {
   recommendStyle,
   sanitiseAnswers,
@@ -31,6 +32,8 @@ function db(): SupabaseClient {
 
 /** GET /api/project-brief?project_id=… — the brief, or an empty one. */
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
@@ -72,6 +75,8 @@ const SaveSchema = z.object({
  * stored row so the client never has to guess what the server decided.
  */
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = SaveSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {

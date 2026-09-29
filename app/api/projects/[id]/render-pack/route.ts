@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { guardDocumentRoute, packJobActor } from "@/lib/documents/pack-export/guard";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -25,6 +26,8 @@ const IdSchema = z.string().uuid();
  * Gated by DRAWINGS_ENABLED with the drawing set it is assembled alongside.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.DRAWINGS_ENABLED !== "true") {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }

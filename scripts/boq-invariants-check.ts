@@ -12,12 +12,17 @@
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { devFetch } from "./lib/dev-auth.mjs";
+
 import { assignRefs } from "@/lib/boq/refs";
 import { formatAed } from "@/lib/format/aed";
 import { boqDerivedInfo, derivedTotal, isUnpricedLine } from "@/lib/documents/boq-derived";
 
 const ROOT = "C:/dev/rennovaite";
 const PORT = process.argv[2] ?? "3098";
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "boq-invariants-check" });
 for (const line of readFileSync(`${ROOT}/.env.local`, "utf8").split(/\r?\n/)) {
   const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
   if (m && !process.env[m[1]!]) process.env[m[1]!] = m[2]!.replace(/^"|"$/g, "");
@@ -54,7 +59,7 @@ for (const p of (projects ?? []) as { id: string; name: string }[]) {
   const refs = assignRefs(sections);
   const values = Object.values(refs);
   check("D5 one REF per line, all unique", values.length === lines.length && new Set(values).size === values.length, `${new Set(values).size}/${lines.length}`);
-  const route = (await (await fetch(`http://localhost:${PORT}/api/projects/${p.id}/boq-refs`)).json()) as { rows?: { ref: string }[]; error?: string };
+  const route = (await (await api(`http://localhost:${PORT}/api/projects/${p.id}/boq-refs`)).json()) as { rows?: { ref: string }[]; error?: string };
   const routeRefs = (route.rows ?? []).map((r) => r.ref);
   check("D5 the REF route agrees with the page and is unique", routeRefs.length === values.length && new Set(routeRefs).size === routeRefs.length && routeRefs.every((r) => values.includes(r)), route.error ?? `${routeRefs.length} rows`);
 

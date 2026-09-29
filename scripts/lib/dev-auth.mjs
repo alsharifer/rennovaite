@@ -83,3 +83,49 @@ export function sessionCookies(projectRef, session) {
   for (let i = 0, n = 0; i < encoded.length; i += MAX_CHUNK, n++) out.push({ name: `${name}.${n}`, value: encoded.slice(i, i + MAX_CHUNK) });
   return out;
 }
+
+/**
+ * @typedef {((input: string | URL | Request, init?: RequestInit) => Promise<Response>) & {
+ *   authorization: () => Promise<string>,
+ * }} DevFetch
+ */
+
+/**
+ * H1: every API route answers a signed-out call with 401 and every app page
+ * redirects it to /auth, so a script that calls the app does so as a dev
+ * account — the same credential `devSession` mints, on every request. The
+ * returned fetch adds `Authorization: Bearer <jwt>` unless the call set its
+ * own. It mints on first use (so a script can declare it before loading
+ * .env.local) and again within five minutes of expiry, so a long run (a full
+ * pack export with renders) never outlives its credential. `.authorization()`
+ * hands the same header to code that makes its own requests (the pack-export
+ * transport).
+ *
+ * Pipeline and seeding scripts use the account "pipeline"
+ * (dev-scripts+pipeline@rennovaite.local), so the events they cause name a
+ * script account rather than nobody or a check's stand-in member.
+ *
+ * @param {string} [who]
+ * @param {{ script?: string }} [opts]
+ * @returns {DevFetch}
+ */
+export function devFetch(who = "a", opts = {}) {
+  /** @type {Awaited<ReturnType<typeof devSession>> | null} */
+  let s = null;
+  /** @type {ReturnType<typeof devSession> | null} */
+  let pending = null;
+  const authorization = async () => {
+    if (!s || (s.session.expires_at ?? 0) - Date.now() / 1000 < 300) {
+      if (!pending) pending = devSession(who, opts).finally(() => { pending = null; });
+      s = await pending;
+    }
+    return s.headers.authorization;
+  };
+  /** @param {string | URL | Request} input @param {RequestInit} [init] */
+  const f = async (input, init = {}) => {
+    const headers = new Headers(init.headers);
+    if (!headers.has("authorization")) headers.set("authorization", await authorization());
+    return fetch(input, { ...init, headers });
+  };
+  return Object.assign(f, { authorization });
+}

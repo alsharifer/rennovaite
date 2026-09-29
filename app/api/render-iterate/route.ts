@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { AnalyticsEvent, recordFeedback, trackServer } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import {
   buildEditInput,
   createRenderPrediction,
@@ -97,6 +98,8 @@ async function rewritePrompt(
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const raw = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);

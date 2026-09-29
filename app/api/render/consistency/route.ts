@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { checkConsistency, loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 
 export const runtime = "nodejs";
@@ -19,6 +20,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   try {

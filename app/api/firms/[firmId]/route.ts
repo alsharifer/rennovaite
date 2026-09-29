@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { deleteFirm, getFirmSummary, updateFirm } from "@/lib/firms/store";
 
@@ -36,10 +36,11 @@ async function firmIdOf(ctx: Ctx): Promise<string | null> {
 }
 
 export async function GET(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const firmId = await firmIdOf(ctx);
   if (!firmId) return badRequest("Invalid firm id.");
   try {
-    const caller = await getCaller(request);
     return NextResponse.json({ success: true, firm: await getFirmSummary(firmDb(), firmId, caller) });
   } catch (e) {
     return storeErrorResponse(e);
@@ -47,12 +48,13 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 }
 
 export async function PATCH(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const firmId = await firmIdOf(ctx);
   if (!firmId) return badRequest("Invalid firm id.");
   const parsed = PatchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    const caller = await getCaller(request);
     return NextResponse.json({ success: true, firm: await updateFirm(firmDb(), firmId, parsed.data, caller) });
   } catch (e) {
     return storeErrorResponse(e);
@@ -60,10 +62,11 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const firmId = await firmIdOf(ctx);
   if (!firmId) return badRequest("Invalid firm id.");
   try {
-    const caller = await getCaller(request);
     await deleteFirm(firmDb(), firmId, caller);
     return NextResponse.json({ success: true });
   } catch (e) {

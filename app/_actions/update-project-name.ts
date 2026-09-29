@@ -2,12 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getCaller } from "@/lib/auth/caller";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function updateProjectName(
   projectId: string,
   name: string,
 ): Promise<{ success: true } | { success: false; error: string }> {
+  // H1: a server action is a POST the proxy cannot tell apart from the page's
+  // own; it checks the caller itself.
+  const caller = await getCaller();
+  if (!caller) return { success: false, error: "Sign in to rename a project." };
   const trimmed = name.trim();
   if (!trimmed) {
     return { success: false, error: "Name cannot be empty." };

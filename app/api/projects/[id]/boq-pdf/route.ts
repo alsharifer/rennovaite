@@ -1,3 +1,4 @@
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -25,6 +26,8 @@ const IdSchema = z.string().uuid();
  * existing item is a price nobody has agreed to. Gated with the drawing set.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.DRAWINGS_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = IdSchema.safeParse((await params).id);
   if (!parsed.success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });

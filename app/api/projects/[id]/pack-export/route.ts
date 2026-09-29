@@ -2,7 +2,7 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { forwardableAuthorization, getCaller, unauthenticated } from "@/lib/auth/caller";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { createPackJob, finishPackJob, latestPackJobs, progressWriter, storageSink } from "@/lib/documents/pack-export/job";
 import { preflightChecklist } from "@/lib/documents/pack-export/preflight";
@@ -43,23 +43,31 @@ async function projectIdOf(ctx: Ctx): Promise<string | null> {
   return z.string().uuid().safeParse(id).success ? id : null;
 }
 
-export async function GET(req: NextRequest, ctx: Ctx) {
+export async function GET(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!packExportEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = await projectIdOf(ctx);
   if (!projectId) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
   // L4: ?proposal=1 adds the client-proposal items to the checklist shown.
-  const proposal = new URL(req.url).searchParams.get("proposal") === "1";
+  const proposal = new URL(request.url).searchParams.get("proposal") === "1";
   const [preflight, jobs] = await Promise.all([preflightChecklist(db, projectId, { proposal }), latestPackJobs(db, projectId)]);
   return NextResponse.json({ ...preflight, jobs: jobs.map((j) => ({ id: j.id, status: j.status, source: j.source, created_at: j.created_at, finished_at: j.finished_at })) });
 }
 
 export async function POST(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!packExportEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = await projectIdOf(ctx);
   if (!projectId) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const parsed = PostSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
+  // H1: the job calls this app's routes as the member who started it; its
+  // credential must outlive the job (maxDuration), so it is refreshed if close.
+  const authorization = await forwardableAuthorization(request, maxDuration + 300);
+  if (!authorization) return unauthenticated("Sign in again to export — the session could not be carried to the export job.");
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
 
   // The client-facing name is part of the gate: set it here, the run checks it.
@@ -74,8 +82,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   };
   const job = await createPackJob(db, projectId, "app", options);
   // L5 (048): who started it — the firm's own export, or ours. Best-effort.
-  const actor = (await getCaller(request))?.id ?? null;
-  if (actor) await db.from("pack_exports").update({ actor }).eq("id", job.id).then(() => undefined, () => undefined);
+  await db.from("pack_exports").update({ actor: caller.id }).eq("id", job.id).then(() => undefined, () => undefined);
   const origin = new URL(request.url).origin;
 
   after(async () => {
@@ -84,7 +91,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       const result = await runPackExport({
         projectId,
         db,
-        transport: httpTransport(origin, job.id),
+        transport: httpTransport(origin, job.id, { authorization }),
         sink: storageSink(db, projectId, job.id),
         options,
         source: "app",

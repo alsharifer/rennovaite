@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as
       | { plan_id?: unknown; notes?: unknown }

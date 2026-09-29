@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { computePilotMetrics, recordPilotEvent, type PilotEvent } from "@/lib/pilot/events";
 import { loadFirmEvidence } from "@/lib/pilot/load";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -16,8 +16,9 @@ export const dynamic = "force-dynamic";
 //         session_decision { project_id, kind, record, question, answer, applied? }
 //         support_touch { project_id?, firm_id?, kind, channel, note, resolved? }   (L5)
 //   GET   ?project_id=   the G5 per-project metrics
-//         ?firm_id=      the L5 per-firm rollup (signed in)
+//         ?firm_id=      the L5 per-firm rollup
 // L5 lifted the GARDEN_PILOT_ENABLED gate: interior firm projects record too.
+// H1: every call needs a signed-in caller, who is the events' actor.
 
 function db(): SupabaseClient {
   return getSupabaseAdmin() as unknown as SupabaseClient;
@@ -54,9 +55,11 @@ const SupportSchema = z
   .refine((b) => !!b.project_id || !!b.firm_id, "project_id or firm_id is required.");
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const body = await request.json().catch(() => null);
   const kind = body && typeof body === "object" ? (body as { kind?: unknown }).kind : undefined;
-  const actor = (await getCaller(request))?.id ?? null;
+  const actor = caller.id;
   if (kind === "session_decision") {
     const d = DecisionSchema.safeParse(body);
     if (!d.success) return NextResponse.json({ error: d.error.message }, { status: 400 });
@@ -79,11 +82,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to read pilot metrics.");
   const url = new URL(request.url);
   const firmId = url.searchParams.get("firm_id");
   if (firmId) {
     if (!z.string().uuid().safeParse(firmId).success) return NextResponse.json({ error: "firm_id must be a uuid." }, { status: 400 });
-    if (!(await getCaller(request))) return NextResponse.json({ error: "Sign in to read firm metrics.", code: "unauthenticated" }, { status: 401 });
     const evidence = await loadFirmEvidence(db(), [firmId]);
     const firm = evidence.firms[0];
     if (!firm) return NextResponse.json({ error: "Firm not found." }, { status: 404 });

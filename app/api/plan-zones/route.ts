@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -30,6 +31,8 @@ const PatchSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = PatchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });

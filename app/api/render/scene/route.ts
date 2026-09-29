@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { NotCachedError } from "@/lib/scene-render/pipeline";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -27,6 +28,8 @@ const BodySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const projectId = request.nextUrl.searchParams.get("project_id") ?? "";
   if (!z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id is required." }, { status: 400 });
@@ -53,6 +56,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   const { project_id, camera_id, view, anchor_render_id, cache_only } = parsed.data;

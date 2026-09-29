@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -24,6 +25,8 @@ function extensionFor(file: File): string {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   let createdProjectId: string | null = null;
 
   try {

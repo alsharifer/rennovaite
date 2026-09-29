@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { gardenStyleFor, isGardenStyleKey } from "@/lib/garden-styles";
 import { gardenPresetItems } from "@/lib/moodboard/types";
 import { loadRenders } from "@/lib/render-batch/load";
@@ -39,6 +40,8 @@ type Preset =
   | { seeded: false; style_key: string | null; reason: string };
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = BodySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {

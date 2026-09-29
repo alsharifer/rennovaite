@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { seedOverlays } from "@/lib/overlays/seed";
@@ -38,6 +39,8 @@ function db(): SupabaseClient {
  * Seeds the rule-based defaults on first access (when none exist yet).
  */
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!flagOn()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
@@ -115,6 +118,8 @@ const UpsertSchema = z.object({
  * Any write is a user edit → source: 'user'.
  */
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!flagOn()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const raw = await request.json().catch(() => null);
   const parsed = UpsertSchema.safeParse(raw);
@@ -170,6 +175,8 @@ export async function POST(request: NextRequest) {
 
 /** DELETE /api/plan-fixtures?id=… */
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!flagOn()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const id = new URL(request.url).searchParams.get("id");
   if (!id || !z.string().uuid().safeParse(id).success) {

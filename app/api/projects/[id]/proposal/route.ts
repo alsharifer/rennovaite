@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { guardDocumentRoute, packJobActor } from "@/lib/documents/pack-export/guard";
 import { loadProposalGate } from "@/lib/documents/proposal-gate";
 import { renderProposalPdf } from "@/lib/documents/proposal-pdf";
@@ -29,6 +30,8 @@ export const maxDuration = 60;
 // that belongs on it.
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const parsed = z.string().uuid().safeParse((await params).id);
   if (!parsed.success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const projectId = parsed.data;

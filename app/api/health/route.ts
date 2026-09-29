@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getCaller } from "@/lib/auth/caller";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -14,7 +16,12 @@ export const dynamic = "force-dynamic";
 // can tell whether you're hitting the right environment scope.
 // (NB: folder is `health`, not `_health` — App Router treats
 // underscore-prefixed folders as private and excludes them from routing.)
-export async function GET() {
+//
+// H1: public (lib/auth/access.ts) so an uptime check needs no session — but an
+// anonymous caller gets presence only. The fingerprints, however partial, are
+// pieces of secrets; they are for a signed-in caller.
+export async function GET(request: Request) {
+  const signedIn = !!(await getCaller(request));
   const vars = [
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
@@ -31,7 +38,7 @@ export async function GET() {
         present: typeof process.env[name] === "string" && process.env[name] !== "",
         // Cheap fingerprint: first 6 + last 4 chars, length. Helps catch
         // "I pasted the wrong value" without leaking the secret.
-        fingerprint: fingerprint(process.env[name]),
+        ...(signedIn ? { fingerprint: fingerprint(process.env[name]) } : {}),
       },
     ]),
   );
@@ -41,6 +48,7 @@ export async function GET() {
     vercel_env: process.env.VERCEL_ENV ?? "unknown",
     vercel_url: process.env.VERCEL_URL ?? null,
     node: process.version,
+    signed_in: signedIn,
     env,
   });
 }

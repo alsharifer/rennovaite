@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { promoteCorrection } from "@/lib/firms/store";
 import { FIRM_ENTRY_KINDS } from "@/lib/rates/firm";
@@ -29,12 +29,13 @@ const PostSchema = z.object({
 });
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ firmId: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   const parsed = PostSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    const caller = await getCaller(request);
     const result = await promoteCorrection(firmDb(), firmId, parsed.data, caller);
     return NextResponse.json({ success: true, ...result }, { status: 201 });
   } catch (e) {

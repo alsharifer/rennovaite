@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { loadMoodboard } from "@/lib/moodboard/load";
 import {
   isStyleRoom,
@@ -30,6 +31,8 @@ function db(): SupabaseClient {
 
 /** GET /api/moodboard?project_id=… */
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
@@ -61,6 +64,8 @@ const AddSchema = z.discriminatedUnion("kind", [
 
 /** POST /api/moodboard — add one reference to the end of the board. */
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = AddSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -147,6 +152,8 @@ const ReorderSchema = z.object({
 
 /** PATCH /api/moodboard — move one item to a new index; renumbers densely. */
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = ReorderSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -183,6 +190,8 @@ export async function PATCH(request: NextRequest) {
 
 /** DELETE /api/moodboard?id=… — remove one reference. */
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const url = new URL(request.url);
     const id = z.string().uuid().safeParse(url.searchParams.get("id"));

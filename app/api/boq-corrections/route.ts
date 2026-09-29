@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { StoreError, findOrCreateFirmByName, requireFirm } from "@/lib/firms/store";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { isMissingSchema } from "@/lib/rates/firm";
@@ -49,6 +49,8 @@ const PostSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = PostSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
@@ -57,14 +59,14 @@ export async function POST(request: NextRequest) {
   let attributedTo = b.attributed_to ?? null;
   try {
     // U1: attributing a correction to a firm — by id or by name — needs a
-    // signed-in MEMBER of that firm (401 / 403 / 404). A correction with no
-    // firm attribution (the in-app ReviewCorrections form sends none) is
-    // unchanged: still unauthenticated, recorded in docs/AUTH.md as such.
+    // signed-in MEMBER of that firm (401 / 403 / 404). H1: a correction with
+    // no firm attribution (the in-app ReviewCorrections form sends none) needs
+    // a signed-in caller, like every route.
     if (firmId) {
-      const firm = await requireFirm(db(), firmId, await getCaller(request));
+      const firm = await requireFirm(db(), firmId, caller);
       attributedTo = attributedTo ?? firm.name;
     } else if (attributedTo && attributedTo.trim()) {
-      firmId = (await findOrCreateFirmByName(db(), attributedTo, "boq-corrections", await getCaller(request))).id;
+      firmId = (await findOrCreateFirmByName(db(), attributedTo, "boq-corrections", caller)).id;
     }
   } catch (e) {
     if (e instanceof StoreError && (e.status === 401 || e.status === 403 || e.status === 404)) {
@@ -97,12 +99,14 @@ export async function POST(request: NextRequest) {
       ...(b.session_ref ? { record: b.session_ref, stage: "design_session" } : {}),
       correction_id: (data as { id: string }).id,
     },
-    { actor: (await getCaller(request))?.id ?? null, firmId, sessionRef: b.session_ref ?? null },
+    { actor: caller.id, firmId, sessionRef: b.session_ref ?? null },
   );
   return NextResponse.json({ correction: data });
 }
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });

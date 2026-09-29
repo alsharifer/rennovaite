@@ -31,6 +31,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { devFetch } from "./lib/dev-auth.mjs";
 
 import { verificationJobs } from "./lib/verification-job.mjs";
 
@@ -53,6 +54,9 @@ const RENDER_REFERENCE = !ARGS.includes("--no-render-reference");
 const RENDER_CLIENT = !ARGS.includes("--no-render-client");
 const OUT_NAME = argValue("--out") ?? "g4b-isolation";
 const BASE = `http://localhost:${PORT}`;
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "garden-isolation-check" });
 const REFERENCE = "Villa 94 garden (ground truth)";
 const STAND_IN = "Client garden stand-in (isolation fixture)";
 const OUT = `${ROOT}/screenshots/garden-pilot`;
@@ -170,21 +174,21 @@ interface GateRow {
 async function regeneratePack(projectId: string, tag: string, render = true): Promise<{ gate: GateRow[]; packBytes: number; pages: number }> {
   // The documents are regenerated whether or not the views are re-rendered: the
   // BoQ (and its take-off rows) and the drawing set are part of the pack.
-  const gen = (await (await fetch(`${BASE}/api/generate-boq`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId }) })).json()) as { error?: string };
+  const gen = (await (await api(`${BASE}/api/generate-boq`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId }) })).json()) as { error?: string };
   console.log(`  [${tag}] BoQ regenerated${gen.error ? ` — ERROR ${gen.error}` : ""}`);
-  await fetch(`${BASE}/api/projects/${projectId}/drawings`, { headers: await docHeaders(projectId) });
+  await api(`${BASE}/api/projects/${projectId}/drawings`, { headers: await docHeaders(projectId) });
   if (!render) {
-    const summary = (await (await fetch(`${BASE}/api/projects/${projectId}/render-pack?format=json`, { headers: await docHeaders(projectId) })).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
+    const summary = (await (await api(`${BASE}/api/projects/${projectId}/render-pack?format=json`, { headers: await docHeaders(projectId) })).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
     return { gate: summary.gate ?? [], packBytes: summary.bytes ?? 0, pages: summary.pages?.length ?? 0 };
   }
-  const cams = (await (await fetch(`${BASE}/api/render/scene?project_id=${projectId}`)).json()) as { cameras: { id: string; label: string; lit: boolean }[]; error?: string };
+  const cams = (await (await api(`${BASE}/api/render/scene?project_id=${projectId}`)).json()) as { cameras: { id: string; label: string; lit: boolean }[]; error?: string };
   if (!cams.cameras) throw new Error(`cameras: ${cams.error}`);
   const run = async (jobs: { id: string; view: "day" | "evening" }[]) => {
     const queue = [...jobs];
     const worker = async () => {
       for (let j = queue.shift(); j; j = queue.shift()) {
         const t0 = Date.now();
-        const res = await fetch(`${BASE}/api/render/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId, camera_id: j.id, view: j.view }) });
+        const res = await api(`${BASE}/api/render/scene`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId, camera_id: j.id, view: j.view }) });
         const body = (await res.json().catch(() => ({}))) as { outcome?: string; cached?: boolean; error?: string };
         console.log(`  [${tag}] ${j.view.padEnd(7)} ${j.id.slice(0, 44).padEnd(44)} ${body.outcome ?? `ERROR ${body.error}`}${body.cached ? " (cached)" : ""} ${Math.round((Date.now() - t0) / 1000)}s`);
       }
@@ -193,7 +197,7 @@ async function regeneratePack(projectId: string, tag: string, render = true): Pr
   };
   await run(cams.cameras.map((c) => ({ id: c.id, view: "day" as const })));
   await run(cams.cameras.filter((c) => c.lit).map((c) => ({ id: c.id, view: "evening" as const })));
-  const summary = (await (await fetch(`${BASE}/api/projects/${projectId}/render-pack?format=json`, { headers: await docHeaders(projectId) })).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
+  const summary = (await (await api(`${BASE}/api/projects/${projectId}/render-pack?format=json`, { headers: await docHeaders(projectId) })).json()) as { gate: GateRow[]; pages: unknown[]; bytes: number; error?: string };
   if (!summary.gate) throw new Error(`render pack: ${summary.error}`);
   return { gate: summary.gate, packBytes: summary.bytes, pages: summary.pages.length };
 }
@@ -227,7 +231,7 @@ async function endToEnd(db: SupabaseClient, projectId: string, otherId: string, 
     check(`[${tag}] every photo pair carries this project — manifest, restyle and source photo`, pairs.every((r) => r.gate?.manifest?.projectId === projectId && String(r.source_image_url).includes(`/${projectId}/`) && !String(r.image_url).includes(otherId)), `${pairs.length} pairs`);
   }
 
-  const drawings = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`, { headers: await docHeaders(projectId) })).json()) as { sheets?: { svg: string }[] };
+  const drawings = (await (await api(`${BASE}/api/projects/${projectId}/drawings`, { headers: await docHeaders(projectId) })).json()) as { sheets?: { svg: string }[] };
   check(`[${tag}] every drawing sheet carries this project`, (drawings.sheets ?? []).length > 0 && (drawings.sheets ?? []).every((s) => s.svg.includes(`data-project-id="${projectId}"`) && !s.svg.includes(otherId)), `${drawings.sheets?.length} sheets`);
 
   const { data: plan } = await db.from("plans").select("id").eq("project_id", projectId).maybeSingle<{ id: string }>();
@@ -265,8 +269,8 @@ async function main() {
     if (error || !data) throw error ?? new Error("could not create the stand-in");
     standIn = data;
     const seedChecks: string[] = [];
-    await seedVilla94Garden(db, BASE, standIn.id, (l, ok, d) => seedChecks.push(`${ok ? "PASS" : "FAIL"} ${l} ${d ?? ""}`));
-    const gen = await (await fetch(`${BASE}/api/generate-boq`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: standIn.id }) })).json();
+    await seedVilla94Garden(db, BASE, standIn.id, (l, ok, d) => seedChecks.push(`${ok ? "PASS" : "FAIL"} ${l} ${d ?? ""}`), { api });
+    const gen = await (await api(`${BASE}/api/generate-boq`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: standIn.id }) })).json();
     check("stand-in seeded from the same records, BoQ generated", seedChecks.every((c) => c.startsWith("PASS")) && !gen.error, seedChecks.filter((c) => !c.startsWith("PASS")).join("; "));
   }
   const A = ref.id;

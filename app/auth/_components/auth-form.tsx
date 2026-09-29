@@ -9,7 +9,7 @@ import { signInWithEmail } from "@/app/_actions/sign-in-with-email";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FADE = { duration: 0.24, ease: "easeOut" as const };
 
-export function AuthForm() {
+export function AuthForm({ next }: { next?: string }) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submittedTo, setSubmittedTo] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export function AuthForm() {
     setError(null);
     setPending(true);
     try {
-      const res = await signInWithEmail(value);
+      const res = await signInWithEmail(value, next);
       if (res.success) {
         setSubmittedTo(value);
       } else {

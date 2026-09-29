@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { listApprovals, recordApproval } from "@/lib/boq/approvals";
 import { storeErrorResponse } from "@/lib/firms/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -31,10 +31,10 @@ function db(): SupabaseClient {
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to read approvals.");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
-  const caller = await getCaller(request);
-  if (!caller) return NextResponse.json({ error: "Sign in to read approvals.", code: "unauthenticated" }, { status: 401 });
   try {
     return NextResponse.json({ success: true, approvals: await listApprovals(db(), id) });
   } catch (e) {
@@ -43,12 +43,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to approve a BoQ revision.");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const parsed = PostSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   try {
-    const caller = await getCaller(request);
     const approval = await recordApproval(db(), id, parsed.data, caller);
     return NextResponse.json({ success: true, approval }, { status: 201 });
   } catch (e) {

@@ -96,18 +96,18 @@ try {
   check("GET reference-basis anonymous → 401", rb401.status === 401);
   const rb = await api("GET", `/api/projects/${STAND_IN}/reference-basis`, undefined, userA);
   check("the BoQ is priced from the market reference and the proposal is refused", rb.status === 200 && rb.body.boq?.basis?.reference_lines > 0 && rb.body.verdict?.ok === false, `${rb.body.boq?.basis?.basis} · ${rb.body.boq?.basis?.reference_lines} ref lines · book ${rb.body.firm?.book_status}`);
-  const pj = await api("GET", `/api/projects/${STAND_IN}/proposal?format=json`);
-  check("proposal?format=json (open) says not ready", pj.status === 200 && pj.body.ready === false && pj.body.firm?.brand === BRAND);
+  const pj = await api("GET", `/api/projects/${STAND_IN}/proposal?format=json`, undefined, userA);
+  check("proposal?format=json (no pack job) says not ready", pj.status === 200 && pj.body.ready === false && pj.body.firm?.brand === BRAND);
   const vh = await jobs.headers(STAND_IN);
-  const p409 = await api("GET", `/api/projects/${STAND_IN}/proposal?format=pages`, undefined, undefined, { headers: vh });
+  const p409 = await api("GET", `/api/projects/${STAND_IN}/proposal?format=pages`, undefined, userA, { headers: vh });
   check("proposal pages through a pack job → 409 proposal_not_ready", p409.status === 409 && p409.body.code === "proposal_not_ready", `${p409.status} ${p409.body.code}`);
-  const pre = await api("GET", `/api/projects/${STAND_IN}/pack-export?proposal=1`);
+  const pre = await api("GET", `/api/projects/${STAND_IN}/pack-export?proposal=1`, undefined, userA);
   const rbItem = pre.body.checklist?.find((c) => c.key === "reference_basis");
   check("export gate checklist (proposal) names the reference-basis refusal with the fix link", !!rbItem && rbItem.ok === false && rbItem.fix?.href === `/project/${STAND_IN}/boq#reference-basis` && rbItem.items?.length === 2, JSON.stringify(rbItem?.items));
   check("…and the branding item says what the cover prints", pre.body.checklist?.find((c) => c.key === "branding")?.detail?.includes(BRAND));
-  const preNo = await api("GET", `/api/projects/${STAND_IN}/pack-export`);
+  const preNo = await api("GET", `/api/projects/${STAND_IN}/pack-export`, undefined, userA);
   check("without ?proposal=1 the checklist has no proposal items", !preNo.body.checklist?.some((c) => c.key === "reference_basis"));
-  const startBlocked = await api("POST", `/api/projects/${STAND_IN}/pack-export`, { proposal: true, renders: "cached" });
+  const startBlocked = await api("POST", `/api/projects/${STAND_IN}/pack-export`, { proposal: true, renders: "cached" }, userA);
   check("POST pack-export { proposal: true } → 202", startBlocked.status === 202, `${startBlocked.status}`);
   created.jobs.push(startBlocked.body.job_id);
   const blocked = await waitJob(startBlocked.body.job_id);
@@ -127,7 +127,7 @@ try {
   check("the BoQ page shows the acceptance", boqHtml2.includes('data-basis-status="accepted"'));
 
   console.log("\n4. the proposal document");
-  const pages = await api("GET", `/api/projects/${STAND_IN}/proposal?format=pages`, undefined, undefined, { headers: vh });
+  const pages = await api("GET", `/api/projects/${STAND_IN}/proposal?format=pages`, undefined, userA, { headers: vh });
   check("proposal pages through a pack job → 200", pages.status === 200 && pages.body.pages?.length >= 2, `${pages.status} ${pages.body.pages?.length ?? 0} pages ${pages.body.error ?? ""}`);
   const pp = pages.body.pages ?? [];
   const all = pp.join("\n");
@@ -140,11 +140,12 @@ try {
   check("terms page present (the firm's words)", all.includes('data-terms="true"') && text.includes("Valid for 30 days"));
   const isDraft = boqHtml2.includes("data-boq-draft");
   if (isDraft) check("draft watermark carries over to every proposal page", pp.every((p) => p.includes('data-boq-draft="true"')));
-  const pdf = await fetch(`${BASE}/api/projects/${STAND_IN}/proposal`, { headers: vh });
+  const pdf = await fetch(`${BASE}/api/projects/${STAND_IN}/proposal`, { headers: { ...vh, ...userA.headers } });
   check("proposal PDF → application/pdf", pdf.status === 200 && pdf.headers.get("content-type") === "application/pdf" && (await pdf.arrayBuffer()).byteLength > 10_000, `${pdf.status}`);
 
   console.log("\n5. the proposal through the full pack export");
-  const start = await api("POST", `/api/projects/${STAND_IN}/pack-export`, { proposal: true, renders: "cached" });
+  // H1: the job runs its routes with user A's session, forwarded by the route.
+  const start = await api("POST", `/api/projects/${STAND_IN}/pack-export`, { proposal: true, renders: "cached" }, userA);
   created.jobs.push(start.body.job_id);
   const job = await waitJob(start.body.job_id);
   const rbAfter = job.checklist?.find((c) => c.key === "reference_basis");
@@ -187,7 +188,7 @@ async function waitJob(jobId) {
   for (let i = 0; i < 160; i++) {
     // The job runs in the route's after(); a dev server busy rasterising may drop a
     // poll connection — a transient fetch failure is retried, not fatal.
-    const r = await api("GET", `/api/projects/${STAND_IN}/pack-export/${jobId}`).catch((e) => ({ status: 0, body: { error: String(e?.cause?.code ?? e) } }));
+    const r = await api("GET", `/api/projects/${STAND_IN}/pack-export/${jobId}`, undefined, userA).catch((e) => ({ status: 0, body: { error: String(e?.cause?.code ?? e) } }));
     if (r.body.status && r.body.status !== "running" && r.body.status !== "queued") return r.body;
     await new Promise((res) => setTimeout(res, 2500));
   }

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { recordFeedback } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { persistDrawingSet } from "@/lib/drawings/persist";
 import { writeProposedSnapshot } from "@/lib/plan/snapshots";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -19,6 +20,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const raw = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);

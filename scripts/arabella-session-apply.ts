@@ -35,6 +35,8 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import { devFetch } from "./lib/dev-auth.mjs";
 import { unzipSync, strFromU8 } from "fflate";
 
 import { PLOT, PROJECT_NAME, toSite } from "../lib/client-garden/arabella-reference.ts";
@@ -57,6 +59,9 @@ import { changeReport, snapshotOf, type ChangeReport, type QtySnapshot } from ".
 const ROOT = "C:/dev/rennovaite";
 const PORT = process.argv.slice(2).find((a) => /^\d+$/.test(a)) ?? "3098";
 const BASE = `http://localhost:${PORT}`;
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "arabella-session-apply" });
 const WORKBOOK = `${ROOT}/data/garden pilot/Arabella_Session_Capture.xlsx`;
 
 for (const line of readFileSync(`${ROOT}/.env.local`, "utf8").split(/\r?\n/)) {
@@ -72,7 +77,7 @@ const check = (label: string, ok: boolean, detail = "") => {
   console.log(line);
 };
 async function call(method: string, path: string, body?: unknown) {
-  const res = await fetch(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await api(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
   return json;
@@ -327,7 +332,7 @@ async function main() {
   console.log(`  programme: an indicative delivery programme section is on the BoQ (not a line) — correction (scope, ${SESSION_FIRM})`);
 
   // Metrics.
-  const metrics = (await (await fetch(`${BASE}/api/pilot-events?project_id=${projectId}`)).json()) as { metrics: Record<string, unknown> & { corrections: { total: number; by_type: Record<string, number> }; sessions: { record: string; decisions: number; corrections: Record<string, number> }[] } };
+  const metrics = (await (await api(`${BASE}/api/pilot-events?project_id=${projectId}`)).json()) as { metrics: Record<string, unknown> & { corrections: { total: number; by_type: Record<string, number> }; sessions: { record: string; decisions: number; corrections: Record<string, number> }[] } };
   const mm = metrics.metrics;
   console.log("\nPILOT METRICS");
   for (const [k, v] of Object.entries(mm)) if (typeof v !== "object" || v === null) console.log(`  ${k.padEnd(30)} ${v}`);
@@ -339,7 +344,7 @@ async function main() {
   check("three-firms instrumentation record #1 is real session data", !!sess && sess.decisions === decisions.length && (sess.corrections.confirm ?? 0) === 1, JSON.stringify(sess));
 
   // Export gate, legitimately.
-  const ready = (await (await fetch(`${BASE}/api/projects/${projectId}/boq-pdf?format=json`)).json()) as { readiness: { ready: boolean } };
+  const ready = (await (await api(`${BASE}/api/projects/${projectId}/boq-pdf?format=json`)).json()) as { readiness: { ready: boolean } };
   check("the export gate passes: nothing untyped, undecided or needs_selection", ready.readiness.ready, JSON.stringify(ready.readiness));
   const { data: latest } = await db.from("boqs").select("sections").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).single<{ sections: { programme?: { total_days: number; phases: { name: string; days: number }[] } } }>();
   check("the BoQ carries the indicative programme", !!latest?.sections.programme, latest?.sections.programme ? `${latest.sections.programme.total_days} days: ${latest.sections.programme.phases.map((p) => `${p.name} ${p.days}`).join(" · ")}` : "");

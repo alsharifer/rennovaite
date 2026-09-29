@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -47,6 +48,8 @@ const CreateSchema = z.object({ plan_id: z.string().uuid(), ...Fields });
 const UpdateSchema = z.object({ id: z.string().uuid(), ...Object.fromEntries(Object.entries(Fields).map(([k, v]) => [k, v.optional()])) } as { id: z.ZodString } & { [K in keyof typeof Fields]: z.ZodOptional<(typeof Fields)[K]> });
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!enabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const planId = new URL(request.url).searchParams.get("plan_id");
   if (!planId || !z.string().uuid().safeParse(planId).success) {
@@ -58,6 +61,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!enabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = CreateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
@@ -94,6 +99,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!enabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = UpdateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
@@ -114,6 +121,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!enabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const id = z.string().uuid().safeParse(new URL(request.url).searchParams.get("id"));
   if (!id.success) return NextResponse.json({ error: "A valid context id is required." }, { status: 400 });

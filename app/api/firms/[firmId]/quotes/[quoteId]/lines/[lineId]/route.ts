@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { FIRM_ENTRY_KINDS } from "@/lib/rates/firm";
 import { updateQuoteLine } from "@/lib/quotes/store";
@@ -31,12 +31,13 @@ const PatchSchema = z
 type Ctx = { params: Promise<{ firmId: string; quoteId: string; lineId: string }> };
 
 export async function PATCH(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId, quoteId, lineId } = await ctx.params;
   if (![firmId, quoteId, lineId].every((v) => UuidSchema.safeParse(v).success)) return badRequest("Invalid id.");
   const parsed = PatchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    const caller = await getCaller(request);
     return NextResponse.json({ success: true, line: await updateQuoteLine(firmDb(), firmId, quoteId, lineId, parsed.data, caller) });
   } catch (e) {
     return storeErrorResponse(e);

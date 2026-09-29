@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { repairForSave } from "@/lib/plan/save-repair";
@@ -36,6 +37,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const raw = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);

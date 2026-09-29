@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { recordFeedback } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -28,6 +29,8 @@ type VendorSelectionRow = {
 };
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as unknown;
     const parsed = BodySchema.safeParse(body);
@@ -108,6 +111,8 @@ export async function POST(request: NextRequest) {
 
 // GET ?project_id=&boq_id= returns all selections for that BoQ.
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const { searchParams } = new URL(request.url);
     const project_id = searchParams.get("project_id");

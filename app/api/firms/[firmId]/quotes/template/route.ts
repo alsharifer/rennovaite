@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { requireFirm } from "@/lib/firms/store";
 import { listVocabulary } from "@/lib/firms/vocabulary";
@@ -16,10 +16,11 @@ export const dynamic = "force-dynamic";
 // known key can be written in directly. Members only, like every firm route.
 
 export async function GET(request: NextRequest, ctx: { params: Promise<{ firmId: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   try {
-    const caller = await getCaller(request);
     await requireFirm(firmDb(), firmId, caller);
     const vocab = listVocabulary().map((v) => ({ ...v, reference: { kind: "none" as const } }));
     const bytes = buildTemplate(vocab);

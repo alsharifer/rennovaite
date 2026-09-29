@@ -1227,9 +1227,9 @@ resolved line carries **`rate_tier`**.
   routes run on the service role, which RLS never sees. Scripts authenticate
   through `scripts/lib/dev-auth.mjs` (a real dev account's real session — no
   bypass); `scripts/firm-member-add.mjs` grants membership with the service
-  role. Sign-out exists (`app/_actions/sign-out.ts`, top bar). **Every other
-  API route is still unauthenticated** — a named deployment blocker, see
-  `docs/AUTH.md`.
+  role. Sign-out exists (`app/_actions/sign-out.ts`, top bar). Since H1 every
+  other route needs a signed-in caller too (see "Route auth" below); project
+  OWNERSHIP is still the named deployment blocker in `docs/AUTH.md`.
 - **Identity.** A firm's rate reaches a line as the constant
   "contractor rate book" — never its name. Pricing paths read `rate_book`
   only through `REFERENCE_COLUMNS` (no `source`, no `internal_ref`) and
@@ -1413,7 +1413,8 @@ its logo. Built on the T5 path, never beside it.
 
 - **Schema (migration 048)**: `pilot_events` gains `firm_id`, `actor`
   (the signed-in account; null = a script or our own run — the distinction
-  the pilot turns on), `session_ref`, `duration_ms`, `stage` (a column now;
+  the pilot turns on; since H1 a script outside a pack job calls as
+  `dev-scripts+pipeline@rennovaite.local`, so its events name that account), `session_ref`, `duration_ms`, `stage` (a column now;
   `detail.stage` stays for old readers), `project_id` nullable (a rate-book
   change is a firm event); kinds gain `boq_viewed`, `support_touch`,
   `rate_book_change`, `approval_recorded`, `basis_accepted`; `pack_exports`
@@ -1542,7 +1543,9 @@ display-name check, outputs not saved together. There is now ONE path.
   so a run is reproducible.
 - **No ungated output path.** Every document route calls `guardDocumentRoute`,
   which serves a document only to a RUNNING `pack_exports` job (migration 042,
-  header `x-pack-export-job`, 3 h TTL, project-scoped). A browser navigation is
+  header `x-pack-export-job`, 3 h TTL, project-scoped) — and, since H1, only to
+  a signed-in caller: the transport carries the session of whoever started the
+  job (the in-app job forwards the member's; the CLI uses `devFetch`). A browser navigation is
   redirected to the Export pack panel; anything else gets `403 use_pack_export`.
   The design-lock archive (`lib/drawings/persist.ts`) no longer mints year-long
   signed URLs — it records storage paths. `ungated-paths.test.ts` scans the app
@@ -1578,6 +1581,40 @@ display-name check, outputs not saved together. There is now ONE path.
 **DB step**: `npm run db:manifest` + `npm run db:push` for
 `20260101004200_pack_exports.sql` (the `pack_exports` table and the private
 `packs` bucket).
+
+## Route auth — a session everywhere (H1)
+
+Every API route and every app page needs a signed-in caller, except the ONE
+allowlist in `lib/auth/access.ts`: the `/auth/callback` route, `/api/health`
+(anonymous = env presence only, no key fingerprints), the pages `/`,
+`/rennovaite`, `/auth`, `/privacy`, `/terms`, and the sign-in / sign-out
+server actions. `docs/AUTH.md` has the full account.
+
+- **`proxy.ts`** (Next 16's middleware) gates first: `getClaims` on the Bearer
+  JWT or the cookie session (local ES256 check, ~5–15 ms); off the allowlist an
+  API route answers `401 { error, code: "unauthenticated" }`, a page redirects
+  `307 /auth?next=<path>`. It also refreshes the cookie session. Fails closed
+  without Supabase env.
+- **Every handler checks again**, as its first await (only route params before
+  it): `const caller = await getCaller(request); if (!caller) return
+  unauthenticated(…);` (both from `lib/auth/caller.ts`). Server actions call
+  `getCaller()` themselves. `lib/firms/__tests__/route-auth.test.ts` scans
+  every route and `"use server"` file and fails the suite on one that does not.
+  **A new route must open with that guard, or be added to the allowlist with a
+  reason.**
+- **Server-to-server calls carry a session.** The in-app pack export forwards
+  its starter's credential (`forwardableAuthorization`) through
+  `httpTransport(base, jobId, { authorization })`; inside a job,
+  `generate-boq` keeps the job's actor for its event.
+- **Scripts** call the app only through `scripts/lib/dev-auth.mjs` — `devFetch(who)`
+  (Bearer, lazily minted, re-minted near expiry; `.authorization()` for the CLI
+  transport) or `devSession(who)` (its `.cookies` for headless Chrome). There is
+  no bypass, shared secret or dev mode in the routes.
+- **Live check**: `node scripts/route-auth-sweep.mjs [port]` — every handler and
+  page derived from the filesystem, anonymous / forged-token / signed-in.
+- **Not done (stage 2)**: anyone with an inbox can get a magic-link session
+  (sign-up is open), and any signed-in account reaches every project — there
+  is no project ownership. RLS is still off.
 
 ## The journey — nine steps, one definition (B1/B2/B3)
 

@@ -11,6 +11,7 @@ import {
   validateAssetFile,
   type AssetKind,
 } from "@/lib/assets/types";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -35,6 +36,8 @@ async function mirrorRoomPhoto(roomId: string, storagePath: string) {
 // POST — create an asset from a multipart upload. Fields: file, project_id,
 // kind, source?, room_id?. Images should be compressed client-side first.
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   let uploadedPath: string | null = null;
   try {
     const form = await request.formData();
@@ -141,6 +144,8 @@ export async function POST(request: NextRequest) {
 
 // PATCH — assign an existing photo asset to a room. Body: { asset_id, room_id }.
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as
       | { asset_id?: unknown; room_id?: unknown }

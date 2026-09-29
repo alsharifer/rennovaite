@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { LOW_CONFIDENCE_FLAG } from "@/lib/parse/constants";
 import { getParseProvider, type ParseAsset } from "@/lib/parse/providers";
 import { repairOverlaps, toRepairInput } from "@/lib/parse/repair";
@@ -32,6 +33,8 @@ async function loadAssetFromUrl(url: string): Promise<ParseAsset> {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as { plan_id?: unknown } | null;
     const planId = typeof body?.plan_id === "string" ? body.plan_id : null;

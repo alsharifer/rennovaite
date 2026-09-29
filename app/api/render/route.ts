@@ -4,6 +4,7 @@ import Replicate from "replicate";
 import { z } from "zod";
 
 import { AnalyticsEvent, trackServer } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { getKgContext } from "@/lib/kg/context";
 import {
   buildBaseInput,
@@ -55,6 +56,8 @@ const BodySchema = z.object({
 const VALID_STYLE_KEYS = new Set<string>([...STYLE_KEYS, ...GARDEN_STYLE_KEYS]);
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const raw = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);

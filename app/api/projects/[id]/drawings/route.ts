@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
 
 import { generateDrawingSet, renderSetPdf, renderSheetPdf, type SheetKind } from "@/lib/drawings/export";
@@ -40,6 +41,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!flagOn()) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }

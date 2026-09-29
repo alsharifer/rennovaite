@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { RevisionNotFound, buildProjectRevisionDiff } from "@/lib/boq/revisions";
 import { renderRevisionDiffPdf } from "@/lib/documents/revision-diff-pdf";
 import { findWithheldIdentities, loadWithheldNames } from "@/lib/identity/curation";
@@ -26,10 +26,10 @@ export const maxDuration = 60;
 const Query = z.object({ from: z.string().uuid(), to: z.string().uuid(), format: z.enum(["json", "pdf", "pages"]).default("json") });
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to read a BoQ revision diff.");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
-  const caller = await getCaller(request);
-  if (!caller) return NextResponse.json({ error: "Sign in to read a BoQ revision diff.", code: "unauthenticated" }, { status: 401 });
   const q = Query.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!q.success) return NextResponse.json({ error: "from and to must be BoQ revision ids (uuid)." }, { status: 400 });
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;

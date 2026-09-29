@@ -21,6 +21,7 @@
 
 import { readFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { devFetch } from "./lib/dev-auth.mjs";
 
 import { verificationJobs } from "./lib/verification-job.mjs";
 
@@ -38,6 +39,9 @@ import { seedVilla94Garden } from "./lib/garden-seed.ts";
 const ROOT = "C:/dev/rennovaite";
 const PORT = process.argv[2] ?? "3098";
 const BASE = `http://localhost:${PORT}`;
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "garden-dry-run-live" });
 const PROJECT_NAME = "Villa 94 garden (ground truth)";
 const LANDSCAPE_SECTIONS = ["Preliminaries", "Demolition", "Hardscape & Structures", "Soft Landscaping", "Irrigation", "Electrical & Lighting"];
 const OVER_MEASURED = ["garden.pcc_base", "garden.paving_install", "garden.grass_supply", "garden.grass_install"];
@@ -61,7 +65,7 @@ async function loadEnv() {
 }
 
 const post = async (p: string, b: unknown) =>
-  (await fetch(BASE + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) })).json();
+  (await api(BASE + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) })).json();
 
 /** Every printed figure on a sheet — dimensions (h and v) and level tags — sorted. Ids differ; figures must not. */
 function printedFigures(svg: string): string[] {
@@ -82,7 +86,7 @@ async function main() {
   const projectId = proj.id;
   console.log(`ground-truth project ${projectId}\n`);
 
-  const { planId, records } = await seedVilla94Garden(db, BASE, projectId, check);
+  const { planId, records } = await seedVilla94Garden(db, BASE, projectId, check, { api });
 
   // --- BoQ through the real route ----------------------------------------------------
   const gen = await post("/api/generate-boq", { project_id: projectId });
@@ -166,7 +170,7 @@ async function main() {
   // --- The live drawing set prints the pure sheets' figures ------------------------------
   // T5: the drawings route answers only a pack job; this read opens one and releases nothing.
   const vj = verificationJobs(db, "garden-dry-run-live");
-  const liveSet = (await (await fetch(`${BASE}/api/projects/${projectId}/drawings`, { headers: await vj.headers(projectId) })).json().catch(() => ({}))) as { sheets?: { sheetNumber: string; kind: string; svg: string }[]; error?: string };
+  const liveSet = (await (await api(`${BASE}/api/projects/${projectId}/drawings`, { headers: await vj.headers(projectId) })).json().catch(() => ({}))) as { sheets?: { sheetNumber: string; kind: string; svg: string }[]; error?: string };
   const graph = buildPlanGraph({
     projectId,
     planId,

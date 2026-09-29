@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { loadSelections } from "@/lib/accessories/load";
 import { loadPickerData } from "@/lib/accessories/picker-data";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -24,6 +25,8 @@ function db(): SupabaseClient {
 }
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
@@ -45,6 +48,8 @@ const SelectSchema = z.object({
 
 /** POST — choose a catalogue item for one BoQ line. */
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = SelectSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -93,6 +98,8 @@ export async function POST(request: NextRequest) {
 
 /** DELETE — deselect, returning that line to its rule-derived default. */
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const url = new URL(request.url);
     const projectId = url.searchParams.get("project_id");

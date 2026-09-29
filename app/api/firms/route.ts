@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { createFirm, listFirms } from "@/lib/firms/store";
 
@@ -25,8 +25,9 @@ const PostSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   try {
-    const caller = await getCaller(request);
     const firms = await listFirms(firmDb(), caller);
     return NextResponse.json({ success: true, firms });
   } catch (e) {
@@ -35,10 +36,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const parsed = PostSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    const caller = await getCaller(request);
     const firm = await createFirm(firmDb(), parsed.data, caller);
     return NextResponse.json({ success: true, firm }, { status: 201 });
   } catch (e) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -53,6 +54,8 @@ const ConvertSchema = z.object({
  * case this serves, and silently deleting geometry is never the right default.
  */
 export async function PATCH(request: Request) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.GARDEN_PILOT_ENABLED !== "true") {
     return NextResponse.json(
       { error: "Drawing a plan from scratch is not enabled." },
@@ -87,6 +90,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.GARDEN_PILOT_ENABLED !== "true") {
     return NextResponse.json(
       { error: "Drawing a plan from scratch is not enabled." },

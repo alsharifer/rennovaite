@@ -1,8 +1,9 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
+import { AUTH_NEXT_COOKIE, safeNextPath } from "@/lib/auth/access";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const EmailSchema = z.string().trim().email();
@@ -20,8 +21,12 @@ export type SignInResult =
  * Requires (Supabase dashboard, not code): the Email auth provider enabled
  * and the {origin}/auth/callback URL on the redirect allowlist. If Auth
  * isn't configured the Supabase error is surfaced to the form verbatim.
+ *
+ * H1: `next` (a same-site path the proxy sent the visitor from) rides in a
+ * short-lived cookie scoped to the callback, not in the e-mailed URL — the
+ * link's redirect target stays exactly the one on the Supabase allowlist.
  */
-export async function signInWithEmail(email: string): Promise<SignInResult> {
+export async function signInWithEmail(email: string, next?: string): Promise<SignInResult> {
   const parsed = EmailSchema.safeParse(email);
   if (!parsed.success) {
     return { success: false, error: "That doesn't look like a valid email." };
@@ -46,6 +51,10 @@ export async function signInWithEmail(email: string): Promise<SignInResult> {
         emailRedirectTo: `${origin}/auth/callback?next=/project`,
       },
     });
+
+    if (!error && safeNextPath(next)) {
+      (await cookies()).set(AUTH_NEXT_COOKIE, next, { httpOnly: true, sameSite: "lax", secure: proto === "https", path: "/auth/callback", maxAge: 60 * 60 });
+    }
 
     if (error) {
       console.error("[signInWithEmail] supabase error", error.message);

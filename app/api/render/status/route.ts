@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import Replicate from "replicate";
 
 import { AnalyticsEvent, recordFeedback, trackServer } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import {
   buildEditInput,
   extractImageUrl,
@@ -46,6 +47,8 @@ async function retryRender(
 }
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const predictionId = request.nextUrl.searchParams.get("prediction_id");
     if (!predictionId) {

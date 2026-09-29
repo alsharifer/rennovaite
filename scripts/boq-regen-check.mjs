@@ -19,12 +19,17 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { devFetch } from "./lib/dev-auth.mjs";
+
 const [cmd, ...args] = process.argv.slice(2);
+// H1: every route and page needs a signed-in caller — read as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "boq-regen-check" });
 
 async function capture(dir, port, ids) {
   fs.mkdirSync(dir, { recursive: true });
   for (const id of ids) {
-    const res = await fetch(`http://localhost:${port}/api/generate-boq`, {
+    const res = await api(`http://localhost:${port}/api/generate-boq`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ project_id: id, dry_run: true }),

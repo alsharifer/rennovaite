@@ -1,3 +1,4 @@
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -76,6 +77,8 @@ function toOption(sku: PricingSku): VendorOption {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as unknown;
     const parsedBody = BodySchema.safeParse(body);

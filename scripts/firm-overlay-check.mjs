@@ -56,7 +56,8 @@ async function rateBookSnapshot() {
   return JSON.stringify(data);
 }
 async function dryRun(projectId) {
-  const r = await api("POST", "/api/generate-boq", { project_id: projectId, dry_run: true });
+  // H1: generate-boq needs a session like every route; the dry run is user A's.
+  const r = await api("POST", "/api/generate-boq", { project_id: projectId, dry_run: true }, userA);
   if (r.status !== 200) throw new Error(`dry run ${projectId}: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
   return r.body.boq;
 }
@@ -155,8 +156,9 @@ try {
   await refUnchanged("pricing");
 
   console.log("\n6. correction → explicit promotion → tier 2");
-  // Remove A's own entry so the promoted correction is what answers.
-  await api("DELETE", `/api/firms/${A}/rates/${ea.body.entry.id}`, undefined, userA);
+  // Remove A's own entry so the promoted correction is what answers. Since UV a
+  // figure edit supersedes (a new id), so the live entry is the PATCH's.
+  await api("DELETE", `/api/firms/${A}/rates/${patched.body.entry.id}`, undefined, userA);
   const anonCorr = await api("POST", "/api/boq-corrections", {
     project_id: STAND_IN, item_key: "garden.pcc_base", line_description: "PCC (anon, must fail)", correction_type: "rate", new_value: 1, attributed_to: "L1 check — firm A (scratch)",
   });

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -29,6 +30,8 @@ const ACTIONS = [
 type Action = (typeof ACTIONS)[number];
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const projectId = new URL(request.url).searchParams.get("project_id");
 

@@ -130,7 +130,7 @@ try {
 
   console.log("\n4. the BoQ prices from it, under the constant label");
   await api("PATCH", `/api/projects/${STAND_IN}`, { firm_id: firmId });
-  const dry = await api("POST", "/api/generate-boq", { project_id: STAND_IN, dry_run: true }, null);
+  const dry = await api("POST", "/api/generate-boq", { project_id: STAND_IN, dry_run: true });
   const pcc = dry.body.boq.sections.flatMap((s) => s.lines).find((l) => l.rule_id === "GL-04");
   check("PCC resolves at firm_private from the quote (98.5)", pcc?.rate_tier === "firm_private" && pcc.rate_aed === 98.5, `${pcc?.rate_aed} · ${pcc?.vendor_or_source}`);
   check("the line's source is the constant quote label", pcc?.vendor_or_source === "contractor rate book (supplier quotation)");
@@ -147,7 +147,7 @@ try {
   const active = (await api("GET", `/api/firms/${firmId}/rates`)).body.entries;
   const { count: total } = await sb.from("firm_rate_entries").select("id", { count: "exact", head: true }).eq("firm_id", firmId);
   check("active entries unchanged in count; superseded rows kept in the table", active.filter((e) => e.item_key === "garden.pcc_base").length === 1 && total === entries.length + 1, `active ${active.length}, total rows ${total}`);
-  const dry2 = await api("POST", "/api/generate-boq", { project_id: STAND_IN, dry_run: true }, null);
+  const dry2 = await api("POST", "/api/generate-boq", { project_id: STAND_IN, dry_run: true });
   const pcc2 = dry2.body.boq.sections.flatMap((s) => s.lines).find((l) => l.rule_id === "GL-04");
   check("BoQ now prices PCC at v2's 101", pcc2?.rate_aed === 101);
   const v1 = await api("GET", `/api/firms/${firmId}/quotes/${quoteId}`);

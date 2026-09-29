@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { saveScenario } from "@/lib/whatif/rate-book";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -19,6 +20,8 @@ const BodySchema = z.object({
 
 /** POST /api/whatif-scenario — persist a grade selection over the baseline BoQ. */
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.WHATIF_ENABLED !== "true") {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
