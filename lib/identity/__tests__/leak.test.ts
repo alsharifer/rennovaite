@@ -217,6 +217,15 @@ describe("T3b — rulings applied and the own-firm rule", () => {
     expect(curateBoq("RAK Ceramics — RAK-MRB-MAXIMUSC-60X60")).toBe("RAK Ceramics — RAK-MRB-MAXIMUSC-60X60");
   });
 
+  it("H2: the bare contractor name the prod seed wrote before its quotation number does not survive", () => {
+    const stored = "Atrium QTN20261407, 14 Jul 2026, 4% disc · 2.2 Kids BR1 bath cabinet with doors (×3), MR melamine";
+    const out = curateBoq(stored);
+    expect(out).toBe("joinery reference quotation, 14 Jul 2026, 4% disc · 2.2 Kids BR1 bath cabinet with doors (×3), MR melamine");
+    expect(out).not.toMatch(/Atrium|QTN/);
+    // The line-ref form keeps its own replacement.
+    expect(curateBoq("(Atrium 1.1)")).toBe("(ref 1.1)");
+  });
+
   it("no BoQ-emitting module still prints a ruled name", () => {
     const ROOT = path.resolve(__dirname, "../../..");
     const files = ["lib/boq/rules.ts", "lib/boq/takeoff.ts", "lib/boq/joinery-aluminum.ts", "lib/accessories/seed-data.ts", "lib/whatif/grades.ts", "lib/timeline/estimate.ts"];
