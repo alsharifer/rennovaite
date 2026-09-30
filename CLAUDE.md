@@ -1229,8 +1229,8 @@ resolved line carries **`rate_tier`**.
   through `scripts/lib/dev-auth.mjs` (a real dev account's real session — no
   bypass); `scripts/firm-member-add.mjs` grants membership with the service
   role. Sign-out exists (`app/_actions/sign-out.ts`, top bar). Since H1 every
-  other route needs a signed-in caller too (see "Route auth" below); project
-  OWNERSHIP is still the named deployment blocker in `docs/AUTH.md`.
+  other route needs a signed-in caller too (see "Route auth" below), and since
+  H5 every project route and page needs project membership.
 - **Identity.** A firm's rate reaches a line as the constant
   "contractor rate book" — never its name. Pricing paths read `rate_book`
   only through `REFERENCE_COLUMNS` (no `source`, no `internal_ref`) and
@@ -1666,6 +1666,26 @@ does).
 - **DB step**: `npm run db:push` for 050 **before** deploying the code — the
   membership read fails closed (500 `migration_required`) without the table.
 
+## Legal pages + the firm-#2 runbook (H6)
+
+- **`/privacy` and `/terms`** render `content/legal/privacy.md` / `terms.md` —
+  counsel's working drafts, verbatim, under a frontmatter block (`status`
+  draft | published, `last_updated` YYYY-MM-DD, `source`). Publishing the
+  lawyer-approved text is a **file swap + `status: published`**; no page edit.
+  `lib/legal/markdown.ts` is a deliberately small Markdown (headings,
+  paragraphs, quotes, lists, bold/italic) parsed to a block tree and rendered as
+  React elements by `components/legal/LegalPage.tsx` — never as HTML. While
+  `draft`: a "Draft — not yet in force" notice, "· draft" after the Last
+  updated line, and `noindex`. The body's own `*Last updated: [date]*` slot
+  is dropped; the page prints the frontmatter date. The sign-in form links both.
+  A test pins both documents at `draft` — flipping it is the sign-off.
+- **`docs/ONBOARDING_RUNBOOK.md`**: onboarding a second firm, in order —
+  account (allowlist) → firm (or `firm-member-add` for Newspace's 041 firm on
+  dev) → project membership + baseline regenerate → attach (both memberships)
+  → regenerate with an EMPTY book, which must not move → build the book →
+  mark reviewed → flags per pilot type → first proposal through the
+  reference-basis gate; plus Arabella's `firm_id` decision point.
+
 ## Regenerate from the BoQ page (H4)
 
 The payoff loop: change a rate or the plan → **Regenerate BoQ** → the new
@@ -1673,9 +1693,8 @@ revision's figure and a link to the U4 diff against the revision it superseded
 (`/project/:id/boq/revisions?from=<previous>&to=<new>`).
 
 - **Who** (`lib/boq/regenerate.ts`, ONE answer for route, pack export and page):
-  a firm's project is its members' to regenerate (`requireFirm`: 401/404/403);
-  a project with no firm, any signed-in account — the approvals rule. H5 adds the
-  project owner. `generate-boq` enforces it on every STORING run, before
+  since H5, the project's MEMBERS (`not_a_project_member`), whether or not it
+  has a firm (H4 shipped it as firm members / any signed-in account). `generate-boq` enforces it on every STORING run, before
   anything is loaded or persisted (a `dry_run` stores nothing and is not
   gated); in-app Export pack refuses up front with the same answer, since it
   regenerates inside its job.

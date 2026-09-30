@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import Link from "next/link";
 import { useState } from "react";
 
 import { signInWithEmail } from "@/app/_actions/sign-in-with-email";
@@ -161,8 +162,15 @@ export function AuthForm({ next }: { next?: string }) {
               </button>
 
               <p className="pt-sm font-body text-[12px] italic leading-relaxed text-on-surface-variant opacity-80">
-                By continuing you agree to our Terms. We never share your
-                floorplan.
+                By continuing you agree to our{" "}
+                <Link href="/terms" className="focus-ring underline underline-offset-2">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" className="focus-ring underline underline-offset-2">
+                  Privacy Policy
+                </Link>
+                . We never share your floorplan.
               </p>
             </form>
 

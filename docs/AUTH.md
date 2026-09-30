@@ -41,9 +41,10 @@ session still does not entitle._
   own run — the pilot's metrics say so.
 - **H4 adds** (2026-09-30): storing a BoQ revision (`POST /api/generate-boq`
   without `dry_run`) and starting an in-app Export pack need the regenerate
-  authority (`lib/boq/regenerate.ts`): a MEMBER of the project's firm when it
-  has one (403 `not_a_member`), any signed-in account otherwise. A dry run is
-  not gated. The BoQ page's Regenerate control is disabled with the same reason.
+  authority (`lib/boq/regenerate.ts`) — since H5 a MEMBER of the project (403
+  `not_a_project_member`; H4 shipped it as the firm's members, or any signed-in
+  account without a firm). A dry run stores nothing but still needs project
+  membership, like every project route. The BoQ page's Regenerate control is disabled with the same reason.
 - **Answers, in this order** (`lib/firms/store.ts → requireFirm`):
 
   | | code | when |
@@ -242,5 +243,5 @@ H1 every route and page needs a session._ A session is still not an entitlement:
 - RLS is still off on every table; routes still run on the service role and
   pages still read through the admin client.
 
-This stays recorded as a blocker for any deployment where more than one party
-uses the app.
+Both are closed by H5 (above). RLS remains off: the application-level checks
+are the whole of the enforcement.
