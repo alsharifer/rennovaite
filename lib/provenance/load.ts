@@ -39,7 +39,7 @@ export async function loadProvenanceContext(sb: SupabaseClient, projectId: strin
     rows(sb.from("plan_fixtures").select("id, layer, type, dims_derived, derived_note").eq("project_id", projectId)),
     planId ? rows(sb.from("plan_context").select("id, kind, name, dims_derived, derived, note").eq("plan_id", planId)) : Promise.resolve([]),
     rows(sb.from("rate_book").select("item_key, qs_validated").eq("city", "Dubai")),
-    rows(sb.from("firms").select("id, name")),
+    rows(sb.from("firms").select("*")),
   ]);
   // T3b: a firm's name may appear on its OWN project only.
   const own = await rows(sb.from("projects").select("firm_id").eq("id", projectId).limit(1));
@@ -67,5 +67,5 @@ export async function loadProvenanceContext(sb: SupabaseClient, projectId: strin
     qsValidated[k] = (qsValidated[k] ?? false) || r.qs_validated === true;
   }
 
-  return { elements, qsValidated, withheldNames: withheldFirmNames(firms.map((f) => ({ id: String(f.id), name: String(f.name) })), ownFirm) };
+  return { elements, qsValidated, withheldNames: withheldFirmNames(firms.map((f) => ({ id: String(f.id), name: String(f.name), display_name: f.display_name == null ? null : String(f.display_name) })), ownFirm) };
 }

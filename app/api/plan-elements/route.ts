@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
+import { loadWithheldNames } from "@/lib/identity/curation";
+import { curatePlanRow, curatePlanRows, keepStoredText } from "@/lib/plan/curate-notes";
 import { LINEAR_ELEMENT_META, LINEAR_ELEMENT_KINDS } from "@/lib/plan/elements";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -82,7 +84,8 @@ export async function GET(request: NextRequest) {
       console.warn("[api/plan-elements] GET degraded:", error.message);
       return NextResponse.json({ elements: [], degraded: true });
     }
-    return NextResponse.json({ elements: data ?? [] });
+    // I4: a note or spec string can name the firm that measured it.
+    return NextResponse.json({ elements: curatePlanRows(data, await loadWithheldNames(db(), access.projectId)) });
   } catch (err) {
     console.warn("[api/plan-elements] GET degraded:", err instanceof Error ? err.message : err);
     return NextResponse.json({ elements: [], degraded: true });
@@ -140,7 +143,7 @@ export async function POST(request: NextRequest) {
       .single();
     if (error || !data) throw error ?? new Error("Failed to create element.");
     await logEdit(b.plan_id, { action: "create", kind: b.kind });
-    return NextResponse.json({ element: data, derived: dimsDefaulted });
+    return NextResponse.json({ element: curatePlanRow(data, await loadWithheldNames(db(), access.projectId)), derived: dimsDefaulted });
   } catch (err) {
     console.error("[api/plan-elements] POST error", err);
     const message = err instanceof Error ? err.message : "Failed to create element.";
@@ -183,6 +186,9 @@ export async function PATCH(request: NextRequest) {
       if (v !== undefined) patch[k] = v;
     }
     if (fields.height_mm != null && fields.width_mm != null) patch.derived = false;
+    // The editor read curated text; re-sending it must not overwrite the stored note.
+    const withheld = await loadWithheldNames(db(), access.projectId);
+    await keepStoredText(db(), "plan_elements", id, patch, withheld);
 
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ error: "No fields to update." }, { status: 400 });
@@ -196,7 +202,7 @@ export async function PATCH(request: NextRequest) {
       .single();
     if (error || !data) throw error ?? new Error("Failed to update element.");
     await logEdit((data as { plan_id?: string }).plan_id ?? null, { action: "update", fields: Object.keys(patch) });
-    return NextResponse.json({ element: data });
+    return NextResponse.json({ element: curatePlanRow(data, withheld) });
   } catch (err) {
     console.error("[api/plan-elements] PATCH error", err);
     const message = err instanceof Error ? err.message : "Failed to update element.";

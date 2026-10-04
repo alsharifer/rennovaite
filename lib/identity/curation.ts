@@ -119,11 +119,14 @@ export function findWithheldIdentities(payload: unknown, extraNames: readonly st
  * the project's own. A firm may see its own name on its own project; no other
  * project's document may carry it.
  */
-export function withheldFirmNames(firms: readonly { id: string; name: string }[], projectFirmId: string | null): string[] {
-  return firms
+export function withheldFirmNames(firms: readonly { id: string; name: string; display_name?: string | null }[], projectFirmId: string | null): string[] {
+  // A firm is known by its registered name AND, since L4 (047), the brand it
+  // prints on its proposals — either one identifies it.
+  const names = firms
     .filter((f) => f.id !== projectFirmId)
-    .map((f) => String(f.name ?? ""))
+    .flatMap((f) => [String(f.name ?? ""), String(f.display_name ?? "")])
     .filter((n) => n.trim().length >= 3);
+  return [...new Set(names)];
 }
 
 type Db = import("@supabase/supabase-js").SupabaseClient;
@@ -137,14 +140,16 @@ export async function loadWithheldNames(sb: unknown, projectId: string | null): 
   const db = sb as Db;
   try {
     const [firms, project] = await Promise.all([
-      db.from("firms").select("id, name"),
+      // `*`, not a column list: `display_name` arrives with 047, and a select
+      // naming it on an older database would error — and withhold nothing.
+      db.from("firms").select("*"),
       projectId
         ? db.from("projects").select("firm_id").eq("id", projectId).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
     if (firms.error || !Array.isArray(firms.data)) return [];
     const own = (project.data as { firm_id?: string | null } | null)?.firm_id ?? null;
-    return withheldFirmNames(firms.data as { id: string; name: string }[], own);
+    return withheldFirmNames(firms.data as { id: string; name: string; display_name?: string | null }[], own);
   } catch {
     return [];
   }

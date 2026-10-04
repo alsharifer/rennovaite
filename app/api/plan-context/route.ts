@@ -3,7 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { loadWithheldNames } from "@/lib/identity/curation";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
+import { curatePlanRow, curatePlanRows, keepStoredText } from "@/lib/plan/curate-notes";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -60,7 +62,8 @@ export async function GET(request: NextRequest) {
   if (access.denied) return access.denied;
   const { data, error } = await db().from("plan_context").select(COLS).eq("plan_id", planId).order("created_at");
   if (error) return NextResponse.json({ context: [], degraded: true });
-  return NextResponse.json({ context: data ?? [] });
+  // I4: a note can name the firm that measured the item.
+  return NextResponse.json({ context: curatePlanRows(data, await loadWithheldNames(db(), access.projectId)) });
 }
 
 export async function POST(request: NextRequest) {
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
     if (error || !data) throw error ?? new Error("Failed to create context.");
     const projectId = await projectOfPlan(db(), b.plan_id);
     if (projectId) await recordPilotEvent(db(), projectId, "design_edit", { layer: "context", action: "create", kind: b.kind });
-    return NextResponse.json({ context: data });
+    return NextResponse.json({ context: curatePlanRow(data, await loadWithheldNames(db(), access.projectId)) });
   } catch (err) {
     console.error("[api/plan-context] POST error", err);
     return NextResponse.json({ error: errMessage(err, "Failed to create context.") }, { status: 500 });
@@ -115,12 +118,15 @@ export async function PATCH(request: NextRequest) {
   const patch: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fields)) if (v !== undefined) patch[k] = v;
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "No fields to update." }, { status: 400 });
+  // The editor read curated text; re-sending it must not overwrite the stored note.
+  const withheld = await loadWithheldNames(db(), access.projectId);
+  await keepStoredText(db(), "plan_context", id, patch, withheld);
   try {
     const { data, error } = await db().from("plan_context").update(patch).eq("id", id).select(COLS).single();
     if (error || !data) throw error ?? new Error("Failed to update context.");
     const projectId = await projectOfPlan(db(), (data as { plan_id: string }).plan_id);
     if (projectId) await recordPilotEvent(db(), projectId, "design_edit", { layer: "context", action: "update", fields: Object.keys(patch) });
-    return NextResponse.json({ context: data });
+    return NextResponse.json({ context: curatePlanRow(data, withheld) });
   } catch (err) {
     console.error("[api/plan-context] PATCH error", err);
     return NextResponse.json({ error: errMessage(err, "Failed to update context.") }, { status: 500 });
