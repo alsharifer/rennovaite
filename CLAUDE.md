@@ -1674,11 +1674,14 @@ does).
   lawyer-approved text is a **file swap + `status: published`**; no page edit.
   `lib/legal/markdown.ts` is a deliberately small Markdown (headings,
   paragraphs, quotes, lists, bold/italic) parsed to a block tree and rendered as
-  React elements by `components/legal/LegalPage.tsx` — never as HTML. While
-  `draft`: a "Draft — not yet in force" notice, "· draft" after the Last
-  updated line, and `noindex`. The body's own `*Last updated: [date]*` slot
-  is dropped; the page prints the frontmatter date. The sign-in form links both.
-  A test pins both documents at `draft` — flipping it is the sign-off.
+  React elements by `components/legal/LegalPage.tsx` — never as HTML. **While
+  `draft` the pages show the pre-H6 "being finalised" placeholders
+  (`components/legal/LegalPlaceholders.tsx`) — the drafts carry bracketed
+  blanks and are never public** (decided 2026-10-04). On `published` the
+  document renders with its Last updated line (the body's own `*Last updated:
+  [date]*` slot is dropped for the frontmatter date). `LegalPage` still marks a
+  draft and noindexes it, for a local preview. The sign-in form links both. A
+  test pins both documents at `draft` — flipping it is the sign-off.
 - **`docs/ONBOARDING_RUNBOOK.md`**: onboarding a second firm, in order —
   account (allowlist) → firm (or `firm-member-add` for Newspace's 041 firm on
   dev) → project membership + baseline regenerate → attach (both memberships)
