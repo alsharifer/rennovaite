@@ -2,9 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { listRevisions } from "@/lib/boq/revisions";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,10 +17,12 @@ export const dynamic = "force-dynamic";
 // a revision list is a price history.
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to read BoQ revisions.");
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
-  const caller = await getCaller(request);
-  if (!caller) return NextResponse.json({ error: "Sign in to read BoQ revisions.", code: "unauthenticated" }, { status: 401 });
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
+  if (access.denied) return access.denied;
   try {
     const revisions = await listRevisions(getSupabaseAdmin() as unknown as SupabaseClient, id);
     return NextResponse.json({ success: true, revisions });

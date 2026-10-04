@@ -11,6 +11,8 @@ import {
   validateAssetFile,
   type AssetKind,
 } from "@/lib/assets/types";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -35,6 +37,8 @@ async function mirrorRoomPhoto(roomId: string, storagePath: string) {
 // POST — create an asset from a multipart upload. Fields: file, project_id,
 // kind, source?, room_id?. Images should be compressed client-side first.
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   let uploadedPath: string | null = null;
   try {
     const form = await request.formData();
@@ -54,6 +58,8 @@ export async function POST(request: NextRequest) {
     const source = isAssetSource(sourceRaw) ? sourceRaw : null;
     const roomId =
       typeof roomIdRaw === "string" && Uuid.safeParse(roomIdRaw).success ? roomIdRaw : null;
+    const access = await projectAccess(db(), caller, { project_id: projectId.data, room_id: roomId });
+    if (access.denied) return access.denied;
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file provided." }, { status: 400 });
@@ -141,6 +147,8 @@ export async function POST(request: NextRequest) {
 
 // PATCH — assign an existing photo asset to a room. Body: { asset_id, room_id }.
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as
       | { asset_id?: unknown; room_id?: unknown }
@@ -153,6 +161,8 @@ export async function PATCH(request: NextRequest) {
         { status: 400 },
       );
     }
+    const access = await projectAccess(db(), caller, { asset_id: assetId.data, room_id: roomId.data });
+    if (access.denied) return access.denied;
 
     const { data: asset, error: getErr } = await db()
       .from("project_assets")

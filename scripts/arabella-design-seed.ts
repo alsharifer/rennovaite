@@ -21,11 +21,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { devFetch } from "./lib/dev-auth.mjs";
+
 import { PLOT, PROJECT_NAME, SOURCE_NOTE, toSite, toSitePath } from "../lib/client-garden/arabella-reference.ts";
 
 const ROOT = "C:/dev/rennovaite";
 const PORT = process.argv.slice(2).find((a) => /^\d+$/.test(a)) ?? "3098";
 const BASE = `http://localhost:${PORT}`;
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "arabella-design-seed" });
 
 for (const line of readFileSync(`${ROOT}/.env.local`, "utf8").split(/\r?\n/)) {
   const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
@@ -58,7 +63,7 @@ const check = (label: string, ok: boolean, detail = "") => {
 };
 
 async function call(method: string, path: string, body?: unknown) {
-  const res = await fetch(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await api(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
   return json;
@@ -102,6 +107,8 @@ async function main() {
 
   const { data: project } = await db.from("projects").select("id").eq("name", PROJECT_NAME).single<{ id: string }>();
   const projectId = project!.id;
+  // H5: the pipeline account works on this project as its member (scripts/lib/dev-auth.mjs).
+  await api.grant([projectId]);
   const { data: plan } = await db.from("plans").select("id").eq("project_id", projectId).single<{ id: string }>();
   const planId = plan!.id;
   const { data: rooms } = await db.from("rooms").select("id, name_en").eq("plan_id", planId);
@@ -220,7 +227,7 @@ async function main() {
   // --- BoQ + the export gate, legitimately ---------------------------------------------------
   const gen = await call("POST", "/api/generate-boq", { project_id: projectId });
   check("the BoQ generates on the proposal", !gen.error, `AED ${gen.grand_total_aed}`);
-  const ready = (await (await fetch(`${BASE}/api/projects/${projectId}/boq-pdf?format=json`)).json()) as { readiness: { ready: boolean; untyped_counters: string[]; undecided: string[]; stale_boq_needs_selection: string[] } };
+  const ready = (await (await api(`${BASE}/api/projects/${projectId}/boq-pdf?format=json`)).json()) as { readiness: { ready: boolean; untyped_counters: string[]; undecided: string[]; stale_boq_needs_selection: string[] } };
   check("the export gate passes: no untyped counter, nothing undecided, no needs_selection", ready.readiness.ready, JSON.stringify(ready.readiness));
 
   // --- every event this script caused is script-generated -------------------------------------

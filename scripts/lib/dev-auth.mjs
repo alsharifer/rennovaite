@@ -83,3 +83,100 @@ export function sessionCookies(projectRef, session) {
   for (let i = 0, n = 0; i < encoded.length; i += MAX_CHUNK, n++) out.push({ name: `${name}.${n}`, value: encoded.slice(i, i + MAX_CHUNK) });
   return out;
 }
+
+/**
+ * @typedef {((input: string | URL | Request, init?: RequestInit) => Promise<Response>) & {
+ *   authorization: () => Promise<string>,
+ *   grant: (projectIds: string[]) => Promise<string[]>,
+ * }} DevFetch
+ */
+
+/**
+ * H1: every API route answers a signed-out call with 401 and every app page
+ * redirects it to /auth, so a script that calls the app does so as a dev
+ * account — the same credential `devSession` mints, on every request. The
+ * returned fetch adds `Authorization: Bearer <jwt>` unless the call set its
+ * own. It mints on first use (so a script can declare it before loading
+ * .env.local) and again within five minutes of expiry, so a long run (a full
+ * pack export with renders) never outlives its credential. `.authorization()`
+ * hands the same header to code that makes its own requests (the pack-export
+ * transport).
+ *
+ * Pipeline and seeding scripts use the account "pipeline"
+ * (dev-scripts+pipeline@rennovaite.local), so the events they cause name a
+ * script account rather than nobody or a check's stand-in member.
+ *
+ * H5: `opts.projects` (and `.grant(ids)` for ids known only later) makes the
+ * account a member of those projects on first use — PERSISTENT, which is the
+ * point for the pipeline account on the pilot projects it works on. Checks
+ * that must leave no trace use grantProjectMembership + revoke instead.
+ *
+ * @param {string} [who]
+ * @param {{ script?: string, projects?: string[] }} [opts]
+ * @returns {DevFetch}
+ */
+export function devFetch(who = "a", opts = {}) {
+  /** @type {Awaited<ReturnType<typeof devSession>> | null} */
+  let s = null;
+  /** @type {ReturnType<typeof devSession> | null} */
+  let pending = null;
+  /** @type {string[]} */
+  const wanted = [...(opts.projects ?? [])];
+  let granted = false;
+  const authorization = async () => {
+    if (!s || (s.session.expires_at ?? 0) - Date.now() / 1000 < 300) {
+      if (!pending) pending = devSession(who, opts).finally(() => { pending = null; });
+      s = await pending;
+    }
+    if (!granted && wanted.length && s.userId) {
+      granted = true;
+      await grantProjectMembership(s.userId, wanted, opts);
+    }
+    return s.headers.authorization;
+  };
+  /** @param {string[]} projectIds */
+  const grant = async (projectIds) => {
+    await authorization();
+    if (!s?.userId) throw new Error("dev session has no user id");
+    return (await grantProjectMembership(s.userId, projectIds, opts)).added;
+  };
+  /** @param {string | URL | Request} input @param {RequestInit} [init] */
+  const f = async (input, init = {}) => {
+    const headers = new Headers(init.headers);
+    if (!headers.has("authorization")) headers.set("authorization", await authorization());
+    return fetch(input, { ...init, headers });
+  };
+  return Object.assign(f, { authorization, grant });
+}
+
+/**
+ * H5: every project route answers only the project's members. A script that
+ * acts on a project as a dev account is made a member first, with the service
+ * role — the same operator act as scripts/project-member-add.mjs, never a
+ * route bypass. Returns `revoke()`, which removes only the rows THIS call
+ * added, so a check that grants itself access leaves no trace.
+ *
+ * @param {string} userId
+ * @param {string[]} projectIds
+ * @param {{ script?: string }} [opts]
+ * @returns {Promise<{ added: string[], revoke: () => Promise<void> }>}
+ */
+export async function grantProjectMembership(userId, projectIds, { script = "dev-auth" } = {}) {
+  const { url, key } = resolveTarget({ script, writes: true });
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const ids = [...new Set(projectIds.filter(Boolean))];
+  const { data: have, error } = ids.length ? await admin.from("project_members").select("project_id").eq("user_id", userId).in("project_id", ids) : { data: [], error: null };
+  if (error) throw new Error(`project_members read failed: ${error.message}`);
+  const already = new Set((have ?? []).map((r) => r.project_id));
+  const added = ids.filter((id) => !already.has(id));
+  if (added.length) {
+    const { error: insErr } = await admin.from("project_members").insert(added.map((project_id) => ({ project_id, user_id: userId })));
+    if (insErr) throw new Error(`project_members insert failed: ${insErr.message}`);
+  }
+  return {
+    added,
+    revoke: async () => {
+      if (added.length) await admin.from("project_members").delete().eq("user_id", userId).in("project_id", added);
+    },
+  };
+}

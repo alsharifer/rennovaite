@@ -23,7 +23,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
-import { devSession } from "./lib/dev-auth.mjs";
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 import { readXlsx, writeXlsx } from "../lib/quotes/xlsx.ts";
 
 const PORT = process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : "3098";
@@ -40,6 +40,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const me = await devSession("quote", { script: "quote-import-check" });
 const other = await devSession("other", { script: "quote-import-check" });
+// H5: the project routes answer members only — this check's accounts are made
+// members of the projects it works on (service role, like project-member-add),
+// and exactly those rows are removed again at cleanup.
+const memberships = [await grantProjectMembership(me.userId, [STAND_IN], { script: "quote-import-check" })];
 const api = async (method, p, body, auth = me, raw = false) => {
   const res = await fetch(`${BASE}${p}`, { method, headers: { ...(raw ? {} : { "content-type": "application/json" }), ...(auth?.headers ?? {}) }, body: raw ? body : body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, headers: res.headers, body: raw ? await res.arrayBuffer() : await res.json().catch(() => ({})) };
@@ -130,7 +134,7 @@ try {
 
   console.log("\n4. the BoQ prices from it, under the constant label");
   await api("PATCH", `/api/projects/${STAND_IN}`, { firm_id: firmId });
-  const dry = await api("POST", "/api/generate-boq", { project_id: STAND_IN, dry_run: true }, null);
+  const dry = await api("POST", "/api/generate-boq", { project_id: STAND_IN, dry_run: true });
   const pcc = dry.body.boq.sections.flatMap((s) => s.lines).find((l) => l.rule_id === "GL-04");
   check("PCC resolves at firm_private from the quote (98.5)", pcc?.rate_tier === "firm_private" && pcc.rate_aed === 98.5, `${pcc?.rate_aed} · ${pcc?.vendor_or_source}`);
   check("the line's source is the constant quote label", pcc?.vendor_or_source === "contractor rate book (supplier quotation)");
@@ -147,12 +151,13 @@ try {
   const active = (await api("GET", `/api/firms/${firmId}/rates`)).body.entries;
   const { count: total } = await sb.from("firm_rate_entries").select("id", { count: "exact", head: true }).eq("firm_id", firmId);
   check("active entries unchanged in count; superseded rows kept in the table", active.filter((e) => e.item_key === "garden.pcc_base").length === 1 && total === entries.length + 1, `active ${active.length}, total rows ${total}`);
-  const dry2 = await api("POST", "/api/generate-boq", { project_id: STAND_IN, dry_run: true }, null);
+  const dry2 = await api("POST", "/api/generate-boq", { project_id: STAND_IN, dry_run: true });
   const pcc2 = dry2.body.boq.sections.flatMap((s) => s.lines).find((l) => l.rule_id === "GL-04");
   check("BoQ now prices PCC at v2's 101", pcc2?.rate_aed === 101);
   const v1 = await api("GET", `/api/firms/${firmId}/quotes/${quoteId}`);
   check("v1 is marked superseded, its lines and entry links intact", v1.body.quote.status === "superseded" && v1.body.lines.some((l) => l.entry_id));
 } finally {
+  for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
   await sb.from("projects").update({ firm_id: priorFirm }).eq("id", STAND_IN);
   if (firmId) {

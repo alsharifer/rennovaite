@@ -23,6 +23,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { devFetch } from "./lib/dev-auth.mjs";
+
 import { PROJECT_NAME, SOURCE_NOTE } from "../lib/client-garden/arabella-reference.ts";
 import { DRIVE_WIDTH_M, GARAGE_POLY, SESSION_MEASURES, UNMAPPED_MEASURES, polyArea, reconciliation, sessionZones, siteNormPath } from "../lib/client-garden/arabella-session.ts";
 import { changeReport, snapshotOf, type QtySnapshot } from "../lib/pilot/change-report.ts";
@@ -30,6 +32,9 @@ import { changeReport, snapshotOf, type QtySnapshot } from "../lib/pilot/change-
 const ROOT = "C:/dev/rennovaite";
 const PORT = process.argv.slice(2).find((a) => /^\d+$/.test(a)) ?? "3098";
 const BASE = `http://localhost:${PORT}`;
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "arabella-unmap-front-border" });
 
 for (const line of readFileSync(`${ROOT}/.env.local`, "utf8").split(/\r?\n/)) {
   const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
@@ -43,7 +48,7 @@ const check = (label: string, ok: boolean, detail = "") => {
   console.log(line);
 };
 async function call(method: string, path: string, body?: unknown) {
-  const res = await fetch(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await api(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
   return json;
@@ -59,6 +64,8 @@ async function main() {
 
   const { data: project } = await db.from("projects").select("id").eq("name", PROJECT_NAME).single<{ id: string }>();
   const projectId = project!.id;
+  // H5: the pipeline account works on this project as its member (scripts/lib/dev-auth.mjs).
+  await api.grant([projectId]);
   const { data: plan } = await db.from("plans").select("id").eq("project_id", projectId).single<{ id: string }>();
   const planId = plan!.id;
   type Room = { id: string; name_en: string; name_ar: string | null; room_type: string | null; area_m2: number; polygon: Pt[]; unroofed: boolean | null; dims_derived: boolean | null; derived_note: string | null; spec: Record<string, unknown> | null };

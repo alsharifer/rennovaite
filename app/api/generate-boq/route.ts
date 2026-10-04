@@ -4,28 +4,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { generateDeterministicBoq } from "@/lib/boq/engine";
-import { loadAccessoryOverrides } from "@/lib/accessories/load";
-import { getCaller } from "@/lib/auth/caller";
-import { packJobActor } from "@/lib/documents/pack-export/guard";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { PACK_JOB_HEADER, packJobActor } from "@/lib/documents/pack-export/guard";
 import { recordPilotEvent } from "@/lib/pilot/events";
-import { findOverlaps } from "@/lib/plan/overlaps";
-import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
-import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
+import { applyElementMapping } from "@/lib/boq/element-map";
+import { loadBoqInputs, priceDeterministicBoq, type LabourRateRow, type PricingSkuRow } from "@/lib/boq/assemble";
+import { regenerateAuthority } from "@/lib/boq/regenerate";
+import { projectAccess } from "@/lib/projects/http";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
-import { loadProjectFirmOverlay } from "@/lib/rates/firm";
 import { elementPricer } from "@/lib/boq/rates";
 import { applyOhp } from "@/lib/rates/ohp";
-import { loadReferenceRows } from "@/lib/rates/reference";
 import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
-import { derivePlanGraph } from "@/lib/plan/derive";
-import { getProposedGraph } from "@/lib/plan/snapshots";
-import type {
-  EngineRoom,
-  LabourRate as EngineLabourRate,
-  PricingSku as EnginePricingSku,
-} from "@/lib/boq/schema";
 import { getKgContext } from "@/lib/kg/context";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getStyleByKey } from "@/lib/styles";
@@ -45,27 +35,9 @@ const BodySchema = z.object({
    * adding a BoQ (or a "time to first BoQ" event) to it. Engine path only.
    */
   dry_run: z.boolean().optional(),
+  /** H4: what asked for this revision — "regenerate" is the BoQ page's control. Recorded on the event. */
+  trigger: z.enum(["regenerate"]).optional(),
 });
-
-// Categories from pricing_skus relevant to a residential first-floor
-// refit. The brief named lowercase tokens ('tile', 'sanitary', etc.) but the
-// seeded CSV uses Title Case ('Tiles', 'Sanitaryware', ...) — these are the
-// actual values in the table.
-const RELEVANT_SKU_CATEGORIES = [
-  "Tiles",
-  "Sanitaryware",
-  "Bathware",
-  "Bathroom Furniture",
-  "Bathroom Accessories",
-  "Kitchen",
-  "Lighting",
-  "Paint & Supplies",
-  "Electrical",
-  "Drywall & Ceilings",
-  "Stone & Slabs",
-  "Hardware",
-  "Building Materials",
-] as const;
 
 const POMI_SECTIONS = [
   "Demolition",
@@ -116,26 +88,6 @@ type RoomRow = {
   name_en: string | null;
   room_type: string | null;
   area_m2: number | null;
-};
-
-type LabourRateRow = {
-  work_section: string | null;
-  description: string | null;
-  unit: string | null;
-  rate_low_aed: number | null;
-  rate_mid_aed: number | null;
-  rate_high_aed: number | null;
-};
-
-type PricingSkuRow = {
-  sku: string | null;
-  brand: string | null;
-  category: string | null;
-  subcategory: string | null;
-  description_en: string | null;
-  unit: string | null;
-  price_aed: number | null;
-  vendor: string | null;
 };
 
 type Quantity = {
@@ -540,6 +492,8 @@ function normalizeTotals(boq: BoqResponse): BoqResponse {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as unknown;
     const parsedBody = BodySchema.safeParse(body);
@@ -556,9 +510,6 @@ export async function POST(request: NextRequest) {
     const dryRun = parsedBody.data.dry_run === true;
     // L5: the generation's duration and the signed-in actor ride on the pilot event.
     const startedAt = Date.now();
-    // A pack export regenerates through this route with no session of its own;
-    // the job it belongs to knows who started it.
-    const actor = (await getCaller(request))?.id ?? (await packJobActor(request));
     if (dryRun && process.env.BOQ_ENGINE === "llm") {
       return NextResponse.json(
         { success: false, error: "dry_run is only supported on the deterministic engine path." },
@@ -578,279 +529,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseAdmin();
-    // labour_rates and pricing_skus aren't in database.types.ts yet, so we
-    // call them via an untyped facet of the same client.
-    const supabaseUntyped = supabase as unknown as SupabaseClient;
+    const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
+    // H5: every run — a dry run too — is for a member of the project.
+    const access = await projectAccess(supabase, caller, { project_id: projectId });
+    if (access.denied) return access.denied;
+    // A pack export regenerates through this route carrying the session of
+    // whoever started it (H1); inside a job the event is the JOB's — a member's
+    // export is the firm's, a CLI run (a job with no actor) stays ours.
+    const actor = request.headers.has(PACK_JOB_HEADER) ? await packJobActor(request) : caller.id;
 
-    // 1. Load project + plan + rooms in parallel with reference data.
-    const [
-      projectRes,
-      plansRes,
-      labourRes,
-      skuRes,
-      stylesRes,
-      approvedRes,
-    ] = await Promise.all([
-      supabase
-        .from("projects")
-        .select("id, name, city")
-        .eq("id", projectId)
-        .single(),
-      supabase
-        .from("plans")
-        .select("id, total_area_m2, parsed_json")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false })
-        .limit(1),
-      supabaseUntyped
-        .from("labour_rates")
-        .select(
-          "work_section, description, unit, rate_low_aed, rate_mid_aed, rate_high_aed",
-        )
-        .returns<LabourRateRow[]>(),
-      supabaseUntyped
-        .from("pricing_skus")
-        .select(
-          "sku, brand, category, subcategory, description_en, unit, price_aed, vendor",
-        )
-        .in("category", RELEVANT_SKU_CATEGORIES)
-        .returns<PricingSkuRow[]>(),
-      supabaseUntyped
-        .from("style_choices")
-        .select("style_key, room_id, created_at")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false })
-        .returns<{ style_key: string | null; room_id: string | null; created_at: string | null }[]>(),
-      supabase
-        .from("approved_designs")
-        .select("room_id, render_id")
-        .eq("project_id", projectId),
-    ]);
-
-    if (projectRes.error || !projectRes.data) {
-      return NextResponse.json(
-        { success: false, error: "Project not found." },
-        { status: 404 },
-      );
-    }
-    const project = projectRes.data;
-
-    if (plansRes.error || !plansRes.data || plansRes.data.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Project has no plan yet — run /api/parse-plan first.",
-        },
-        { status: 400 },
-      );
-    }
-    const plan = plansRes.data[0]!;
-    if (!plan.total_area_m2 || plan.total_area_m2 <= 0) {
-      return NextResponse.json(
-        { success: false, error: "Plan has no total_area_m2." },
-        { status: 400 },
-      );
+    // H4/H5: storing a revision is for the project's members
+    // (lib/boq/regenerate.ts; the page's Regenerate control reads the same
+    // answer). Checked before anything is loaded or persisted.
+    if (!dryRun) {
+      const block = await regenerateAuthority(supabase, projectId, caller);
+      if (block) return NextResponse.json({ success: false, error: block.reason, code: block.code }, { status: block.code === "project_not_found" ? 404 : 403 });
     }
 
-    const { data: rooms, error: roomsErr } = await supabase
-      .from("rooms")
-      .select("id, name_en, room_type, area_m2, polygon")
-      .eq("plan_id", plan.id);
-    if (roomsErr || !rooms || rooms.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Plan has no rooms. Re-run /api/parse-plan.",
-        },
-        { status: 400 },
-      );
-    }
-
-    // D3: refuse to price a plan whose rooms overlap.
-    //
-    // This is the right blocking point. Overlapping rooms are fine to SAVE —
-    // they are a normal transient state mid-edit — but they double-count floor
-    // area (two rooms claiming the same m²) and wall area (shared-edge
-    // derivation sees walls that are not there). A BoQ built on them is wrong
-    // in a way no downstream check would catch. Here the user is asking for an
-    // output rather than editing, so refusing is information, not interruption.
-    //
-    // Assessed live from the rooms just loaded, not read from plans.has_overlaps
-    // — that column is a cache for the UI, and a stale cache must never be the
-    // thing that decides whether a quantity is trustworthy.
-    // G5: a site-reference zone the design removes is not in the garden, so a
-    // zone drawn over its footprint does not overlap it.
-    let removedZoneIds = new Set<string>();
-    try {
-      const { data: removed } = await (supabase as unknown as SupabaseClient)
-        .from("rooms")
-        .select("id")
-        .eq("plan_id", plan.id)
-        .eq("site_reference", true)
-        .eq("disposition", "remove")
-        .returns<{ id: string }[]>();
-      removedZoneIds = new Set((removed ?? []).map((r) => r.id));
-    } catch {
-      /* pre-037 */
-    }
-    const overlaps = findOverlaps(
-      rooms
-        .filter((r) => !removedZoneIds.has(r.id))
-        .map((r) => ({
-          id: r.id,
-          name: r.name_en ?? "Room",
-          polygon: r.polygon,
-        })),
-    );
-    if (overlaps.has_overlaps) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `This plan has ${overlaps.room_names.length} overlapping rooms. Resolve them on the plan before costing — overlapping rooms double-count floor and wall area.`,
-          code: "plan_has_overlaps",
-          overlap_pairs: overlaps.pairs,
-          overlap_room_names: overlaps.room_names,
-        },
-        { status: 409 },
-      );
-    }
-
-    if (labourRes.error || !labourRes.data || labourRes.data.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "labour_rates table is empty — run scripts/seed-labour-rates.ts.",
-        },
-        { status: 500 },
-      );
-    }
-
-    if (skuRes.error || !skuRes.data || skuRes.data.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "pricing_skus returned no rows for the curated categories — run scripts/seed-pricing.ts.",
-        },
-        { status: 500 },
-      );
-    }
-
-    const labourRates = labourRes.data;
-    const skus = skuRes.data;
-    const chosenStyleKey =
-      stylesRes.data && stylesRes.data.length > 0
-        ? stylesRes.data[0]!.style_key
-        : null;
+    // 1. Everything the BoQ is priced from (lib/boq/assemble.ts — shared with
+    // the flag-invariance test and the read-only dry-run scripts). A refusal
+    // (no plan, overlapping rooms, empty rate tables…) is answered as-is.
+    const loaded = await loadBoqInputs(supabase, projectId, { dryRun });
+    if (loaded.refusal) return NextResponse.json(loaded.refusal.body, { status: loaded.refusal.status });
+    const { project, plan, rooms, labourRates, skus, chosenStyleKey, approvedCount, takeoffItems, firm } = loaded.inputs;
     const chosenStyle = chosenStyleKey ? getStyleByKey(chosenStyleKey) : null;
-    const approvedCount = approvedRes.data?.length ?? 0;
-
-    // P4: per-element take-off (ground truth for element↔BoQ mapping);
-    // best-effort. The mapped POMI sections are rebuilt so their quantities =
-    // Σ per-room take-off and their element_refs are real element ids, and
-    // takeoff_items persist for the per-room views + the tap-to-inspect panel.
-    //
-    // U7: this used to be gated on VIEWER_3D_ENABLED, so the six element
-    // sections priced through the element take-off (a firm's `wall_plaster`
-    // rate applied) with the flag ON and through the engine's rule lines
-    // (`plaster.make_good`; the same firm rate ignored) with it OFF — a UI flag
-    // deciding a pricing path. The mapping now runs whenever the plan yields a
-    // take-off; the viewer flag gates only the viewer and inspect UI.
-    let takeoffItems: TakeoffItem[] = [];
-    try {
-      const graph = await derivePlanGraph(projectId);
-      const proposed = await getProposedGraph(projectId);
-      takeoffItems = quantifyPlan(graph, { proposed });
-      if (!dryRun) await persistTakeoffItems(projectId, takeoffItems, supabaseUntyped);
-    } catch (e) {
-      console.warn(
-        "[api/generate-boq] P4 take-off skipped:",
-        e instanceof Error ? e.message : e,
-      );
-    }
-
-    // L1: the books behind every rate. The project's firm overlay (tiers 1–2 —
-    // FirmOverlay.none() for a project with no firm, which is every project
-    // before L1) and the reference book (tiers 3 and 5). Order documented in
-    // lib/rates/tiers.ts.
-    const firm = await loadProjectFirmOverlay(supabaseUntyped, projectId);
-    const referenceRows = await loadReferenceRows(supabaseUntyped);
 
     // 2a. DEFAULT PATH — fully deterministic financial model (lib/boq).
     // Quantities, rate selection, SKU picks, and totals are all rules-driven;
     // no LLM in the pricing path. Set BOQ_ENGINE="llm" to fall back to the
-    // legacy Claude-priced flow below.
+    // legacy Claude-priced flow below. H3: no feature flag reaches the pricing.
     if (process.env.BOQ_ENGINE !== "llm") {
-      const engineRooms: EngineRoom[] = rooms.map((r) => ({
-        id: r.id,
-        name: r.name_en ?? "(unnamed)",
-        room_type: r.room_type ?? "other",
-        area_m2: r.area_m2 ?? 0,
-        polygon: Array.isArray(r.polygon)
-          ? (r.polygon as unknown as number[][])
-          : null,
-      }));
-      const { boq: engineBoq } = generateDeterministicBoq({
-        rooms: engineRooms,
-        labourRates: labourRates.map(
-          (r): EngineLabourRate => ({
-            work_section: r.work_section ?? "",
-            description: r.description ?? "",
-            unit: r.unit ?? "",
-            rate_low_aed: r.rate_low_aed ?? 0,
-            rate_mid_aed: r.rate_mid_aed ?? 0,
-            rate_high_aed: r.rate_high_aed ?? 0,
-          }),
-        ),
-        skus: skus.map(
-          (s): EnginePricingSku => ({
-            sku: s.sku ?? "",
-            brand: s.brand ?? "",
-            category: s.category ?? "",
-            subcategory: s.subcategory ?? "",
-            description_en: s.description_en ?? "",
-            unit: s.unit ?? "",
-            price_aed: s.price_aed ?? 0,
-            vendor: s.vendor ?? "",
-          }),
-        ),
-        styleKey: chosenStyleKey,
-        // D1: user-chosen accessories replace the R-xx rate for their own
-        // item_key only. `{}` before migration 028 or with nothing selected,
-        // which reproduces the pre-D1 BoQ byte for byte.
-        accessorySelections: await loadAccessoryOverrides(projectId),
-        referenceRows,
-        firm,
-      });
-
-      // P4: rebuild mapped POMI sections from the take-off (element_refs + true
-      // per-room quantities). No-op when there are no take-off items.
-      // T3b: the element sections resolve through the same firm overlay.
-      const mappedBoq = applyElementMapping(engineBoq, takeoffItems, elementPricer(firm, engineBoq.engine.tier));
-      // P2: append Electrical Installations + Plumbing & Sanitary sections from
-      // plan_fixtures counts (flagged, best-effort, no-op when off/empty).
-      const overlaid = await appendOverlaySections(
-        mappedBoq,
-        projectId,
-        supabaseUntyped,
-      );
-      // Ground-truth: append Joinery + Aluminum & Glass sections (Atrium/Global
-      // Creation actuals; aluminum = site_assessment allowances). Core, additive.
-      const withJoinery = appendJoineryAluminumSections(overlaid, rooms);
-      // G3: append the landscape sections from the drawn garden (zones, runs,
-      // units, points) priced at the calibrated landscape rates. No-op for a
-      // project with no outdoor zones, which is every interior project.
-      const gardened = await appendGardenSections(withJoinery, projectId, supabaseUntyped, { persist: !dryRun, firm });
-      // L1: the firm's OH&P, LAST — its own summary line over the priced
-      // subtotal, never inside a rate. A no-op without a firm book.
-      const boq = applyOhp(gardened, firm.ohpPct);
+      const boq = await priceDeterministicBoq(supabase, projectId, loaded.inputs, { dryRun });
 
       if (dryRun) {
-        return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq: curateBoq(boq, await loadWithheldNames(supabaseUntyped, projectId)) });
+        return NextResponse.json({ success: true, dry_run: true, grand_total_aed: boq.grand_total_aed, boq: curateBoq(boq, await loadWithheldNames(supabase, projectId)) });
       }
 
+      // H4: the revision this one supersedes — the "from" of its diff.
+      const { data: previous } = await supabase
+        .from("boqs")
+        .select("id, total_aed")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<{ id: string; total_aed: number }>();
       const { data: inserted, error: insertErr } = await supabase
         .from("boqs")
         .insert({
@@ -867,11 +589,13 @@ export async function POST(request: NextRequest) {
       console.log(
         `[api/generate-boq] deterministic engine project=${projectId} grand_total=AED ${boq.grand_total_aed}`,
       );
-      await recordBoqEvent(supabaseUntyped, projectId, inserted.id, boq, { startedAt, actor });
+      await recordBoqEvent(supabase, projectId, inserted.id, boq, { startedAt, actor, previousBoqId: previous?.id ?? null, trigger: parsedBody.data.trigger ?? null });
       return NextResponse.json({
         success: true,
         boq_id: inserted.id,
         grand_total_aed: boq.grand_total_aed,
+        previous_boq_id: previous?.id ?? null,
+        previous_total_aed: previous ? Number(previous.total_aed) : null,
       });
     }
 
@@ -961,8 +685,8 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
     // P4: rebuild mapped sections from the take-off, then P2 overlays, then the
     // ground-truth Joinery + Aluminum & Glass sections.
     const mappedLlm = applyElementMapping(llmBoq, takeoffItems, elementPricer(firm, "mid"));
-    const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabaseUntyped);
-    const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabaseUntyped, { firm });
+    const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabase);
+    const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabase, { firm });
     const boq = applyOhp(appendJoineryAluminumSections(gardenedLlm, rooms), firm.ohpPct);
 
     // 5. Save and return.
@@ -1022,7 +746,7 @@ async function recordBoqEvent(
   projectId: string,
   boqId: string,
   boq: { grand_total_aed: number; garden?: { needs_selection: string[]; undecided: unknown[]; draft: { draft: boolean }; derived_lines: number } },
-  opts: { startedAt: number; actor: string | null },
+  opts: { startedAt: number; actor: string | null; previousBoqId?: string | null; trigger?: string | null },
 ): Promise<void> {
   const g = boq.garden;
   await recordPilotEvent(
@@ -1031,6 +755,9 @@ async function recordBoqEvent(
     "boq_generated",
     {
       boq_id: boqId,
+      // H4: the revision it supersedes (the diff's "from") and what asked for it.
+      previous_boq_id: opts.previousBoqId ?? null,
+      ...(opts.trigger ? { trigger: opts.trigger } : {}),
       grand_total_aed: boq.grand_total_aed,
       full: g ? g.needs_selection.length === 0 && g.undecided.length === 0 : true,
       needs_selection: g?.needs_selection.length ?? 0,

@@ -1,5 +1,9 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { memberProjectIds } from "@/lib/projects/access";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -29,13 +33,23 @@ const ACTIONS = [
 type Action = (typeof ACTIONS)[number];
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const projectId = new URL(request.url).searchParams.get("project_id");
 
     let query = getSupabaseAdmin()
       .from("feedback_events")
       .select("kg_bundle_id, action");
-    if (projectId) query = query.eq("project_id", projectId);
+    // H5: one project the caller is a member of, or — unfiltered — only the
+    // caller's own projects; never every project's feedback.
+    if (projectId) {
+      const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+      if (access.denied) return access.denied;
+      query = query.eq("project_id", projectId);
+    } else {
+      query = query.in("project_id", await memberProjectIds(getSupabaseAdmin() as unknown as SupabaseClient, caller.id));
+    }
 
     const { data, error } = await query;
 

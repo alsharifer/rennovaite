@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { loadMoodboard } from "@/lib/moodboard/load";
 import {
   isStyleRoom,
@@ -9,6 +10,7 @@ import {
   styleDescriptor,
   type MoodboardItem,
 } from "@/lib/moodboard/types";
+import { projectAccess } from "@/lib/projects/http";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -30,10 +32,14 @@ function db(): SupabaseClient {
 
 /** GET /api/moodboard?project_id=… */
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const items = await loadMoodboard(projectId);
   return NextResponse.json({ items });
 }
@@ -61,6 +67,8 @@ const AddSchema = z.discriminatedUnion("kind", [
 
 /** POST /api/moodboard — add one reference to the end of the board. */
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = AddSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -68,6 +76,8 @@ export async function POST(request: NextRequest) {
     }
     const body = parsed.data;
     const supabase = db();
+    const access = await projectAccess(db(), caller, { project_id: body.project_id, ...(body.kind === "asset" ? { asset_id: body.asset_id } : body.kind === "render" ? { render_id: body.render_id } : {}) });
+    if (access.denied) return access.denied;
 
     // Append: one past the current maximum position.
     const { data: last } = await supabase
@@ -147,12 +157,16 @@ const ReorderSchema = z.object({
 
 /** PATCH /api/moodboard — move one item to a new index; renumbers densely. */
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = ReorderSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { project_id, id, to_index } = parsed.data;
+    const access = await projectAccess(db(), caller, { project_id, moodboard_item_id: id });
+    if (access.denied) return access.denied;
     const supabase = db();
 
     const { data, error } = await supabase
@@ -183,12 +197,16 @@ export async function PATCH(request: NextRequest) {
 
 /** DELETE /api/moodboard?id=… — remove one reference. */
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const url = new URL(request.url);
     const id = z.string().uuid().safeParse(url.searchParams.get("id"));
     if (!id.success) {
       return NextResponse.json({ error: "A valid id is required." }, { status: 400 });
     }
+    const access = await projectAccess(db(), caller, { moodboard_item_id: id.data });
+    if (access.denied) return access.denied;
     const { error } = await db().from("moodboard_items").delete().eq("id", id.data);
     if (error) throw error;
     return NextResponse.json({ success: true });

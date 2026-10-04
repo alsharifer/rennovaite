@@ -2,10 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { repairForSave } from "@/lib/plan/save-repair";
 import { ensureAsBuiltSnapshot } from "@/lib/plan/snapshots";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -36,6 +38,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const raw = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);
@@ -46,6 +50,8 @@ export async function POST(request: NextRequest) {
       );
     }
     const { plan_id, rooms: postedAll, deleted_ids } = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { plan_id });
+    if (access.denied) return access.denied;
     const supabase = getSupabaseAdmin();
 
     // G5: a site-reference zone the design REMOVES is not in the garden any more,

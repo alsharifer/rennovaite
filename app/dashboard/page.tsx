@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { AnalyticsIdentify } from "@/app/_components/analytics-identify";
 import { AppShell } from "@/components/app/AppShell";
+import { memberProjectIds } from "@/lib/projects/access";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { cn } from "@/lib/utils";
@@ -179,6 +180,8 @@ export default async function DashboardPage({
     data: { user },
   } = await authClient.auth.getUser();
   const firstName = firstNameFromUser(user);
+  // H5: the portfolio is the caller's projects — the ones they are a member of.
+  const mine = user ? await memberProjectIds(sb, user.id) : [];
 
   const thirtyDaysAgo = thirtyDaysAgoIso();
 
@@ -193,26 +196,32 @@ export default async function DashboardPage({
     supabase
       .from("projects")
       .select("id, name, city, budget_aed, status, created_at")
+      .in("id", mine)
       .order("created_at", { ascending: false }),
     supabase
       .from("plans")
       .select("id, project_id, parsed_json, created_at")
+      .in("project_id", mine)
       .order("created_at", { ascending: false }),
     supabase
       .from("boqs")
       .select("id, project_id, total_aed, created_at")
+      .in("project_id", mine)
       .order("created_at", { ascending: false }),
     supabase
       .from("renders")
       .select("id, project_id, image_url, created_at")
+      .in("project_id", mine)
       .order("created_at", { ascending: false }),
     supabase
       .from("renders")
       .select("id", { count: "exact", head: true })
+      .in("project_id", mine)
       .gte("created_at", thirtyDaysAgo),
     sb
       .from("vendor_selections")
       .select("id, project_id, boq_line_id, created_at")
+      .in("project_id", mine)
       .order("created_at", { ascending: false })
       .returns<SelectionRow[]>(),
   ]);
@@ -228,6 +237,7 @@ export default async function DashboardPage({
     const { data } = await sb
       .from("projects")
       .select("id, archived_at")
+      .in("id", mine)
       .not("archived_at", "is", null)
       .returns<{ id: string; archived_at: string }[]>();
     for (const r of data ?? []) archivedAt.set(r.id, r.archived_at);

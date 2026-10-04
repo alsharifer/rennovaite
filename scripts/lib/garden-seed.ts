@@ -17,9 +17,12 @@ import { PLOT, VILLA94_GARDEN } from "../../lib/ground-truth/villa94-garden-plan
 
 export type Check = (label: string, ok: boolean, detail?: string) => void;
 
-export async function seedVilla94Garden(db: SupabaseClient, base: string, projectId: string, check: Check, opts: { styleKey?: string } = {}) {
+/** A fetch that carries a session (H1: every route needs one) — scripts/lib/dev-auth.mjs → devFetch. */
+export type ApiFetch = (input: string, init?: RequestInit) => Promise<Response>;
+
+export async function seedVilla94Garden(db: SupabaseClient, base: string, projectId: string, check: Check, opts: { styleKey?: string; api: ApiFetch }) {
   const post = async (p: string, b: unknown) =>
-    (await fetch(base + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) })).json();
+    (await opts.api(base + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) })).json();
 
   // --- 1. an authored plan at the traced plot size -------------------------------
   let { data: plan } = await db.from("plans").select("id").eq("project_id", projectId).maybeSingle<{ id: string }>();

@@ -27,7 +27,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
-import { devSession } from "./lib/dev-auth.mjs";
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 
 const PORT = process.argv[2] ?? "3098";
 const BASE = `http://localhost:${PORT}`;
@@ -56,7 +56,8 @@ async function rateBookSnapshot() {
   return JSON.stringify(data);
 }
 async function dryRun(projectId) {
-  const r = await api("POST", "/api/generate-boq", { project_id: projectId, dry_run: true });
+  // H1: generate-boq needs a session like every route; the dry run is user A's.
+  const r = await api("POST", "/api/generate-boq", { project_id: projectId, dry_run: true }, userA);
   if (r.status !== 200) throw new Error(`dry run ${projectId}: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
   return r.body.boq;
 }
@@ -66,6 +67,10 @@ const pccOf = (boq) => lines(boq).find((l) => l.rule_id === "GL-04");
 console.log("\n0. two dev sessions (real Supabase users, Bearer tokens)");
 const userA = await devSession("a", { script: "firm-overlay-check" });
 const userB = await devSession("b", { script: "firm-overlay-check" });
+// H5: the project routes answer members only — this check's accounts are made
+// members of the projects it works on (service role, like project-member-add),
+// and exactly those rows are removed again at cleanup.
+const memberships = [await grantProjectMembership(userA.userId, [STAND_IN, ARABELLA], { script: "firm-overlay-check" }), await grantProjectMembership(userB.userId, [STAND_IN, ARABELLA], { script: "firm-overlay-check" })];
 check("sessions minted for two distinct accounts", !!userA.token && !!userB.token && userA.userId !== userB.userId, `${userA.email} · ${userB.email}`);
 
 const refBefore = await rateBookSnapshot();
@@ -155,8 +160,9 @@ try {
   await refUnchanged("pricing");
 
   console.log("\n6. correction → explicit promotion → tier 2");
-  // Remove A's own entry so the promoted correction is what answers.
-  await api("DELETE", `/api/firms/${A}/rates/${ea.body.entry.id}`, undefined, userA);
+  // Remove A's own entry so the promoted correction is what answers. Since UV a
+  // figure edit supersedes (a new id), so the live entry is the PATCH's.
+  await api("DELETE", `/api/firms/${A}/rates/${patched.body.entry.id}`, undefined, userA);
   const anonCorr = await api("POST", "/api/boq-corrections", {
     project_id: STAND_IN, item_key: "garden.pcc_base", line_description: "PCC (anon, must fail)", correction_type: "rate", new_value: 1, attributed_to: "L1 check — firm A (scratch)",
   });
@@ -185,6 +191,7 @@ try {
   check("PCC now resolves at firm_correction", after.rate_tier === "firm_correction" && after.rate_aed === 99.99, `${after.rate_aed} · ${after.vendor_or_source}`);
   await refUnchanged("promotion");
 } finally {
+  for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
   await sb.from("projects").update({ firm_id: priorFirm }).eq("id", STAND_IN);
   if (created.correction) {

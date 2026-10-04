@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { addProjectMember } from "@/lib/projects/access";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -24,6 +26,8 @@ function extensionFor(file: File): string {
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   let createdProjectId: string | null = null;
 
   try {
@@ -59,6 +63,8 @@ export async function POST(request: NextRequest) {
       throw projectErr ?? new Error("Failed to create project row.");
     }
     createdProjectId = project.id;
+    // H5: creating a project makes the uploader its member (rolled back with it).
+    await addProjectMember(supabaseAdmin as unknown as SupabaseClient, project.id, caller.id);
 
     const path = `${project.id}/${crypto.randomUUID()}.${extensionFor(file)}`;
     const bytes = await file.arrayBuffer();

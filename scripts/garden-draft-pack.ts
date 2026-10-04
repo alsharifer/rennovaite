@@ -29,6 +29,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { devFetch } from "./lib/dev-auth.mjs";
+
 import { parityTableText, type ParityResult } from "../lib/documents/parity.ts";
 import { createPackJob, finishPackJob } from "../lib/documents/pack-export/job.ts";
 import { runPackExport } from "../lib/documents/pack-export/run.ts";
@@ -45,6 +47,9 @@ if (!PROJECT_ARG) {
 const PROJECT: string = PROJECT_ARG;
 const flag = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
 const PORT = args.find((a) => /^\d{2,5}$/.test(a)) ?? "3098";
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "garden-draft-pack", projects: [PROJECT] });
 const OUT_DIR = flag("--out-dir") ?? `${ROOT}/data/garden pilot/g5-draft-pack`;
 
 const options: PackExportOptions = {
@@ -78,7 +83,7 @@ async function main() {
     result = await runPackExport({
       projectId: PROJECT,
       db,
-      transport: httpTransport(`http://localhost:${PORT}`, job.id),
+      transport: httpTransport(`http://localhost:${PORT}`, job.id, { authorization: api.authorization }),
       sink: localSink(OUT_DIR),
       options,
       source: "cli",

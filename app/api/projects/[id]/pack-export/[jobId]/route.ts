@@ -2,9 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { loadPackJob, signedOutputs } from "@/lib/documents/pack-export/job";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,12 +15,16 @@ export const dynamic = "force-dynamic";
 // Progress while running; the checklist when blocked; the failed checks when a
 // printed-content check failed; signed download links ONLY when every gate held.
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string; jobId: string }> }) {
+export async function GET(request: NextRequest, ctx: { params: Promise<{ id: string; jobId: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!packExportEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const { id, jobId } = await ctx.params;
   if (!z.string().uuid().safeParse(id).success || !z.string().uuid().safeParse(jobId).success) {
     return NextResponse.json({ error: "Invalid id." }, { status: 400 });
   }
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
+  if (access.denied) return access.denied;
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
   const job = await loadPackJob(db, jobId);
   if (!job || job.project_id !== id) return NextResponse.json({ error: "Not found." }, { status: 404 });

@@ -545,6 +545,7 @@ export function BoqView({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.24, ease: "easeOut" }}
             className="font-display text-headline-lg tabular-nums text-ink-900"
+            data-display-total={displayTotal}
           >
             <Figure value={displayTotal} text={headline.text} provenance={totalProv} />
             {/* D4: a to-be-priced line is never silently inside the headline. */}

@@ -179,7 +179,9 @@ describe("element-section resolution across viewer flag states (U7)", () => {
   });
 
   it("generate-boq no longer gates the element take-off or mapping on the viewer flag", () => {
-    const src = readFileSync(path.resolve(__dirname, "../../../app/api/generate-boq/route.ts"), "utf8");
+    // H3 moved the deterministic assembly to lib/boq/assemble.ts; the route
+    // keeps the LLM path. Together they are the pricing path.
+    const src = ["../../../app/api/generate-boq/route.ts", "../../boq/assemble.ts"].map((f) => readFileSync(path.resolve(__dirname, f), "utf8")).join("\n");
     expect(src).not.toMatch(/process\.env\.VIEWER_3D_ENABLED/);
     // The mapping is applied unconditionally on both engine and LLM paths.
     expect((src.match(/applyElementMapping\(/g) ?? []).length).toBe(2);

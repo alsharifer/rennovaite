@@ -1,9 +1,12 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { recordFeedback } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { persistDrawingSet } from "@/lib/drawings/persist";
 import { writeProposedSnapshot } from "@/lib/plan/snapshots";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { rehostImage } from "@/lib/render-storage";
 import { upscaleRender } from "@/lib/render-upscale";
@@ -19,6 +22,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const raw = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);
@@ -29,6 +34,8 @@ export async function POST(request: NextRequest) {
       );
     }
     const { project_id, room_id, render_id } = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, room_id, render_id });
+    if (access.denied) return access.denied;
 
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase

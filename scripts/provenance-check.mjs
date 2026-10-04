@@ -19,10 +19,14 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
+import { devFetch } from "./lib/dev-auth.mjs";
 
 const args = process.argv.slice(2);
 const port = /^\d+$/.test(args[0] ?? "") ? args.shift() : "3098";
 const ids = args;
+// H1: every route and page needs a signed-in caller — read as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "provenance-check" });
 
 // Mirrors lib/identity/curation.ts WITHHELD_IDENTITIES (kept literal here so the
 // check cannot be weakened by editing the module it checks).
@@ -33,9 +37,11 @@ const { url, key } = resolveTarget({ script: "provenance-check", writes: false }
 const sb = createClient(url, key);
 const firmNames = ((await sb.from("firms").select("name")).data ?? []).map((f) => f.name).filter((n) => n && n.trim().length >= 3);
 
+// H5: project pages answer members only.
+await api.grant(ids);
 let failed = false;
 for (const id of ids) {
-  const res = await fetch(`http://localhost:${port}/project/${id}/boq`);
+  const res = await api(`http://localhost:${port}/project/${id}/boq`);
   const html = await res.text();
   const triggers = [...html.matchAll(/data-figure=""[^>]*data-provenance="(traced|gap|none)"/g)].map((m) => m[1]);
   const none = [...html.matchAll(/<span data-figure="" data-provenance="none"[^>]*>([^<]*)</g)].map((m) => m[1]);

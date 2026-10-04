@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { safeNextPath } from "@/lib/auth/access";
+
 import { AuthForm } from "./_components/auth-form";
 
 export const metadata: Metadata = {
@@ -12,12 +14,15 @@ export const metadata: Metadata = {
 const DETAIL_IMG =
   "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1100&q=80";
 
-export default function AuthPage() {
+// H1: the proxy sends a signed-out visit here as /auth?next=<path>; the form
+// carries it so the magic link returns the visitor to where they were going.
+export default async function AuthPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const { next } = await searchParams;
   return (
     <main className="flex min-h-screen bg-background">
       {/* Left — form */}
       <section className="flex w-full flex-col items-center justify-center border-r border-ink-100 bg-canvas px-margin md:w-1/2">
-        <AuthForm />
+        <AuthForm next={safeNextPath(next) ? next : undefined} />
       </section>
 
       {/* Right — editorial imagery */}

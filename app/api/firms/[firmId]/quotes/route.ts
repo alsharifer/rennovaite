@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 import { importQuote, listQuotes } from "@/lib/quotes/store";
 
@@ -37,10 +37,11 @@ const MetaSchema = z.object({
 type Ctx = { params: Promise<{ firmId: string }> };
 
 export async function GET(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   try {
-    const caller = await getCaller(request);
     return NextResponse.json({ success: true, quotes: await listQuotes(firmDb(), firmId, caller) });
   } catch (e) {
     return storeErrorResponse(e);
@@ -48,6 +49,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 }
 
 export async function POST(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   const form = await request.formData().catch(() => null);
@@ -64,7 +67,6 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   const parsed = MetaSchema.safeParse(fields);
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    const caller = await getCaller(request);
     const bytes = new Uint8Array(await file.arrayBuffer());
     const result = await importQuote(firmDb(), firmId, caller, parsed.data, { name: file.name, bytes });
     return NextResponse.json({ success: true, ...result }, { status: 201 });

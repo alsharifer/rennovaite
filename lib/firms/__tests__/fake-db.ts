@@ -28,6 +28,8 @@ const UNIQUE: Record<string, (r: Row) => string> = {
   firm_rate_entries: (r) => (r.superseded_at ? `superseded:${r.id ?? Math.random()}` : `${r.firm_id}|${r.item_key}|${r.grade ?? "*"}|${r.origin}`),
   // 043: one membership row per (firm, user).
   firm_members: (r) => `${r.firm_id}|${r.user_id}`,
+  // 050: one membership row per (project, user).
+  project_members: (r) => `${r.project_id}|${r.user_id}`,
 };
 
 let seq = 0; // strictly increasing created_at for rows inserted within one millisecond

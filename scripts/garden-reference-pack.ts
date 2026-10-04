@@ -25,6 +25,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { devFetch } from "./lib/dev-auth.mjs";
+
 import { createPackJob, finishPackJob } from "../lib/documents/pack-export/job.ts";
 import { runPackExport } from "../lib/documents/pack-export/run.ts";
 import { httpTransport } from "../lib/documents/pack-export/transport.ts";
@@ -34,6 +36,9 @@ const ROOT = "C:/dev/rennovaite";
 const args = process.argv.slice(2);
 const PORT = args.find((a) => /^\d{2,5}$/.test(a)) ?? "3098";
 const BASE = `http://localhost:${PORT}`;
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "garden-reference-pack" });
 const OUT_DIR = `${ROOT}/data/garden pilot/g5-draft-pack`;
 const WORKING_NAME = "Villa 94 garden (ground truth)";
 /** What a client reads: what the garden is, not whose house it is or what it is to us. */
@@ -84,9 +89,11 @@ async function main() {
   const db: SupabaseClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const { data: project } = await db.from("projects").select("id").eq("name", WORKING_NAME).single<{ id: string }>();
   const PROJECT = project!.id;
+  // H5: the pipeline account works on this project as its member (scripts/lib/dev-auth.mjs).
+  await api.grant([PROJECT]);
 
   // The client-facing name, through the project route (the export gate checks it).
-  const named = await fetch(`${BASE}/api/projects/${PROJECT}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: DISPLAY_NAME }) });
+  const named = await api(`${BASE}/api/projects/${PROJECT}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ display_name: DISPLAY_NAME }) });
   if (!named.ok) throw new Error(`display name could not be set: HTTP ${named.status}`);
 
   const job = await createPackJob(db, PROJECT, "cli", options);
@@ -95,7 +102,7 @@ async function main() {
     result = await runPackExport({
       projectId: PROJECT,
       db,
-      transport: httpTransport(BASE, job.id),
+      transport: httpTransport(BASE, job.id, { authorization: api.authorization }),
       sink: {
         async write(name, bytes) {
           mkdirSync(OUT_DIR, { recursive: true });

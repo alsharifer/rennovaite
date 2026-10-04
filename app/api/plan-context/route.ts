@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -47,21 +49,29 @@ const CreateSchema = z.object({ plan_id: z.string().uuid(), ...Fields });
 const UpdateSchema = z.object({ id: z.string().uuid(), ...Object.fromEntries(Object.entries(Fields).map(([k, v]) => [k, v.optional()])) } as { id: z.ZodString } & { [K in keyof typeof Fields]: z.ZodOptional<(typeof Fields)[K]> });
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!enabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const planId = new URL(request.url).searchParams.get("plan_id");
   if (!planId || !z.string().uuid().safeParse(planId).success) {
     return NextResponse.json({ error: "plan_id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { plan_id: planId });
+  if (access.denied) return access.denied;
   const { data, error } = await db().from("plan_context").select(COLS).eq("plan_id", planId).order("created_at");
   if (error) return NextResponse.json({ context: [], degraded: true });
   return NextResponse.json({ context: data ?? [] });
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!enabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = CreateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   const b = parsed.data;
+  const access = await projectAccess(db(), caller, { plan_id: b.plan_id });
+  if (access.denied) return access.denied;
   try {
     const { data, error } = await db()
       .from("plan_context")
@@ -94,10 +104,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!enabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = UpdateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   const { id, ...fields } = parsed.data;
+  const access = await projectAccess(db(), caller, { context_id: id });
+  if (access.denied) return access.denied;
   const patch: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fields)) if (v !== undefined) patch[k] = v;
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "No fields to update." }, { status: 400 });
@@ -114,9 +128,13 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (!enabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const id = z.string().uuid().safeParse(new URL(request.url).searchParams.get("id"));
   if (!id.success) return NextResponse.json({ error: "A valid context id is required." }, { status: 400 });
+  const access = await projectAccess(db(), caller, { context_id: id.data });
+  if (access.denied) return access.denied;
   const { error } = await db().from("plan_context").delete().eq("id", id.data);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

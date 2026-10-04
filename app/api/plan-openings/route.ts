@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { DEFAULT_OPENING_DIMS } from "@/lib/plan/geometry";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -27,10 +29,14 @@ const SELECT_COLS =
  * degrades to an empty layer instead of breaking the plan page.
  */
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const planId = new URL(request.url).searchParams.get("plan_id");
   if (!planId || !z.string().uuid().safeParse(planId).success) {
     return NextResponse.json({ error: "plan_id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { plan_id: planId });
+  if (access.denied) return access.denied;
   try {
     const { data, error } = await db()
       .from("plan_openings")
@@ -72,12 +78,16 @@ const CreateSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = CreateSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const b = parsed.data;
+    const access = await projectAccess(db(), caller, { plan_id: b.plan_id, room_id: b.room_id ?? null, context_id: (b as { context_id?: string | null }).context_id ?? null });
+    if (access.denied) return access.denied;
     const def = DEFAULT_OPENING_DIMS[b.kind];
     const dimsDefaulted = b.width_mm == null || b.height_mm == null;
 
@@ -137,12 +147,16 @@ const UpdateSchema = z.object({
  * must not silently promote a defaulted door into a measured quantity).
  */
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = UpdateSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { id, reset_dims, ...fields } = parsed.data;
+    const access = await projectAccess(db(), caller, { opening_id: id, room_id: fields.room_id ?? null, context_id: (fields as { context_id?: string | null }).context_id ?? null });
+    if (access.denied) return access.denied;
 
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(fields)) {
@@ -191,11 +205,15 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const id = z.string().uuid().safeParse(new URL(request.url).searchParams.get("id"));
     if (!id.success) {
       return NextResponse.json({ error: "A valid opening id is required." }, { status: 400 });
     }
+    const access = await projectAccess(db(), caller, { opening_id: id.data });
+    if (access.denied) return access.denied;
     const { error } = await db().from("plan_openings").delete().eq("id", id.data);
     if (error) throw error;
     return NextResponse.json({ success: true });

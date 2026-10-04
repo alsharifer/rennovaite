@@ -22,6 +22,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { devFetch } from "./lib/dev-auth.mjs";
+
 import {
   arabellaReferenceRecords,
   CONTEXT,
@@ -41,6 +43,9 @@ const RESEED = args.includes("--reseed");
 const NAME = args.includes("--name") ? args[args.indexOf("--name") + 1]! : PROJECT_NAME;
 const RESULT_FILE = NAME === PROJECT_NAME ? "g5-step1.json" : "g5-rehearsal-step1.json";
 const BASE = `http://localhost:${PORT}`;
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "arabella-draft-plan" });
 const PHOTOS = `${ROOT}/data/garden pilot/Client Garden Photos`;
 
 const results: string[] = [];
@@ -62,7 +67,7 @@ function loadEnv(): Record<string, string> {
 }
 
 async function call(method: string, path: string, body?: unknown) {
-  const res = await fetch(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await api(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
   return json as Record<string, unknown>;
@@ -161,7 +166,7 @@ async function main() {
     fd.append("project_id", projectId);
     fd.append("kind", "photo");
     fd.append("source", "intake");
-    const res = await fetch(`${BASE}/api/project-asset`, { method: "POST", body: fd });
+    const res = await api(`${BASE}/api/project-asset`, { method: "POST", body: fd });
     if (res.ok) uploaded++;
     else console.log(`  upload ${file} → ${res.status} ${(await res.text()).slice(0, 160)}`);
   }

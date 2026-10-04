@@ -15,11 +15,15 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
+import { devFetch } from "./lib/dev-auth.mjs";
 import { verificationJobs } from "./lib/verification-job.mjs";
 
 const args = process.argv.slice(2);
 const port = /^\d+$/.test(args[0] ?? "") ? args.shift() : "3098";
 const base = `http://localhost:${port}`;
+// H1: every route and page needs a signed-in caller — read as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "document-identity-scan" });
 
 // Literal on purpose: the scan must not be weakened by editing the module it checks.
 const WITHHELD = ["KAME", "Atrium", "QTN20261407", "Global Creation", "3936/R1", "Laspinas", "46703", "Villa 94", "Villa94", "V94", "RAK tiles quotation"];
@@ -30,6 +34,8 @@ const firms = (await sb.from("firms").select("id, name")).data ?? [];
 // T5: the document routes answer only a pack job; this READ opens one per project and releases nothing.
 const vj = verificationJobs(sb, "document-identity-scan");
 
+// H5: project routes and pages answer members only.
+await api.grant(args);
 let hits = 0;
 for (const id of args) {
   const { data: p } = await sb.from("projects").select("firm_id, name").eq("id", id).maybeSingle();
@@ -38,13 +44,13 @@ for (const id of args) {
 
   const surfaces = [];
   const headers = await vj.headers(id);
-  const d = await fetch(`${base}/api/projects/${id}/drawings`, { headers });
+  const d = await api(`${base}/api/projects/${id}/drawings`, { headers });
   if (d.ok) for (const s of (await d.json()).sheets ?? []) surfaces.push([`sheet ${s.sheetNumber} (${s.kind})`, s.svg]);
   else console.log(`  drawings: HTTP ${d.status}`);
-  const r = await fetch(`${base}/api/projects/${id}/render-pack?format=pages`, { headers });
+  const r = await api(`${base}/api/projects/${id}/render-pack?format=pages`, { headers });
   if (r.ok) (await r.json()).pages?.forEach((pg, i) => surfaces.push([`pack page ${i + 1}`, typeof pg === "string" ? pg : JSON.stringify(pg)]));
   else console.log(`  render pack: HTTP ${r.status}`);
-  const b = await fetch(`${base}/project/${id}/boq`);
+  const b = await api(`${base}/project/${id}/boq`);
   if (b.ok) surfaces.push(["BoQ page (HTML + payload)", await b.text()]);
 
   console.log(`  surfaces scanned: ${surfaces.length}`);

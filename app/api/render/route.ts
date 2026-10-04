@@ -4,7 +4,9 @@ import Replicate from "replicate";
 import { z } from "zod";
 
 import { AnalyticsEvent, trackServer } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { getKgContext } from "@/lib/kg/context";
+import { projectAccess } from "@/lib/projects/http";
 import {
   buildBaseInput,
   buildEditInput,
@@ -55,6 +57,8 @@ const BodySchema = z.object({
 const VALID_STYLE_KEYS = new Set<string>([...STYLE_KEYS, ...GARDEN_STYLE_KEYS]);
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const raw = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);
@@ -65,6 +69,8 @@ export async function POST(request: NextRequest) {
       );
     }
     const { project_id, room_id, tweak } = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, room_id });
+    if (access.denied) return access.denied;
 
     const apiKey = process.env.REPLICATE_API_TOKEN;
     if (!apiKey) {

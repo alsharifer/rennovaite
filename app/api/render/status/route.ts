@@ -1,7 +1,10 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import Replicate from "replicate";
 
 import { AnalyticsEvent, recordFeedback, trackServer } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import {
   buildEditInput,
   extractImageUrl,
@@ -46,6 +49,8 @@ async function retryRender(
 }
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const predictionId = request.nextUrl.searchParams.get("prediction_id");
     if (!predictionId) {
@@ -54,6 +59,8 @@ export async function GET(request: NextRequest) {
         { status: 400 },
       );
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { prediction_id: predictionId });
+    if (access.denied) return access.denied;
 
     const supabase = getSupabaseAdmin();
     const { data: row } = await supabase

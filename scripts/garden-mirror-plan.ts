@@ -24,11 +24,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { devFetch } from "./lib/dev-auth.mjs";
+
 const ROOT = "C:/dev/rennovaite";
 const args = process.argv.slice(2);
 const PROJECT = args.find((a) => /^[0-9a-f-]{36}$/.test(a));
 const PORT = args.find((a) => /^\d{2,5}$/.test(a)) ?? "3098";
 const BASE = `http://localhost:${PORT}`;
+// H1: every route needs a signed-in caller — this script calls as the dev
+// "pipeline" account (scripts/lib/dev-auth.mjs), never anonymously.
+const api = devFetch("pipeline", { script: "garden-mirror-plan", projects: PROJECT ? [PROJECT] : [] });
 if (!PROJECT) {
   console.error("usage: garden-mirror-plan.ts <project-id> [port]");
   process.exit(1);
@@ -48,7 +53,7 @@ const check = (label: string, ok: boolean, detail = "") => {
 };
 
 async function call(method: string, path: string, body?: unknown) {
-  const res = await fetch(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await api(BASE + path, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
   return json;

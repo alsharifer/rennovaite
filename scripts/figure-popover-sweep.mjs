@@ -10,12 +10,16 @@
 // the popup title. Reports how many figures resolved, lists any that did not,
 // checks one TAP (click) opens a popup too, and — with --shots — writes
 // screenshots of the summary rows and of representative popovers.
+// H1: app pages redirect a signed-out visit, so the browser carries the dev
+// "pipeline" account's session as the cookies @supabase/ssr itself writes.
 // =============================================================================
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 
 const url = process.argv[2];
 const opt = Object.fromEntries(process.argv.slice(3).map((a) => a.replace(/^--/, "").split("=")));
@@ -58,6 +62,15 @@ const send = (method, params = {}) =>
 const evaluate = async (expression) => (await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })).result.value;
 
 await send("Page.enable");
+await send("Network.enable");
+const { hostname } = new URL(url);
+const me = await devSession("pipeline", { script: "figure-popover-sweep" });
+// H5: project pages answer members only — the sweep's account reads the page's project as one.
+const pageProject = /\/project\/([0-9a-f-]{36})/.exec(url)?.[1];
+if (pageProject && me.userId) await grantProjectMembership(me.userId, [pageProject], { script: "figure-popover-sweep" });
+for (const c of me.cookies) {
+  await send("Network.setCookie", { name: c.name, value: c.value, domain: hostname, path: "/", httpOnly: false, secure: false, sameSite: "Lax" });
+}
 await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
 await send("Page.navigate", { url });
 for (let i = 0; i < 100; i++) {

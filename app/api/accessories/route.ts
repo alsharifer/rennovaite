@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { loadSelections } from "@/lib/accessories/load";
 import { loadPickerData } from "@/lib/accessories/picker-data";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -24,10 +26,14 @@ function db(): SupabaseClient {
 }
 
 export async function GET(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   const projectId = new URL(request.url).searchParams.get("project_id");
   if (!projectId || !z.string().uuid().safeParse(projectId).success) {
     return NextResponse.json({ error: "project_id (uuid) required." }, { status: 400 });
   }
+  const access = await projectAccess(db(), caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   try {
     return NextResponse.json(await loadPickerData(projectId));
   } catch (err) {
@@ -45,12 +51,16 @@ const SelectSchema = z.object({
 
 /** POST — choose a catalogue item for one BoQ line. */
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = SelectSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { project_id, item_key, catalog_item_id } = parsed.data;
+    const access = await projectAccess(db(), caller, { project_id });
+    if (access.denied) return access.denied;
 
     // The catalogue row must actually price this item_key — otherwise a
     // selection would silently re-rate the wrong line.
@@ -93,6 +103,8 @@ export async function POST(request: NextRequest) {
 
 /** DELETE — deselect, returning that line to its rule-derived default. */
 export async function DELETE(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const url = new URL(request.url);
     const projectId = url.searchParams.get("project_id");
@@ -103,6 +115,8 @@ export async function DELETE(request: NextRequest) {
         { status: 400 },
       );
     }
+    const access = await projectAccess(db(), caller, { project_id: projectId });
+    if (access.denied) return access.denied;
     const { error } = await db()
       .from("accessory_selections")
       .delete()

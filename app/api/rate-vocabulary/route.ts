@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { listVocabulary } from "@/lib/firms/vocabulary";
 import type { VocabularyItem } from "@/lib/firms/vocabulary-client";
 import { indexReference, loadReferenceRows, lookupCalibrated, lookupIndicative } from "@/lib/rates/reference";
@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const caller = await getCaller(request);
-  if (!caller) return NextResponse.json({ success: false, error: "Sign in to read the vocabulary.", code: "unauthenticated" }, { status: 401 });
+  if (!caller) return unauthenticated("Sign in to read the vocabulary.");
 
   const base = listVocabulary();
   let idx = indexReference([]);

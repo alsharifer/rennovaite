@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -30,10 +32,14 @@ const PatchSchema = z.object({
 });
 
 export async function PATCH(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.GARDEN_PILOT_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = PatchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.message }, { status: 400 });
   const { id, ...fields } = parsed.data;
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { room_id: id });
+  if (access.denied) return access.denied;
   const patch: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fields)) if (v !== undefined) patch[k] = v;
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "No fields to update." }, { status: 400 });

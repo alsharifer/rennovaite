@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { AnalyticsEvent, trackServer } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import {
   buildEveningPrompt,
   currentDayRender,
@@ -40,12 +42,16 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const parsed = BodySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const { project_id, room_id } = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, room_id });
+    if (access.denied) return access.denied;
 
     const apiKey = process.env.REPLICATE_API_TOKEN;
     if (!apiKey) {

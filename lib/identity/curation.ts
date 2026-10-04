@@ -42,6 +42,9 @@ export const WITHHELD_IDENTITIES: readonly Withheld[] = [
   { pattern: /\bKAME\b/g, replacement: "landscape reference contractor", why: "garden contractor (internal_ref)" },
   { pattern: /Atrium Technical Services(?: QTN\d+)?/gi, replacement: "joinery reference quotation", why: "Mudon joinery contractor (rate_book.source, joinery rule notes)" },
   { pattern: /\bAtrium (?=\d)/g, replacement: "ref ", why: "Mudon joinery contractor line refs, e.g. '(Atrium 1.1)'" },
+  // H2: the prod seed wrote "Atrium QTN…" — the name alone, then the number.
+  // Anything the two patterns above left is the bare name.
+  { pattern: /\bAtrium\b(?: QTN\d+)?/g, replacement: "joinery reference quotation", why: "Mudon joinery contractor, bare name (prod rate_book.source)" },
   { pattern: /\bQTN20261407\b/g, replacement: "joinery reference quotation", why: "Mudon joinery quotation number" },
   { pattern: /Global Creation(?: Services)?(?: ref 3936\/R1)?/gi, replacement: "aluminium & glazing reference quotation", why: "Mudon aluminium contractor (rate_book.source, R-43 note)" },
   { pattern: /\b3936\/R1\b/g, replacement: "aluminium reference quotation", why: "Mudon aluminium quotation number" },

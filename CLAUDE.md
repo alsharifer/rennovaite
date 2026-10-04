@@ -314,7 +314,8 @@ unchanged.
 ## Overlays — electrical + plumbing (P2)
 
 Point-based electrical + plumbing layers on the 2D plan whose **counts** feed
-two new BoQ sections deterministically. Gated by `OVERLAYS_ENABLED`.
+two new BoQ sections deterministically. `OVERLAYS_ENABLED` gates the overlay
+UI, rule seeding and the services sheets — since H3, NOT the BoQ feed.
 
 - **Fixtures** live in `plan_fixtures` (migration `015`): `layer`
   (electrical|plumbing), `type`, `room_id`, `position` ([x,y] in **normalised**
@@ -331,7 +332,7 @@ two new BoQ sections deterministically. Gated by `OVERLAYS_ENABLED`.
   `/api/plan-fixtures`, always `source: 'user'`). Flag off → no toggle, plan
   unchanged.
 - **BoQ feed** (`lib/overlays/boq.ts` + `boq-feed.ts`): `appendOverlaySections`
-  adds **"Electrical Installations"** + **"Plumbing & Sanitary"** POMI sections
+  (unconditional since H3 — a flag-off deploy used to drop both sections) adds **"Electrical Installations"** + **"Plumbing & Sanitary"** POMI sections
   to the generated BoQ (both engine + LLM paths) with quantities = fixture
   counts (never the LLM). Each line records `element_refs` (fixture ids) and
   `rate_status`; where the catalog has no default point rate the line is
@@ -1227,9 +1228,9 @@ resolved line carries **`rate_tier`**.
   routes run on the service role, which RLS never sees. Scripts authenticate
   through `scripts/lib/dev-auth.mjs` (a real dev account's real session — no
   bypass); `scripts/firm-member-add.mjs` grants membership with the service
-  role. Sign-out exists (`app/_actions/sign-out.ts`, top bar). **Every other
-  API route is still unauthenticated** — a named deployment blocker, see
-  `docs/AUTH.md`.
+  role. Sign-out exists (`app/_actions/sign-out.ts`, top bar). Since H1 every
+  other route needs a signed-in caller too (see "Route auth" below), and since
+  H5 every project route and page needs project membership.
 - **Identity.** A firm's rate reaches a line as the constant
   "contractor rate book" — never its name. Pricing paths read `rate_book`
   only through `REFERENCE_COLUMNS` (no `source`, no `internal_ref`) and
@@ -1413,7 +1414,8 @@ its logo. Built on the T5 path, never beside it.
 
 - **Schema (migration 048)**: `pilot_events` gains `firm_id`, `actor`
   (the signed-in account; null = a script or our own run — the distinction
-  the pilot turns on), `session_ref`, `duration_ms`, `stage` (a column now;
+  the pilot turns on; since H1 a script outside a pack job calls as
+  `dev-scripts+pipeline@rennovaite.local`, so its events name that account), `session_ref`, `duration_ms`, `stage` (a column now;
   `detail.stage` stays for old readers), `project_id` nullable (a rate-book
   change is a firm event); kinds gain `boq_viewed`, `support_touch`,
   `rate_book_change`, `approval_recorded`, `basis_accepted`; `pack_exports`
@@ -1542,7 +1544,9 @@ display-name check, outputs not saved together. There is now ONE path.
   so a run is reproducible.
 - **No ungated output path.** Every document route calls `guardDocumentRoute`,
   which serves a document only to a RUNNING `pack_exports` job (migration 042,
-  header `x-pack-export-job`, 3 h TTL, project-scoped). A browser navigation is
+  header `x-pack-export-job`, 3 h TTL, project-scoped) — and, since H1, only to
+  a signed-in caller: the transport carries the session of whoever started the
+  job (the in-app job forwards the member's; the CLI uses `devFetch`). A browser navigation is
   redirected to the Export pack panel; anything else gets `403 use_pack_export`.
   The design-lock archive (`lib/drawings/persist.ts`) no longer mints year-long
   signed URLs — it records storage paths. `ungated-paths.test.ts` scans the app
@@ -1578,6 +1582,177 @@ display-name check, outputs not saved together. There is now ONE path.
 **DB step**: `npm run db:manifest` + `npm run db:push` for
 `20260101004200_pack_exports.sql` (the `pack_exports` table and the private
 `packs` bucket).
+
+## Pricing never depends on a flag (H3)
+
+For a fixed project state no combination of feature flags changes a BoQ.
+Flags gate UI; they do not price. U7 took the viewer flag out of the element
+sections; H3 took `OVERLAYS_ENABLED` out of the P2 overlay feed — a flag-off
+deployment had silently dropped Electrical Installations and Plumbing &
+Sanitary from every BoQ with fixtures (Mudon: ~AED 8,380 + ~6,440).
+
+- **One assembly**: `lib/boq/assemble.ts` — `loadBoqInputs` (both engine
+  paths) + `priceDeterministicBoq`, moved out of the route verbatim. The route,
+  the invariance test and read-only scripts all price through it.
+- **Invariance test** `lib/boq/__tests__/flag-invariance.test.ts`: a static
+  proof (the runtime import graph of `assemble.ts` reads no feature flag; the
+  flag list must cover every `*_ENABLED`-style env the app reads; KG grounding
+  stays on the legacy LLM path) plus all 2^12 flag combinations over a fixed
+  Mudon state with fixtures → one BoQ, Electrical + Plumbing priced. A new flag
+  read anywhere in the pricing graph fails the suite. `BOQ_ENGINE` is an engine
+  selector, not a feature flag.
+- **Measured, read-only**: `scripts/boq-dry-run-diff.ts <project> [--boq id]`
+  regenerates IN-PROCESS under current code (no server, no session, nothing
+  written — a degraded assembly voids the run) and diffs against a stored
+  revision: price moves line by line (revision-diff identity) + every
+  non-price field change. Needs `node --experimental-transform-types --import
+  ./scripts/_alias-hook.mjs` (`lib/boq/rates.ts` uses a parameter property).
+  Prod Mudon, 5 Sep BoQ (AED 723,282) → **738,529 (+15,247)**: the only price
+  movement is the four S6-pre lines added on 8 Sep (`4383c34`: cove LED supply
+  2,745 · vanity counter slab 4,350 · frameless shower glass 4,400 · bathroom
+  mirrors 1,950 = subtotal +13,445, then contingency + VAT). Everything else is
+  additive or text: `item_key` / `rate_tier` added, rule ids on the 15
+  joinery/aluminium lines (identity only — quantities, rates and totals equal),
+  supplier names emitted as role labels at source. Electrical + Plumbing
+  unchanged.
+
+## Project ownership + invite-only sign-up (H5)
+
+Route auth stage 2: a session is not an entitlement. Migration **050**
+`project_members (project_id, user_id)` mirrors `firm_members`; creating a
+project (`/api/upload`, `/api/draw-plan`) makes you its member; every
+project-scoped route and page requires membership. Existing projects were
+backfilled to Abdallah's account (by e-mail, where the account exists — prod
+yes, dev no: run `node scripts/project-member-add.mjs <email> --all` once it
+does).
+
+- **One resolver** `lib/projects/access.ts → authorizeProject(db, caller, refs)`
+  (routes: `lib/projects/http.ts → projectAccess`). It takes EVERY id a request
+  carries — project, plan, room, render, prediction, asset, BoQ, fixture,
+  element, opening, context, moodboard item — resolves each to its project, and
+  answers 401 → 404 `<kind>_not_found` → 403 `not_a_project_member` → 400
+  `refs_span_projects`. Checking only the NAMED project would let a caller pass
+  their own project id beside someone else's room or render.
+- **Routes**: every handler outside `NON_PROJECT_ROUTE_FILES` (firm-scoped
+  routes and the vocabulary, in `lib/auth/access.ts`, each with a reason) calls
+  `projectAccess` with all its ids, awaiting nothing but caller, params and body
+  before it (`route-auth.test.ts` scans it). pilot-events is dual: a project
+  event needs the project, a firm event / the firm rollup needs the firm.
+  **A new project route must pass every id it touches.**
+- **Pages**: `proxy.ts` checks membership for `/project/<id>/…` before any page
+  code runs (a page renders in PARALLEL with its layout, so a layout-only check
+  let a non-member's visit run the page's reads and side effects — the BoQ page
+  recorded a view). A non-member gets a plain 404. `app/project/[id]/layout.tsx`
+  checks again; the dashboard lists only member projects.
+- **Firm attach** (`PATCH /api/projects/:id { firm_id }`) needs membership of
+  BOTH the project and the firm. Regenerating (H4) = the project's members.
+- **Invite-only sign-up** (`lib/auth/signup.ts`): the magic link stays; account
+  CREATION needs `AUTH_SIGNUP_ALLOWLIST` (exact addresses or a local-part
+  pattern like `dev-scripts+*@rennovaite.local`; unset = nobody new). The
+  sign-in action creates an invited address's account itself and never lets
+  Supabase create one (`shouldCreateUser: false`); anyone else sees the same
+  invite-only notice whether or not their address has an account. **Supabase's
+  own "Allow new users to sign up" must be OFF** on each project, or the public
+  anon key can still open accounts directly.
+- **Scripts**: dev accounts act on projects as members — `grantProjectMembership`
+  (+ `revoke()`) or `devFetch(who, { projects })` / `.grant(ids)` in
+  `scripts/lib/dev-auth.mjs` (service role, the operator act; no route bypass).
+  Checks revoke what they granted; the pipeline account's grants persist.
+- **Live**: `node scripts/project-isolation-sweep.mjs [port]` — two fresh
+  accounts; every project handler (from the filesystem) as the intruder → 403,
+  mixed-reference attacks → 403, every project page → 404, firm attach both
+  ways, the owner's rows byte-identical after. At H5: 74/74, 13/13 mixed, 13/13
+  pages.
+- **DB step**: `npm run db:push` for 050 **before** deploying the code — the
+  membership read fails closed (500 `migration_required`) without the table.
+
+## Legal pages + the firm-#2 runbook (H6)
+
+- **`/privacy` and `/terms`** render `content/legal/privacy.md` / `terms.md` —
+  counsel's working drafts, verbatim, under a frontmatter block (`status`
+  draft | published, `last_updated` YYYY-MM-DD, `source`). Publishing the
+  lawyer-approved text is a **file swap + `status: published`**; no page edit.
+  `lib/legal/markdown.ts` is a deliberately small Markdown (headings,
+  paragraphs, quotes, lists, bold/italic) parsed to a block tree and rendered as
+  React elements by `components/legal/LegalPage.tsx` — never as HTML. **While
+  `draft` the pages show the pre-H6 "being finalised" placeholders
+  (`components/legal/LegalPlaceholders.tsx`) — the drafts carry bracketed
+  blanks and are never public** (decided 2026-10-04). On `published` the
+  document renders with its Last updated line (the body's own `*Last updated:
+  [date]*` slot is dropped for the frontmatter date). `LegalPage` still marks a
+  draft and noindexes it, for a local preview. The sign-in form links both. A
+  test pins both documents at `draft` — flipping it is the sign-off.
+- **`docs/ONBOARDING_RUNBOOK.md`**: onboarding a second firm, in order —
+  account (allowlist) → firm (or `firm-member-add` for Newspace's 041 firm on
+  dev) → project membership + baseline regenerate → attach (both memberships)
+  → regenerate with an EMPTY book, which must not move → build the book →
+  mark reviewed → flags per pilot type → first proposal through the
+  reference-basis gate; plus Arabella's `firm_id` decision point.
+
+## Regenerate from the BoQ page (H4)
+
+The payoff loop: change a rate or the plan → **Regenerate BoQ** → the new
+revision's figure and a link to the U4 diff against the revision it superseded
+(`/project/:id/boq/revisions?from=<previous>&to=<new>`).
+
+- **Who** (`lib/boq/regenerate.ts`, ONE answer for route, pack export and page):
+  since H5, the project's MEMBERS (`not_a_project_member`), whether or not it
+  has a firm (H4 shipped it as firm members / any signed-in account). `generate-boq` enforces it on every STORING run, before
+  anything is loaded or persisted (a `dry_run` stores nothing and is not
+  gated); in-app Export pack refuses up front with the same answer, since it
+  regenerates inside its job.
+- **Disabled with a reason**: `regenerateReadiness` = authority + the plan
+  refusals generation would answer with (`loadPriceablePlan` in
+  `lib/boq/assemble.ts`: no plan / no area / no rooms / overlapping rooms), each
+  with its fix link. The page passes the server's answer to the control
+  (`RegenerateBoq`), so a grey button never disagrees with the route.
+- **Recorded**: the `boq_generated` event carries the actor, `trigger:
+  "regenerate"` and `previous_boq_id`; the response carries
+  `previous_boq_id` / `previous_total_aed`, so the diff link is the server's own
+  record of what it superseded.
+- **What-if baseline fix (found by the walkthrough)**: `recalc` priced every
+  UNSELECTED gradeable line at the rate-book "standard", so a firm-priced BoQ's
+  page headline and summary showed reference-priced totals (the walkthrough
+  villa: 498,824 on the page vs 477,495 stored) and a regenerated firm-rate
+  change could never move them. An unselected line now keeps the rate it was
+  priced at; only a chosen grade re-prices. The headline carries
+  `data-display-total`.
+- **Live**: the onboarding walkthrough's step 6 now edits a rate, presses
+  Regenerate, checks progress, the stored revision, the page total, the event
+  and the exact diff link, then follows it (`screenshots/h4/`).
+
+## Route auth — a session everywhere (H1)
+
+Every API route and every app page needs a signed-in caller, except the ONE
+allowlist in `lib/auth/access.ts`: the `/auth/callback` route, `/api/health`
+(anonymous = env presence only, no key fingerprints), the pages `/`,
+`/rennovaite`, `/auth`, `/privacy`, `/terms`, and the sign-in / sign-out
+server actions. `docs/AUTH.md` has the full account.
+
+- **`proxy.ts`** (Next 16's middleware) gates first: `getClaims` on the Bearer
+  JWT or the cookie session (local ES256 check, ~5–15 ms); off the allowlist an
+  API route answers `401 { error, code: "unauthenticated" }`, a page redirects
+  `307 /auth?next=<path>`. It also refreshes the cookie session. Fails closed
+  without Supabase env.
+- **Every handler checks again**, as its first await (only route params before
+  it): `const caller = await getCaller(request); if (!caller) return
+  unauthenticated(…);` (both from `lib/auth/caller.ts`). Server actions call
+  `getCaller()` themselves. `lib/firms/__tests__/route-auth.test.ts` scans
+  every route and `"use server"` file and fails the suite on one that does not.
+  **A new route must open with that guard, or be added to the allowlist with a
+  reason.**
+- **Server-to-server calls carry a session.** The in-app pack export forwards
+  its starter's credential (`forwardableAuthorization`) through
+  `httpTransport(base, jobId, { authorization })`; inside a job,
+  `generate-boq` keeps the job's actor for its event.
+- **Scripts** call the app only through `scripts/lib/dev-auth.mjs` — `devFetch(who)`
+  (Bearer, lazily minted, re-minted near expiry; `.authorization()` for the CLI
+  transport) or `devSession(who)` (its `.cookies` for headless Chrome). There is
+  no bypass, shared secret or dev mode in the routes.
+- **Live check**: `node scripts/route-auth-sweep.mjs [port]` — every handler and
+  page derived from the filesystem, anonymous / forged-token / signed-in.
+- **Stage 2 is H5** (below): project ownership and invite-only sign-up. RLS is
+  still off.
 
 ## The journey — nine steps, one definition (B1/B2/B3)
 
@@ -1646,6 +1821,7 @@ view-only side surface reached from the layout and render steps).
 | `PACK_EXPORT_ENABLED`             | server — `"true"` **with `DRAWINGS_ENABLED="true"`** shows the in-app "Export pack" action and lets the document routes answer a running pack job (T5). Off = the action is absent and every document route 404s |
 | `TEXTURED_WALKTHROUGH`            | server — `"true"` lets the 3D walkthrough read StyleBoard finishes onto floors and walls (F1). Off = the clay model, unchanged |
 | `PARSE_PROVIDER`                  | server — optional; which floorplan parser to use. Only `"inhouse"` (the default) is configured; any other value throws rather than silently mis-parsing |
+| `AUTH_SIGNUP_ALLOWLIST`           | server — H5: who may be GIVEN an account (comma/space separated addresses or `prefix+*@domain` patterns). Unset = nobody new; existing accounts still sign in |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
 
 ### Feature flags — read at server start (flip → restart)

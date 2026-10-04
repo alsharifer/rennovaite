@@ -1,9 +1,11 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { StoreError, assignProjectFirm } from "@/lib/firms/store";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,12 +18,15 @@ const IdSchema = z.string().uuid();
 // single row delete tears down the whole tree. Irreversible; the UI gates this
 // behind a confirm dialog.
 //
-// Note: like the rest of this PoC, data access runs through the service-role
-// admin client with no per-user ownership check (projects have no user_id yet).
+// H1: a signed-in caller only. There is still no per-user ownership check —
+// data access runs through the service-role admin client and projects have no
+// owner yet (docs/AUTH.md, stage 2).
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const { id } = await params;
     const parsed = IdSchema.safeParse(id);
@@ -31,6 +36,8 @@ export async function DELETE(
         { status: 400 },
       );
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsed.data });
+    if (access.denied) return access.denied;
 
     const supabase = getSupabaseAdmin();
 
@@ -90,6 +97,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const { id } = await params;
     const parsedId = IdSchema.safeParse(id);
@@ -99,6 +108,8 @@ export async function PATCH(
         { status: 400 },
       );
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsedId.data });
+    if (access.denied) return access.denied;
 
     const body = PatchSchema.safeParse(await request.json());
     if (!body.success) {
@@ -111,11 +122,9 @@ export async function PATCH(
     const supabase = getSupabaseAdmin();
     if (body.data.firm_id !== undefined) {
       // U1: attaching a firm needs a signed-in member of that firm (detaching,
-      // a member of the firm being detached). The rest of this PATCH is still
-      // unauthenticated like the rest of the PoC — recorded as a deployment
-      // blocker in docs/AUTH.md, not fixed here.
+      // a member of the firm being detached). The rest of this PATCH needs a
+      // signed-in caller (H1) but no ownership of the project yet.
       try {
-        const caller = await getCaller(request);
         await assignProjectFirm(supabase as unknown as import("@supabase/supabase-js").SupabaseClient, parsedId.data, body.data.firm_id, caller);
       } catch (e) {
         if (e instanceof StoreError) return NextResponse.json({ success: false, error: e.message, code: e.code }, { status: e.status });

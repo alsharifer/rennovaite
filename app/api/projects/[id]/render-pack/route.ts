@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { guardDocumentRoute, packJobActor } from "@/lib/documents/pack-export/guard";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -9,6 +10,7 @@ import { loadPackReadiness, readinessMessage } from "@/lib/documents/pack-readin
 import { generateRenderPack } from "@/lib/documents/render-pack-pdf";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +27,8 @@ const IdSchema = z.string().uuid();
  * Gated by DRAWINGS_ENABLED with the drawing set it is assembled alongside.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.DRAWINGS_ENABLED !== "true") {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
@@ -32,6 +36,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   }
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsed.data });
+  if (access.denied) return access.denied;
   // T5: the render pack (PDF, pages or manifest) goes only to a running pack export.
   const denied = await guardDocumentRoute(request, parsed.data);
   if (denied) return denied;

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { addProjectMember } from "@/lib/projects/access";
+import { projectAccess } from "@/lib/projects/http";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -53,6 +56,8 @@ const ConvertSchema = z.object({
  * case this serves, and silently deleting geometry is never the right default.
  */
 export async function PATCH(request: Request) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.GARDEN_PILOT_ENABLED !== "true") {
     return NextResponse.json(
       { error: "Drawing a plan from scratch is not enabled." },
@@ -66,6 +71,8 @@ export async function PATCH(request: Request) {
     }
     const b = parsed.data;
     const sb = getSupabaseAdmin() as unknown as SupabaseClient;
+    const access = await projectAccess(sb, caller, { plan_id: b.plan_id });
+    if (access.denied) return access.denied;
     const { error } = await sb
       .from("plans")
       .update({
@@ -87,6 +94,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.GARDEN_PILOT_ENABLED !== "true") {
     return NextResponse.json(
       { error: "Drawing a plan from scratch is not enabled." },
@@ -112,6 +121,8 @@ export async function POST(request: Request) {
       throw projectErr ?? new Error("Failed to create project row.");
     }
     createdProjectId = project.id;
+    // H5: creating a project makes the creator its member (rolled back with it).
+    await addProjectMember(supabase as unknown as SupabaseClient, project.id, caller.id);
 
     // parsed_json stays NULL — there is nothing parsed about this plan, and
     // writing a decorative object there would make an authored plan

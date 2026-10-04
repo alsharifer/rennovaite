@@ -18,8 +18,9 @@
 //      firm-priced figure and a fallback figure: the popovers say so
 //   5. /project/:id/drawings?export=1 — Export pack with the client proposal,
 //      through the gate (the book is reviewed → basis passes); downloads appear
-//   6. one change — edit a rate in the book, regenerate — then
-//      /project/:id/boq/revisions shows the diff with the recorded cause
+//   6. one change — edit a rate in the book, press Regenerate on the BoQ page
+//      (H4) — the result links to /project/:id/boq/revisions?from=&to=, which
+//      shows the diff with the recorded cause
 //   7. the milestone report prints the firm and the villa
 // A screenshot at every step under --shots. Scratch state only; the seed/teardown
 // script removes it and verifies nothing remains. Needs the `pack` launch config
@@ -240,23 +241,27 @@ try {
   await clickByText("button", "Save");
   check("plaster rate edited 41.5 → 45 (book returns to Draft)", await until(`(() => { const t = document.querySelector('[data-item-key="wall_plaster"]')?.textContent ?? ""; return t.includes("45 / m2") && !t.includes("41.5 / m2"); })() &&(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Draft"`, 60000));
   await shot("rate-edited");
-  // The BoQ page offers no regenerate control once a BoQ exists (a UI gap the
-  // report names), so the member regenerates through the route with the page's
-  // own session.
+  // H4: the member regenerates from the BoQ page's own control — the payoff
+  // loop: edit a rate → Regenerate → the diff link shows exactly what moved.
   await goto(`${BASE}/project/${villa}/boq`);
-  const { count: before } = await sb.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", villa);
-  const regen = await evaluate(`fetch("/api/generate-boq", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ project_id: ${JSON.stringify(villa)} }) }).then((r) => r.status)`);
-  check("POST /api/generate-boq → 200 after the rate change (no regenerate control on the page — API, the page's own session)", regen === 200, String(regen));
-  let regenerated = false;
-  for (let i = 0; i < 120 && !regenerated; i++) {
-    await sleep(1000);
-    const { count } = await sb.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", villa);
-    regenerated = (count ?? 0) > (before ?? 0);
-  }
-  check("BoQ regenerated after the change (a new revision)", regenerated);
+  const { data: prevRow } = await sb.from("boqs").select("id, total_aed").eq("project_id", villa).order("created_at", { ascending: false }).limit(1).single();
+  check("the page's headline is the stored revision's total (what-if with no grade chosen moves nothing)", Number(await evaluate(`document.querySelector('[data-display-total]')?.getAttribute("data-display-total")`)) === Number(prevRow?.total_aed), `page ${await evaluate(`document.querySelector('[data-display-total]')?.getAttribute("data-display-total")`)} · stored ${prevRow?.total_aed}`);
+  check("Regenerate control offered to the member, enabled", await until(`(() => { const b = document.querySelector('[data-testid="regenerate-button"]'); return !!b && !b.disabled; })()`, 30000));
+  await shot("regenerate-ready");
+  await click('[data-testid="regenerate-button"]');
+  check("progress shown while it runs", await until(`document.querySelector('[data-testid="regenerate"]')?.getAttribute("data-regenerate-state") === "running"`, 5000));
+  check("the resulting revision is shown", await until(`!!document.querySelector('[data-testid="regenerate-result"]')`, 120000), await text('[data-testid="regenerate-failure"]'));
   await sleep(1500);
-  await goto(`${BASE}/project/${villa}/boq/revisions`);
-  check("revisions page shows a diff", await until(`!!document.querySelector('[data-diff-from]')`, 30000));
+  await shot("regenerate-result");
+  const { data: newRow } = await sb.from("boqs").select("id, total_aed").eq("project_id", villa).order("created_at", { ascending: false }).limit(1).single();
+  check("a new revision was stored", !!newRow && newRow.id !== prevRow?.id, `${prevRow?.id?.slice(0, 8)} → ${newRow?.id?.slice(0, 8)}`);
+  check("after regenerating, the page shows the new revision's total", await until(`Number(document.querySelector('[data-display-total]')?.getAttribute("data-display-total")) === ${Number(newRow?.total_aed)}`, 30000), `page ${await evaluate(`document.querySelector('[data-display-total]')?.getAttribute("data-display-total")`)} · stored ${newRow?.total_aed}`);
+  const href = await evaluate(`document.querySelector('[data-testid="regenerate-diff-link"]')?.getAttribute("href") ?? null`);
+  check("the diff link compares exactly the superseded revision with the new one", href === `/project/${villa}/boq/revisions?from=${prevRow?.id}&to=${newRow?.id}`, String(href));
+  const { data: ev } = await sb.from("pilot_events").select("actor, detail").eq("project_id", villa).eq("kind", "boq_generated").contains("detail", { boq_id: newRow?.id }).maybeSingle();
+  check("boq_generated recorded with the member as actor, trigger=regenerate and the superseded revision", ev?.actor === state.userId && ev?.detail?.trigger === "regenerate" && ev?.detail?.previous_boq_id === prevRow?.id, JSON.stringify({ actor: ev?.actor?.slice(0, 8), trigger: ev?.detail?.trigger, prev: ev?.detail?.previous_boq_id?.slice(0, 8) }));
+  await goto(`${BASE}${href}`);
+  check("revisions page shows the diff of those two revisions", await until(`!!document.querySelector('[data-diff-from]')`, 30000) && (await evaluate(`document.querySelector('[data-diff-from]')?.getAttribute("data-diff-from")`)) === prevRow?.id, await evaluate(`document.querySelector('[data-diff-from]')?.getAttribute("data-diff-from") ?? "-"`));
   const moved = await evaluate(`[...document.querySelectorAll('[data-line-key]')].map((tr) => tr.getAttribute("data-line-key"))`);
   check("the Plaster line moved (rate), and only what the rate change touched", (moved ?? []).some((k) => k.includes("wall_plaster")), (moved ?? []).join(" · "));
   check("the moved line carries the recorded cause — the firm's rate-book change", await evaluate(`[...document.querySelectorAll('[data-line-key*="wall_plaster"] [data-causes="recorded"]')].some((ul) => /contractor rate book/i.test(ul.textContent))`), await evaluate(`(document.querySelector('[data-line-key*="wall_plaster"] [data-causes]')?.textContent ?? "").slice(0, 160)`));

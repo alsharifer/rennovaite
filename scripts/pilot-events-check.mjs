@@ -20,7 +20,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
-import { devSession } from "./lib/dev-auth.mjs";
+import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 
 const PORT = process.argv[2] ?? "3098";
 const BASE = `http://localhost:${PORT}`;
@@ -39,6 +39,10 @@ async function api(method, path, body, auth) {
 }
 
 const userA = await devSession("a", { script: "pilot-events-check" });
+// H5: the project routes answer members only — this check's accounts are made
+// members of the projects it works on (service role, like project-member-add),
+// and exactly those rows are removed again at cleanup.
+const memberships = [await grantProjectMembership(userA.userId, [STAND_IN], { script: "pilot-events-check" })];
 // Pages read the COOKIE session (getCaller() with no request), not a Bearer header.
 const cookieHeader = { cookie: userA.cookies.map((c) => `${c.name}=${c.value}`).join("; ") };
 const t0 = new Date().toISOString();
@@ -87,6 +91,7 @@ try {
   check("rollup counts the firm's rate-book changes", roll.body.firm?.rate_book?.entries >= 1 && roll.body.firm?.rate_book?.promotions >= 1, JSON.stringify(roll.body.firm?.rate_book));
   check("corrections land by section (garden.pcc_base → Hardscape & Structures)", (p?.corrections?.by_section?.["Hardscape & Structures"] ?? 0) >= 1, JSON.stringify(p?.corrections?.by_section));
 } finally {
+  for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
   await sb.from("projects").update({ firm_id: prior.firm_id ?? null }).eq("id", STAND_IN);
   await sb.from("pilot_events").delete().gte("recorded_at", t0).or(`project_id.eq.${STAND_IN},firm_id.eq.${created.firm ?? "00000000-0000-0000-0000-000000000000"}`);

@@ -296,6 +296,12 @@
       "version": "20260101004900",
       "name": "pilot_events_scope_fix",
       "sha256": "1c4543b52f5ad7b490e58c5a8700eaf1f321b267ac287b7370d1de7f47c4e154"
+    },
+    {
+      "legacy": null,
+      "version": "20260101005000",
+      "name": "project_members",
+      "sha256": "bda623adbc5e4c10b04ea9718d1158111869cc2271aa4b90469925cfe61fb3dc"
     }
   ]
 }

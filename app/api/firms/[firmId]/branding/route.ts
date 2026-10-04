@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { publicUrlForPath } from "@/lib/assets/load";
-import { getCaller } from "@/lib/auth/caller";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { LOGO_MAX_BYTES, getBranding, setLogo, updateBranding, type FirmBranding } from "@/lib/firms/branding";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
 
@@ -24,10 +24,11 @@ type Ctx = { params: Promise<{ firmId: string }> };
 const view = (b: FirmBranding) => ({ firm_id: b.firm_id, name: b.name, display_name: b.display_name, brand: b.brand, terms_text: b.terms_text, logo_url: b.logo_path ? publicUrlForPath(b.logo_path) : null });
 
 export async function GET(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   try {
-    const caller = await getCaller(request);
     return NextResponse.json({ success: true, branding: view(await getBranding(firmDb(), firmId, caller)) });
   } catch (e) {
     return storeErrorResponse(e);
@@ -35,12 +36,13 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 }
 
 export async function PATCH(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   const parsed = PatchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.message);
   try {
-    const caller = await getCaller(request);
     return NextResponse.json({ success: true, branding: view(await updateBranding(firmDb(), firmId, parsed.data, caller)) });
   } catch (e) {
     return storeErrorResponse(e);
@@ -48,6 +50,8 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
 }
 
 export async function POST(request: NextRequest, ctx: Ctx) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
   const form = await request.formData().catch(() => null);
@@ -55,7 +59,6 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   if (!(file instanceof File)) return badRequest("Send the logo as multipart field `logo`.");
   if (file.size > LOGO_MAX_BYTES) return NextResponse.json({ success: false, error: `A logo must be under ${LOGO_MAX_BYTES / 1e6} MB.`, code: "logo_size" }, { status: 413 });
   try {
-    const caller = await getCaller(request);
     const bytes = new Uint8Array(await file.arrayBuffer());
     return NextResponse.json({ success: true, branding: view(await setLogo(firmDb(), firmId, { bytes, mime: file.type }, caller)) }, { status: 201 });
   } catch (e) {

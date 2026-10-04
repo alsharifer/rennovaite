@@ -1,11 +1,16 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const body = (await request.json().catch(() => null)) as
       | { plan_id?: unknown; notes?: unknown }
@@ -26,6 +31,8 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { plan_id: planId });
+    if (access.denied) return access.denied;
 
     const supabase = getSupabaseAdmin();
     const { error } = await supabase

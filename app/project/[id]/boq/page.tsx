@@ -38,11 +38,13 @@ import {
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 
 import { GenerateBoqButton } from "./_components/generate-boq-button";
+import { RegenerateBoq } from "./_components/regenerate-boq";
 import { ReferenceBasisNotice } from "./_components/reference-basis-notice";
 import { ReviewCorrections } from "./_components/review-corrections";
 import { loadProposalGate, type ProposalGate } from "@/lib/documents/proposal-gate";
 import { SupportTouch } from "@/components/app/SupportTouch";
 import { getCaller } from "@/lib/auth/caller";
+import { regenerateReadiness } from "@/lib/boq/regenerate";
 import { recordBoqView } from "@/lib/pilot/views";
 
 export const dynamic = "force-dynamic";
@@ -193,6 +195,17 @@ export default async function BoqPage({
     // L5: a signed-in view of the BoQ is the checking signal (deduped per actor per 10 min).
     const viewer = await getCaller();
     if (viewer && latestBoq) await recordBoqView(sb, id, latestBoq.id, viewer.id);
+  }
+  // H4: may this viewer regenerate, and if not, why — the same answer the
+  // route enforces (lib/boq/regenerate.ts). Best-effort: a failed read shows
+  // the control enabled and lets the route decide.
+  let regenerateBlock: { code: string; reason: string; fix?: { label: string; href: string } } | null = null;
+  if (latestBoq) {
+    try {
+      regenerateBlock = (await regenerateReadiness(sb, id, await getCaller())).block;
+    } catch {
+      /* the route still enforces */
+    }
   }
 
   const lineCount =
@@ -366,6 +379,8 @@ export default async function BoqPage({
               <SupportTouch projectId={id} area="boq" />
             </span>
           )}
+          {/* H4 — change a rate or the plan, regenerate, see exactly what moved. */}
+          {latestBoq && <RegenerateBoq projectId={id} block={regenerateBlock} />}
         </header>
 
         {permitCheck && (

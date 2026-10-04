@@ -146,7 +146,9 @@ try {
   await click('[aria-label="Retire garden.pcc_base"]');
   check("entry retired — gone from the active list", await until(`!document.querySelector('[data-item-key="garden.pcc_base"]')`));
   const { data: retiredRows } = await sb.from("firm_rate_entries").select("id, superseded_at, retire_reason").eq("firm_id", firmId).eq("item_key", "garden.pcc_base");
-  check("…and kept as history (retire, never delete)", (retiredRows ?? []).length === 1 && !!retiredRows[0].superseded_at && retiredRows[0].retire_reason === "retired by a member", JSON.stringify(retiredRows));
+  // Since UV the step-4 figure edit supersedes too: two history rows, both kept.
+  const hist = retiredRows ?? [];
+  check("…and kept as history (retire, never delete) — the edit's superseded row too", hist.length === 2 && hist.every((r) => !!r.superseded_at) && hist.some((r) => r.retire_reason === "retired by a member") && hist.some((r) => /^edited by a member/.test(r.retire_reason ?? "")), JSON.stringify(hist));
 
   console.log("\n6. privacy — every request the page made");
   const api = requests.filter((r) => /\/api\//.test(r.url)).map((r) => new URL(r.url).pathname);

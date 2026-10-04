@@ -1,8 +1,10 @@
-# Auth — what exists, what it protects, what it does not (U1)
+# Auth — what exists, what it protects, what it does not (U1, H1)
 
 _Written 2026-09-26 with U1. Read `SPRINT_ADDENDUM.md` §7(a) for the substrate
 this was built on: magic-link sessions, no middleware, RLS off, service role
-on every route._
+on every route. **H1 (2026-09-29) requires a session everywhere** — see
+"A session everywhere (H1)" below, and "What H1 does NOT do" for what a
+session still does not entitle._
 
 ## The ownership model (minimal; no teams, no roles)
 
@@ -30,13 +32,19 @@ on every route._
   project's firm accepts the reference basis for one BoQ revision (422 when
   the project has no firm; 401/404/403 as everywhere); `GET …/reference-basis`
   requires a signed-in caller. `GET /api/projects/:id/proposal` is a document
-  route behind the pack-job guard (T5), not behind user auth.
+  route behind the pack-job guard (T5) — and, since H1, a signed-in caller.
 - **L5 adds** (2026-09-28): `GET /api/pilot-events?firm_id=` requires a
   signed-in caller (401); `POST /api/pilot-events` (friction, decisions,
-  support touches) stays open but records the caller as `actor` when there is
-  one; the BoQ page records `boq_viewed` only for a signed-in viewer. Every
+  support touches) records the caller as `actor` (open at L5; since H1 it needs
+  a signed-in caller like every route); the BoQ page records `boq_viewed` only for a signed-in viewer. Every
   event writer stores the actor it knows; a null actor means a script or our
   own run — the pilot's metrics say so.
+- **H4 adds** (2026-09-30): storing a BoQ revision (`POST /api/generate-boq`
+  without `dry_run`) and starting an in-app Export pack need the regenerate
+  authority (`lib/boq/regenerate.ts`) — since H5 a MEMBER of the project (403
+  `not_a_project_member`; H4 shipped it as the firm's members, or any signed-in
+  account without a firm). A dry run stores nothing but still needs project
+  membership, like every project route. The BoQ page's Regenerate control is disabled with the same reason.
 - **Answers, in this order** (`lib/firms/store.ts → requireFirm`):
 
   | | code | when |
@@ -74,6 +82,69 @@ request body.
   server action + cookie session cover what exists. Add one when a firm page
   needs client-side calls.
 
+## A session everywhere (H1)
+
+Every API route and every app page needs a signed-in caller, except the
+explicit allowlist in `lib/auth/access.ts` — the one list both layers below
+read:
+
+| Public | Why |
+| --- | --- |
+| `/auth/callback` (route handler) | the magic link lands here before any session exists |
+| `/api/health` | liveness for uptime checks — anonymous callers get env *presence* only; the key fingerprints need a session |
+| pages `/`, `/rennovaite`, `/auth`, `/privacy`, `/terms` | the landing surfaces, sign-in, the legal pages the footer links |
+| server actions `sign-in-with-email`, `sign-out` | getting and ending a session |
+
+Static assets (`/_next/*`, anything served from `public/`) never reach the proxy.
+
+**Two layers, one allowlist.**
+
+1. **`proxy.ts`** (Next 16's renamed middleware) runs before every route. It
+   verifies the caller with `getClaims` — the Bearer JWT, else the cookie
+   session — which on an ES256 project (dev is) checks the signature locally
+   against the cached JWKS: ~5–15 ms a request. Off the allowlist an API route
+   answers `401 { error: "Sign in required.", code: "unauthenticated" }` and a
+   page redirects `307 /auth?next=<path>`. It fails closed when Supabase is not
+   configured, rejects anonymous-sign-in JWTs, and refreshes the cookie session
+   (the @supabase/ssr pattern — a Server Component cannot write cookies). The
+   matcher takes `/api/:path*` whole (a dot in a dynamic segment is still an API
+   path) and every page except `_next/`, the dev overlay and file-extension paths.
+2. **Every handler** — 97 across the 61 API route files — opens with
+   `const caller = await getCaller(request); if (!caller) return unauthenticated(…);`
+   and awaits nothing but its route params before it, because a proxy can be
+   skipped (a matcher change, an odd path) and the handler cannot. Server
+   actions do the same with `getCaller()` — the proxy sees a POST to a page, not
+   which action rides on it. `lib/firms/__tests__/route-auth.test.ts` scans
+   every route file and every `"use server"` file and fails the suite on a
+   handler that does not; a public one must be listed, with its reason, in
+   `lib/auth/access.ts`.
+
+So a route now answers 401 first, then its own answers (404 flag-off, 400,
+the firm routes' 404/403, the document routes' pack-job 403, …).
+
+- **Back where you were going.** The sign-in form keeps `next` in a short-lived
+  cookie scoped to `/auth/callback` (`rv_auth_next`, same-site paths only —
+  `safeNextPath` refuses `//host` and schemes); the e-mailed link is unchanged,
+  so the Supabase redirect allowlist is too.
+- **The pack export acts as the member who started it.** The in-app Export
+  pack's `after()` job calls this app's own routes over HTTP. It forwards the
+  starter's credential (`forwardableAuthorization`: a Bearer as-is; a cookie
+  session's access token, refreshed first if it would expire within the job's
+  budget) as `Authorization: Bearer`. The pack-job header still authorises the
+  documents; the session authenticates the request — neither stands in for the
+  other. Inside a job, `generate-boq`'s event keeps the JOB's actor, so a
+  member's export is the firm's and a CLI job (no actor) stays ours, exactly as
+  before.
+- **Pages accept a Bearer at the proxy** (scripts read BoQ pages that way), but a
+  page's own `getCaller()` reads the cookie session only — a scripted page read
+  records no `boq_viewed`.
+- **Live check:** `node scripts/route-auth-sweep.mjs [port]` derives every
+  handler and page from the filesystem and asserts: every off-allowlist handler
+  401s anonymously and with a forged or expired Bearer; dotted and unknown
+  `/api` paths 401; every gated page redirects to `/auth?next=…`; the public
+  surfaces answer; and a signed-in dev account gets past the gate on every GET.
+  At H1: 97/97 handlers, 24/24 gated pages, 35/35 signed-in GETs.
+
 ## The dev-auth path for scripts (not a bypass)
 
 `scripts/lib/dev-auth.mjs → devSession("a")` mints a **real session** for the
@@ -83,6 +154,17 @@ account `dev-scripts+a@rennovaite.local`: `auth.admin.createUser` (confirmed),
 token goes on requests as `Authorization: Bearer …`. Needs the service-role key
 (so it refuses production through `scripts/_target-guard.mjs`); the routes
 contain no dev mode, shared secret or allow-list.
+
+**H1: every script that calls the app does it this way.** `devFetch(who)` (same
+module) is a fetch that adds the dev session's Bearer, mints on first use and
+again within five minutes of expiry; `.authorization()` feeds the CLI pack
+transport. Pipeline, seeding and verification scripts call as
+`dev-scripts+pipeline@rennovaite.local`; the privacy checks keep their a/b
+stand-in members; headless-Chrome scripts set the same session as the cookies
+@supabase/ssr writes. One consequence for the L5 metrics: an event a script
+causes OUTSIDE a pack job now names that script account as its actor rather
+than null (identifiable by its `rennovaite.local` e-mail; stages still classify
+it). Inside a pack job the job's actor is used, as above.
 
 `scripts/firm-overlay-check.mjs [port]` uses two such accounts and asserts the
 whole model live: 401 anonymous, 403 cross-firm on every route, only-my-firms
@@ -112,17 +194,54 @@ it lives outside the tree (`~/backups/rennovaite/quotes/`, say), and what goes
 into a commit message or an issue is its **sha256 only**, never the file, its
 name, or a line from it.
 
-## What is NOT protected — a named deployment blocker
+## Project ownership + invite-only sign-up (H5, stage 2)
 
-U1 is scope-disciplined on purpose. **Every other API route is still
-unauthenticated** and runs on the service role: projects, plans, rooms,
-renders, BoQ generation, uploads, corrections without firm attribution, the
-document routes (gated by a pack job, not a user), pilot events. Pages do not
-redirect signed-out visitors; there is no middleware/proxy; RLS is off on every
-table. As of U1 that is **~44 of 49 API route files** with no caller check.
+- **`project_members (project_id, user_id)`** (migration 050), mirroring
+  `firm_members`. Creating a project makes you a member; every project-scoped
+  route and page requires membership; existing projects were backfilled to
+  Abdallah's account by e-mail where it exists (production: yes; dev: no — use
+  `scripts/project-member-add.mjs <email> --all`).
+- **Answers** (`lib/projects/access.ts → authorizeProject`), U1's order:
 
-This is recorded here and in the UV deployment report as a blocker for any
-deployment where more than one party uses the app. Fixing it is a platform
-change — project ownership (`projects.owner_id` or a membership table), a
-caller check on every route, RLS or a user-scoped client — not a firm-routes
-change, and it is not this sprint's.
+  | | code | when |
+  | --- | --- | --- |
+  | 401 | `unauthenticated` | nobody signed in, before anything is looked up |
+  | 404 | `<kind>_not_found` | an id in the request that does not exist |
+  | 403 | `not_a_project_member` | an id in a project the caller is not a member of |
+  | 400 | `refs_span_projects` | ids from two projects (only reachable by a member of both) |
+
+  EVERY id a request carries is resolved, not just the project it names — so
+  "my project + your room" is a 403, not a write into your project.
+- **Pages**: the proxy checks membership for `/project/<id>/…` before any page
+  code runs (404 for a non-member, as for a project that does not exist); the
+  `[id]` layout checks again; the dashboard lists the caller's projects only.
+- **Firm attach** needs membership of both the project and the firm.
+- **Invite-only sign-up** (`lib/auth/signup.ts`, env `AUTH_SIGNUP_ALLOWLIST`):
+  magic link unchanged; only listed addresses get an account, created by the
+  sign-in action through the admin API; Supabase is never asked to create one.
+  Anyone else sees one invite-only notice, worded the same whether or not the
+  address has an account. **Operator step, per Supabase project: Auth → "Allow
+  new users to sign up" OFF** — otherwise the public anon key can still create
+  accounts by calling Supabase directly.
+- **Live check**: `node scripts/project-isolation-sweep.mjs [port]`.
+
+## What H1 did NOT do — closed by H5 (kept for the record)
+
+_Until U1 no route checked the caller; after U1 ~44 of 49 still did not. Since
+H1 every route and page needs a session._ A session is still not an entitlement:
+
+- **Anyone with an e-mail inbox can get a session.** Magic-link sign-in creates
+  the account on first use (`signInWithOtp` defaults to `shouldCreateUser:
+  true`; H1 did not change the Supabase project's sign-up setting). "Signed in"
+  means "controls some inbox", not "is a pilot user". Closing that is an
+  invite-only switch — `shouldCreateUser: false` with provisioned accounts, or
+  sign-ups disabled in the dashboard — and it is a product decision.
+- **No ownership.** Any signed-in account reaches every project's routes and
+  pages; projects have no owner, and the firm routes remain the only
+  membership-scoped surface. Stage 2 is project ownership (`projects.owner_id`
+  or a membership table) checked where every handler now resolves its caller.
+- RLS is still off on every table; routes still run on the service role and
+  pages still read through the admin client.
+
+Both are closed by H5 (above). RLS remains off: the application-level checks
+are the whole of the enforcement.

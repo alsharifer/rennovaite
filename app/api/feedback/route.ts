@@ -1,7 +1,10 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { recordFeedback } from "@/lib/analytics";
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -20,6 +23,8 @@ const BodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   try {
     const raw = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);
@@ -30,6 +35,8 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = parsed.data;
+    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: body.project_id, ...(body.entity_type === "render" ? { render_id: body.entity_id } : body.entity_type === "plan" ? { plan_id: body.entity_id } : {}) });
+    if (access.denied) return access.denied;
 
     // For render entities, resolve the producing KG bundle server-side if the
     // client didn't supply it (the client doesn't hold kg_bundle_id).

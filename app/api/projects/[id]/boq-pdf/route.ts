@@ -1,3 +1,4 @@
+import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -11,6 +12,7 @@ import { loadParity } from "@/lib/documents/parity-load";
 import { loadDocumentProject } from "@/lib/documents/project-name";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { projectAccess } from "@/lib/projects/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,10 +27,14 @@ const IdSchema = z.string().uuid();
  * existing item is a price nobody has agreed to. Gated with the drawing set.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const caller = await getCaller(request);
+  if (!caller) return unauthenticated();
   if (process.env.DRAWINGS_ENABLED !== "true") return NextResponse.json({ error: "Not found." }, { status: 404 });
   const parsed = IdSchema.safeParse((await params).id);
   if (!parsed.success) return NextResponse.json({ error: "Invalid project id." }, { status: 400 });
   const projectId = parsed.data;
+  const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: projectId });
+  if (access.denied) return access.denied;
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
   const format = new URL(request.url).searchParams.get("format");
   // T5: a BoQ PDF (or its printed pages) goes only to a running pack export —

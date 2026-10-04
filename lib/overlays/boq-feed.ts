@@ -3,9 +3,15 @@
 //
 // Called from app/api/generate-boq for BOTH the deterministic-engine path and
 // the legacy LLM path. Fixture COUNTS become the line quantities (never the
-// LLM). Flagged by OVERLAYS_ENABLED and fully best-effort: if the flag is off,
-// the plan_fixtures table is absent, or there are no fixtures, the BoQ is
-// returned byte-identical to today. Existing sections / zod / KG are untouched.
+// LLM). Best-effort: if the plan_fixtures table is absent or there are no
+// fixtures, the BoQ is returned byte-identical. Existing sections / zod / KG
+// are untouched.
+//
+// H3: NOT flag-gated. This used to return early when OVERLAYS_ENABLED was off,
+// so a flag-off deployment silently dropped Electrical Installations and
+// Plumbing & Sanitary from every BoQ that had fixtures (Mudon: ~AED 8,380 +
+// ~6,440). The flag now gates only the overlay layer UI, its rule seeding and
+// the services drawing sheets; the fixtures a project has are priced always.
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -40,8 +46,6 @@ export async function appendOverlaySections<T extends BoqLike>(
   projectId: string,
   supabase: SupabaseClient,
 ): Promise<T> {
-  if (process.env.OVERLAYS_ENABLED !== "true") return boq;
-
   let fixtures: { id: string; type: FixtureType }[] = [];
   try {
     const { data, error } = await supabase
