@@ -126,5 +126,6 @@ describe.each([
       }
     }
     expect(checked, "no camera saw a structure — the check proved nothing").toBeGreaterThan(0);
-  });
+    // Explicit budget: camera selection + a software rasterise per camera, CPU-bound — ~3.6 s alone, past the 5 s default under suite parallelism.
+  }, 60_000);
 });
