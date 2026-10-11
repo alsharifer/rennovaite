@@ -153,7 +153,7 @@ try {
   const baseOthers = lines(base).filter((l) => l.rule_id !== "GL-04");
   check("every other line unchanged", JSON.stringify(others.map((l) => [l.rate_aed, l.total_aed])) === JSON.stringify(baseOthers.map((l) => [l.rate_aed, l.total_aed])));
   check("subtotal moved by exactly the PCC delta", Math.abs(withA.subtotal_aed - base.subtotal_aed - (pccA.total_aed - basePcc.total_aed)) < 0.01);
-  check("OH&P is its own line at 10% of the subtotal", withA.ohp_pct === 10 && withA.ohp_aed === Math.round(withA.subtotal_aed * 0.1), `AED ${withA.ohp_aed}`);
+  check("OH&P is its own line at 10% of the subtotal (to the fils, H7)", withA.ohp_pct === 10 && withA.ohp_aed === Math.round(withA.subtotal_aed * 0.1 * 100) / 100, `AED ${withA.ohp_aed}`);
   check("grand total = subtotal + OH&P + contingency + VAT", Math.abs(withA.grand_total_aed - (withA.subtotal_aed + withA.ohp_aed + withA.contingency_aed + withA.vat_aed)) < 0.01);
   const arabella = await dryRun(ARABELLA);
   check("Arabella (no firm) still reference-priced, no OH&P", pccOf(arabella)?.rate_tier !== "firm_private" && arabella.ohp_aed === undefined);

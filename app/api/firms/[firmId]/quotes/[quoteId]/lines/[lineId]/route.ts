@@ -25,6 +25,9 @@ const PatchSchema = z
     kind: z.enum(FIRM_ENTRY_KINDS).nullable().optional(),
     unit: z.string().trim().min(1).max(20).nullable().optional(),
     status: z.enum(["rejected", "unmatched"]).optional(),
+    // H8: take the converted rate the review offered, or accept an outlier as quoted.
+    apply_conversion: z.literal(true).optional(),
+    confirm_outlier: z.literal(true).optional(),
   })
   .refine((b) => Object.keys(b).length > 0, "Body needs at least one field.");
 

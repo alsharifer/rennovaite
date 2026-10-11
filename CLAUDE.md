@@ -1724,6 +1724,55 @@ Every figure a QS sees multiplies out from the figures beside it.
   the pergola −0.04); dev demo villa 498,824 → 498,823.06 (5 lines); prod Mudon
   vs 5 Sep: 3 rounding lines (−0.36) beside H3's S6-pre lines, grand 738,529.00.
 
+## Rate-book integrity — magnitude hold + one active entry per item (H8)
+
+Found in the J0 export of the synthetic test firm; both would have hit firm #2
+on day one.
+
+- **Magnitude / unit hold** (`lib/firms/magnitude.ts`, pure): a firm rate is
+  checked against the figure it SHADOWS (`lib/firms/shadow-rate.ts`: the market
+  reference for a garden key; the `WORK_ITEM_DEF` constant for a P4 element key;
+  the allowance for an interior allowance rule; catalogue / labour-book keys have
+  no single figure and are not checked). Outside **0.33–3×** it is HELD with
+  "rate is N× the reference — check the unit". Where the description carries
+  dimensions that resolve to the item's unit ("pergola 3.5 x 3.5 m", 1 no, item
+  per m² plan) the converted rate is OFFERED (24,500 ÷ 12.25 = 2,000.00 / m² plan),
+  never applied. The J0 pergola had been ACCEPTED at 24,500 / m² plan (17.9×),
+  which would have priced Arabella's HRD-06 at 300,125.00 instead of 16,741.95.
+- **Quote review** (`assessLine` in `lib/quotes/store.ts` — the one place
+  confirm and accept compute a status): the hold, `PATCH …/lines/:id
+  { apply_conversion: true }` (rate, qty and unit converted, `conversion_note`
+  kept) and `{ confirm_outlier: true }` (keep as quoted — an explicit act, a
+  `rate_book_change` event `action: "outlier_confirmed"` with the ratio).
+  `reviewQuote` gives each line the entry it would `replaces` and the
+  `conversion` offer; the review screen shows both. Lines keep the sheet's
+  `unit_given` (confirming an item overwrites `unit`).
+- **Manual entries**: the same check on `POST /rates` and a figure-moving
+  `PATCH` — 409 `rate_outlier` with `{ ratio, reference_rate_aed }` unless
+  `confirm_outlier: true` (recorded). The editor warns live and offers "save
+  anyway". `/api/rate-vocabulary` now carries the built-in figure where there is
+  one (`reference.kind = "builtin"` + `rate_aed`).
+- **One active entry per (firm, item_key, grade)** — whatever the origin or
+  kind (the resolver ignores kind; two active kinds would be the same ambiguity).
+  Before H8 the 045 index included `origin`, so the J0 book had two active
+  `garden.pcc_base` (96.00 typed, 98.50 imported) and two `wall_plaster` (44.00
+  typed, 48.00 imported); the resolver priced the **typed** one of each
+  (`firm_entry` > `quote_import`), silently. Now a new entry SUPERSEDES the
+  active one (history kept), enforced by `firm_rate_entries_active_uidx` and
+  done in ONE transaction by `replace_firm_entry()` (migration **051**) — typed
+  entries, figure edits (a grade change also retires the edited row) and quote
+  accepts all go through `replaceEntry` (`lib/firms/store.ts`);
+  `promote_correction()` supersedes an active entry of any origin. 051 resolved
+  any existing duplicates to the resolver's winner. The review screen and the
+  add form say which entry a new one replaces.
+- **Checks**: `lib/firms/__tests__/magnitude.test.ts`,
+  `lib/quotes/__tests__/h8-magnitude.test.ts` (the J0 fixture end to end);
+  `scripts/quote-import-check.mjs` asserts the hold + conversion live; the
+  onboarding walkthrough adds the supersede trail and the held pergola.
+- **DB step**: `npm run db:push` for `051` **before** the code — without it
+  `replaceEntry` answers 500 `migration_required` (no silent fallback that could
+  create a second active row).
+
 ## Legal pages + the firm-#2 runbook (H6)
 
 - **`/privacy` and `/terms`** render `content/legal/privacy.md` / `terms.md` —

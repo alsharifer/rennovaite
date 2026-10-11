@@ -20,6 +20,8 @@ const PatchSchema = z
     rate_aed: z.number().finite().nonnegative().optional(),
     kind: z.enum(FIRM_ENTRY_KINDS).optional(),
     note: z.string().trim().max(500).nullable().optional(),
+    // H8: keep a moved rate outside 0.33–3× the figure it shadows.
+    confirm_outlier: z.boolean().optional(),
   })
   .refine((b) => Object.keys(b).length > 0, "Body needs at least one field.");
 

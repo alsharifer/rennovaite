@@ -302,6 +302,12 @@
       "version": "20260101005000",
       "name": "project_members",
       "sha256": "bda623adbc5e4c10b04ea9718d1158111869cc2271aa4b90469925cfe61fb3dc"
+    },
+    {
+      "legacy": null,
+      "version": "20260101005100",
+      "name": "rate_book_integrity",
+      "sha256": "78d218f13e18d3b62a0e6bec5c418dddc378f83a7696eb80b4e98407f878084c"
     }
   ]
 }

@@ -7,6 +7,8 @@ export class StoreError extends Error {
     readonly status: 400 | 401 | 403 | 404 | 409 | 422 | 500,
     readonly code: string,
     message: string,
+    /** Extra fields for the JSON answer (H8: a rate_outlier carries its ratio and reference). */
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "StoreError";

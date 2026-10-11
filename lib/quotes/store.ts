@@ -29,11 +29,13 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Caller } from "@/lib/auth/caller";
-import { StoreError, ensureBook, requireFirm, touchBook } from "@/lib/firms/store";
+import { StoreError, ensureBook, replaceEntry, requireFirm, touchBook } from "@/lib/firms/store";
+import { checkMagnitude, conversionOffer, type ConversionOffer } from "@/lib/firms/magnitude";
+import { loadShadowRates, type ShadowRate } from "@/lib/firms/shadow-rate";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { itemVocabulary, listVocabulary, validateEntry } from "@/lib/firms/vocabulary";
 import type { EntryKind, VocabularyItem } from "@/lib/firms/vocabulary-client";
-import { FIRM_ENTRY_COLUMNS, isMissingSchema, toFirmEntry, type FirmRateEntry } from "@/lib/rates/firm";
+import { isMissingSchema, type FirmRateEntry } from "@/lib/rates/firm";
 import type { RateGrade } from "@/lib/rates/reference";
 
 import { deriveRate, type QuoteTerms } from "./derive";
@@ -84,12 +86,31 @@ export interface QuoteLine {
   status: LineStatus;
   hold_reason: string | null;
   entry_id: string | null;
+  // H8 (migration 051) — null on an older database.
+  /** The unit as the SHEET gave it (confirming an item overwrites `unit` with the vocabulary's). */
+  unit_given?: string | null;
+  /** The figure the magnitude check compared with, and the ratio it found. */
+  reference_rate_aed?: number | null;
+  magnitude_ratio?: number | null;
+  /** How a converted rate was derived, when the member applied the offer. */
+  conversion_note?: string | null;
+  /** An explicit "accept this outlier" — who and when (also an event). */
+  outlier_confirmed_at?: string | null;
+  outlier_confirmed_by?: string | null;
 }
 
 const QUOTE_COLUMNS =
   "id, firm_id, supplier_label, supplier_role, quote_ref, quote_date, valid_until, currency, vat_treatment, rates_are, discount_pct, source_filename, source_sha256, status, version, supersedes_quote_id, created_at, accepted_at";
-const LINE_COLUMNS =
+const LINE_COLUMNS_PRE051: string =
   "id, quote_id, firm_id, row_no, description, item_key_given, suggested_item_key, suggestion_score, item_key, grade, kind, qty, unit, rate_raw, currency, rate_aed, status, hold_reason, entry_id";
+const LINE_COLUMNS: string = `${LINE_COLUMNS_PRE051}, unit_given, reference_rate_aed, magnitude_ratio, conversion_note, outlier_confirmed_at, outlier_confirmed_by`;
+/** The H8 columns, for writes that must also work on a pre-051 database. */
+const H8_LINE_FIELDS = ["unit_given", "reference_rate_aed", "magnitude_ratio", "conversion_note", "outlier_confirmed_at", "outlier_confirmed_by"] as const;
+const withoutH8 = <T extends Record<string, unknown>>(row: T): T => {
+  const out = { ...row };
+  for (const k of H8_LINE_FIELDS) delete (out as Record<string, unknown>)[k];
+  return out;
+};
 
 function fail(error: { message: string; code?: string } | null, what: string): never {
   if (error?.code === "23505") throw new StoreError(409, "conflict", `${what}: already exists`);
@@ -105,6 +126,8 @@ const toLine = (r: Record<string, unknown>): QuoteLine =>
     qty: r.qty == null ? null : Number(r.qty),
     rate_raw: r.rate_raw == null ? null : Number(r.rate_raw),
     rate_aed: r.rate_aed == null ? null : Number(r.rate_aed),
+    reference_rate_aed: r.reference_rate_aed == null ? null : Number(r.reference_rate_aed),
+    magnitude_ratio: r.magnitude_ratio == null ? null : Number(r.magnitude_ratio),
   }) as unknown as QuoteLine;
 
 const terms = (q: QuoteMeta): QuoteTerms => ({ currency: q.currency, vat_treatment: q.vat_treatment, rates_are: q.rates_are, discount_pct: q.discount_pct });
@@ -184,6 +207,7 @@ export async function importQuote(
       kind: null,
       qty: l.qty,
       unit: l.unit,
+      unit_given: l.unit,
       rate_raw: l.rate_raw,
       currency: l.currency ?? t.currency,
       rate_aed: d.rate_aed,
@@ -191,9 +215,11 @@ export async function importQuote(
       hold_reason: l.parse_note ?? d.hold_reason ?? (s ? null : "no matching item — choose one or reject the line"),
     };
   });
-  const { data: lrows, error: lerr } = await db.from("firm_quote_lines").insert(rows).select(LINE_COLUMNS);
+  let ins = await db.from("firm_quote_lines").insert(rows).select(LINE_COLUMNS);
+  if (ins.error && isMissingSchema(ins.error)) ins = await db.from("firm_quote_lines").insert(rows.map(withoutH8)).select(LINE_COLUMNS_PRE051);
+  const { data: lrows, error: lerr } = ins;
   if (lerr) fail(lerr, "create quote lines");
-  const lines = ((lrows ?? []) as Record<string, unknown>[]).map(toLine).sort((a, b) => a.row_no - b.row_no);
+  const lines = ((lrows ?? []) as unknown as Record<string, unknown>[]).map(toLine).sort((a, b) => a.row_no - b.row_no);
   return {
     quote,
     lines,
@@ -231,9 +257,52 @@ export async function getQuote(db: SupabaseClient, firmId: string, quoteId: stri
   if (error) fail(error, "read quote");
   // Another firm's quote id reads as NOT FOUND through this firm's path.
   if (!data) throw new StoreError(404, "quote_not_found", "Quote not found in this firm.");
-  const { data: lrows, error: lerr } = await db.from("firm_quote_lines").select(LINE_COLUMNS).eq("quote_id", quoteId).eq("firm_id", firmId).order("row_no");
-  if (lerr) fail(lerr, "read quote lines");
-  return { quote: toQuote(data as Record<string, unknown>), lines: ((lrows ?? []) as Record<string, unknown>[]).map(toLine) };
+  let res = await db.from("firm_quote_lines").select(LINE_COLUMNS).eq("quote_id", quoteId).eq("firm_id", firmId).order("row_no");
+  if (res.error && isMissingSchema(res.error)) res = await db.from("firm_quote_lines").select(LINE_COLUMNS_PRE051).eq("quote_id", quoteId).eq("firm_id", firmId).order("row_no");
+  if (res.error) fail(res.error, "read quote lines");
+  return { quote: toQuote(data as Record<string, unknown>), lines: ((res.data ?? []) as unknown as Record<string, unknown>[]).map(toLine) };
+}
+
+/** H8 — what the review screen shows beside a line: the entry it would replace, and a converted rate it can offer. */
+export interface LineReview {
+  /** The active book entry this line would supersede on accept (same item/grade), if any. */
+  replaces: { id: string; rate_aed: number; unit: string; origin: string; created_at: string } | null;
+  /** A converted rate from the description's dimensions, offered for a magnitude hold. */
+  conversion: ConversionOffer | null;
+  /** The figure the line shadows (null: no single reference figure for this item — not checked). */
+  reference: ShadowRate | null;
+}
+
+/** The quote with each line's review aids (H8). */
+export async function reviewQuote(db: SupabaseClient, firmId: string, quoteId: string, caller: Caller | null): Promise<{ quote: Quote; lines: (QuoteLine & LineReview)[] }> {
+  const { quote, lines } = await getQuote(db, firmId, quoteId, caller);
+  const keys = [...new Set(lines.map((l) => l.item_key ?? l.suggested_item_key).filter((k): k is string => !!k))];
+  const shadows = await loadShadowRates(db, keys);
+  const { data: active } = await db
+    .from("firm_rate_entries")
+    .select("id, item_key, grade, rate_aed, unit, origin, created_at")
+    .eq("firm_id", firmId)
+    .is("superseded_at", null);
+  const activeRows = (active ?? []) as { id: string; item_key: string; grade: string | null; rate_aed: number; unit: string; origin: string; created_at: string }[];
+  return {
+    quote,
+    lines: lines.map((l) => {
+      const key = l.item_key ?? l.suggested_item_key;
+      const reference = key ? (shadows.get(key) ?? null) : null;
+      const cur = key ? activeRows.find((e) => e.item_key === key && (e.grade ?? null) === (l.grade ?? null) && e.id !== l.entry_id) : undefined;
+      const v = key ? itemVocabulary(key) : null;
+      const held = l.magnitude_ratio != null && !l.outlier_confirmed_at && l.status === "unmatched";
+      return {
+        ...l,
+        reference,
+        replaces: cur && l.status !== "accepted" ? { id: cur.id, rate_aed: Number(cur.rate_aed), unit: cur.unit, origin: cur.origin, created_at: cur.created_at } : null,
+        conversion:
+          held && l.rate_aed != null && !l.conversion_note
+            ? conversionOffer({ description: l.description, rate_aed: l.rate_aed, quantity: l.qty, unit_given: l.unit_given ?? null, item_unit: v?.unit ?? null, reference_aed: reference?.rate_aed })
+            : null,
+      };
+    }),
+  };
 }
 
 // --- Review ------------------------------------------------------------------
@@ -245,21 +314,47 @@ export interface LinePatch {
   kind?: EntryKind | null;
   unit?: string | null;
   status?: "rejected" | "unmatched";
+  /** H8: take the converted rate the review screen offered (dimensions → the item's unit). */
+  apply_conversion?: true;
+  /** H8: accept a rate outside the magnitude band as quoted — an explicit act, recorded as an event. */
+  confirm_outlier?: true;
+}
+
+interface Assessment {
+  status: LineStatus;
+  hold_reason: string | null;
+  kind: EntryKind | null;
+  unit: string | null;
+  magnitude_ratio: number | null;
+  reference_rate_aed: number | null;
+  /** True when the only thing holding the line is the magnitude check. */
+  magnitude_hold: boolean;
 }
 
 /** What a line's entry would be, and every reason it cannot be one yet. */
-function assessLine(l: QuoteLine): { status: LineStatus; hold_reason: string | null; kind: EntryKind | null; unit: string | null } {
-  if (l.status === "rejected") return { status: "rejected", hold_reason: l.hold_reason, kind: l.kind, unit: l.unit };
-  if (!l.item_key) return { status: "unmatched", hold_reason: l.hold_reason ?? "no item confirmed", kind: l.kind, unit: l.unit };
+function assessLine(l: QuoteLine, shadow?: ShadowRate | null): Assessment {
+  const base = { magnitude_ratio: null, reference_rate_aed: null, magnitude_hold: false };
+  if (l.status === "rejected") return { ...base, status: "rejected", hold_reason: l.hold_reason, kind: l.kind, unit: l.unit };
+  if (!l.item_key) return { ...base, status: "unmatched", hold_reason: l.hold_reason ?? "no item confirmed", kind: l.kind, unit: l.unit };
   const v = itemVocabulary(l.item_key);
-  if (!v) return { status: "unmatched", hold_reason: `"${l.item_key}" is not an item any take-off prices`, kind: l.kind, unit: l.unit };
+  if (!v) return { ...base, status: "unmatched", hold_reason: `"${l.item_key}" is not an item any take-off prices`, kind: l.kind, unit: l.unit };
   const unit = l.unit ?? v.unit;
   const kind = l.kind ?? v.default_kind;
-  if (l.rate_aed === null) return { status: "unmatched", hold_reason: l.hold_reason ?? "no usable rate", kind, unit };
-  if (!unit) return { status: "unmatched", hold_reason: "unit required for this item", kind, unit };
+  if (l.rate_aed === null) return { ...base, status: "unmatched", hold_reason: l.hold_reason ?? "no usable rate", kind, unit };
+  if (!unit) return { ...base, status: "unmatched", hold_reason: "unit required for this item", kind, unit };
   const errors = validateEntry({ item_key: l.item_key, unit, kind, rate_aed: l.rate_aed });
-  if (errors.length) return { status: "unmatched", hold_reason: errors.join("; "), kind, unit };
-  return { status: "matched", hold_reason: null, kind, unit };
+  if (errors.length) return { ...base, status: "unmatched", hold_reason: errors.join("; "), kind, unit };
+  // H8: the rate against the figure it would shadow, in the same unit.
+  const ref = shadow && (shadow.unit == null || shadow.unit === unit) ? shadow.rate_aed : null;
+  const m = checkMagnitude(l.rate_aed, ref);
+  const mag = { magnitude_ratio: m?.ratio ?? null, reference_rate_aed: m ? ref : null };
+  if (m?.outlier && !l.outlier_confirmed_at) return { ...mag, magnitude_hold: true, status: "unmatched", hold_reason: m.reason, kind, unit };
+  return { ...mag, magnitude_hold: false, status: "matched", hold_reason: null, kind, unit };
+}
+
+async function shadowFor(db: SupabaseClient, itemKey: string | null): Promise<ShadowRate | null> {
+  if (!itemKey) return null;
+  return (await loadShadowRates(db, [itemKey])).get(itemKey) ?? null;
 }
 
 export async function updateQuoteLine(
@@ -274,6 +369,8 @@ export async function updateQuoteLine(
   if (quote.status !== "review") throw new StoreError(409, "quote_closed", `This quote is ${quote.status}; its lines are read-only.`);
   const current = lines.find((l) => l.id === lineId);
   if (!current) throw new StoreError(404, "line_not_found", "Line not found on this quote.");
+  const itemChanged = patch.item_key !== undefined && patch.item_key !== current.item_key;
+  const fresh = itemChanged || patch.unit !== undefined;
   const next: QuoteLine = {
     ...current,
     item_key: patch.item_key === undefined ? current.item_key : patch.item_key,
@@ -281,6 +378,9 @@ export async function updateQuoteLine(
     kind: patch.kind === undefined ? current.kind : patch.kind,
     unit: patch.unit === undefined ? current.unit : patch.unit,
     status: patch.status === "rejected" ? "rejected" : patch.status === "unmatched" ? "unmatched" : current.status === "rejected" ? "unmatched" : current.status,
+    // A different item or unit is a different question: an earlier "accept the outlier" does not carry over.
+    outlier_confirmed_at: fresh ? null : (current.outlier_confirmed_at ?? null),
+    outlier_confirmed_by: fresh ? null : (current.outlier_confirmed_by ?? null),
   };
   if (next.item_key && !itemVocabulary(next.item_key)) throw new StoreError(422, "invalid_entry", `"${next.item_key}" is not an item any take-off prices`);
   // A freshly confirmed item takes the vocabulary's unit when the sheet's unit is not usable for it.
@@ -288,17 +388,54 @@ export async function updateQuoteLine(
     const v = itemVocabulary(next.item_key)!;
     if (v.unit && next.unit !== v.unit) next.unit = v.unit;
   }
-  const a = assessLine(next);
-  const { data, error } = await db
-    .from("firm_quote_lines")
-    .update({ item_key: next.item_key, grade: next.grade, kind: a.kind, unit: a.unit, status: a.status, hold_reason: a.hold_reason, updated_at: new Date().toISOString() })
-    .eq("id", lineId)
-    .eq("firm_id", firmId)
-    .eq("quote_id", quoteId)
-    .select(LINE_COLUMNS)
-    .single();
-  if (error) fail(error, "update quote line");
-  return toLine(data as Record<string, unknown>);
+  const shadow = await shadowFor(db, next.item_key);
+  let event: Record<string, unknown> | null = null;
+  if (patch.apply_conversion) {
+    const v = next.item_key ? itemVocabulary(next.item_key) : null;
+    const offer =
+      next.rate_aed != null && v
+        ? conversionOffer({ description: next.description, rate_aed: next.rate_aed, quantity: next.qty, unit_given: next.unit_given ?? null, item_unit: v.unit, reference_aed: shadow?.rate_aed })
+        : null;
+    if (!offer) throw new StoreError(422, "no_conversion", "The description carries no dimensions that convert this line's unit to the item's.");
+    // The quoted line stays as the supplier wrote it (qty, unit_given); only
+    // the rate the book takes, and its unit, are converted.
+    next.rate_aed = offer.rate_aed;
+    next.unit = offer.unit;
+    next.conversion_note = offer.note;
+    next.outlier_confirmed_at = null;
+    next.outlier_confirmed_by = null;
+  }
+  if (patch.confirm_outlier) {
+    const before = assessLine(next, shadow);
+    if (!before.magnitude_hold) throw new StoreError(409, "not_an_outlier", "This line is not held for its magnitude; there is nothing to confirm.");
+    next.outlier_confirmed_at = new Date().toISOString();
+    next.outlier_confirmed_by = caller?.id ?? null;
+    event = { action: "outlier_confirmed", quote_id: quoteId, line_id: lineId, item_key: next.item_key, rate_aed: next.rate_aed, unit: next.unit, reference_rate_aed: before.reference_rate_aed, ratio: before.magnitude_ratio };
+  }
+  const a = assessLine(next, shadow);
+  const row: Record<string, unknown> = {
+    item_key: next.item_key,
+    grade: next.grade,
+    kind: a.kind,
+    unit: a.unit,
+    qty: next.qty,
+    rate_aed: next.rate_aed,
+    status: a.status,
+    hold_reason: a.hold_reason,
+    reference_rate_aed: a.reference_rate_aed,
+    magnitude_ratio: a.magnitude_ratio,
+    conversion_note: next.conversion_note ?? null,
+    outlier_confirmed_at: next.outlier_confirmed_at ?? null,
+    outlier_confirmed_by: next.outlier_confirmed_by ?? null,
+    updated_at: new Date().toISOString(),
+  };
+  const write = (r: Record<string, unknown>, cols: string) =>
+    db.from("firm_quote_lines").update(r).eq("id", lineId).eq("firm_id", firmId).eq("quote_id", quoteId).select(cols).single();
+  let res = await write(row, LINE_COLUMNS);
+  if (res.error && isMissingSchema(res.error)) res = await write(withoutH8(row), LINE_COLUMNS_PRE051);
+  if (res.error) fail(res.error, "update quote line");
+  if (event) await recordPilotEvent(db, null, "rate_book_change", event, { actor: caller?.id ?? null, firmId });
+  return toLine(res.data as unknown as Record<string, unknown>);
 }
 
 /** Confirm every suggestion at or above `minScore` — an explicit act by a member, once, for the whole sheet. */
@@ -321,6 +458,8 @@ export interface AcceptResult {
   held: number;
   rejected: number;
   superseded: number;
+  /** H8: lines accepted although outside the magnitude band (each confirmed explicitly). */
+  outliers_confirmed: number;
   entries: FirmRateEntry[];
 }
 
@@ -328,71 +467,39 @@ export async function acceptQuote(db: SupabaseClient, firmId: string, quoteId: s
   const { quote, lines } = await getQuote(db, firmId, quoteId, caller);
   if (quote.status === "accepted") throw new StoreError(409, "already_accepted", "This quote has already been accepted.");
   if (quote.status === "superseded") throw new StoreError(409, "quote_closed", "This quote was superseded by a later import.");
-  const book = await ensureBook(db, firmId);
+  await ensureBook(db, firmId);
   const now = new Date().toISOString();
-  const result: AcceptResult = { accepted: 0, held: 0, rejected: 0, superseded: 0, entries: [] };
+  const result: AcceptResult = { accepted: 0, held: 0, rejected: 0, superseded: 0, outliers_confirmed: 0, entries: [] };
+  const shadows = await loadShadowRates(db, [...new Set(lines.map((l) => l.item_key).filter((k): k is string => !!k))]);
   for (const l of lines) {
-    const a = assessLine(l);
+    const a = assessLine(l, l.item_key ? shadows.get(l.item_key) : null);
     if (a.status === "rejected") { result.rejected++; continue; }
     if (a.status !== "matched" || !l.item_key || l.rate_aed === null || !a.unit || !a.kind) {
       result.held++;
       if (a.hold_reason !== l.hold_reason || a.status !== l.status) {
-        await db.from("firm_quote_lines").update({ status: a.status, hold_reason: a.hold_reason, updated_at: now }).eq("id", l.id).eq("firm_id", firmId);
+        let up = await db.from("firm_quote_lines").update({ status: a.status, hold_reason: a.hold_reason, magnitude_ratio: a.magnitude_ratio, reference_rate_aed: a.reference_rate_aed, updated_at: now }).eq("id", l.id).eq("firm_id", firmId);
+        if (up.error && isMissingSchema(up.error)) up = await db.from("firm_quote_lines").update({ status: a.status, hold_reason: a.hold_reason, updated_at: now }).eq("id", l.id).eq("firm_id", firmId);
       }
       continue;
     }
-    // Supersede the active quote_import entry for this key/grade (from any earlier
-    // quote, including an earlier version of this one) — history stays.
-    const { data: olds, error: oerr } = await db
-      .from("firm_rate_entries")
-      .select("id")
-      .eq("firm_id", firmId)
-      .eq("item_key", l.item_key)
-      .eq("origin", "quote_import")
-      .is("superseded_at", null);
-    if (oerr) fail(oerr, "read prior quote entries");
-    const priorIds = ((olds ?? []) as { id: string }[]).map((o) => o.id);
-    const sameGrade: string[] = [];
-    for (const id of priorIds) {
-      const { data: row } = await db.from("firm_rate_entries").select("id, grade").eq("id", id).eq("firm_id", firmId).maybeSingle();
-      if (row && ((row as { grade: string | null }).grade ?? null) === (l.grade ?? null)) sameGrade.push(id);
-    }
-    for (const id of sameGrade) {
-      // U4: who retired it and why, alongside when (046 columns; a pre-046 db takes the fallback).
-      let sup = await db
-        .from("firm_rate_entries")
-        .update({ superseded_at: now, updated_at: now, retired_by: caller?.id ?? null, retire_reason: "superseded by a later quotation" })
-        .eq("id", id)
-        .eq("firm_id", firmId);
-      if (sup.error && isMissingSchema(sup.error)) {
-        sup = await db.from("firm_rate_entries").update({ superseded_at: now, updated_at: now }).eq("id", id).eq("firm_id", firmId);
-      }
-      if (sup.error) fail(sup.error, "supersede prior entry");
-    }
-    const { data: erow, error: eerr } = await db
-      .from("firm_rate_entries")
-      .insert({
-        created_by: caller?.id ?? null,
-        book_id: book.id,
-        firm_id: firmId,
-        item_key: l.item_key,
-        grade: l.grade,
-        unit: a.unit,
-        rate_aed: l.rate_aed,
-        kind: a.kind,
-        origin: "quote_import",
-        quote_id: quote.id,
-        quote_line_id: l.id,
-        note: `quotation ${quote.quote_ref ?? quote.id.slice(0, 8)} (${quote.supplier_role}) · row ${l.row_no}: ${deriveRate(l.rate_raw, terms(quote)).explanation}`,
-      })
-      .select(FIRM_ENTRY_COLUMNS)
-      .single();
-    if (eerr) fail(eerr, `entry ${l.item_key}${l.grade ? `/${l.grade}` : ""} (quote_import)`);
-    const entry = toFirmEntry(erow as Record<string, unknown>);
-    for (const id of sameGrade) {
-      await db.from("firm_rate_entries").update({ superseded_by: entry.id }).eq("id", id).eq("firm_id", firmId);
-      result.superseded++;
-    }
+    if (l.outlier_confirmed_at) result.outliers_confirmed++;
+    // H8: one active entry per item/grade — this line SUPERSEDES whatever is
+    // active for it (any origin: a typed entry, an earlier import, a promotion),
+    // atomically, history kept.
+    const { entry, superseded } = await replaceEntry(db, firmId, {
+      item_key: l.item_key,
+      grade: l.grade,
+      unit: a.unit,
+      rate_aed: l.rate_aed,
+      kind: a.kind,
+      origin: "quote_import",
+      note: `quotation ${quote.quote_ref ?? quote.id.slice(0, 8)} (${quote.supplier_role}) · row ${l.row_no}: ${l.conversion_note ?? deriveRate(l.rate_raw, terms(quote)).explanation}`,
+      actor: caller?.id ?? null,
+      retire_reason: `superseded by quotation ${quote.quote_ref ?? quote.id.slice(0, 8)}`,
+      quote_id: quote.id,
+      quote_line_id: l.id,
+    });
+    if (superseded) result.superseded++;
     await db.from("firm_quote_lines").update({ status: "accepted", entry_id: entry.id, hold_reason: null, updated_at: now }).eq("id", l.id).eq("firm_id", firmId);
     result.entries.push(entry);
     result.accepted++;
@@ -405,7 +512,7 @@ export async function acceptQuote(db: SupabaseClient, firmId: string, quoteId: s
   if (result.accepted > 0) {
     await touchBook(db, firmId);
     // L5: an accepted quotation is a rate-book change (one event, the counts inside).
-    await recordPilotEvent(db, null, "rate_book_change", { action: "quote_accept", quote_id: quote.id, accepted: result.accepted, superseded: result.superseded, held: result.held }, { actor: caller?.id ?? null, firmId });
+    await recordPilotEvent(db, null, "rate_book_change", { action: "quote_accept", quote_id: quote.id, accepted: result.accepted, superseded: result.superseded, held: result.held, outliers_confirmed: result.outliers_confirmed }, { actor: caller?.id ?? null, firmId });
   }
   return result;
 }
