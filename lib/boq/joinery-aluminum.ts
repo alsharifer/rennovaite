@@ -20,8 +20,10 @@ import {
   ALUMINUM_ALLOWANCE_CAVEAT,
 } from "@/lib/ground-truth/mudon-actuals";
 import { enforceScope, type ScopedLine } from "./scope";
+import { lineTotal, money2, sumMoney } from "./money";
 import { RATE_RULES } from "./rules";
 import { mirrorCount, showerGlassCount, vanitySlabCount } from "./scope-components";
+import { rechain, type ChainedDoc } from "./totals";
 
 export type GtRateStatus = "actual_transaction" | "site_assessment" | "indicative";
 
@@ -81,13 +83,16 @@ function line(
   rate_status: GtRateStatus,
   notes: string | null,
 ): GtBoqLine {
+  // H7: the total multiplies out from the quantity and rate PRINTED on the line
+  // (2-dp each); it used to use the unrounded quantity and whole dirhams.
+  const qty = round(quantity);
   return {
     rule_id,
     description,
-    quantity: round(quantity),
+    quantity: qty,
     unit,
-    rate_aed,
-    total_aed: Math.round(quantity * rate_aed),
+    rate_aed: money2(rate_aed),
+    total_aed: lineTotal(qty, rate_aed),
     vendor_or_source,
     notes,
     rate_status,
@@ -266,7 +271,7 @@ function finalize(work_section: GtSection["work_section"], lines: GtBoqLine[]): 
   return {
     work_section,
     lines,
-    section_total_aed: lines.reduce((s, l) => s + l.total_aed, 0),
+    section_total_aed: sumMoney(lines.map((l) => l.total_aed)),
   };
 }
 
@@ -300,17 +305,6 @@ export function appendJoineryAluminumSections<T extends BoqLike>(boq: T, rooms: 
       s.work_section !== "Aluminum & Glass" &&
       !(joinery !== null && s.work_section === "Joinery & Carpentry"),
   );
-  const sections = [...kept, ...(extra as unknown as BoqLike["sections"])];
-  const subtotal_aed = sections.reduce((s, x) => s + x.section_total_aed, 0);
-  const contingency_aed = Math.round((subtotal_aed * boq.contingency_pct) / 100);
-  const vat_aed = Math.round(((subtotal_aed + contingency_aed) * boq.vat_pct) / 100);
-
-  return {
-    ...boq,
-    sections,
-    subtotal_aed,
-    contingency_aed,
-    vat_aed,
-    grand_total_aed: subtotal_aed + contingency_aed + vat_aed,
-  } as T;
+  // H7: canonical order, section totals, subtotal and chain — all by rechain.
+  return rechain({ ...boq, sections: [...kept, ...(extra as unknown as BoqLike["sections"])] } as unknown as ChainedDoc) as unknown as T;
 }

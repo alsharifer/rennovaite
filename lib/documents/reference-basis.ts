@@ -19,6 +19,7 @@
 // Pure. Server-side (the tier inference reaches the provenance module).
 // =============================================================================
 
+import { sortSections } from "@/lib/boq/section-order";
 import { createHash } from "node:crypto";
 
 import { isUnpricedLine } from "@/lib/documents/boq-derived";
@@ -70,7 +71,9 @@ export function referenceBasisOf(boq: BasisBoq | null | undefined): ReferenceBas
  */
 export function boqPricingFingerprint(boq: (BasisBoq & { subtotal_aed?: number; ohp_aed?: number; contingency_aed?: number; vat_aed?: number; grand_total_aed?: number }) | null | undefined): string {
   const canon = {
-    sections: (boq?.sections ?? []).map((s) => ({ w: s.work_section, l: s.lines.map((l) => [l.description, Number(l.quantity), l.unit, Number(l.rate_aed), Number(l.total_aed)]) })),
+    // H7: in THE canonical section order, so the same priced BoQ in another
+    // order is the same basis (sections are matched by name, lines by position).
+    sections: sortSections(boq?.sections ?? []).map((s) => ({ w: s.work_section, l: s.lines.map((l) => [l.description, Number(l.quantity), l.unit, Number(l.rate_aed), Number(l.total_aed)]) })),
     t: [boq?.subtotal_aed ?? 0, boq?.ohp_aed ?? 0, boq?.contingency_aed ?? 0, boq?.vat_aed ?? 0, boq?.grand_total_aed ?? 0],
   };
   return createHash("sha256").update(JSON.stringify(canon)).digest("hex");

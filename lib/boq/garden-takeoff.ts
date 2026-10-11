@@ -45,6 +45,8 @@ import { isFirmTier, type RateTier } from "@/lib/rates/tiers";
 import { GARDEN_TIER_LABEL, type GardenRateBook } from "./garden-rates";
 import type { PomiSection, ScopeItem } from "./schema";
 
+import { lineTotal, money2 } from "./money";
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // --- Input -------------------------------------------------------------------
@@ -650,11 +652,15 @@ export function priceGardenTakeoff(items: readonly ScopeItem[], book: GardenRate
     }
     if (!hit) throw new Error(`No garden rate for "${i.item_key}" in the landscape rate book.`);
     // A banded allowance (G5c) is one lump at the book rate × its band factor.
-    const r = i.rate_factor == null ? hit.rate_aed : Math.round(hit.rate_aed * i.rate_factor * 100) / 100;
+    // H7: the book rate to 2 dp first (GL-14 pergola is 1,366.6928 net in the
+    // book — list × 0.88 — and 1,366.69 on the line), the band factor on that,
+    // and the total from the rate printed on the line.
+    const base = money2(hit.rate_aed);
+    const r = i.rate_factor == null ? base : money2(base * i.rate_factor);
     const priced: GardenPricedLine = {
       ...i,
       rate_aed: r,
-      total_aed: Math.round(i.quantity * r * 100) / 100,
+      total_aed: lineTotal(i.quantity, r),
       // Never the contractor's name. See the identity rule in the ground-truth
       // module: this string reaches the BoQ, and the BoQ reaches the client. The
       // label is a constant per tier (GARDEN_TIER_LABEL), never a database string.

@@ -20,7 +20,6 @@ import {
 export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Vendors";
-const FALLBACK_BUDGET_AED = 850000;
 const TOP_LANES = 8;
 
 type SkuRow = {
@@ -153,7 +152,9 @@ export default async function VendorsPage({
   // I4: curated on its way to the browser — a stored BoQ may predate the source scrub.
   const boqPayload = curateBoq(latestBoq.sections, await loadWithheldNames(sb, id));
   const boqId = latestBoq.id;
-  const budgetAed = project.budget_aed ?? FALLBACK_BUDGET_AED;
+  // H7: the client's own entered budget, owner projects only — never a default.
+  const { data: firmRow } = await sb.from("projects").select("firm_id").eq("id", id).maybeSingle();
+  const budgetAed = (firmRow as { firm_id?: string | null } | null)?.firm_id ? null : (project.budget_aed ?? null);
 
   const allSkus: SkuRow[] = skuRes.data ?? [];
   const skuById = new Map(allSkus.map((s) => [s.id, s]));

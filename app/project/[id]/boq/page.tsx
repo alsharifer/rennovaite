@@ -10,6 +10,7 @@ import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { DRAFT_STATEMENT } from "@/lib/plan/site-reference";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { curateBoq } from "@/lib/identity/curation";
+import { sortSections } from "@/lib/boq/section-order";
 import { buildBoqProvenance } from "@/lib/provenance/boq";
 import { loadProvenanceContext } from "@/lib/provenance/load";
 import type { BoqProvenance } from "@/lib/provenance/types";
@@ -50,7 +51,6 @@ import { recordBoqView } from "@/lib/pilot/views";
 export const dynamic = "force-dynamic";
 
 const PAGE_NAME = "Bill of Quantities";
-const FALLBACK_BUDGET_AED = 850000;
 
 type SkuRow = {
   id: string;
@@ -169,16 +169,24 @@ export default async function BoqPage({
   }
 
   const project = projectRes.data;
-  const budgetAed = project.budget_aed ?? FALLBACK_BUDGET_AED;
+  // H7: the headline's budget is the CLIENT'S, on an owner project only. A
+  // firm-attached project prices against its own book, not an owner's budget;
+  // and no figure the client never entered (the old AED 850,000 platform
+  // default) is ever shown as theirs.
+  const { data: firmRow } = await sb.from("projects").select("firm_id").eq("id", id).maybeSingle();
+  const budgetAed = (firmRow as { firm_id?: string | null } | null)?.firm_id ? null : (project.budget_aed ?? null);
   const latestBoq = boqRes.data?.[0];
   // I4: the plan context behind every figure's source chain, and the names that
   // must never reach the page (firm names). The stored document is CURATED on
   // its way out — a BoQ generated before I4 still holds contractor names.
   const provenanceCtx = await loadProvenanceContext(sb, id);
-  const boqPayload =
+  // H7: THE canonical section order on screen too — a revision stored before
+  // H7 shows the same order as a new one (REFs are per section; unaffected).
+  const curatedBoq =
     latestBoq && isBoqPayload(latestBoq.sections)
       ? curateBoq(latestBoq.sections, provenanceCtx.withheldNames)
       : null;
+  const boqPayload = curatedBoq ? { ...curatedBoq, sections: sortSections(curatedBoq.sections) } : null;
   const provenance: BoqProvenance | null = boqPayload
     ? buildBoqProvenance(boqPayload as unknown as Parameters<typeof buildBoqProvenance>[0], provenanceCtx)
     : null;

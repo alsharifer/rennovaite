@@ -18,6 +18,7 @@ import { esc } from "@/lib/drawings/sheet";
 import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
 
 import { assignRefs, refMigration } from "@/lib/boq/refs";
+import { sortSections } from "@/lib/boq/section-order";
 
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "./boq-derived";
 import { formatAed } from "@/lib/format/aed";
@@ -84,7 +85,9 @@ const STATUS_MARK: Record<string, { mark: string; label: string }> = {
   priced: { mark: "P", label: "catalogue price" },
 };
 
-const aed = (n: number) => formatAed(n, "amount");
+// H7: every BoQ figure on paper to the fils, so 12.25 × 1,366.69 = 16,741.95
+// can be checked with a calculator — whole dirhams never multiplied out.
+const aed = (n: number) => formatAed(n, "money");
 const f1 = (n: number) => (Math.round(n * 10) / 10).toString();
 
 /**
@@ -127,7 +130,9 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   // D5: the same unique REF the screen shows — screen and paper reconcile line by line.
   const refs = assignRefs(boq.sections);
   const rows: Row[] = [];
-  for (const s of boq.sections) {
+  // H7: THE canonical section order, for any stored revision (REFs are per
+  // section, so the order cannot move one).
+  for (const s of sortSections(boq.sections)) {
     rows.push({ kind: "section", title: s.work_section });
     s.lines.forEach((l, idx) => {
       const sub = [derivedLineNote(l), l.vendor_or_source ? `Source: ${l.vendor_or_source}` : null].filter((x): x is string => !!x).flatMap((x) => wrap(x, 64));
@@ -257,7 +262,9 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   if (boq.ohp_aed && boq.ohp_aed > 0) sumRow(`${OHP_LINE_LABEL} ${boq.ohp_pct}%`, aed(boq.ohp_aed));
   sumRow(`Contingency ${boq.contingency_pct}%`, aed(boq.contingency_aed));
   sumRow(`VAT ${boq.vat_pct}%`, aed(boq.vat_aed));
-  sumRow("Grand total", total.text, true);
+  sumRow("Grand total", total.derived ? total.text : `AED ${aed(boq.grand_total_aed)}`, true);
+  // A draft prints its labelled "≈" headline; the exact chain is printed under it.
+  if (total.derived) sumRow("Chain total (exact)", `AED ${aed(boq.grand_total_aed)}`);
   // D4: excluded lines, named, directly under the figure they are not in.
   if (total.excludes) {
     svg += t(BOQ_PAGE_W - M, y - 1.5, total.excludes, { size: 2.5, fill: TERRACOTTA, anchor: "end", weight: 700 });

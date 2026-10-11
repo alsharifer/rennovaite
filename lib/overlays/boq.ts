@@ -15,6 +15,8 @@ import {
   POMI_ELECTRICAL,
   POMI_PLUMBING,
 } from "./catalog";
+import { lineTotal, money2, sumMoney } from "@/lib/boq/money";
+
 import { GARDEN_TYPES, type FixtureType } from "./types";
 
 export interface OverlayBoqLine {
@@ -49,14 +51,14 @@ export interface FixtureLike {
 function lineForType(type: FixtureType, ids: string[]): OverlayBoqLine {
   const meta = FIXTURE_META[type];
   const priced = meta.unitRateAed != null;
-  const rate = meta.unitRateAed ?? 0;
+  const rate = money2(meta.unitRateAed ?? 0);
   const qty = ids.length;
   return {
     description: meta.boqDescription,
     quantity: qty,
     unit: "no",
     rate_aed: rate,
-    total_aed: Math.round(qty * rate),
+    total_aed: lineTotal(qty, rate),
     vendor_or_source: priced ? "Overlay point rate (P2 default)" : "TBC — QS to price",
     notes: `Count from 2D ${type} fixtures on the plan.`,
     rule_id: `P2/overlay/${type}`,
@@ -97,7 +99,7 @@ export function buildOverlaySections(fixtures: FixtureLike[]): OverlayBoqSection
     return {
       work_section,
       lines,
-      section_total_aed: lines.reduce((s, l) => s + l.total_aed, 0),
+      section_total_aed: sumMoney(lines.map((l) => l.total_aed)),
     };
   };
 

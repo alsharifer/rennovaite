@@ -5,7 +5,10 @@
 //   node scripts/document-identity-scan.mjs [port] <project-id>...
 //
 // READ-ONLY. Renders each project's drawing set (every sheet's SVG), render-pack
-// pages and BoQ page through the running dev server and searches the output for:
+// pages, BoQ page, plan page and project hub, and reads every plan-editor API
+// response (H7: elements, context, openings, fixtures — the free-text notes a
+// firm's measurement can name), through the running dev server, and searches
+// the output for:
 //   - every withheld identity (contractor / supplier / reference-property names)
 //   - every firm name in `firms` EXCEPT the project's own firm, which is the only
 //     project whose surfaces may carry it (lib/identity/curation.ts).
@@ -30,7 +33,8 @@ const WITHHELD = ["KAME", "Atrium", "QTN20261407", "Global Creation", "3936/R1",
 
 const { url, key } = resolveTarget({ script: "document-identity-scan", writes: false });
 const sb = createClient(url, key);
-const firms = (await sb.from("firms").select("id, name")).data ?? [];
+// A firm is known by its registered name and the brand it prints (047).
+const firms = ((await sb.from("firms").select("*")).data ?? []).map((f) => ({ id: f.id, names: [f.name, f.display_name].filter((n) => typeof n === "string" && n.trim().length >= 3) }));
 // T5: the document routes answer only a pack job; this READ opens one per project and releases nothing.
 const vj = verificationJobs(sb, "document-identity-scan");
 
@@ -39,8 +43,8 @@ await api.grant(args);
 let hits = 0;
 for (const id of args) {
   const { data: p } = await sb.from("projects").select("firm_id, name").eq("id", id).maybeSingle();
-  const names = [...WITHHELD, ...firms.filter((f) => f.id !== (p?.firm_id ?? null)).map((f) => f.name)];
-  console.log(`\n${id}  (${p?.name ?? "?"}; own firm: ${firms.find((f) => f.id === p?.firm_id)?.name ?? "none"})`);
+  const names = [...WITHHELD, ...firms.filter((f) => f.id !== (p?.firm_id ?? null)).flatMap((f) => f.names)];
+  console.log(`\n${id}  (${p?.name ?? "?"}; own firm: ${firms.find((f) => f.id === p?.firm_id)?.names[0] ?? "none"})`);
 
   const surfaces = [];
   const headers = await vj.headers(id);
@@ -52,6 +56,20 @@ for (const id of args) {
   else console.log(`  render pack: HTTP ${r.status}`);
   const b = await api(`${base}/project/${id}/boq`);
   if (b.ok) surfaces.push(["BoQ page (HTML + payload)", await b.text()]);
+  // H7: the plan page and hub payloads, and every plan-editor API response.
+  for (const [label, path] of [["plan page (HTML + payload)", `/project/${id}/plan`], ["project hub (HTML + payload)", `/project/${id}`]]) {
+    const res = await api(`${base}${path}`);
+    if (res.ok) surfaces.push([label, await res.text()]);
+    else console.log(`  ${label}: HTTP ${res.status}`);
+  }
+  const { data: plan } = await sb.from("plans").select("id").eq("project_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const editor = [["GET /api/plan-fixtures", `/api/plan-fixtures?project_id=${id}`]];
+  if (plan) editor.push(["GET /api/plan-elements", `/api/plan-elements?plan_id=${plan.id}`], ["GET /api/plan-context", `/api/plan-context?plan_id=${plan.id}`], ["GET /api/plan-openings", `/api/plan-openings?plan_id=${plan.id}`]);
+  for (const [label, path] of editor) {
+    const res = await api(`${base}${path}`);
+    if (res.ok) surfaces.push([label, await res.text()]);
+    else console.log(`  ${label}: HTTP ${res.status}`);
+  }
 
   console.log(`  surfaces scanned: ${surfaces.length}`);
   for (const n of names) {

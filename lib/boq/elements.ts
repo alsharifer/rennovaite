@@ -8,6 +8,7 @@
 // Aggregation happens here, at line-assembly time — never before persistence.
 // =============================================================================
 
+import { lineTotal, money2, sumMoney } from "./money";
 import type { ElementPricer } from "./rates";
 import type { TakeoffItem, WorkItemKey } from "./quantify";
 
@@ -57,7 +58,6 @@ export interface MappedSection {
   section_total_aed: number;
 }
 
-const r0 = (n: number) => Math.round(n);
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -98,13 +98,14 @@ export function assembleMappedSections(items: TakeoffItem[], price?: ElementPric
 
     const unit = its[0]!.unit;
     const book = price?.(key, unit) ?? null;
-    const rate = book?.rate_aed ?? def.rate_aed;
+    // H7: a 2-dp rate, and a total that multiplies out from it.
+    const rate = money2(book?.rate_aed ?? def.rate_aed);
     lines.push({
       description: def.description,
       quantity,
       unit,
       rate_aed: rate,
-      total_aed: r0(quantity * rate),
+      total_aed: lineTotal(quantity, rate),
       vendor_or_source: book?.vendor_or_source ?? "Deterministic take-off (P4)",
       notes,
       rule_id: `P4/quantify/${key}`,
@@ -127,7 +128,7 @@ export function assembleMappedSections(items: TakeoffItem[], price?: ElementPric
   return Array.from(bySection.entries()).map(([work_section, ls]) => ({
     work_section,
     lines: ls,
-    section_total_aed: ls.reduce((s, l) => s + l.total_aed, 0),
+    section_total_aed: sumMoney(ls.map((l) => l.total_aed)),
   }));
 }
 
@@ -170,11 +171,13 @@ export function roomRollup(items: TakeoffItem[], price?: ElementPricer): RoomRol
       const def = WORK_ITEM_DEF[key];
       // T3b: the same element price the mapped line uses, so a room total and
       // its BoQ line cannot disagree.
-      const rate = price?.(key, unit)?.rate_aed ?? def.rate_aed;
-      workItems.push({ work_item_key: key, description: def.description, qty: r2(qty), unit, total_aed: r0(qty * rate) });
+      // H7: the mapped line multiplies its 2-dp quantity by its 2-dp rate; so does
+      // the room view, or the two would disagree by the fils.
+      const rate = money2(price?.(key, unit)?.rate_aed ?? def.rate_aed);
+      workItems.push({ work_item_key: key, description: def.description, qty: r2(qty), unit, total_aed: lineTotal(r2(qty), rate) });
     }
     workItems.sort((a, b) => b.total_aed - a.total_aed);
-    rollups.push({ room_id, total_aed: workItems.reduce((s, w) => s + w.total_aed, 0), items: workItems });
+    rollups.push({ room_id, total_aed: sumMoney(workItems.map((w) => w.total_aed)), items: workItems });
   }
   rollups.sort((a, b) => b.total_aed - a.total_aed);
   return rollups;

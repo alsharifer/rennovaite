@@ -17,6 +17,8 @@
 // =============================================================================
 
 import { lineItemKey, stableLineKeys } from "./line-identity";
+import { lineTotal, money2 } from "./money";
+import { sortSections } from "./section-order";
 import { CAUSE_KIND_LABEL, DIFF_CLASS_LABEL, type CauseKind, type DiffClass } from "./revision-diff-types";
 
 export { CAUSE_KIND_LABEL, DIFF_CLASS_LABEL };
@@ -49,6 +51,8 @@ export interface RevisionBoq {
   vat_aed: number;
   grand_total_aed: number;
   garden?: { draft?: { draft?: boolean } | null } | null;
+  /** The engine that produced the revision (H7 reads its version). */
+  engine?: { version?: string } | null;
 }
 
 export interface RevisionLine {
@@ -71,6 +75,8 @@ export interface RevisionSnapshot {
   boq_id: string;
   created_at: string;
   draft: boolean;
+  /** The stored engine version; null for a document that carries none. */
+  engine_version: string | null;
   lines: RevisionLine[];
   summary: { subtotal_aed: number; ohp_aed: number; contingency_aed: number; vat_aed: number; grand_total_aed: number };
 }
@@ -100,6 +106,7 @@ export function snapshotRevision(boqId: string, createdAt: string, boq: Revision
     boq_id: boqId,
     created_at: createdAt,
     draft: boq.garden?.draft?.draft === true,
+    engine_version: typeof boq.engine?.version === "string" ? boq.engine.version : null,
     lines,
     summary: {
       subtotal_aed: Number(boq.subtotal_aed),
@@ -197,6 +204,34 @@ function causesFor(line: RevisionLine, recorded: readonly RecordedCause[]): Caus
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 
+/** The first engine version that prices to the fils (lib/boq/rules.ts ENGINE_VERSION). */
+export const H7_ENGINE_VERSION = "0.3.0";
+
+const semver = (v: string | null): number[] => (v ?? "0").split(".").map((x) => Number.parseInt(x, 10) || 0);
+const before3 = (v: string | null) => {
+  const [a = 0, b = 0, c = 0] = semver(v);
+  const [x = 0, y = 0, z = 0] = semver(H7_ENGINE_VERSION);
+  return a !== x ? a < x : b !== y ? b < y : c < z;
+};
+
+/**
+ * H7: a line's movement is the H7 rounding — and named so — only when the
+ * RECORDS say so: the two revisions' stored engine versions straddle 0.3.0,
+ * the quantity is unchanged, the new rate is the old rate to 2 dp, the new
+ * total is quantity × that rate to the fils, and the move is no larger than
+ * rounding can make it (whole-dirham rounding of the total ≤ 0.50, plus the
+ * rate's third and fourth decimals × the quantity). Anything else keeps
+ * whatever cause a record gives it, or none.
+ */
+export function isH7Rounding(beforeVersion: string | null, afterVersion: string | null, o: RevisionLine, n: RevisionLine): boolean {
+  if (!(before3(beforeVersion) && !before3(afterVersion))) return false;
+  if (o.quantity !== n.quantity) return false;
+  if (n.rate_aed !== money2(o.rate_aed)) return false;
+  if (n.total_aed !== lineTotal(n.quantity, n.rate_aed)) return false;
+  const bound = 0.5 + Math.abs(n.quantity) * Math.abs(o.rate_aed - n.rate_aed) + 0.01;
+  return Math.abs(n.total_aed - o.total_aed) <= bound;
+}
+
 function inWindow(c: RecordedCause, from: string, to: string): boolean {
   // (from, to]: a record made at exactly the earlier revision's instant belongs to
   // it, not to the movement after it.
@@ -214,7 +249,8 @@ export function diffRevisions(before: RevisionSnapshot, after: RevisionSnapshot,
     const ref = (n ?? o)!;
     const oq = o?.quantity ?? 0;
     const nq = n?.quantity ?? 0;
-    const cls: DiffClass = !o ? "added" : !n ? "removed" : o.quantity !== n.quantity && o.rate_aed !== n.rate_aed ? "both" : o.quantity !== n.quantity ? "quantity" : "rate";
+    const cls: DiffClass = !o ? "added" : !n ? "removed" : o.quantity !== n.quantity && o.rate_aed !== n.rate_aed ? "both" : o.quantity !== n.quantity ? "quantity" : o.rate_aed !== n.rate_aed ? "rate" : "total";
+    const rounding = !!o && !!n && isH7Rounding(before.engine_version, after.engine_version, o, n);
     lines.push({
       key: ref.key,
       section: ref.section,
@@ -228,12 +264,19 @@ export function diffRevisions(before: RevisionSnapshot, after: RevisionSnapshot,
       delta_pct: o && o.quantity ? r2(((nq - oq) / o.quantity) * 100) : null,
       delta_rate_aed: r2((n?.rate_aed ?? 0) - (o?.rate_aed ?? 0)),
       delta_aed: r2((n?.total_aed ?? 0) - (o?.total_aed ?? 0)),
-      causes: causesFor(ref, window),
+      causes: [
+        ...causesFor(ref, window),
+        ...(rounding
+          ? [{ kind: "engine_rounding" as const, at: after.created_at, summary: `H7 rounding — rate to 2 dp, total = quantity × rate to the fils (engine ${before.engine_version ?? "pre-0.3"} → ${after.engine_version})` }]
+          : []),
+      ],
     });
   };
 
   // `to` order first; removed lines follow the last survivor of their section.
-  const sectionsInOrder = [...new Set([...after.lines.map((l) => l.section), ...before.lines.map((l) => l.section)])];
+  // H7: sections in THE canonical order (stable: a section the order does not
+  // name keeps its `to`-then-`from` position after the named ones).
+  const sectionsInOrder = sortSections([...new Set([...after.lines.map((l) => l.section), ...before.lines.map((l) => l.section)])].map((work_section) => ({ work_section }))).map((s) => s.work_section);
   for (const section of sectionsInOrder) {
     for (const n of after.lines.filter((l) => l.section === section)) {
       const o = a.get(n.key) ?? null;

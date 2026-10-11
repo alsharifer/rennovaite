@@ -1,3 +1,4 @@
+import { lineTotal, sumMoney } from "@/lib/boq/money";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,7 +23,7 @@ describe("Joinery section (Step 4)", () => {
     expect(section.lines.length).toBeGreaterThan(0);
     for (const l of section.lines) {
       expect(l.scope).toBe("supply_and_install");
-      expect(l.total_aed).toBe(Math.round(l.quantity * l.rate_aed));
+      expect(l.total_aed).toBe(lineTotal(l.quantity, l.rate_aed));
     }
     // Everything the Atrium quotation covered is an actual. The S6-pre vanity
     // slab (G19) is the one line it did NOT cover, so it must NOT claim to be
@@ -80,8 +81,8 @@ describe("append post-pass", () => {
     const names = out.sections.map((s) => s.work_section);
     expect(names).toContain("Joinery");
     expect(names).toContain("Aluminum & Glass");
-    expect(out.subtotal_aed).toBe(out.sections.reduce((s, x) => s + x.section_total_aed, 0));
-    expect(out.grand_total_aed).toBe(out.subtotal_aed + out.contingency_aed + out.vat_aed);
+    expect(out.subtotal_aed).toBe(sumMoney(out.sections.map((x) => x.section_total_aed)));
+    expect(out.grand_total_aed).toBe(sumMoney([out.subtotal_aed, out.contingency_aed, out.vat_aed]));
   });
 
   it("supersedes the engine's generic Joinery & Carpentry (no double-count)", () => {

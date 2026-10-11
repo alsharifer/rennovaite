@@ -16,6 +16,8 @@ import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
 import { elementPricer } from "@/lib/boq/rates";
 import { applyOhp } from "@/lib/rates/ohp";
 import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
+import { lineTotal, money2 } from "@/lib/boq/money";
+import { rechain, type ChainedDoc } from "@/lib/boq/totals";
 import { getKgContext } from "@/lib/kg/context";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getStyleByKey } from "@/lib/styles";
@@ -456,39 +458,18 @@ async function generateBoq(
 // We trust the structure but recompute every derived total from line rates ×
 // quantities, then apply the project-spec contingency/VAT chain on top.
 function normalizeTotals(boq: BoqResponse): BoqResponse {
-  const normalizedSections = boq.sections.map((section) => {
-    const normalizedLines = section.lines.map((line) => ({
-      ...line,
-      total_aed: Math.round(line.quantity * line.rate_aed),
-    }));
-    const section_total_aed = normalizedLines.reduce(
-      (sum, l) => sum + l.total_aed,
-      0,
-    );
-    return { ...section, lines: normalizedLines, section_total_aed };
-  });
-
-  const subtotal_aed = normalizedSections.reduce(
-    (sum, s) => sum + s.section_total_aed,
-    0,
-  );
-  const contingency_pct = boq.contingency_pct || 8;
-  const vat_pct = boq.vat_pct || 5;
-  const contingency_aed = Math.round((subtotal_aed * contingency_pct) / 100);
-  const vat_aed = Math.round(
-    ((subtotal_aed + contingency_aed) * vat_pct) / 100,
-  );
-  const grand_total_aed = subtotal_aed + contingency_aed + vat_aed;
-
-  return {
-    sections: normalizedSections,
-    subtotal_aed,
-    contingency_pct,
-    contingency_aed,
-    vat_pct,
-    vat_aed,
-    grand_total_aed,
-  };
+  // H7: the model's rate to 2 dp, the total from it, and the chain by the same
+  // rechain every deterministic producer uses (fils, canonical order).
+  const sections = boq.sections.map((section) => ({
+    ...section,
+    lines: section.lines.map((line) => ({ ...line, rate_aed: money2(line.rate_aed), total_aed: lineTotal(line.quantity, line.rate_aed) })),
+  }));
+  return rechain({
+    ...boq,
+    sections,
+    contingency_pct: boq.contingency_pct || 8,
+    vat_pct: boq.vat_pct || 5,
+  } as unknown as ChainedDoc) as unknown as BoqResponse;
 }
 
 export async function POST(request: NextRequest) {

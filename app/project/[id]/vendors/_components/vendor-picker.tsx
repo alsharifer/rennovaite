@@ -12,6 +12,7 @@ import { AnalyticsEvent, track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
 import { SendModal } from "./send-modal";
+import { lineTotal, money2 } from "@/lib/boq/money";
 import { chainTotals } from "@/lib/boq/totals";
 import { formatAed } from "@/lib/format/aed";
 
@@ -51,7 +52,7 @@ export type BoqMeta = {
   ohp_pct?: number;
   base_subtotal_aed: number;
   base_grand_total_aed: number;
-  budget_aed: number;
+  budget_aed: number | null;
 };
 
 type Props = {
@@ -121,8 +122,9 @@ export function VendorPicker({ projectId, boqMeta, lines }: Props) {
     let delta = 0;
     for (const l of lines) {
       const picked = selection[l.line_key] ?? l.current;
-      const newLineTotal = Math.round(l.quantity * picked.price_aed);
-      delta += newLineTotal - l.base_total_aed;
+      // H7: the same line arithmetic the server stores (2-dp rate, total to the fils).
+      const newLineTotal = lineTotal(l.quantity, picked.price_aed);
+      delta = money2(delta + newLineTotal - l.base_total_aed);
     }
     const c = chainTotals({
       subtotal_aed: boqMeta.base_subtotal_aed + delta,

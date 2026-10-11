@@ -359,26 +359,26 @@ describe("anti-double-count invariants", () => {
 
 describe("nothing interior moves", () => {
   it("adds landscape sections without touching the interior order", () => {
-    // The first fourteen entries are the interior order, unchanged. A section
-    // with no lines is filtered out before rendering, so their existence cannot
-    // change an interior BoQ.
-    expect(SECTION_ORDER.slice(0, 14)).toEqual([
+    // H7: THE canonical order — Preliminaries first, the interior trades, then
+    // the landscape sections. A section with no lines is filtered out before
+    // rendering, so their existence cannot change an interior BoQ.
+    expect(SECTION_ORDER).toEqual([
+      "Preliminaries",
       "Demolition",
       "Blockwork",
       "Plaster",
       "Floor Finishes",
       "Wall Finishes",
       "Ceilings",
-      "Decoration & Painting",
       "Joinery & Carpentry",
-      "Electrical",
-      "Plumbing",
       "Sanitaryware",
+      "Electrical",
+      "Electrical Installations",
+      "Plumbing",
+      "Plumbing & Sanitary",
       "MEP / HVAC",
       "Lighting",
-      "Preliminaries",
-    ]);
-    expect(SECTION_ORDER.slice(14)).toEqual([
+      "Decoration & Painting",
       "Hardscape & Structures",
       "Soft Landscaping",
       "Irrigation",
@@ -494,8 +494,8 @@ describe("what-if leaves landscape lines alone", () => {
   it("keeps landscape work in its own POMI sections", () => {
     const names = buildGardenSections(VILLA94).sections.map((s) => s.work_section);
     expect(names).toEqual([
-      "Demolition",
       "Preliminaries",
+      "Demolition",
       "Hardscape & Structures",
       "Soft Landscaping",
       "Irrigation",

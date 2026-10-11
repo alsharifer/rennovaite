@@ -102,7 +102,7 @@ export function restoreCurated<T>(incoming: T, stored: unknown, names: readonly 
  */
 export async function keepStoredText(
   db: SupabaseClient,
-  table: "rooms" | "plan_elements" | "plan_fixtures" | "plan_context",
+  table: "rooms" | "plan_elements" | "plan_fixtures" | "plan_context" | "plan_openings",
   id: string,
   patch: Record<string, unknown>,
   names: readonly string[],

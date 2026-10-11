@@ -193,7 +193,8 @@ describe("the draft watermark on every document", () => {
 
   it("prints a BoQ with nothing derived exactly as a number", () => {
     const t = derivedTotal(148205.01, { derivedLines: 0, draft: false, statement: null, unpriced: [] });
-    expect(t).toEqual({ text: "AED 148,205", headline: "AED 148,205", derived: false, footnote: null, excludes: null, excluded: [] });
+    // H7: exactly — to the fils.
+    expect(t).toEqual({ text: "AED 148,205.01", headline: "AED 148,205.01", derived: false, footnote: null, excludes: null, excluded: [] });
   });
 
   it("puts the statement on the render-pack cover and header", () => {

@@ -34,8 +34,10 @@ import { isFirmTier } from "@/lib/rates/tiers";
 
 import { GardenRateBookMissingError, loadGardenRateBook, withFirmOverlay, type GardenRateBook } from "./garden-rates";
 import { indicativeProgramme } from "./programme";
+import { sumMoney } from "./money";
 import { SECTION_ORDER } from "./rules";
 import type { PomiSection, ScopeItem } from "./schema";
+import { rechain, type ChainedDoc } from "./totals";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -338,7 +340,7 @@ export function buildGardenSections(capture: GardenTakeoffInput, book: GardenRat
     return {
       work_section,
       lines,
-      section_total_aed: round2(lines.reduce((s, l) => s + (l.total_aed as number), 0)),
+      section_total_aed: sumMoney(lines.map((l) => l.total_aed as number)),
     };
   });
 
@@ -349,7 +351,7 @@ export function buildGardenSections(capture: GardenTakeoffInput, book: GardenRat
     removals: takeoff.removals,
     kept: takeoff.kept,
     undecided: takeoff.undecided,
-    total_aed: round2(sections.reduce((s, x) => s + x.section_total_aed, 0)),
+    total_aed: sumMoney(sections.map((x) => x.section_total_aed)),
     violations,
   };
 }
@@ -393,7 +395,6 @@ export async function appendGardenSections<T extends BoqLike>(
       const existing = boq.sections.find((x) => x.work_section === s.work_section);
       if (existing) {
         existing.lines.push(...s.lines);
-        existing.section_total_aed = round2(existing.section_total_aed + s.section_total_aed);
       } else {
         boq.sections.push(s as unknown as BoqSectionLike);
       }
@@ -417,18 +418,9 @@ export async function appendGardenSections<T extends BoqLike>(
     };
     (boq as T & { garden?: GardenBoqMeta }).garden = meta;
 
-    // Keep the canonical order after the merge.
-    const rank = new Map(SECTION_ORDER.map((s, i) => [s as string, i] as const));
-    boq.sections.sort(
-      (a, b) => (rank.get(a.work_section) ?? 999) - (rank.get(b.work_section) ?? 999),
-    );
-
-    boq.subtotal_aed = round2(boq.sections.reduce((s, x) => s + x.section_total_aed, 0));
-    boq.contingency_aed = Math.round((boq.subtotal_aed * boq.contingency_pct) / 100);
-    boq.vat_aed = Math.round(
-      ((boq.subtotal_aed + boq.contingency_aed) * boq.vat_pct) / 100,
-    );
-    boq.grand_total_aed = boq.subtotal_aed + boq.contingency_aed + boq.vat_aed;
+    // H7: canonical order, section totals, subtotal and chain — all by rechain.
+    // (The garden document is built in place, so the result is folded back.)
+    Object.assign(boq, rechain(boq as unknown as ChainedDoc));
     // G5d: an indicative delivery programme, scaled from the reference project's
     // 90-day anchor. Stored on the BoQ document, never a line: it prices nothing.
     const programme = indicativeProgramme(boq.sections, boq.subtotal_aed);

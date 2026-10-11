@@ -18,6 +18,13 @@ export type AedFormat =
   | "amount"
   /** "105.6" — a unit rate, shown exactly as stored (no rounding). */
   | "rate"
+  /**
+   * "16,741.95" — a BoQ money figure to the fils (H7): line rates and totals
+   * and the summary chain, so every figure multiplies out from those beside it.
+   */
+  | "money"
+  /** "+0.04" / "−16,741.99" / "—" for zero — a change to the fils (H7 rounding moves). */
+  | "money-delta"
   /** "+AED 1,234" / "−AED 1,234" — a change. */
   | "signed"
   /** "+1,234" / "−1,234" / "—" for zero — a compact change in a dense list. */
@@ -30,6 +37,7 @@ const MINUS = "−";
 
 const isNum = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
 const digits = (n: number) => Math.round(n).toLocaleString("en-US");
+const fils2 = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Format an AED figure. Null / NaN / Infinity → "—" in every format. */
 export function formatAed(n: number | null | undefined, format: AedFormat = "aed"): string {
@@ -41,6 +49,13 @@ export function formatAed(n: number | null | undefined, format: AedFormat = "aed
       return digits(n);
     case "rate":
       return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+    case "money":
+      return fils2(n);
+    case "money-delta": {
+      if (Math.round(n * 100) === 0) return EMPTY;
+      const abs = fils2(Math.abs(n));
+      return n > 0 ? `+${abs}` : `${MINUS}${abs}`;
+    }
     case "signed": {
       const abs = digits(Math.abs(n));
       return n >= 0 ? `+AED ${abs}` : `${MINUS}AED ${abs}`;

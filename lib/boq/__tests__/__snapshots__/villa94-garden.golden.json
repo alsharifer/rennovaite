@@ -1,26 +1,6 @@
 {
   "sections": [
     {
-      "work_section": "Demolition",
-      "lines": [
-        {
-          "description": "Garden demolition & strip-out",
-          "quantity": 1,
-          "unit": "lump",
-          "rate_aed": 4400,
-          "total_aed": 4400,
-          "vendor_or_source": "market reference — Dubai garden 2026",
-          "notes": "per project — strip-out of 110.69 m² existing hardscape and grass (lump for a garden this size, not scaled)",
-          "rule_id": "GL-03",
-          "kind": "supply_and_install",
-          "rate_band": "sku",
-          "wastage_pct": 0,
-          "rate_status": "actual_transaction"
-        }
-      ],
-      "section_total_aed": 4400
-    },
-    {
       "work_section": "Preliminaries",
       "lines": [
         {
@@ -53,6 +33,26 @@
         }
       ],
       "section_total_aed": 7920
+    },
+    {
+      "work_section": "Demolition",
+      "lines": [
+        {
+          "description": "Garden demolition & strip-out",
+          "quantity": 1,
+          "unit": "lump",
+          "rate_aed": 4400,
+          "total_aed": 4400,
+          "vendor_or_source": "market reference — Dubai garden 2026",
+          "notes": "per project — strip-out of 110.69 m² existing hardscape and grass (lump for a garden this size, not scaled)",
+          "rule_id": "GL-03",
+          "kind": "supply_and_install",
+          "rate_band": "sku",
+          "wastage_pct": 0,
+          "rate_status": "actual_transaction"
+        }
+      ],
+      "section_total_aed": 4400
     },
     {
       "work_section": "Hardscape & Structures",
@@ -232,8 +232,8 @@
           "description": "Motorized louvered pergola (alum, LED, coated)",
           "quantity": 12.25,
           "unit": "m2 plan",
-          "rate_aed": 1366.6928,
-          "total_aed": 16741.99,
+          "rate_aed": 1366.69,
+          "total_aed": 16741.95,
           "vendor_or_source": "market reference — Dubai garden 2026",
           "notes": "Σ structure zone plan area = 12.25 m² (all-in rate: structure, coating and its 8 recessed downlights)",
           "rule_id": "GL-14",
@@ -263,7 +263,7 @@
           ]
         }
       ],
-      "section_total_aed": 99735.02
+      "section_total_aed": 99734.98
     },
     {
       "work_section": "Soft Landscaping",
@@ -397,5 +397,5 @@
       "section_total_aed": 18851
     }
   ],
-  "total_aed": 147679.18
+  "total_aed": 147679.14
 }

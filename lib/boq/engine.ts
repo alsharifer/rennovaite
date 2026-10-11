@@ -7,7 +7,9 @@
 
 import { isFirmTier } from "@/lib/rates/tiers";
 
+import { lineTotal, money2 } from "./money";
 import { RateResolver } from "./rates";
+import { rechain } from "./totals";
 import {
   CONTINGENCY_PCT,
   DEFAULT_FLOORING,
@@ -51,8 +53,9 @@ export function generateDeterministicBoq(
       description: chosen ? `${item.description} — ${chosen.name}` : item.description,
       quantity: pricedQty,
       unit: item.unit,
-      rate_aed: rate.rate_aed,
-      total_aed: Math.round(pricedQty * rate.rate_aed),
+      // H7: the resolver hands back a 2-dp rate; the total multiplies out from it.
+      rate_aed: money2(rate.rate_aed),
+      total_aed: lineTotal(pricedQty, rate.rate_aed),
       vendor_or_source: rate.vendor_or_source,
       notes:
         rate.wastage > 0
@@ -100,18 +103,17 @@ export function generateDeterministicBoq(
     };
   });
 
-  const subtotal_aed = sections.reduce((s, x) => s + x.section_total_aed, 0);
-  const contingency_aed = Math.round((subtotal_aed * CONTINGENCY_PCT) / 100);
-  const vat_aed = Math.round(((subtotal_aed + contingency_aed) * VAT_PCT) / 100);
-
-  const boq: Boq = {
+  // H7: section totals, subtotal, contingency and VAT are all put together by
+  // `rechain` (to the fils, canonical section order) — the same function every
+  // later producer calls.
+  const boq: Boq = rechain({
     sections,
-    subtotal_aed,
+    subtotal_aed: 0,
     contingency_pct: CONTINGENCY_PCT,
-    contingency_aed,
+    contingency_aed: 0,
     vat_pct: VAT_PCT,
-    vat_aed,
-    grand_total_aed: subtotal_aed + contingency_aed + vat_aed,
+    vat_aed: 0,
+    grand_total_aed: 0,
     engine: {
       version: ENGINE_VERSION,
       tier,
@@ -119,7 +121,7 @@ export function generateDeterministicBoq(
       style_key: input.styleKey,
       generated_at: new Date().toISOString(),
     },
-  };
+  });
 
   return { boq, takeoff };
 }

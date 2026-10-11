@@ -235,7 +235,10 @@ export default async function ProjectHubPage({
         : 0;
 
   // ----- Budget snapshot --------------------------------------------------
-  const budgetTotal = project.budget_aed ?? null;
+  // H7: the client's own entered budget, owner projects only — never a default,
+  // and never on a firm-attached project.
+  const { data: firmRow } = await sb.from("projects").select("firm_id").eq("id", projectId).maybeSingle();
+  const budgetTotal = (firmRow as { firm_id?: string | null } | null)?.firm_id ? null : (project.budget_aed ?? null);
   const boqTotal = boq?.total_aed ?? null;
   // Materials vs labour split — approximate by section bucket. Flagged.
   let materialsTotal = 0;
@@ -696,16 +699,25 @@ function BudgetCard({
   projectId: string;
 }) {
   const spent = boqTotal ?? 0;
-  const budget = budgetTotal ?? 0;
-  const pct =
-    budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+  // H7: "of AED …" only against a budget the client entered. With none, the
+  // card reports the BoQ total and says no budget is recorded — it used to
+  // print "of AED 0".
+  const budget = budgetTotal != null && budgetTotal > 0 ? budgetTotal : null;
+  const pct = budget ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
   return (
     <section className="col-span-1 flex flex-col rounded-xl border border-ink-100 bg-paper p-lg lg:col-span-4">
-      <p className="label-caps mb-xs text-ink-500">Budget</p>
-      <h2 className="mb-lg font-display text-headline-md leading-tight text-ink-900">
-        {formatAed(spent)} <span className="text-on-surface-variant">of</span>{" "}
-        {formatAed(budget)}
+      <p className="label-caps mb-xs text-ink-500">{budget ? "Budget" : "BoQ total"}</p>
+      <h2 className="mb-lg font-display text-headline-md leading-tight text-ink-900" data-budget={budget ?? "none"}>
+        {formatAed(spent)}
+        {budget && (
+          <>
+            {" "}
+            <span className="text-on-surface-variant">of</span> {formatAed(budget)}
+          </>
+        )}
       </h2>
+      {!budget && <p className="-mt-md mb-lg font-body text-body-sm text-ink-500">No client budget recorded for this project.</p>}
+      {budget && (
       <div
         className="mb-lg h-3 w-full overflow-hidden rounded-full bg-bone"
         role="progressbar"
@@ -718,6 +730,7 @@ function BudgetCard({
           style={{ width: `${pct}%` }}
         />
       </div>
+      )}
       <div className="mb-lg grid grid-cols-2 gap-md">
         <div>
           <p className="label-caps text-ink-500">Materials</p>

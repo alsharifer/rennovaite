@@ -16,6 +16,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { rechain, type ChainedDoc } from "@/lib/boq/totals";
+
 import { buildOverlaySections } from "./boq";
 import { POMI_ELECTRICAL, POMI_PLUMBING } from "./catalog";
 import type { FixtureType } from "./types";
@@ -66,18 +68,6 @@ export async function appendOverlaySections<T extends BoqLike>(
   const kept = boq.sections.filter(
     (s) => s.work_section !== POMI_ELECTRICAL && s.work_section !== POMI_PLUMBING,
   );
-  const sections = [...kept, ...(overlay as unknown as BoqSectionLike[])];
-
-  const subtotal_aed = sections.reduce((s, x) => s + x.section_total_aed, 0);
-  const contingency_aed = Math.round((subtotal_aed * boq.contingency_pct) / 100);
-  const vat_aed = Math.round(((subtotal_aed + contingency_aed) * boq.vat_pct) / 100);
-
-  return {
-    ...boq,
-    sections,
-    subtotal_aed,
-    contingency_aed,
-    vat_aed,
-    grand_total_aed: subtotal_aed + contingency_aed + vat_aed,
-  } as T;
+  // H7: canonical order, section totals, subtotal and chain — all by rechain.
+  return rechain({ ...boq, sections: [...kept, ...(overlay as unknown as BoqSectionLike[])] } as unknown as ChainedDoc) as unknown as T;
 }

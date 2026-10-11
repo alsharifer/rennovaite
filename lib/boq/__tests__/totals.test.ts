@@ -24,14 +24,22 @@ describe("chainTotals reproduces stored BoQs", () => {
     }
   });
 
-  it("garden documents with fractional subtotals — Arabella and Villa 94 as stored on dev (2026-09-20)", () => {
-    const stored = [
-      { subtotal_aed: 102892.07, contingency_pct: 8, contingency_aed: 8231, vat_pct: 5, vat_aed: 5556, grand_total_aed: 116679.07 },
-      { subtotal_aed: 147679.18, contingency_pct: 8, contingency_aed: 11814, vat_pct: 5, vat_aed: 7975, grand_total_aed: 167468.18 },
-    ];
-    for (const b of stored) {
-      const c = chainTotals(b);
-      expect([c.contingency_aed, c.vat_aed, c.grand_total_aed]).toEqual([b.contingency_aed, b.vat_aed, b.grand_total_aed]);
+  it("H7 — contingency and VAT to the fils (Arabella and Villa 94 on their corrected subtotals)", () => {
+    // Before H7 these were whole dirhams: Arabella stored 8,231 and 5,556
+    // (grand 116,679.07 on the pergola's unrounded rate).
+    expect(chainTotals({ subtotal_aed: 102892.03, contingency_pct: 8, vat_pct: 5 })).toMatchObject({ contingency_aed: 8231.36, vat_aed: 5556.17, grand_total_aed: 116679.56 });
+    expect(chainTotals({ subtotal_aed: 147679.18, contingency_pct: 8, vat_pct: 5 })).toMatchObject({ contingency_aed: 11814.33, vat_aed: 7974.68, grand_total_aed: 167468.19 });
+  });
+
+  it("H7 — grand total = subtotal + OH&P + contingency + VAT exactly, each component rounded once", () => {
+    const fils = (n: number) => Math.round(n * 100);
+    for (const subtotal_aed of [102892.03, 147679.18, 637815, 0.01, 1234567.89, 99999.99]) {
+      for (const ohp_pct of [0, 7.5, 12]) {
+        const c = chainTotals({ subtotal_aed, contingency_pct: 8, vat_pct: 5, ohp_pct });
+        for (const v of [c.subtotal_aed, c.ohp_aed, c.contingency_aed, c.vat_aed, c.grand_total_aed]) expect(fils(v) / 100).toBe(v);
+        expect(fils(c.grand_total_aed)).toBe(fils(c.subtotal_aed) + fils(c.ohp_aed) + fils(c.contingency_aed) + fils(c.vat_aed));
+        expect(c.contingency_aed).toBe(Math.round((c.subtotal_aed + c.ohp_aed) * 8) / 100);
+      }
     }
   });
 

@@ -1674,6 +1674,56 @@ does).
 - **DB step**: `npm run db:push` for 050 **before** deploying the code — the
   membership read fails closed (500 `migration_required`) without the table.
 
+## BoQ numeric integrity + payload identity (H7)
+
+Every figure a QS sees multiplies out from the figures beside it.
+
+- **One rounding module** `lib/boq/money.ts`: `money2` (2 dp, half away from
+  zero, robust to binary representation), `lineTotal(qty, rate) =
+  money2(qty × money2(rate))`, `sumMoney` (exact in integer fils). Every
+  resolved rate is 2 dp **at resolution** (`RateResolver.resolve` /
+  `resolveDefault`, `elementPricer`, the garden book pick, overlays, joinery,
+  the LLM path, furniture); every producer's total is `lineTotal`. GL-14
+  pergola: book net 1,366.6928 (list × 0.88) → 1,366.69; 12.25 × 1,366.69 =
+  16,741.95 (was 16,741.99).
+- **The chain to the fils** (`lib/boq/totals.ts`): OH&P, contingency and VAT
+  each rounded ONCE to 2 dp; grand = subtotal + OH&P + contingency + VAT
+  exactly. **OH&P sits between the subtotal and contingency** (contingency and
+  VAT are both charged on it). **`rechain(boq)`** is the one way any producer
+  puts a document back together (canonical order, section totals, subtotal,
+  chain, OH&P kept if present) — the six copies of the chain arithmetic are gone.
+- **THE section order** `lib/boq/section-order.ts` (`CANONICAL_SECTION_ORDER`,
+  Preliminaries first; `SECTION_ORDER` in rules.ts derives from it). Applied by
+  `rechain` to every stored document and by `sortSections` on read in the BoQ
+  page, BoQ PDF, proposal, revision diff and the pricing fingerprint — so a
+  pre-H7 revision displays in the same order. Stable, whole sections only: REF
+  codes are per section, so none moves (asserted).
+- **Display**: `formatAed(n, "money")` (16,741.95) for line rates, line totals
+  and the summary rows on the page, PDF and proposal; a non-draft total prints
+  to the fils; a draft keeps its labelled "≈ AED N*" headline with the exact
+  chain beside it. `"money-delta"` for fils changes.
+- **Diff cause "H7 rounding"** (`isH7Rounding`, lib/boq/revision-diff.ts): only
+  when the RECORDS say so — the revisions' stored `engine.version` straddle
+  **0.3.0** (`ENGINE_VERSION`), the quantity is unchanged, the new rate is the
+  old one to 2 dp, the new total is qty × rate, and the move is within rounding
+  size. A total-only move is class `total` ("total moved (rounding)"), no
+  longer misfiled as `rate`.
+- **Budget**: a budget renders only when the CLIENT entered one
+  (`projects.budget_aed`) on a project with **no firm**. The old AED 850,000
+  was a platform default (`FALLBACK_BUDGET_AED`, BoQ + vendors pages; the intake
+  slider's initial value is never sent) and is gone from every "your budget";
+  the hub card says "No client budget recorded" instead of "of AED 0"; the style
+  page calls 850k a baseline.
+- **Payload identity** (with #88/#89): `plan-openings` curates its responses
+  too; `scripts/read-path-leak-scan.ts` pins process.env to its target (on dev
+  the plan + catalogue checks had degraded to empty); `scripts/document-identity-scan.mjs`
+  also scans the plan page, the hub and every plan-editor API response.
+- **Acceptance**: `lib/boq/__tests__/numeric-integrity.test.ts` (every line of
+  every fixture BoQ, the chain, the order, REF stability, 5,000 random cases).
+  Measured (dry-run, read-only): Arabella 116,679.07 → **116,679.56** (1 line,
+  the pergola −0.04); dev demo villa 498,824 → 498,823.06 (5 lines); prod Mudon
+  vs 5 Sep: 3 rounding lines (−0.36) beside H3's S6-pre lines, grand 738,529.00.
+
 ## Legal pages + the firm-#2 runbook (H6)
 
 - **`/privacy` and `/terms`** render `content/legal/privacy.md` / `terms.md` —
