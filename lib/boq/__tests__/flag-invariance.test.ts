@@ -184,5 +184,6 @@ describe("H3 confirmation: every combination of flags prices one fixed project t
     expect(answers.size).toBe(1);
     expect(reference!.sections).toMatch(/Electrical Installations=\d+/);
     expect(reference!.sections).toMatch(/Plumbing & Sanitary=\d+/);
-  });
+    // Explicit budget: 4096 full BoQ assemblies, CPU-bound — ~2.5 s alone, past the 5 s default under suite parallelism.
+  }, 60_000);
 });
