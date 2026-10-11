@@ -3,7 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { loadWithheldNames } from "@/lib/identity/curation";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
+import { curatePlanRow, keepStoredText } from "@/lib/plan/curate-notes";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -45,6 +47,10 @@ export async function PATCH(request: NextRequest) {
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "No fields to update." }, { status: 400 });
 
   const sb = getSupabaseAdmin() as unknown as SupabaseClient;
+  // The response carries curated text; a caller re-sending it must not
+  // overwrite the stored note (I4).
+  const withheld = await loadWithheldNames(sb, access.projectId);
+  await keepStoredText(sb, "rooms", id, patch, withheld);
   const { data, error } = await sb
     .from("rooms")
     .update(patch)
@@ -56,5 +62,5 @@ export async function PATCH(request: NextRequest) {
   }
   const projectId = await projectOfPlan(sb, data.plan_id);
   if (projectId) await recordPilotEvent(sb, projectId, "design_edit", { layer: "zones", action: "update", fields: Object.keys(patch) });
-  return NextResponse.json({ zone: data });
+  return NextResponse.json({ zone: curatePlanRow(data, withheld) });
 }

@@ -1501,6 +1501,14 @@ its logo. Built on the T5 path, never beside it.
   `loadWithheldNames(sb, projectId)` withholds every other firm, and it is
   applied to BoQ reads, the drawing set (`generateDrawingSet`) and the render
   pack. What-if never selects `rate_book.source` (`RATE_BOOK_LABEL`).
+  A firm is withheld by its `name` AND its `display_name`. **Plan notes**
+  (`derived_note`, `note`, context `name`, every `spec` string) are curated on
+  read too (`lib/plan/curate-notes.ts`): the plan page's garden payload
+  (`loadGardenSiteData`) and every row `/api/plan-{elements,context,fixtures,zones}`
+  returns. The write side calls `keepStoredText` first, so an editor
+  re-sending curated text it read (the fixture inspector re-sends the whole
+  spec) never overwrites the stored note. Room `name_en` / `name_ar` are not
+  curated in the editor: its save re-sends every name.
   `scripts/document-identity-scan.mjs [port] <ids>` scans every sheet, pack
   page and BoQ page payload of a project.
 - **Checks:** `scripts/provenance-check.mjs [port] <ids>` (read-only: figure

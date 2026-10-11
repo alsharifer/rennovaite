@@ -3,7 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { loadWithheldNames } from "@/lib/identity/curation";
 import { recordPilotEvent } from "@/lib/pilot/events";
+import { curatePlanRow, curatePlanRows, keepStoredText } from "@/lib/plan/curate-notes";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { seedOverlays } from "@/lib/overlays/seed";
 import {
@@ -64,7 +66,8 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     if (existing && existing.length > 0) {
-      return NextResponse.json({ fixtures: existing, seeded: false });
+      // I4: a note or spec string can name the firm that measured the item.
+      return NextResponse.json({ fixtures: curatePlanRows(existing, await loadWithheldNames(supabase, projectId)), seeded: false });
     }
 
     // First access → seed rule defaults from the plan graph.
@@ -148,6 +151,10 @@ export async function POST(request: NextRequest) {
     if (f[k] !== undefined) row[k] = f[k];
   }
   if (!f.id && row.spec === undefined) row.spec = null;
+  // The inspector re-sends the whole spec it read, curated; that must not
+  // overwrite the stored text.
+  const withheld = await loadWithheldNames(db(), f.project_id);
+  if (f.id) await keepStoredText(db(), "plan_fixtures", f.id, row, withheld);
   try {
     if (f.id) {
       const { data, error } = await supabase
@@ -159,7 +166,7 @@ export async function POST(request: NextRequest) {
         .single();
       if (error) throw error;
       await recordPilotEvent(supabase, f.project_id, "design_edit", { layer: "fixtures", action: "update", type: f.type });
-      return NextResponse.json({ fixture: data });
+      return NextResponse.json({ fixture: curatePlanRow(data, withheld) });
     }
     const { data, error } = await supabase
       .from("plan_fixtures")
@@ -168,7 +175,7 @@ export async function POST(request: NextRequest) {
       .single();
     if (error) throw error;
     await recordPilotEvent(supabase, f.project_id, "design_edit", { layer: "fixtures", action: "create", type: f.type });
-    return NextResponse.json({ fixture: data });
+    return NextResponse.json({ fixture: curatePlanRow(data, withheld) });
   } catch (err) {
     console.error("[api/plan-fixtures POST]", err);
     return NextResponse.json(

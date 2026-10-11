@@ -1,10 +1,15 @@
 // =============================================================================
 // lib/plan/garden-site-data.ts — what the plan page's garden panel reads
 // (garden pilot G5). Server-only; every read degrades to empty before 037.
+// Its notes and names are curated on the way out (I4): a note can name the
+// firm that took a measurement, and a firm may appear only on its own projects.
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { loadWithheldNames } from "@/lib/identity/curation";
+
+import { curateGardenSiteData } from "./curate-notes";
 import { LINEAR_ELEMENT_META, isLinearElementKind } from "./elements";
 import { derivePlanGraph } from "./derive";
 import { graphDraftStatus } from "./geometry";
@@ -105,12 +110,12 @@ export async function loadGardenSiteData(sb: SupabaseClient, projectId: string, 
     /* pre-033 */
   }
 
-  return {
+  return curateGardenSiteData({
     draft: { draft: draft.draft, derived: draft.derived, note: draft.note },
     items,
     zones: graph.rooms.map((r) => ({ id: r.id, name: r.name_en, type: r.type, level_mm: r.level_mm, height_mm: r.height_mm, site_reference: r.site_reference })),
     untypedCounters,
     context,
     siteRefs: Object.fromEntries(graph.rooms.map((r) => [r.id, { site_reference: r.site_reference, disposition: r.disposition, dims_derived: r.dims_derived }])),
-  };
+  }, await loadWithheldNames(sb, projectId));
 }

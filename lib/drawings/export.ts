@@ -400,7 +400,7 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
   return {
     projectId,
     planId: asBuilt.planId,
-    sheets: sheets.map((s) => ({ ...s, svg: curateText(s.svg, withheld) })),
+    sheets: sheets.map((s) => ({ ...s, title: curateText(s.title, withheld), svg: curateText(s.svg, withheld) })),
     derivedNotes: asBuilt.notes.map((n) => curateText(n, withheld)),
   };
 }
