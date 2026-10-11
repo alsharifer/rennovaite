@@ -16,9 +16,15 @@
 //      (loadRateBook);
 //   3. every stored BoQ as the BoQ page / PDF / pack serve it (curateBoq with
 //      the project's withheld firm names);
-//   4. the accessory catalogue as the picker reads it (loadCatalog).
+//   4. the accessory catalogue as the picker reads it (loadCatalog);
+//   5. plan text as a user receives it — every row of the plan tables as the
+//      editor routes serve it (curatePlanRows with the project's withheld
+//      names) and the plan page's garden payload (loadGardenSiteData). A
+//      wall's measurement note once named the firm that measured it on a
+//      project that is not that firm's; this is the check that catches it.
 // REPORTED (findings, not failures): raw text elsewhere that a surface curates
-// on the way out — stored BoQ jsonb before curation, and catalogue tables.
+// on the way out — stored BoQ jsonb and plan notes before curation, and
+// catalogue tables.
 // `internal_ref` is where identity belongs; it is not scanned.
 // =============================================================================
 
@@ -28,6 +34,8 @@ import { resolveTarget } from "./_target-guard.mjs";
 
 import { loadCatalog } from "../lib/accessories/load.ts";
 import { curateBoq, findWithheldIdentities, loadWithheldNames } from "../lib/identity/curation.ts";
+import { curatePlanRows } from "../lib/plan/curate-notes.ts";
+import { loadGardenSiteData } from "../lib/plan/garden-site-data.ts";
 import { loadReferenceRows } from "../lib/rates/reference.ts";
 import { loadRateBook } from "../lib/whatif/rate-book.ts";
 
@@ -43,7 +51,10 @@ function hits(payload: unknown, extra: readonly string[] = []): string[] {
 async function main() {
   const { url, key, isProd } = resolveTarget({ script: "read-path-leak-scan", writes: false });
   const sb: SupabaseClient = createClient(url, key, { auth: { persistSession: false } });
-  const firms = (((await sb.from("firms").select("id, name")).data ?? []) as { id: string; name: string }[]).map((f) => f.name);
+  // A firm is known by its registered name and by the brand it prints (047).
+  const firms = (((await sb.from("firms").select("*")).data ?? []) as { name: string; display_name?: string | null }[])
+    .flatMap((f) => [f.name, f.display_name ?? ""])
+    .filter((n) => n.trim().length >= 3);
   let failures = 0;
   const line = (ok: boolean, label: string, detail = "") => {
     if (!ok) failures++;
@@ -75,8 +86,32 @@ async function main() {
   const catalog = await loadCatalog();
   line(hits(catalog, firms).length === 0, `accessory catalogue as the picker reads it (loadCatalog): ${catalog.length} items`, hits(catalog, firms).join(", "));
 
+  // 5. plan text, as the editor routes and the plan page serve it.
+  const PLAN_TABLES = [["rooms", "plan_id"], ["plan_elements", "plan_id"], ["plan_context", "plan_id"], ["plan_openings", "plan_id"], ["plan_fixtures", "project_id"]] as const;
+  const plans = ((await sb.from("plans").select("id, project_id")).data ?? []) as { id: string; project_id: string }[];
+  let planRows = 0;
+  const rawPlan: string[] = [];
+  const planServed: string[] = [];
+  for (const p of plans) {
+    const withheld = await loadWithheldNames(sb, p.project_id);
+    for (const [table, key] of PLAN_TABLES) {
+      const { data, error } = await sb.from(table).select("*").eq(key, key === "plan_id" ? p.id : p.project_id);
+      if (error) continue; // a table an older database does not have yet
+      const rows = (data ?? []) as Record<string, unknown>[];
+      planRows += rows.length;
+      for (const r of rows) if (hits(r, withheld).length) rawPlan.push(`${table} ${String(r.id).slice(0, 8)}: ${hits(r, withheld).join(", ")}`);
+      const h = hits(curatePlanRows(rows, withheld), withheld);
+      if (h.length) planServed.push(`${table} of plan ${p.id.slice(0, 8)}: ${h.join(", ")}`);
+    }
+    const site = await loadGardenSiteData(sb, p.project_id, p.id);
+    const h = hits(site, withheld);
+    if (h.length) planServed.push(`plan-page garden payload of plan ${p.id.slice(0, 8)}: ${h.join(", ")}`);
+  }
+  line(planServed.length === 0, `plan text as served (editor rows + plan-page garden payload): ${plans.length} plans, ${planRows} rows`, planServed.join(" | "));
+
   console.log("\nfindings (curated on the way out; reported, not failed)");
   console.log(`  stored BoQ jsonb carrying a withheld name BEFORE curation: ${rawHits} of ${boqs.length}`);
+  console.log(`  plan rows whose stored text names a withheld identity BEFORE curation: ${rawPlan.length} of ${planRows}${rawPlan.length ? ` (${rawPlan.join(" | ")})` : ""}`);
   for (const [table, cols] of [["pricing_skus", "*"], ["labour_rates", "*"], ["accessory_catalog", "*"], ["projects", "id, name, display_name"], ["approved_designs", "*"]] as const) {
     const { data, error } = await sb.from(table).select(cols);
     if (error) {
