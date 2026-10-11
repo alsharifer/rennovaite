@@ -50,6 +50,12 @@ function hits(payload: unknown, extra: readonly string[] = []): string[] {
 
 async function main() {
   const { url, key, isProd } = resolveTarget({ script: "read-path-leak-scan", writes: false });
+  // Some read functions (the accessory catalogue, the plan graph behind the
+  // plan page's garden payload) reach Supabase through the admin singleton,
+  // which reads process.env — pin it to the SAME database this script
+  // resolved, or they degrade to empty and a check passes on nothing.
+  process.env.NEXT_PUBLIC_SUPABASE_URL = url;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = key;
   const sb: SupabaseClient = createClient(url, key, { auth: { persistSession: false } });
   // A firm is known by its registered name and by the brand it prints (047).
   const firms = (((await sb.from("firms").select("*")).data ?? []) as { name: string; display_name?: string | null }[])

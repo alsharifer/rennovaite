@@ -16,7 +16,7 @@ export function firmDb(): SupabaseClient {
 /** A StoreError becomes its own status + code; anything else is a 500. */
 export function storeErrorResponse(e: unknown): NextResponse {
   if (e instanceof StoreError) {
-    return NextResponse.json({ success: false, error: e.message, code: e.code }, { status: e.status });
+    return NextResponse.json({ success: false, error: e.message, code: e.code, ...(e.details ?? {}) }, { status: e.status });
   }
   console.error("[api/firms]", e);
   return NextResponse.json(

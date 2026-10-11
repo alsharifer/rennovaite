@@ -34,7 +34,7 @@ export interface VocabularyItem {
    */
   reference:
     | { kind: "market"; rate_aed: number; unit: string; grade: string | null; provenance: string }
-    | { kind: "builtin"; how: "catalog" | "labour_book" | "allowance" | "element_def" }
+    | { kind: "builtin"; how: "catalog" | "labour_book" | "allowance" | "element_def"; /** H8: the single figure it prices at, where there is one. */ rate_aed?: number; unit?: string | null }
     | { kind: "none" };
 }
 

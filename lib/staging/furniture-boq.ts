@@ -15,6 +15,8 @@ import {
   TIER_VENDOR,
   type FurniturePriceBook,
 } from "./prices";
+import { lineTotal, money2, sumMoney } from "@/lib/boq/money";
+
 import type { StagingSet } from "./sets";
 
 /** The work-section label — also the exclusion key for contractor exports. */
@@ -72,7 +74,7 @@ export function buildFurnitureSection(
   for (const room of rooms) {
     for (const item of room.set) {
       const qty = item.qty && item.qty > 0 ? item.qty : 1;
-      const rate = priceFor(book, item.key, room.styleKey);
+      const rate = money2(priceFor(book, item.key, room.styleKey));
       if (rate <= 0) continue; // no indicative price → skip, never invent one
       lines.push({
         rule_id: `P7/furniture/${item.key}`,
@@ -80,7 +82,7 @@ export function buildFurnitureSection(
         quantity: qty,
         unit: "no",
         rate_aed: rate,
-        total_aed: rate * qty,
+        total_aed: lineTotal(qty, rate),
         vendor_or_source: TIER_VENDOR[tierForStyle(room.styleKey)],
         notes: "Indicative retail — not in contractor scope",
         rate_status: "indicative",
@@ -91,7 +93,7 @@ export function buildFurnitureSection(
 
   if (lines.length === 0) return null;
 
-  const section_total_aed = lines.reduce((s, l) => s + l.total_aed, 0);
+  const section_total_aed = sumMoney(lines.map((l) => l.total_aed));
   return {
     work_section: FURNITURE_SECTION_NAME,
     lines,

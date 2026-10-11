@@ -1,3 +1,4 @@
+import { lineTotal, money2 } from "@/lib/boq/money";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -54,7 +55,7 @@ describe("element sections resolve through the firm overlay (viewer flag on)", (
   it("a firm rate on a plaster item resolves tier-1 (firm_private)", () => {
     const line = plasterLine(p4(overlay([entry({})])));
     expect(line).toMatchObject({ rate_aed: 41.5, rate_tier: "firm_private", vendor_or_source: FIRM_RATE_LABEL, rate_band: "book" });
-    expect(line.total_aed).toBe(Math.round(line.quantity * 41.5));
+    expect(line.total_aed).toBe(lineTotal(line.quantity, 41.5));
   });
 
   it("a promoted correction answers tier-2 when the firm has no own rate", () => {
@@ -69,7 +70,7 @@ describe("element sections resolve through the firm overlay (viewer flag on)", (
     const moved = lines(firm).filter((l, i) => l.rate_aed !== lines(base)[i]!.rate_aed);
     expect(moved.map((l) => l.rule_id)).toEqual(["P4/quantify/wall_plaster"]);
     const plasterDelta = plasterLine(firm).total_aed - plasterLine(base).total_aed;
-    expect(firm.subtotal_aed - base.subtotal_aed).toBe(plasterDelta);
+    expect(money2(firm.subtotal_aed - base.subtotal_aed)).toBe(money2(plasterDelta));
   });
 
   it("no firm book → identical to the constant path (golden covers the bytes)", () => {

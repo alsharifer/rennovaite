@@ -167,6 +167,46 @@ try {
     check(`entry ${e.key} @ ${e.rate}`, await until(`!!document.querySelector('[data-item-key=${JSON.stringify(e.key)}]')`, 60000), await text('[data-testid="add-errors"]'));
   }
   await shot("book-entries");
+
+  console.log("\n2b. H8 — a second entry for an existing item supersedes the first");
+  await setValue('[aria-label="Item"]', "garden.pcc_base");
+  await sleep(150);
+  await setValue('[aria-label="Kind"]', "labour");
+  await setValue('[aria-label="Rate AED"]', "97");
+  check("the form says the entry it will replace before saving", await until(`(document.querySelector('[data-testid="replaces-hint"]')?.textContent ?? "").includes("95.5")`, 10000), await text('[data-testid="replaces-hint"]'));
+  await shot("h8-replaces-hint");
+  await clickByText("button", "Add entry");
+  check("one active garden.pcc_base row, at 97", await until(`document.querySelectorAll('[data-item-key="garden.pcc_base"]').length === 1 && (document.querySelector('[data-item-key="garden.pcc_base"]')?.textContent ?? "").includes("97")`, 60000), await text('[data-testid="add-errors"]'));
+  await click('[aria-label="History of garden.pcc_base"]');
+  check("the trail shows both: 97 active, 95.5 superseded by it", await until(`(() => { const rows = [...document.querySelectorAll('[data-history-for="garden.pcc_base"] [data-history-id]')]; return rows.length === 2 && rows.filter((r) => r.getAttribute("data-active") === "true").length === 1 && rows.some((r) => r.textContent.includes("95.5")) && rows.some((r) => r.textContent.includes("97")); })()`, 20000));
+  await shot("h8-supersede-trail");
+  const dbRows = (await sb.from("firm_rate_entries").select("rate_aed, superseded_at, retire_reason").eq("firm_id", firmId).eq("item_key", "garden.pcc_base")).data ?? [];
+  check("in the database: one active row, the other retired with its reason (051 index)", dbRows.filter((r) => !r.superseded_at).length === 1 && dbRows.some((r) => r.retire_reason === "superseded by a new entry"), JSON.stringify(dbRows));
+
+  console.log("\n2c. H8 — the synthetic quote: the pergola is held, the conversion offered");
+  const fixtureB64 = fs.readFileSync("lib/quotes/__fixtures__/synthetic-quote.xlsx").toString("base64");
+  const quoteId = await evaluate(`(async () => {
+    const bytes = Uint8Array.from(atob(${JSON.stringify(fixtureB64)}), (c) => c.charCodeAt(0));
+    const fd = new FormData();
+    fd.append("file", new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "synthetic-quote.xlsx");
+    for (const [k, v] of Object.entries({ supplier_label: "Example Supplier (synthetic)", supplier_role: "supplier", quote_ref: "WALK-H8-001", quote_date: "2026-10-01", valid_until: "2026-12-31", currency: "AED", vat_treatment: "excl", rates_are: "net", discount_pct: "0" })) fd.append(k, v);
+    const r = await fetch("/api/firms/${firmId}/quotes", { method: "POST", body: fd });
+    return (await r.json()).quote?.id ?? null;
+  })()`);
+  check("the synthetic quote uploaded from the member's session", !!quoteId, String(quoteId));
+  await goto(`${BASE}/firms/${firmId}/quotes/${quoteId}`);
+  await evaluate(`[...document.querySelectorAll("button")].find((b) => /^Confirm [0-9]+ suggestion/.test(b.textContent.trim()))?.click()`);
+  await until(`[...document.querySelectorAll('[data-testid="hold-reason"]')].some((n) => n.textContent.includes("17.9×"))`, 30000);
+  const heldText = await evaluate(`[...document.querySelectorAll('[data-testid="hold-reason"]')].map((n) => n.textContent).find((t) => t.includes("pergola") || t.includes("17.9")) ?? ""`);
+  check("the pergola line is HELD: rate is 17.9× the reference — check the unit", /17\.9× the reference — check the unit/.test(heldText), heldText);
+  check("the conversion is offered: 2,000.00 / m2 plan (24,500 ÷ 12.25)", await until(`(document.querySelector('[data-testid="apply-conversion"]')?.textContent ?? "").includes("2000.00")`, 10000), await text('[data-testid="apply-conversion"]'));
+  await shot("h8-pergola-held-conversion-offered");
+  await click('[data-testid="apply-conversion"]');
+  check("applied: the pergola line matches at 2,000 / m2 plan", await until(`(document.querySelector('[data-testid="conversion-note"]')?.textContent ?? "").includes("÷ 12.25")`, 30000), await text('[data-testid="conversion-note"]'));
+  await shot("h8-pergola-converted");
+  // Left in review: the book the later steps price from is the one built above.
+  await goto(`${BASE}/firms/${firmId}`);
+  await until(`document.querySelectorAll('[aria-label="Item"] option').length > 20`, 20000);
   await clickByText("button", "Mark reviewed");
   check("book marked Reviewed", await until(`(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Reviewed"`, 60000));
   await shot("book-reviewed");
@@ -274,7 +314,7 @@ try {
   const reportJson = JSON.parse(reportOut.slice(reportOut.indexOf("{"))); // the target banner precedes the JSON
   const firmRow = reportJson.firms?.[0];
   const villaRow = firmRow?.projects?.find((p) => p.project_id === villa);
-  check("report names the firm and the villa with a first-BoQ time, a checking time and the firm's rate-book entries", firmRow?.name === FIRM_NAME && villaRow?.name === DOC_NAME && villaRow.time_to_first_boq_min != null && villaRow.checking_min != null && firmRow.rate_book.entries === BOOK.length, `→1st BoQ ${villaRow?.time_to_first_boq_min} min · checking ${villaRow?.checking_min} min · entries ${firmRow?.rate_book?.entries} · saved ${SHOTS}/99-milestone-report.txt`);
+  check("report names the firm and the villa with a first-BoQ time, a checking time and the firm's rate-book entries", firmRow?.name === FIRM_NAME && villaRow?.name === DOC_NAME && villaRow.time_to_first_boq_min != null && villaRow.checking_min != null && firmRow.rate_book.entries === BOOK.length + 1, `→1st BoQ ${villaRow?.time_to_first_boq_min} min · checking ${villaRow?.checking_min} min · entries ${firmRow?.rate_book?.entries} · saved ${SHOTS}/99-milestone-report.txt`);
   check("the release that closes checking time carries the member's actor (the export they started)", villaRow?.gaps?.every((g) => !/first release carries no actor/.test(g)) === true, (villaRow?.gaps ?? []).join(" | ").slice(0, 200));
   console.log(report.split("\n").slice(0, 12).map((l) => "     " + l).join("\n"));
 } finally {

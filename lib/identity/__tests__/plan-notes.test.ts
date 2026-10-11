@@ -149,7 +149,8 @@ describe("I4 — curation never reaches the stored rows", () => {
 });
 
 describe("I4 — every plan-text route curates what it returns (static)", () => {
-  const ROUTES = ["plan-elements", "plan-context", "plan-fixtures", "plan-zones"];
+  // H7: plan-openings joins them — it returned raw rows.
+  const ROUTES = ["plan-elements", "plan-context", "plan-fixtures", "plan-zones", "plan-openings"];
   it.each(ROUTES)("app/api/%s returns no raw plan row", (r) => {
     const src = fs.readFileSync(path.join(process.cwd(), "app/api", r, "route.ts"), "utf8");
     expect(src).toMatch(/curatePlanRows?\(/);

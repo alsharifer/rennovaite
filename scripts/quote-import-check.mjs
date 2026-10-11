@@ -121,6 +121,15 @@ try {
   console.log("\n3. confirm suggestions, accept");
   const conf = await api("POST", `/api/firms/${firmId}/quotes/${quoteId}`, { action: "confirm_suggestions", min_score: 0.5 });
   check("confirm suggestions ≥ 0.5 (an explicit act)", conf.status === 200 && conf.body.confirmed >= 3, `${conf.body.confirmed} confirmed`);
+  // H8: the pergola (1 no at 24,500 matched to an item priced per m² plan) is
+  // HELD for its magnitude, with the dimension-based conversion offered.
+  const q0 = await api("GET", `/api/firms/${firmId}/quotes/${quoteId}`);
+  const perg = q0.body.lines.find((l) => /pergola/i.test(l.description));
+  check("H8: the pergola is held — 17.9× the reference, check the unit — and 2,000.00 / m2 plan is offered", perg?.status === "unmatched" && /17\.9× the reference — check the unit/.test(perg?.hold_reason ?? "") && perg?.conversion?.rate_aed === 2000, `${perg?.hold_reason} · offer ${perg?.conversion?.rate_aed}`);
+  const grass = q0.body.lines.find((l) => /grass/i.test(l.description));
+  check("H8: the grass line (3.1×) is held by the same rule", grass?.status === "unmatched" && /3\.1× the reference/.test(grass?.hold_reason ?? ""), grass?.hold_reason);
+  const conv = await api("PATCH", `/api/firms/${firmId}/quotes/${quoteId}/lines/${perg.id}`, { apply_conversion: true });
+  check("H8: applying the offer → 2,000.00 / m2 plan, the quoted 1 no kept, and the line matches", conv.status === 200 && conv.body.line?.status === "matched" && conv.body.line.rate_aed === 2000 && conv.body.line.qty === 1 && conv.body.line.unit_given === "no", JSON.stringify(conv.body.line ?? conv.body).slice(0, 160));
   const q1 = await api("GET", `/api/firms/${firmId}/quotes/${quoteId}`);
   const matched = q1.body.lines.filter((l) => l.status === "matched");
   check("matched lines carry the vocabulary unit/kind and a derived rate", matched.every((l) => l.unit && l.kind && l.rate_aed != null), matched.map((l) => `${l.item_key}=${l.rate_aed}/${l.unit}`).join(" "));

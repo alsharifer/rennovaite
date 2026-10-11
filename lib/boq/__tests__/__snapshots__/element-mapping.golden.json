@@ -2,6 +2,96 @@
   "mapped": {
     "sections": [
       {
+        "work_section": "Preliminaries",
+        "lines": [
+          {
+            "description": "Site setup, hoarding, protection, daily clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 12000,
+            "total_aed": 12000,
+            "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
+            "notes": "R-27: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-32/R-27",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "DM / DEWA permits and fees",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
+            "notes": "R-28: mid band (tier mid); lump sum per project",
+            "rule_id": "Q-33/R-28",
+            "kind": "lump",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Skip hire and waste disposal",
+            "quantity": 9,
+            "unit": "no",
+            "rate_aed": 1500,
+            "total_aed": 13500,
+            "vendor_or_source": "labour_rates: Skip hire and waste disposal",
+            "notes": "R-29: mid band (tier mid); F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips",
+            "rule_id": "Q-34/R-29",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
+            "description": "Protective floor covering over new tiling until handover",
+            "quantity": 199,
+            "unit": "m2",
+            "rate_aed": 8,
+            "total_aed": 1592,
+            "vendor_or_source": "allowance",
+            "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 199 m²",
+            "rule_id": "Q-35/R-37",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          },
+          {
+            "description": "Rolling scaffold hire — ceiling + painting works",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 2500,
+            "total_aed": 2500,
+            "vendor_or_source": "allowance",
+            "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-36/R-38",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          },
+          {
+            "description": "Final clearance + professional handover clean",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 1500,
+            "total_aed": 1500,
+            "vendor_or_source": "allowance",
+            "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
+            "rule_id": "Q-37/R-39",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
+          }
+        ],
+        "section_total_aed": 37092
+      },
+      {
         "work_section": "Blockwork",
         "lines": [
           {
@@ -29,7 +119,7 @@
             "quantity": 426.95,
             "unit": "m2",
             "rate_aed": 55,
-            "total_aed": 23482,
+            "total_aed": 23482.25,
             "vendor_or_source": "Deterministic take-off (P4)",
             "notes": "Aggregated from 63 element take-off items.",
             "rule_id": "P4/quantify/wall_plaster",
@@ -105,7 +195,7 @@
             "work_item_key": "wall_plaster"
           }
         ],
-        "section_total_aed": 23482
+        "section_total_aed": 23482.25
       },
       {
         "work_section": "Floor Finishes",
@@ -494,7 +584,7 @@
             "quantity": 43.29,
             "unit": "lm",
             "rate_aed": 85,
-            "total_aed": 3680,
+            "total_aed": 3679.65,
             "vendor_or_source": "allowance",
             "notes": "R-45: G10 — cove LED strip SUPPLY, AED 85/lm indicative (24V 14.4W/m COB strip + driver + profile, Dubai trade counter mid-2026). Complements R-31, which prices the cove LABOUR at 45/lm and explicitly assumes 'strips client-supplied' — this is the material that assumption left out. QS to confirm.; S6-02: Σ perimeter over 2 eligible room(s) (living/dining/majlis/master only), perimeter from area at aspect 1.3 = 43.29 lm",
             "rule_id": "S6-02/R-45",
@@ -519,7 +609,7 @@
             "rate_tier": "labour_book"
           }
         ],
-        "section_total_aed": 5080
+        "section_total_aed": 5079.65
       },
       {
         "work_section": "Decoration & Painting",
@@ -529,7 +619,7 @@
             "quantity": 426.95,
             "unit": "m2",
             "rate_aed": 35,
-            "total_aed": 14943,
+            "total_aed": 14943.25,
             "vendor_or_source": "Deterministic take-off (P4)",
             "notes": "Aggregated from 63 element take-off items.",
             "rule_id": "P4/quantify/wall_paint",
@@ -605,107 +695,17 @@
             "work_item_key": "wall_paint"
           }
         ],
-        "section_total_aed": 14943
-      },
-      {
-        "work_section": "Preliminaries",
-        "lines": [
-          {
-            "description": "Site setup, hoarding, protection, daily clean",
-            "quantity": 1,
-            "unit": "project",
-            "rate_aed": 12000,
-            "total_aed": 12000,
-            "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
-            "notes": "R-27: mid band (tier mid); lump sum per project",
-            "rule_id": "Q-32/R-27",
-            "kind": "lump",
-            "rate_band": "mid",
-            "wastage_pct": 0,
-            "rate_tier": "labour_book"
-          },
-          {
-            "description": "DM / DEWA permits and fees",
-            "quantity": 1,
-            "unit": "project",
-            "rate_aed": 6000,
-            "total_aed": 6000,
-            "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
-            "notes": "R-28: mid band (tier mid); lump sum per project",
-            "rule_id": "Q-33/R-28",
-            "kind": "lump",
-            "rate_band": "mid",
-            "wastage_pct": 0,
-            "rate_tier": "labour_book"
-          },
-          {
-            "description": "Skip hire and waste disposal",
-            "quantity": 9,
-            "unit": "no",
-            "rate_aed": 1500,
-            "total_aed": 13500,
-            "vendor_or_source": "labour_rates: Skip hire and waste disposal",
-            "notes": "R-29: mid band (tier mid); F-11: ceil(199 × 0.2 ÷ 4.5) = 9 skips",
-            "rule_id": "Q-34/R-29",
-            "kind": "labour",
-            "rate_band": "mid",
-            "wastage_pct": 0,
-            "rate_tier": "labour_book"
-          },
-          {
-            "description": "Protective floor covering over new tiling until handover",
-            "quantity": 199,
-            "unit": "m2",
-            "rate_aed": 8,
-            "total_aed": 1592,
-            "vendor_or_source": "allowance",
-            "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 199 m²",
-            "rule_id": "Q-35/R-37",
-            "kind": "allowance",
-            "rate_band": "allowance",
-            "wastage_pct": 0,
-            "rate_tier": "allowance"
-          },
-          {
-            "description": "Rolling scaffold hire — ceiling + painting works",
-            "quantity": 1,
-            "unit": "project",
-            "rate_aed": 2500,
-            "total_aed": 2500,
-            "vendor_or_source": "allowance",
-            "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
-            "rule_id": "Q-36/R-38",
-            "kind": "allowance",
-            "rate_band": "allowance",
-            "wastage_pct": 0,
-            "rate_tier": "allowance"
-          },
-          {
-            "description": "Final clearance + professional handover clean",
-            "quantity": 1,
-            "unit": "project",
-            "rate_aed": 1500,
-            "total_aed": 1500,
-            "vendor_or_source": "allowance",
-            "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
-            "rule_id": "Q-37/R-39",
-            "kind": "allowance",
-            "rate_band": "allowance",
-            "wastage_pct": 0,
-            "rate_tier": "allowance"
-          }
-        ],
-        "section_total_aed": 37092
+        "section_total_aed": 14943.25
       }
     ],
-    "subtotal_aed": 326673,
+    "subtotal_aed": 326673.15,
     "contingency_pct": 8,
-    "contingency_aed": 26134,
+    "contingency_aed": 26133.85,
     "vat_pct": 5,
-    "vat_aed": 17640,
-    "grand_total_aed": 370447,
+    "vat_aed": 17640.35,
+    "grand_total_aed": 370447.35,
     "engine": {
-      "version": "0.2.0",
+      "version": "0.3.0",
       "tier": "mid",
       "flooring": "porcelain",
       "style_key": "contemporary-majlis"
@@ -721,21 +721,21 @@
           "description": "Wet-area wall tiling — supply & install",
           "qty": 33.82,
           "unit": "m2",
-          "total_aed": 8793
+          "total_aed": 8793.2
         },
         {
           "work_item_key": "wall_plaster",
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 33.82,
           "unit": "m2",
-          "total_aed": 1860
+          "total_aed": 1860.1
         },
         {
           "work_item_key": "wall_paint",
           "description": "Wall painting — primer + 2 coats",
           "qty": 33.82,
           "unit": "m2",
-          "total_aed": 1184
+          "total_aed": 1183.7
         },
         {
           "work_item_key": "floor_finish",
@@ -755,21 +755,21 @@
     },
     {
       "room_id": "mbath-01",
-      "total_aed": 12426,
+      "total_aed": 12426.6,
       "items": [
         {
           "work_item_key": "wet_tiling",
           "description": "Wet-area wall tiling — supply & install",
           "qty": 33.82,
           "unit": "m2",
-          "total_aed": 8793
+          "total_aed": 8793.2
         },
         {
           "work_item_key": "wall_plaster",
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 23.66,
           "unit": "m2",
-          "total_aed": 1301
+          "total_aed": 1301.3
         },
         {
           "work_item_key": "floor_finish",
@@ -783,7 +783,7 @@
           "description": "Wall painting — primer + 2 coats",
           "qty": 23.66,
           "unit": "m2",
-          "total_aed": 828
+          "total_aed": 828.1
         },
         {
           "work_item_key": "ceiling_finish",
@@ -796,7 +796,7 @@
     },
     {
       "room_id": "bed4-01",
-      "total_aed": 11694,
+      "total_aed": 11694.2,
       "items": [
         {
           "work_item_key": "floor_finish",
@@ -810,7 +810,7 @@
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 59.18,
           "unit": "m2",
-          "total_aed": 3255
+          "total_aed": 3254.9
         },
         {
           "work_item_key": "ceiling_finish",
@@ -824,13 +824,13 @@
           "description": "Wall painting — primer + 2 coats",
           "qty": 59.18,
           "unit": "m2",
-          "total_aed": 2071
+          "total_aed": 2071.3
         }
       ]
     },
     {
       "room_id": "family-01",
-      "total_aed": 10877,
+      "total_aed": 10876.8,
       "items": [
         {
           "work_item_key": "floor_finish",
@@ -851,20 +851,20 @@
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 35.52,
           "unit": "m2",
-          "total_aed": 1954
+          "total_aed": 1953.6
         },
         {
           "work_item_key": "wall_paint",
           "description": "Wall painting — primer + 2 coats",
           "qty": 35.52,
           "unit": "m2",
-          "total_aed": 1243
+          "total_aed": 1243.2
         }
       ]
     },
     {
       "room_id": "terr-02",
-      "total_aed": 9509,
+      "total_aed": 9508.6,
       "items": [
         {
           "work_item_key": "floor_finish",
@@ -878,7 +878,7 @@
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 47.34,
           "unit": "m2",
-          "total_aed": 2604
+          "total_aed": 2603.7
         },
         {
           "work_item_key": "ceiling_finish",
@@ -892,13 +892,13 @@
           "description": "Wall painting — primer + 2 coats",
           "qty": 47.34,
           "unit": "m2",
-          "total_aed": 1657
+          "total_aed": 1656.9
         }
       ]
     },
     {
       "room_id": "bed3-01",
-      "total_aed": 9257,
+      "total_aed": 9256.8,
       "items": [
         {
           "work_item_key": "floor_finish",
@@ -912,7 +912,7 @@
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 43.12,
           "unit": "m2",
-          "total_aed": 2372
+          "total_aed": 2371.6
         },
         {
           "work_item_key": "ceiling_finish",
@@ -926,13 +926,13 @@
           "description": "Wall painting — primer + 2 coats",
           "qty": 43.12,
           "unit": "m2",
-          "total_aed": 1509
+          "total_aed": 1509.2
         }
       ]
     },
     {
       "room_id": "mbed-01",
-      "total_aed": 8651,
+      "total_aed": 8650.4,
       "items": [
         {
           "work_item_key": "floor_finish",
@@ -953,34 +953,34 @@
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 25.36,
           "unit": "m2",
-          "total_aed": 1395
+          "total_aed": 1394.8
         },
         {
           "work_item_key": "wall_paint",
           "description": "Wall painting — primer + 2 coats",
           "qty": 25.36,
           "unit": "m2",
-          "total_aed": 888
+          "total_aed": 887.6
         }
       ]
     },
     {
       "room_id": "toilet-01",
-      "total_aed": 8447,
+      "total_aed": 8446.7,
       "items": [
         {
           "work_item_key": "wet_tiling",
           "description": "Wet-area wall tiling — supply & install",
           "qty": 25.36,
           "unit": "m2",
-          "total_aed": 6594
+          "total_aed": 6593.6
         },
         {
           "work_item_key": "wall_plaster",
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 10.99,
           "unit": "m2",
-          "total_aed": 604
+          "total_aed": 604.45
         },
         {
           "work_item_key": "floor_finish",
@@ -994,7 +994,7 @@
           "description": "Wall painting — primer + 2 coats",
           "qty": 10.99,
           "unit": "m2",
-          "total_aed": 385
+          "total_aed": 384.65
         },
         {
           "work_item_key": "ceiling_finish",
@@ -1007,7 +1007,7 @@
     },
     {
       "room_id": "terr-01",
-      "total_aed": 7662,
+      "total_aed": 7661,
       "items": [
         {
           "work_item_key": "floor_finish",
@@ -1021,7 +1021,7 @@
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 38.9,
           "unit": "m2",
-          "total_aed": 2140
+          "total_aed": 2139.5
         },
         {
           "work_item_key": "ceiling_finish",
@@ -1035,27 +1035,27 @@
           "description": "Wall painting — primer + 2 coats",
           "qty": 38.9,
           "unit": "m2",
-          "total_aed": 1362
+          "total_aed": 1361.5
         }
       ]
     },
     {
       "room_id": "balc-01",
-      "total_aed": 6037,
+      "total_aed": 6036.4,
       "items": [
         {
           "work_item_key": "wall_plaster",
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 43.96,
           "unit": "m2",
-          "total_aed": 2418
+          "total_aed": 2417.8
         },
         {
           "work_item_key": "wall_paint",
           "description": "Wall painting — primer + 2 coats",
           "qty": 43.96,
           "unit": "m2",
-          "total_aed": 1539
+          "total_aed": 1538.6
         },
         {
           "work_item_key": "floor_finish",
@@ -1075,21 +1075,21 @@
     },
     {
       "room_id": "dress-01",
-      "total_aed": 4547,
+      "total_aed": 4546.9,
       "items": [
         {
           "work_item_key": "wall_plaster",
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 33.81,
           "unit": "m2",
-          "total_aed": 1860
+          "total_aed": 1859.55
         },
         {
           "work_item_key": "wall_paint",
           "description": "Wall painting — primer + 2 coats",
           "qty": 33.81,
           "unit": "m2",
-          "total_aed": 1183
+          "total_aed": 1183.35
         },
         {
           "work_item_key": "floor_finish",
@@ -1109,14 +1109,14 @@
     },
     {
       "room_id": "stair-01",
-      "total_aed": 2762,
+      "total_aed": 2762.1,
       "items": [
         {
           "work_item_key": "wall_plaster",
           "description": "Wall plaster / skim coat (net of openings)",
           "qty": 20.29,
           "unit": "m2",
-          "total_aed": 1116
+          "total_aed": 1115.95
         },
         {
           "work_item_key": "ceiling_finish",
@@ -1130,7 +1130,7 @@
           "description": "Wall painting — primer + 2 coats",
           "qty": 20.29,
           "unit": "m2",
-          "total_aed": 710
+          "total_aed": 710.15
         }
       ]
     },

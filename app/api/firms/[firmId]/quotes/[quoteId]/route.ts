@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
-import { acceptQuote, confirmSuggestions, getQuote } from "@/lib/quotes/store";
+import { acceptQuote, confirmSuggestions, reviewQuote } from "@/lib/quotes/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +39,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   const p = await ids(ctx);
   if (!p) return badRequest("Invalid firm or quote id.");
   try {
-    return NextResponse.json({ success: true, ...(await getQuote(firmDb(), p.firmId, p.quoteId, caller)) });
+    // H8: each line with the entry it would replace and any converted-rate offer.
+    return NextResponse.json({ success: true, ...(await reviewQuote(firmDb(), p.firmId, p.quoteId, caller)) });
   } catch (e) {
     return storeErrorResponse(e);
   }

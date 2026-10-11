@@ -39,7 +39,7 @@ export default async function StylePage({
             Pick a direction.
           </h1>
           <p className="max-w-[720px] font-body text-body-lg text-on-surface-variant">
-            We tuned six directions to Dubai villas and your AED 850k budget.
+            We tuned six directions to Dubai villas, priced against an AED 850k first-floor baseline.
             Each one comes with an indicative cost delta against a baseline
             finish.
           </p>

@@ -115,9 +115,17 @@ describe("firm rate book CRUD", () => {
     expect(validateEntry({ item_key: "floor.porcelain_material", unit: "m2", rate_aed: 1, kind: "supply" })).toEqual([]);
     // An item the market book cannot price is still a valid firm entry.
     expect(validateEntry({ item_key: "garden.deck", unit: "m2", rate_aed: 650, kind: "supply_and_install" })).toEqual([]);
-    // One entry per key/grade/origin.
-    await createEntry(db.client, firm.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 1, kind: "labour" }, alice);
-    await expectStoreError(createEntry(db.client, firm.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 2, kind: "labour" }, alice), 409);
+    // H8: ONE active entry per key/grade — a second entry SUPERSEDES the first (history kept).
+    const first = await createEntry(db.client, firm.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 96, kind: "labour" }, alice);
+    const second = await createEntry(db.client, firm.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 98.5, kind: "labour" }, alice);
+    const rows = db.tables.firm_rate_entries!.filter((e) => e.item_key === "garden.pcc_base");
+    expect(rows).toHaveLength(2);
+    expect(rows.find((e) => e.id === first.id)).toMatchObject({ superseded_by: second.id, retire_reason: "superseded by a new entry" });
+    expect(rows.filter((e) => !e.superseded_at).map((e) => e.id)).toEqual([second.id]);
+    // H8: a rate far outside the figure it shadows is refused unless confirmed — 105.60 is the PCC reference.
+    await expectStoreError(createEntry(db.client, firm.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 1, kind: "labour" }, alice), 409, "rate_outlier");
+    const kept = await createEntry(db.client, firm.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 1, kind: "labour", confirm_outlier: true }, alice);
+    expect(kept.rate_aed).toBe(1);
     referenceUnchanged();
   });
 
@@ -147,7 +155,7 @@ describe("U1 — who is asking", () => {
 
   it("signed out → 401 on every firm operation, before any firm is looked up", async () => {
     const A = await createFirm(db.client, { name: "Firm A" }, alice);
-    const e = await createEntry(db.client, A.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 1, kind: "labour" }, alice);
+    const e = await createEntry(db.client, A.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 100, kind: "labour" }, alice);
     const missing = "00000000-0000-4000-8000-00000000dead";
     await expectStoreError(listFirms(db.client, nobody), 401, "unauthenticated");
     await expectStoreError(createFirm(db.client, { name: "Anon Firm" }, nobody), 401, "unauthenticated");

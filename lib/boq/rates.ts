@@ -36,6 +36,7 @@ import {
   type RateTier,
 } from "@/lib/rates/tiers";
 
+import { money2 } from "./money";
 import { RATE_RULES, TIER_LABOUR_BAND, TIER_SKU_PERCENTILE, type RateRule } from "./rules";
 import type { LabourRate, PricingSku, Tier } from "./schema";
 
@@ -185,13 +186,14 @@ export class RateResolver {
 
   /** The rate this item_key would take with no user selection — the default. */
   resolveDefault(itemKey: string, unit: string): ResolvedRate {
-    return this.resolveBase(itemKey, unit);
+    return to2dp(this.resolveBase(itemKey, unit));
   }
 
+  /** H7: every resolved rate leaves here at 2 dp — before anything multiplies it. */
   resolve(itemKey: string, unit: string): ResolvedRate {
-    const base = this.resolveBase(itemKey, unit);
+    const base = to2dp(this.resolveBase(itemKey, unit));
     const chosen = this.accessories[itemKey];
-    return chosen ? applyAccessory(base, chosen) : base;
+    return chosen ? to2dp(applyAccessory(base, chosen)) : base;
   }
 
   /** Tiers 1–5, first answer wins. See the header and lib/rates/tiers.ts. */
@@ -387,13 +389,15 @@ export interface ElementRate {
 }
 export type ElementPricer = (workItemKey: string, unit: string) => ElementRate | null;
 
+const to2dp = (r: ResolvedRate): ResolvedRate => ({ ...r, rate_aed: money2(r.rate_aed) });
+
 export function elementPricer(firm: FirmOverlay | null | undefined, tier: Tier): ElementPricer {
   const grade = TIER_GRADE[tier] ?? "standard";
   return (key, unit) => {
     const hit = firm?.lookup(key, grade, unit);
     if (!hit) return null;
     return {
-      rate_aed: hit.entry.rate_aed,
+      rate_aed: money2(hit.entry.rate_aed),
       vendor_or_source:
         hit.tier !== "firm_private" ? FIRM_CORRECTION_LABEL : hit.entry.origin === "quote_import" ? FIRM_QUOTE_LABEL : FIRM_RATE_LABEL,
       rate_tier: hit.tier,

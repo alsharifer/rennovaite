@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { loadWithheldNames } from "@/lib/identity/curation";
+import { curatePlanRow, curatePlanRows, keepStoredText } from "@/lib/plan/curate-notes";
 import { DEFAULT_OPENING_DIMS } from "@/lib/plan/geometry";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -47,7 +49,10 @@ export async function GET(request: NextRequest) {
       console.warn("[api/plan-openings] GET degraded:", error.message);
       return NextResponse.json({ openings: [], degraded: true });
     }
-    return NextResponse.json({ openings: data ?? [] });
+    // H7 / I4: an opening's note or spec can name the firm that measured it —
+    // curated like every plan row (the select carries no free text today; this
+    // keeps it so if one is added).
+    return NextResponse.json({ openings: curatePlanRows(data ?? [], await loadWithheldNames(db(), access.projectId)) });
   } catch (err) {
     console.warn("[api/plan-openings] GET degraded:", err instanceof Error ? err.message : err);
     return NextResponse.json({ openings: [], degraded: true });
@@ -111,7 +116,7 @@ export async function POST(request: NextRequest) {
       .select(SELECT_COLS)
       .single();
     if (error || !data) throw error ?? new Error("Failed to create opening.");
-    return NextResponse.json({ opening: data, derived: dimsDefaulted });
+    return NextResponse.json({ opening: curatePlanRow(data, await loadWithheldNames(db(), access.projectId)), derived: dimsDefaulted });
   } catch (err) {
     console.error("[api/plan-openings] POST error", err);
     const message = err instanceof Error ? err.message : "Failed to create opening.";
@@ -189,6 +194,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "No fields to update." }, { status: 400 });
     }
 
+    // A string re-sent in its curated form goes back to the stored text.
+    const withheld = await loadWithheldNames(db(), access.projectId);
+    await keepStoredText(db(), "plan_openings", id, patch, withheld);
     const { data, error } = await db()
       .from("plan_openings")
       .update(patch)
@@ -196,7 +204,7 @@ export async function PATCH(request: NextRequest) {
       .select(SELECT_COLS)
       .single();
     if (error || !data) throw error ?? new Error("Failed to update opening.");
-    return NextResponse.json({ opening: data });
+    return NextResponse.json({ opening: curatePlanRow(data, withheld) });
   } catch (err) {
     console.error("[api/plan-openings] PATCH error", err);
     const message = err instanceof Error ? err.message : "Failed to update opening.";

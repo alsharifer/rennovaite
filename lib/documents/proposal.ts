@@ -18,6 +18,7 @@
 // =============================================================================
 
 import { assignRefs } from "@/lib/boq/refs";
+import { sortSections } from "@/lib/boq/section-order";
 import { esc } from "@/lib/drawings/sheet";
 import { formatAed } from "@/lib/format/aed";
 import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
@@ -47,7 +48,8 @@ export interface ProposalInput {
   boq: BoqPdfInput["boq"];
 }
 
-const aed = (n: number) => formatAed(n, "amount");
+// H7: the proposal's BoQ to the fils, like the firm's own BoQ PDF.
+const aed = (n: number) => formatAed(n, "money");
 
 /**
  * A BoQ description may carry a provenance aside for the firm's eyes —
@@ -155,7 +157,7 @@ export function buildProposalPages(input: ProposalInput): string[] {
   if (input.rooms.length) {
     scopeLines.push(`${input.rooms.length} area${input.rooms.length === 1 ? "" : "s"}: ${input.rooms.map((r) => `${r.name}${r.area_m2 != null ? ` (${Math.round(r.area_m2 * 10) / 10} m²)` : ""}`).join(", ")}.`);
   }
-  scopeLines.push(`${boq.sections.length} work sections, ${boq.sections.reduce((k, s) => k + s.lines.length, 0)} priced items: ${boq.sections.map((s) => `${s.work_section} (${aed(s.section_total_aed)})`).join(" · ")}.`);
+  scopeLines.push(`${boq.sections.length} work sections, ${boq.sections.reduce((k, s) => k + s.lines.length, 0)} priced items: ${sortSections(boq.sections).map((s) => `${s.work_section} (${aed(s.section_total_aed)})`).join(" · ")}.`);
   const g = boq.garden;
   if (g?.kept?.length) scopeLines.push(`Existing on site, kept and excluded from the works: ${g.kept.map((k) => k.name).join(", ")}.`);
   if (g?.removals?.length) scopeLines.push(`Existing on site, taken out: ${g.removals.map((r) => `${r.name} (${r.disposition})`).join(", ")}.`);
@@ -172,7 +174,7 @@ export function buildProposalPages(input: ProposalInput): string[] {
   // The BoQ at the firm's rates: REF, description, qty, unit, rate, total — no
   // source, no tier, no QS mark. Derived quantities keep their flag and note.
   const rows: Row[] = [];
-  for (const s of boq.sections) {
+  for (const s of sortSections(boq.sections)) {
     rows.push({ kind: "section", title: s.work_section });
     s.lines.forEach((l, idx) => {
       const note = derivedLineNote(l);

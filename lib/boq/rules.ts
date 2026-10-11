@@ -8,12 +8,17 @@
 // tables by scripts/boq-example.ts.
 // =============================================================================
 
-import type { PomiSection, Tier } from "./schema";
+import { POMI_SECTIONS, type PomiSection, type Tier } from "./schema";
+import { CANONICAL_SECTION_ORDER } from "./section-order";
 
 // v0.2.0 — calibrated against the real Villa 94 (Al Naseem F2, Mudon) signed
 // scope of work, tile BoQ, sanitary quotation, and Rev-00 shop drawings.
 // See docs/QS_PACK_VALIDATION.md for the full derivation of each correction.
-export const ENGINE_VERSION = "0.2.0";
+//
+// v0.3.0 (H7) — 2-dp rates at resolution, line totals round(qty × rate, 2),
+// contingency and VAT to the fils, the canonical section order. A revision
+// diff across 0.2.0 → 0.3.0 names that as the cause of the fils it moves.
+export const ENGINE_VERSION = "0.3.0";
 
 // --- C: dimensional constants (rule IDs C-xx) --------------------------------
 
@@ -520,26 +525,9 @@ export const HVAC_SERVICE_TYPES = new Set([
 ]);
 
 export type SectionOrder = Record<PomiSection, number>;
-export const SECTION_ORDER: readonly PomiSection[] = [
-  "Demolition",
-  "Blockwork",
-  "Plaster",
-  "Floor Finishes",
-  "Wall Finishes",
-  "Ceilings",
-  "Decoration & Painting",
-  "Joinery & Carpentry",
-  "Electrical",
-  "Plumbing",
-  "Sanitaryware",
-  "MEP / HVAC",
-  "Lighting",
-  "Preliminaries",
-  // G2/G3 landscape sections, ordered after the interior trades. A section with
-  // no lines is filtered out before rendering, so adding them changes nothing
-  // for an interior project.
-  "Hardscape & Structures",
-  "Soft Landscaping",
-  "Irrigation",
-  "Electrical & Lighting",
-];
+// H7: the engine's sections in THE canonical order (lib/boq/section-order.ts,
+// Preliminaries first) — the POMI sections the engine and garden take-off can
+// emit. It used to be its own list, with Preliminaries 14th.
+export const SECTION_ORDER: readonly PomiSection[] = CANONICAL_SECTION_ORDER.filter((s): s is PomiSection =>
+  (POMI_SECTIONS as readonly string[]).includes(s),
+);

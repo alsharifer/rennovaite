@@ -83,7 +83,9 @@ export function derivedTotal(amountAed: number, info: BoqDerivedInfo): HeadlineT
   const excludes = k > 0 ? `excludes ${k} line${k === 1 ? "" : "s"} to be priced` : null;
   const withExcludes = (text: string) => (excludes ? `${text} · ${excludes}` : text);
   if (info.derivedLines === 0 && !info.draft) {
-    const text = aed(amountAed);
+    // H7: a firm total is the chain to the fils — the figure a QS can rebuild
+    // from the rows above it. Only a draft keeps the labelled "≈ hundreds*".
+    const text = `AED ${formatAed(amountAed, "money")}`;
     return { text, headline: withExcludes(text), derived: false, footnote: null, excludes, excluded };
   }
   const n = info.derivedLines;

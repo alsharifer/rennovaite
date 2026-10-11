@@ -13,26 +13,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { assembleMappedSections, MAPPED_SECTIONS } from "./elements";
 import type { TakeoffItem } from "./quantify";
 import type { ElementPricer } from "./rates";
+import { rechain, type ChainedDoc } from "./totals";
 
-// POMI display order for a clean merged document.
-const POMI_ORDER = [
-  "Demolition",
-  "Blockwork",
-  "Plaster",
-  "Floor Finishes",
-  "Wall Finishes",
-  "Ceilings",
-  "Joinery & Carpentry",
-  "Sanitaryware",
-  "Electrical",
-  "Plumbing",
-  "MEP / HVAC",
-  "Lighting",
-  "Electrical Installations",
-  "Plumbing & Sanitary",
-  "Decoration & Painting",
-  "Preliminaries",
-];
+// H7: section order is the canonical one (lib/boq/section-order.ts), applied by rechain.
 
 interface BoqSectionLike {
   work_section: string;
@@ -47,11 +30,6 @@ interface BoqLike {
   vat_pct: number;
   vat_aed: number;
   grand_total_aed: number;
-}
-
-function orderIndex(section: string): number {
-  const i = POMI_ORDER.indexOf(section);
-  return i === -1 ? POMI_ORDER.length : i;
 }
 
 /**
@@ -77,27 +55,12 @@ export function applyElementMapping<T extends BoqLike>(boq: T, items: TakeoffIte
     const ff = mapped.find((m) => m.work_section === "Floor Finishes");
     if (ff) {
       ff.lines.push(...(stairTileLines as unknown as (typeof ff.lines)));
-      ff.section_total_aed += stairTileLines.reduce((s, l) => s + (l.total_aed ?? 0), 0);
     }
   }
 
   const kept = boq.sections.filter((s) => !MAPPED_SECTIONS.includes(s.work_section));
-  const sections = [...kept, ...(mapped as unknown as BoqSectionLike[])].sort(
-    (a, b) => orderIndex(a.work_section) - orderIndex(b.work_section),
-  );
-
-  const subtotal_aed = sections.reduce((s, x) => s + x.section_total_aed, 0);
-  const contingency_aed = Math.round((subtotal_aed * boq.contingency_pct) / 100);
-  const vat_aed = Math.round(((subtotal_aed + contingency_aed) * boq.vat_pct) / 100);
-
-  return {
-    ...boq,
-    sections,
-    subtotal_aed,
-    contingency_aed,
-    vat_aed,
-    grand_total_aed: subtotal_aed + contingency_aed + vat_aed,
-  } as T;
+  // H7: canonical order, section totals, subtotal and chain — all by rechain.
+  return rechain({ ...boq, sections: [...kept, ...(mapped as unknown as BoqSectionLike[])] } as unknown as ChainedDoc) as unknown as T;
 }
 
 /** Persist takeoff items for the project (best-effort; replaces prior items). */

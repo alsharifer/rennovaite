@@ -51,7 +51,19 @@ interface Line {
   status: "matched" | "unmatched" | "rejected" | "accepted";
   hold_reason: string | null;
   entry_id: string | null;
+  // H8 review aids.
+  unit_given?: string | null;
+  magnitude_ratio?: number | null;
+  reference_rate_aed?: number | null;
+  conversion_note?: string | null;
+  outlier_confirmed_at?: string | null;
+  replaces?: { id: string; rate_aed: number; unit: string; origin: string; created_at: string } | null;
+  conversion?: { rate_aed: number; quantity: number; unit: string; ratio: number | null; note: string } | null;
 }
+
+const ORIGIN_LABEL: Record<string, string> = { firm_entry: "typed entry", quote_import: "earlier quotation", promoted_correction: "promoted correction" };
+/** A hold the magnitude check made (the only kind a member can keep as quoted). */
+const isMagnitudeHold = (l: Line) => l.status === "unmatched" && !!l.hold_reason && /× the reference — check the unit/.test(l.hold_reason);
 
 const KIND_LABEL: Record<EntryKind, string> = { labour: "Labour", supply: "Supply", supply_and_install: "Supply & install", lump: "Lump" };
 const STATUS: Record<Line["status"], { label: string; cls: string }> = {
@@ -106,7 +118,11 @@ export function QuoteReview({ firmId, initialQuote, initialLines }: { firmId: st
         setBanner(b.error ?? `Update failed (${res.status}).`);
         return;
       }
-      setLines((ls) => ls.map((l) => (l.id === b.line!.id ? b.line! : l)));
+      // H8: re-read the review — the line's hold, offer and "replaces" all follow from the change.
+      const r = await fetch(`/api/firms/${firmId}/quotes/${quote.id}`, { cache: "no-store" });
+      const rb = (await r.json().catch(() => ({}))) as { lines?: Line[] };
+      if (r.ok && rb.lines) setLines(rb.lines);
+      else setLines((ls) => ls.map((l) => (l.id === b.line!.id ? b.line! : l)));
     } finally {
       setBusy(null);
     }
@@ -215,7 +231,8 @@ export function QuoteReview({ firmId, initialQuote, initialLines }: { firmId: st
                     <div className="text-ink-900">{l.description}</div>
                     <div className="font-mono text-[12px] text-ink-500">
                       {l.qty != null && `${l.qty} `}
-                      {l.unit ?? "—"}
+                      {/* H8: the unit as QUOTED — confirming an item sets `unit` to the item's. */}
+                      {l.unit_given ?? l.unit ?? "—"}
                       {l.item_key_given && ` · key given: ${l.item_key_given}`}
                     </div>
                   </td>
@@ -285,6 +302,16 @@ export function QuoteReview({ firmId, initialQuote, initialLines }: { firmId: st
                     ) : (
                       <span className="text-ink-500">—</span>
                     )}
+                    {l.conversion_note && (
+                      <div className="mt-xs max-w-[240px] text-[12px] text-ink-500" data-testid="conversion-note">
+                        converted: {l.conversion_note}
+                      </div>
+                    )}
+                    {l.replaces && (
+                      <div className="mt-xs text-[12px] text-ink-500" data-testid="replaces">
+                        replaces <span className="font-mono tabular-nums">{l.replaces.rate_aed.toFixed(2)}</span> / {l.replaces.unit} ({ORIGIN_LABEL[l.replaces.origin] ?? l.replaces.origin})
+                      </div>
+                    )}
                   </td>
                   <td className="py-sm pr-sm text-right">
                     {!ref || ref.kind === "none" ? (
@@ -303,6 +330,37 @@ export function QuoteReview({ firmId, initialQuote, initialLines }: { firmId: st
                     {l.hold_reason && l.status !== "accepted" && (
                       <div className="mt-xs max-w-[220px] text-[12px] text-error" data-testid="hold-reason">
                         {l.hold_reason}
+                      </div>
+                    )}
+                    {!readOnly && l.conversion && (
+                      <button
+                        type="button"
+                        onClick={() => patch(l, { apply_conversion: true })}
+                        disabled={busy === l.id}
+                        data-testid="apply-conversion"
+                        className="focus-ring mt-xs block max-w-[240px] rounded-lg border border-brass-600 px-sm py-[2px] text-left text-[12px] text-brass-600 hover:bg-brass-600 hover:text-paper"
+                        title={l.conversion.note}
+                      >
+                        Use <span className="font-mono tabular-nums">{l.conversion.rate_aed.toFixed(2)}</span> / {l.conversion.unit}
+                        <span className="block text-[11px] opacity-80">{l.conversion.note}</span>
+                      </button>
+                    )}
+                    {!readOnly && isMagnitudeHold(l) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Keep ${l.rate_aed} per ${l.unit} as quoted? It is ${l.magnitude_ratio}× the reference it replaces (${l.reference_rate_aed}). Your confirmation is recorded.`)) void patch(l, { confirm_outlier: true });
+                        }}
+                        disabled={busy === l.id}
+                        data-testid="confirm-outlier"
+                        className="focus-ring mt-xs block text-[12px] text-ink-500 hover:text-error"
+                      >
+                        keep as quoted…
+                      </button>
+                    )}
+                    {l.outlier_confirmed_at && l.status !== "accepted" && (
+                      <div className="mt-xs text-[12px] text-ink-500" data-testid="outlier-confirmed">
+                        outlier kept as quoted ({l.magnitude_ratio}×) — confirmed
                       </div>
                     )}
                     {!readOnly && l.status !== "rejected" && (

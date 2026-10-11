@@ -48,7 +48,7 @@ describe("promote-over-existing", () => {
 
     expect(rows()).toHaveLength(2); // nothing deleted
     const old = rows().find((r) => r.id === first.entry.id)!;
-    expect(old).toMatchObject({ superseded_by: second.entry.id, retired_by: alice.id, retire_reason: "superseded by a later promotion" });
+    expect(old).toMatchObject({ superseded_by: second.entry.id, retired_by: alice.id, retire_reason: "superseded by a promoted correction" });
     expect(old.superseded_at).toBeTruthy();
     expect(rows().find((r) => r.id === second.entry.id)).toMatchObject({ rate_aed: 91, created_by: alice.id, superseded_at: null, correction_id: "c2" });
     // Both corrections remain marked with the entry they produced.

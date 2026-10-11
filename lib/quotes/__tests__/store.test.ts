@@ -13,7 +13,7 @@ import { StoreError, assignProjectFirm, createEntry, createFirm, getFirmSummary,
 import { FIRM_QUOTE_LABEL } from "@/lib/rates/tiers";
 import { loadProjectFirmOverlay } from "@/lib/rates/firm";
 
-import { acceptQuote, confirmSuggestions, getQuote, importQuote, listQuotes, updateQuoteLine } from "../store";
+import { acceptQuote, confirmSuggestions, getQuote, importQuote, listQuotes, reviewQuote, updateQuoteLine } from "../store";
 
 // =============================================================================
 // U3 — template → import → review → accept, on the fake db:
@@ -135,17 +135,24 @@ describe("review → accept", () => {
     expect(lines.find((l) => /sign board/.test(l.description))!.item_key).toBeNull();
   });
 
-  it("accept touches no entry of another origin, and the overlay prefers a typed rate over an imported one", async () => {
-    const typed = await createEntry(db.client, A.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 77, kind: "labour" }, alice);
+  it("H8 — accept SUPERSEDES the active entry for the item (any origin), history kept; the overlay prices the import", async () => {
+    const typed = await createEntry(db.client, A.id, { item_key: "garden.pcc_base", unit: "m2", rate_aed: 96, kind: "labour" }, alice);
     await updateFirm(db.client, A.id, { status: "reviewed" }, alice);
     const { quote, lines } = await importQuote(db.client, A.id, alice, META, { name: "q.xlsx", bytes: FIXTURE });
     await updateQuoteLine(db.client, A.id, quote.id, lines[0]!.id, { item_key: "garden.pcc_base" }, alice);
-    await acceptQuote(db.client, A.id, quote.id, alice);
+    const review = await reviewQuote(db.client, A.id, quote.id, alice);
+    // The review names the entry the line will replace.
+    expect(review.lines[0]!.replaces).toMatchObject({ id: typed.id, rate_aed: 96, origin: "firm_entry" });
+    const res = await acceptQuote(db.client, A.id, quote.id, alice);
+    expect(res.superseded).toBe(1);
     const all = db.tables.firm_rate_entries!;
-    expect(all.find((e) => e.id === typed.id)).toMatchObject({ rate_aed: 77, superseded_at: null });
+    const imported = all.find((e) => e.origin === "quote_import" && e.item_key === "garden.pcc_base")!;
+    expect(all.find((e) => e.id === typed.id)).toMatchObject({ rate_aed: 96, superseded_by: imported.id });
+    expect(all.find((e) => e.id === typed.id)!.superseded_at).toBeTruthy();
+    expect(all.filter((e) => e.item_key === "garden.pcc_base" && !e.superseded_at)).toHaveLength(1);
     await assignProjectFirm(db.client, "p1", A.id, alice);
     const hit = (await loadProjectFirmOverlay(db.client, "p1")).lookup("garden.pcc_base", "standard", "m2");
-    expect(hit).toMatchObject({ tier: "firm_private", entry: { origin: "firm_entry", rate_aed: 77 } });
+    expect(hit).toMatchObject({ tier: "firm_private", entry: { origin: "quote_import", rate_aed: 98.5 } });
   });
 });
 

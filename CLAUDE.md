@@ -1674,6 +1674,105 @@ does).
 - **DB step**: `npm run db:push` for 050 **before** deploying the code — the
   membership read fails closed (500 `migration_required`) without the table.
 
+## BoQ numeric integrity + payload identity (H7)
+
+Every figure a QS sees multiplies out from the figures beside it.
+
+- **One rounding module** `lib/boq/money.ts`: `money2` (2 dp, half away from
+  zero, robust to binary representation), `lineTotal(qty, rate) =
+  money2(qty × money2(rate))`, `sumMoney` (exact in integer fils). Every
+  resolved rate is 2 dp **at resolution** (`RateResolver.resolve` /
+  `resolveDefault`, `elementPricer`, the garden book pick, overlays, joinery,
+  the LLM path, furniture); every producer's total is `lineTotal`. GL-14
+  pergola: book net 1,366.6928 (list × 0.88) → 1,366.69; 12.25 × 1,366.69 =
+  16,741.95 (was 16,741.99).
+- **The chain to the fils** (`lib/boq/totals.ts`): OH&P, contingency and VAT
+  each rounded ONCE to 2 dp; grand = subtotal + OH&P + contingency + VAT
+  exactly. **OH&P sits between the subtotal and contingency** (contingency and
+  VAT are both charged on it). **`rechain(boq)`** is the one way any producer
+  puts a document back together (canonical order, section totals, subtotal,
+  chain, OH&P kept if present) — the six copies of the chain arithmetic are gone.
+- **THE section order** `lib/boq/section-order.ts` (`CANONICAL_SECTION_ORDER`,
+  Preliminaries first; `SECTION_ORDER` in rules.ts derives from it). Applied by
+  `rechain` to every stored document and by `sortSections` on read in the BoQ
+  page, BoQ PDF, proposal, revision diff and the pricing fingerprint — so a
+  pre-H7 revision displays in the same order. Stable, whole sections only: REF
+  codes are per section, so none moves (asserted).
+- **Display**: `formatAed(n, "money")` (16,741.95) for line rates, line totals
+  and the summary rows on the page, PDF and proposal; a non-draft total prints
+  to the fils; a draft keeps its labelled "≈ AED N*" headline with the exact
+  chain beside it. `"money-delta"` for fils changes.
+- **Diff cause "H7 rounding"** (`isH7Rounding`, lib/boq/revision-diff.ts): only
+  when the RECORDS say so — the revisions' stored `engine.version` straddle
+  **0.3.0** (`ENGINE_VERSION`), the quantity is unchanged, the new rate is the
+  old one to 2 dp, the new total is qty × rate, and the move is within rounding
+  size. A total-only move is class `total` ("total moved (rounding)"), no
+  longer misfiled as `rate`.
+- **Budget**: a budget renders only when the CLIENT entered one
+  (`projects.budget_aed`) on a project with **no firm**. The old AED 850,000
+  was a platform default (`FALLBACK_BUDGET_AED`, BoQ + vendors pages; the intake
+  slider's initial value is never sent) and is gone from every "your budget";
+  the hub card says "No client budget recorded" instead of "of AED 0"; the style
+  page calls 850k a baseline.
+- **Payload identity** (with #88/#89): `plan-openings` curates its responses
+  too; `scripts/read-path-leak-scan.ts` pins process.env to its target (on dev
+  the plan + catalogue checks had degraded to empty); `scripts/document-identity-scan.mjs`
+  also scans the plan page, the hub and every plan-editor API response.
+- **Acceptance**: `lib/boq/__tests__/numeric-integrity.test.ts` (every line of
+  every fixture BoQ, the chain, the order, REF stability, 5,000 random cases).
+  Measured (dry-run, read-only): Arabella 116,679.07 → **116,679.56** (1 line,
+  the pergola −0.04); dev demo villa 498,824 → 498,823.06 (5 lines); prod Mudon
+  vs 5 Sep: 3 rounding lines (−0.36) beside H3's S6-pre lines, grand 738,529.00.
+
+## Rate-book integrity — magnitude hold + one active entry per item (H8)
+
+Found in the J0 export of the synthetic test firm; both would have hit firm #2
+on day one.
+
+- **Magnitude / unit hold** (`lib/firms/magnitude.ts`, pure): a firm rate is
+  checked against the figure it SHADOWS (`lib/firms/shadow-rate.ts`: the market
+  reference for a garden key; the `WORK_ITEM_DEF` constant for a P4 element key;
+  the allowance for an interior allowance rule; catalogue / labour-book keys have
+  no single figure and are not checked). Outside **0.33–3×** it is HELD with
+  "rate is N× the reference — check the unit". Where the description carries
+  dimensions that resolve to the item's unit ("pergola 3.5 x 3.5 m", 1 no, item
+  per m² plan) the converted rate is OFFERED (24,500 ÷ 12.25 = 2,000.00 / m² plan),
+  never applied. The J0 pergola had been ACCEPTED at 24,500 / m² plan (17.9×),
+  which would have priced Arabella's HRD-06 at 300,125.00 instead of 16,741.95.
+- **Quote review** (`assessLine` in `lib/quotes/store.ts` — the one place
+  confirm and accept compute a status): the hold, `PATCH …/lines/:id
+  { apply_conversion: true }` (rate, qty and unit converted, `conversion_note`
+  kept) and `{ confirm_outlier: true }` (keep as quoted — an explicit act, a
+  `rate_book_change` event `action: "outlier_confirmed"` with the ratio).
+  `reviewQuote` gives each line the entry it would `replaces` and the
+  `conversion` offer; the review screen shows both. Lines keep the sheet's
+  `unit_given` (confirming an item overwrites `unit`).
+- **Manual entries**: the same check on `POST /rates` and a figure-moving
+  `PATCH` — 409 `rate_outlier` with `{ ratio, reference_rate_aed }` unless
+  `confirm_outlier: true` (recorded). The editor warns live and offers "save
+  anyway". `/api/rate-vocabulary` now carries the built-in figure where there is
+  one (`reference.kind = "builtin"` + `rate_aed`).
+- **One active entry per (firm, item_key, grade)** — whatever the origin or
+  kind (the resolver ignores kind; two active kinds would be the same ambiguity).
+  Before H8 the 045 index included `origin`, so the J0 book had two active
+  `garden.pcc_base` (96.00 typed, 98.50 imported) and two `wall_plaster` (44.00
+  typed, 48.00 imported); the resolver priced the **typed** one of each
+  (`firm_entry` > `quote_import`), silently. Now a new entry SUPERSEDES the
+  active one (history kept), enforced by `firm_rate_entries_active_uidx` and
+  done in ONE transaction by `replace_firm_entry()` (migration **051**) — typed
+  entries, figure edits (a grade change also retires the edited row) and quote
+  accepts all go through `replaceEntry` (`lib/firms/store.ts`);
+  `promote_correction()` supersedes an active entry of any origin. 051 resolved
+  any existing duplicates to the resolver's winner. The review screen and the
+  add form say which entry a new one replaces.
+- **Checks**: `lib/firms/__tests__/magnitude.test.ts`,
+  `lib/quotes/__tests__/h8-magnitude.test.ts` (the J0 fixture end to end);
+  `scripts/quote-import-check.mjs` asserts the hold + conversion live; the
+  onboarding walkthrough adds the supersede trail and the held pergola.
+- **DB step**: `npm run db:push` for `051` **before** the code — without it
+  `replaceEntry` answers 500 `migration_required` (no silent fallback that could
+  create a second active row).
+
 ## Legal pages + the firm-#2 runbook (H6)
 
 - **`/privacy` and `/terms`** render `content/legal/privacy.md` / `terms.md` —

@@ -24,6 +24,8 @@ const EntrySchema = z.object({
   rate_aed: z.number().finite().nonnegative(),
   kind: z.enum(FIRM_ENTRY_KINDS),
   note: z.string().trim().max(500).nullable().optional(),
+  // H8: keep a rate outside 0.33–3× the figure it shadows (409 rate_outlier otherwise).
+  confirm_outlier: z.boolean().optional(),
 });
 
 type Ctx = { params: Promise<{ firmId: string }> };

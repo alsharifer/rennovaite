@@ -85,6 +85,9 @@ project and the firm (`PATCH /api/projects/:id { firm_id }` answers 403
    (prod Mudon's 5 Sep BoQ moves +AED 15,247 from the approved S6-pre lines —
    see CLAUDE.md "Pricing never depends on a flag (H3)"). Absorbing that drift
    now is what makes step 4's "unchanged" check mean something.
+   **Since H7 this baseline also absorbs the rounding change** (rates to 2 dp,
+   contingency and VAT to the fils, canonical section order): the diff names
+   those lines "H7 rounding". Step 4 runs AFTER it, so any movement there is a bug.
 3. **Attach.** There is no attach control yet. From the firm member's signed-in
    browser tab on the target (DevTools → Console):
 

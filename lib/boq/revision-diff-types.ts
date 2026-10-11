@@ -7,13 +7,15 @@
 // types from here.
 // =============================================================================
 
-export type DiffClass = "quantity" | "rate" | "both" | "added" | "removed";
-export type CauseKind = "correction" | "firm_rate" | "plan_edit" | "session_decision" | "regeneration";
+export type DiffClass = "quantity" | "rate" | "both" | "total" | "added" | "removed";
+export type CauseKind = "correction" | "firm_rate" | "plan_edit" | "session_decision" | "regeneration" | "engine_rounding";
 
 /** Human label for a class, shared by the view and the PDF. */
 export const DIFF_CLASS_LABEL: Record<DiffClass, string> = {
   quantity: "quantity moved",
   rate: "rate moved",
+  // H7: quantity and rate as printed are unchanged; only the total's rounding moved.
+  total: "total moved (rounding)",
   both: "quantity and rate moved",
   added: "added",
   removed: "removed",
@@ -25,4 +27,5 @@ export const CAUSE_KIND_LABEL: Record<CauseKind, string> = {
   plan_edit: "Plan edited",
   session_decision: "Session decision",
   regeneration: "BoQ regenerated",
+  engine_rounding: "H7 rounding",
 };

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { builtinShadowRate } from "@/lib/firms/shadow-rate";
 import { listVocabulary } from "@/lib/firms/vocabulary";
 import type { VocabularyItem } from "@/lib/firms/vocabulary-client";
 import { indexReference, loadReferenceRows, lookupCalibrated, lookupIndicative } from "@/lib/rates/reference";
@@ -44,7 +45,10 @@ export async function GET(request: NextRequest) {
           : { kind: "none" },
       };
     }
-    return { ...v, reference: { kind: "builtin", how: v.builtin ?? "catalog" } };
+    // H8: the one figure an element or allowance key prices at with no firm entry
+    // (catalogue and labour-book keys have none) — what the magnitude check reads.
+    const b = builtinShadowRate(v.item_key);
+    return { ...v, reference: { kind: "builtin", how: v.builtin ?? "catalog", ...(b ? { rate_aed: b.rate_aed, unit: b.unit } : {}) } };
   });
   return NextResponse.json({ success: true, items, count: items.length });
 }

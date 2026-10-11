@@ -105,7 +105,13 @@ export type RoomRollupView = {
 
 type Props = {
   projectId: string;
-  budgetAed: number;
+  /**
+   * H7: the CLIENT'S budget — present only when one was entered for an owner
+   * project. Null on a firm-attached project (budget headroom is an owner-
+   * journey idea) and when none was entered: a platform default is never shown
+   * as the client's budget.
+   */
+  budgetAed: number | null;
   boq: BoqPayload;
   lineOptions: Record<string, VendorOption[]>;
   byRoom?: RoomRollupView[];
@@ -370,7 +376,7 @@ export function BoqView({
   const derivedInfo = boqDerivedInfo(boq);
   const headline = derivedTotal(displayTotal, derivedInfo);
   const totalFootnote = headline.footnote;
-  const headroom = budgetAed - displayTotal;
+  const headroom = budgetAed == null ? 0 : budgetAed - displayTotal;
 
   // I4: the summary chain the table shows — the stored one, or the scenario's
   // (same arithmetic, lib/boq/totals.ts) when a what-if moved the subtotal.
@@ -409,7 +415,7 @@ export function BoqView({
         ["not the stored figure"],
       );
   const budgetProv = computedProvenance("Your budget", [
-    { kind: "source", label: "Project setting", detail: "The budget entered for this project (the platform default of AED 850,000 when none was entered)." },
+    { kind: "source", label: "Project setting", detail: "The budget entered for this project." },
   ]);
   const headroomProv = computedProvenance(headroom >= 0 ? "Headroom" : "Over budget", [
     { kind: "arith", label: "Budget − displayed total", detail: `${formatAed(budgetAed)} − ${formatAed(displayTotal)} = ${formatAed(headroom, "signed")}` },
@@ -569,21 +575,31 @@ export function BoqView({
               {totalFootnote}
             </p>
           )}
-          <p className="font-body-sm text-body-sm text-on-surface-variant">
-            against your <Figure value={budgetAed} provenance={budgetProv} /> budget —{" "}
-            <span
-              className={cn(
-                "font-semibold",
-                headroom >= 0 ? "text-tertiary" : "text-error",
-              )}
-            >
-              <Figure value={Math.abs(headroom)} provenance={headroomProv} />{" "}
-              {headroom >= 0 ? "headroom" : "over"}
-            </span>
+          {(budgetAed != null || adjustments.pct !== 0) && (
+          <p className="font-body-sm text-body-sm text-on-surface-variant" data-budget-headline={budgetAed != null ? "shown" : "hidden"}>
+            {/* H7: only the client's own entered budget, and never on a firm project. */}
+            {budgetAed != null && (
+              <>
+                against your <Figure value={budgetAed} provenance={budgetProv} /> budget —{" "}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    headroom >= 0 ? "text-tertiary" : "text-error",
+                  )}
+                >
+                  <Figure value={Math.abs(headroom)} provenance={headroomProv} />{" "}
+                  {headroom >= 0 ? "headroom" : "over"}
+                </span>
+              </>
+            )}
             {adjustments.pct !== 0 && (
               <>
-                {" "}
-                ·{" "}
+                {budgetAed != null && (
+                  <>
+                    {" "}
+                    ·{" "}
+                  </>
+                )}
                 <span className="text-ink-500">
                   base <Figure value={baseTotal} provenance={summaryProv?.grand ?? null} /> · adjusted{" "}
                   {adjustments.pct > 0 ? "+" : ""}
@@ -592,6 +608,7 @@ export function BoqView({
               </>
             )}
           </p>
+          )}
         </div>
 
         {/* Center: stacked bar */}
@@ -787,8 +804,15 @@ export function BoqView({
                       fontFamily: "var(--font-jetbrains-mono), monospace",
                     }}
                   >
-                    <Figure value={displayTotal} text={derivedTotal(displayTotal, derivedInfo).text} provenance={totalProv} />
+                    {/* H7: the table total is the chain to the fils; a draft keeps its
+                        labelled "≈" headline and shows the exact chain beside it. */}
+                    <Figure value={displayTotal} text={headline.derived ? headline.text : `AED ${formatAed(displayTotal, "money")}`} provenance={totalProv} />
                   </motion.span>
+                  {headline.derived && (
+                    <span className="mt-xs block font-mono text-[12px] tabular-nums text-ink-500" data-chain-total={displayTotal}>
+                      chain total AED {formatAed(displayTotal, "money")}
+                    </span>
+                  )}
                 </td>
                 <td colSpan={2} />
               </tr>
@@ -963,7 +987,7 @@ function SummaryRow({
   note,
   value,
   provenance,
-  format = "amount",
+  format = "money",
   strong = false,
   dataAttr,
 }: {
@@ -971,7 +995,7 @@ function SummaryRow({
   note?: string;
   value: number;
   provenance: FigureProvenance | null;
-  format?: "amount" | "signed";
+  format?: "money" | "amount" | "signed";
   strong?: boolean;
   dataAttr?: string;
 }) {
@@ -1170,10 +1194,10 @@ function FurnitureBlock({
                 {line.quantity}
               </td>
               <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-                <Figure value={line.rate_aed} format="rate" provenance={{ title: `Rate — ${line.description}`, steps: [{ kind: "tier", label: "Indicative", detail: "Indicative Dubai retail price for this piece at the style's tier." }, { kind: "source", label: "Retail tier", detail: line.vendor_or_source }, { kind: "qs", label: "QS validation", detail: "Indicative — not QS-validated." }], flags: ["indicative"], traceable: true }} />
+                <Figure value={line.rate_aed} format="money" provenance={{ title: `Rate — ${line.description}`, steps: [{ kind: "tier", label: "Indicative", detail: "Indicative Dubai retail price for this piece at the style's tier." }, { kind: "source", label: "Retail tier", detail: line.vendor_or_source }, { kind: "qs", label: "QS validation", detail: "Indicative — not QS-validated." }], flags: ["indicative"], traceable: true }} />
               </td>
               <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-                <Figure value={line.total_aed} format="amount" provenance={{ title: `Total — ${line.description}`, steps: [{ kind: "arith", label: "Quantity × rate", detail: `${fmtQty(line.quantity)} × ${formatAed(line.rate_aed, "rate")} = ${formatAed(line.total_aed, "amount")}` }], flags: ["indicative"], traceable: true }} />
+                <Figure value={line.total_aed} format="money" provenance={{ title: `Total — ${line.description}`, steps: [{ kind: "arith", label: "Quantity × rate", detail: `${fmtQty(line.quantity)} × ${formatAed(line.rate_aed, "money")} = ${formatAed(line.total_aed, "money")}` }], flags: ["indicative"], traceable: true }} />
               </td>
               <td className="px-md py-sm font-body-sm text-[12px] text-on-surface-variant">
                 <span className="line-clamp-2">{line.vendor_or_source}</span>
@@ -1375,10 +1399,10 @@ function LineRow({
           <Figure value={line.quantity} text={fmtQty(line.quantity)} provenance={prov?.quantity ?? null} />
         </td>
         <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-          <Figure value={line.rate_aed} format="rate" provenance={prov?.rate ?? null} />
+          <Figure value={line.rate_aed} format="money" provenance={prov?.rate ?? null} />
         </td>
         <td className="px-md py-sm text-right font-mono text-body-sm tabular-nums text-ink-900">
-          <Figure value={line.total_aed} format="rate" provenance={prov?.total ?? null} />
+          <Figure value={line.total_aed} format="money" provenance={prov?.total ?? null} />
         </td>
         <td className="px-md py-sm font-body-sm text-[12px] text-on-surface-variant">
           <span className="line-clamp-2">{line.vendor_or_source}</span>

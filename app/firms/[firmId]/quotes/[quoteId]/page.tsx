@@ -5,7 +5,7 @@ import { z } from "zod";
 import { AppShell } from "@/components/app/AppShell";
 import { getCaller } from "@/lib/auth/caller";
 import { StoreError } from "@/lib/firms/store";
-import { getQuote, type Quote, type QuoteLine } from "@/lib/quotes/store";
+import { reviewQuote, type LineReview, type Quote, type QuoteLine } from "@/lib/quotes/store";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { SignInCard } from "../../../_components/sign-in-card";
@@ -31,9 +31,10 @@ export default async function QuoteReviewPage({ params }: { params: Promise<{ fi
     );
   }
   let quote: Quote;
-  let lines: QuoteLine[];
+  let lines: (QuoteLine & LineReview)[];
   try {
-    ({ quote, lines } = await getQuote(getSupabaseAdmin() as unknown as SupabaseClient, firmId, quoteId, caller));
+    // H8: each line with the entry it would replace and any converted-rate offer.
+    ({ quote, lines } = await reviewQuote(getSupabaseAdmin() as unknown as SupabaseClient, firmId, quoteId, caller));
   } catch (e) {
     if (e instanceof StoreError && e.status === 404) notFound();
     if (e instanceof StoreError && e.status === 403) {

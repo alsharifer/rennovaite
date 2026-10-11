@@ -4,7 +4,12 @@ import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { Figure } from "@/components/figures/Figure";
+import { checkMagnitude } from "@/lib/firms/magnitude";
 import { ENTRY_KINDS, groupBySection, validateDraftAgainst, type EntryKind, type VocabularyItem } from "@/lib/firms/vocabulary-client";
+
+/** H8: the single figure an item shadows (market reference, or the built-in element / allowance constant). */
+const shadowFigure = (v: VocabularyItem | null | undefined): number | null =>
+  !v ? null : v.reference.kind === "market" ? v.reference.rate_aed : v.reference.kind === "builtin" ? (v.reference.rate_aed ?? null) : null;
 
 // =============================================================================
 // U2 — a firm's rate book: OH&P, status, and its entries, each shown beside
@@ -87,7 +92,9 @@ function inlineErrors(status: number, body: ApiError): string[] {
   if (status === 422 && body.error) return body.error.split(/;\s*/).filter(Boolean);
   if (status === 409 && body.code === "entry_locked") return [body.error ?? "This rate's figures come from its record and cannot be edited here."];
   if (status === 409 && body.code === "entry_retired") return ["This entry is already history."];
-  if (status === 409) return ["There is already an entry for this item at this grade — edit that one instead."];
+  // H8: a rate far from the figure it shadows needs an explicit "save anyway".
+  if (status === 409 && body.code === "rate_outlier") return [body.error ?? "This rate is far from the reference — check the unit."];
+  if (status === 409) return ["The book changed while you were editing — reload it."];
   if (status === 401) return ["Your session has ended — sign in again."];
   if (status === 403) return ["You are no longer a member of this firm."];
   return [body.error ?? `The request failed (${status}).`];
@@ -184,11 +191,19 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
     }));
     setDraftErrors([]);
   }
+  // H8: an outlier the server refused; the member may save it anyway (recorded).
+  const [addOutlier, setAddOutlier] = useState(false);
+  const draftMagnitude = useMemo(() => {
+    const r = Number(draft.rate_aed);
+    return draft.item_key && draft.rate_aed.trim() !== "" && Number.isFinite(r) ? checkMagnitude(r, shadowFigure(draftItem)) : null;
+  }, [draft, draftItem]);
+  // H8: the active entry this one would supersede (one active entry per item/grade).
+  const draftReplaces = draft.item_key ? (entries.find((e) => e.item_key === draft.item_key && (e.grade ?? null) === (draft.grade || null)) ?? null) : null;
   const liveErrors = useMemo(() => {
     if (!draft.item_key) return [];
     return validateDraftAgainst(draftItem, { item_key: draft.item_key, unit: draft.unit, kind: draft.kind, rate_aed: Number(draft.rate_aed) });
   }, [draft, draftItem]);
-  async function add() {
+  async function add(confirmOutlier = false) {
     const errs = [...(draft.item_key ? [] : ["Choose an item."]), ...(draft.rate_aed.trim() === "" ? ["Enter a rate."] : []), ...liveErrors];
     if (errs.length) {
       setDraftErrors(errs);
@@ -207,13 +222,16 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
           kind: draft.kind,
           rate_aed: Number(draft.rate_aed),
           note: draft.note.trim() || null,
+          ...(confirmOutlier ? { confirm_outlier: true } : {}),
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { entry?: Entry } & ApiError;
       if (!res.ok || !body.entry) {
         setDraftErrors(inlineErrors(res.status, body));
+        setAddOutlier(res.status === 409 && body.code === "rate_outlier");
         return;
       }
+      setAddOutlier(false);
       setDraft(EMPTY);
       await refresh();
     } finally {
@@ -226,12 +244,13 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
   const [edit, setEdit] = useState<{ rate_aed: string; kind: EntryKind; grade: Grade | ""; note: string }>({ rate_aed: "", kind: "labour", grade: "", note: "" });
   const [editErrors, setEditErrors] = useState<string[]>([]);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [editOutlier, setEditOutlier] = useState(false);
   function startEdit(e: Entry) {
     setEditing(e.id);
     setEdit({ rate_aed: String(e.rate_aed), kind: e.kind, grade: e.grade ?? "", note: e.note ?? "" });
     setEditErrors([]);
   }
-  async function saveEdit(e: Entry) {
+  async function saveEdit(e: Entry, confirmOutlier = false) {
     const item = byKey.get(e.item_key) ?? null;
     const errs = validateDraftAgainst(item, { item_key: e.item_key, unit: e.unit, kind: edit.kind, rate_aed: Number(edit.rate_aed) });
     if (edit.rate_aed.trim() === "") errs.unshift("Enter a rate.");
@@ -245,13 +264,15 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
       const res = await fetch(`/api/firms/${firmId}/rates/${e.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ rate_aed: Number(edit.rate_aed), kind: edit.kind, grade: edit.grade || null, note: edit.note.trim() || null }),
+        body: JSON.stringify({ rate_aed: Number(edit.rate_aed), kind: edit.kind, grade: edit.grade || null, note: edit.note.trim() || null, ...(confirmOutlier ? { confirm_outlier: true } : {}) }),
       });
       const body = (await res.json().catch(() => ({}))) as { entry?: Entry } & ApiError;
       if (!res.ok || !body.entry) {
         setEditErrors(inlineErrors(res.status, body));
+        setEditOutlier(res.status === 409 && body.code === "rate_outlier");
         return;
       }
+      setEditOutlier(false);
       setEditing(null);
       await refresh();
     } finally {
@@ -506,6 +527,11 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
                           ))}
                         </ul>
                       )}
+                      {isEditing && editOutlier && (
+                        <button type="button" onClick={() => saveEdit(e, true)} disabled={rowBusy === e.id} data-testid="edit-confirm-outlier" className="focus-ring mt-xs block text-[12px] text-ink-500 hover:text-error">
+                          save anyway — my confirmation is recorded
+                        </button>
+                      )}
                     </td>
                   </tr>
                   {trail && (
@@ -645,7 +671,7 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
             <input value={draft.note} onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))} aria-label="Note" className="focus-ring mt-xs w-full rounded border border-ink-100 bg-paper px-sm py-xs text-body-sm text-ink-900" />
           </label>
           <div className="flex items-end md:col-span-1">
-            <button type="button" onClick={add} disabled={adding || !vocab} className="focus-ring w-full rounded-lg bg-brass-600 px-md py-xs text-body-sm font-semibold text-white disabled:opacity-50">
+            <button type="button" onClick={() => add()} disabled={adding || !vocab} className="focus-ring w-full rounded-lg bg-brass-600 px-md py-xs text-body-sm font-semibold text-white disabled:opacity-50">
               {adding ? "Adding…" : "Add entry"}
             </button>
           </div>
@@ -662,7 +688,24 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
             ) : (
               "no reference rate (a QS-to-price item)"
             )}
+            {draftItem.reference.kind === "builtin" && draftItem.reference.rate_aed != null && (
+              <>
+                {" "}
+                <span className="font-mono tabular-nums">AED {draftItem.reference.rate_aed} / {draftItem.reference.unit ?? draftItem.unit}</span>
+              </>
+            )}
             {" · "}accepts {draftItem.kinds.map((k) => KIND_LABEL[k]).join(" / ")}
+          </p>
+        )}
+        {draftMagnitude?.outlier && (
+          <p className="mt-xs text-[12px] font-semibold text-[#9A3412]" data-testid="magnitude-warning">
+            {draftMagnitude.reason}
+          </p>
+        )}
+        {draftReplaces && (
+          <p className="mt-xs text-[12px] text-ink-500" data-testid="replaces-hint">
+            Saving replaces the current entry —{" "}
+            <span className="font-mono tabular-nums">AED {draftReplaces.rate_aed} / {draftReplaces.unit}</span> ({ORIGIN_LABEL[draftReplaces.origin]}); it stays in the item&apos;s history.
           </p>
         )}
         {(draftErrors.length > 0 || (draft.item_key && liveErrors.length > 0)) && (
@@ -671,6 +714,11 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
               <li key={m}>{m}</li>
             ))}
           </ul>
+        )}
+        {addOutlier && (
+          <button type="button" onClick={() => add(true)} disabled={adding} data-testid="add-confirm-outlier" className="focus-ring mt-xs text-[12px] text-ink-500 hover:text-error">
+            Save anyway — my confirmation is recorded
+          </button>
         )}
       </section>
     </div>

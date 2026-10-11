@@ -1,3 +1,4 @@
+import { money2, sumMoney } from "@/lib/boq/money";
 import { describe, expect, it } from "vitest";
 
 import { generateDeterministicBoq } from "@/lib/boq/engine";
@@ -195,10 +196,11 @@ describe("OH&P (L1) — its own line, never in a rate", () => {
     const base = priced();
     const withOhp = applyOhp(priced(), 12);
     expect(withOhp.ohp_pct).toBe(12);
-    expect(withOhp.ohp_aed).toBe(Math.round(base.subtotal_aed * 0.12));
+    // H7: each component to the fils, the grand total their exact sum.
+    expect(withOhp.ohp_aed).toBe(money2(base.subtotal_aed * 0.12));
     expect(withOhp.subtotal_aed).toBe(base.subtotal_aed);
-    expect(withOhp.contingency_aed).toBe(Math.round(((base.subtotal_aed + withOhp.ohp_aed!) * base.contingency_pct) / 100));
-    expect(withOhp.grand_total_aed).toBe(withOhp.subtotal_aed + withOhp.ohp_aed! + withOhp.contingency_aed + withOhp.vat_aed);
+    expect(withOhp.contingency_aed).toBe(money2(((base.subtotal_aed + withOhp.ohp_aed!) * base.contingency_pct) / 100));
+    expect(withOhp.grand_total_aed).toBe(sumMoney([withOhp.subtotal_aed, withOhp.ohp_aed!, withOhp.contingency_aed, withOhp.vat_aed]));
     // Never baked into a rate: every line is untouched.
     expect(JSON.stringify(withOhp.sections)).toBe(JSON.stringify(base.sections));
   });

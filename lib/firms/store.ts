@@ -36,6 +36,8 @@ import type { RateGrade } from "@/lib/rates/reference";
 
 import { recordPilotEvent } from "@/lib/pilot/events";
 
+import { checkMagnitude } from "./magnitude";
+import { loadShadowRates } from "./shadow-rate";
 import { itemVocabulary, validateEntry } from "./vocabulary";
 
 import { StoreError } from "@/lib/store-error";
@@ -328,6 +330,8 @@ export interface EntryInput {
   rate_aed: number;
   kind: FirmEntryKind;
   note?: string | null;
+  /** H8: keep a rate outside 0.33–3× the figure it shadows (an explicit act, recorded). */
+  confirm_outlier?: boolean;
 }
 
 /** The firm's ACTIVE entries (U3: a superseded entry is history, listed nowhere the book is edited). */
@@ -351,45 +355,105 @@ function assertValid(d: { item_key: string; unit: string; kind: FirmEntryKind; r
   if (errors.length > 0) throw new StoreError(422, "invalid_entry", errors.join("; "));
 }
 
-async function insertEntry(
-  db: SupabaseClient,
-  firmId: string,
-  input: EntryInput & { origin: "firm_entry"; created_by: string | null },
-): Promise<FirmRateEntry> {
+export interface ReplaceInput {
+  item_key: string;
+  grade: RateGrade | null;
+  unit: string;
+  rate_aed: number;
+  kind: FirmEntryKind | string;
+  origin: "firm_entry" | "quote_import";
+  note: string | null;
+  actor: string | null;
+  /** Why the entry this one replaces is retired (kept on the old row). */
+  retire_reason: string;
+  quote_id?: string | null;
+  quote_line_id?: string | null;
+  /** An edit that moves an entry to another grade also retires the row it edits. */
+  also_retire?: string | null;
+  also_reason?: string | null;
+}
+
+/**
+ * H8 — ONE active entry per item/grade. Every way an entry enters a book (a
+ * typed entry, an edit, a quote accept) supersedes the active entry for its
+ * item/grade — whatever that entry's origin or kind — and inserts the new one
+ * in ONE transaction (migration 051, replace_firm_entry), so a failed insert
+ * can never leave the item with no active rate. History is kept on the old
+ * row (superseded_at / superseded_by / retired_by / retire_reason).
+ */
+export async function replaceEntry(db: SupabaseClient, firmId: string, input: ReplaceInput): Promise<{ entry: FirmRateEntry; superseded: string | null }> {
+  const { data, error } = await db.rpc("replace_firm_entry", {
+    p_firm_id: firmId,
+    p_item_key: input.item_key,
+    p_grade: input.grade ?? null,
+    p_unit: input.unit,
+    p_rate: input.rate_aed,
+    p_kind: input.kind,
+    p_origin: input.origin,
+    p_note: input.note,
+    p_actor: input.actor,
+    p_retire_reason: input.retire_reason,
+    p_quote_id: input.quote_id ?? null,
+    p_quote_line_id: input.quote_line_id ?? null,
+    p_correction_id: null,
+    p_also_retire: input.also_retire ?? null,
+    p_also_reason: input.also_reason ?? null,
+  });
+  if (error) {
+    if (error.code === "42883" || error.code === "PGRST202" || /replace_firm_entry/.test(error.message ?? "")) {
+      throw new StoreError(500, "migration_required", "The rate book needs migration 051 (one active entry per item) — apply it with npm run db:push.");
+    }
+    if (/entry_retired/.test(error.message ?? "")) throw new StoreError(409, "entry_retired", "This entry was changed by someone else; reload the book.");
+    fail(error, `entry ${input.item_key}${input.grade ? `/${input.grade}` : ""} (${input.origin})`);
+  }
+  const r = data as { entry_id: string; superseded_entry_id: string | null };
+  return { entry: await readEntry(db, firmId, r.entry_id), superseded: r.superseded_entry_id ?? null };
+}
+
+/**
+ * H8 — the magnitude check on a typed rate: outside 0.33–3× the figure it
+ * shadows it is refused with 409 `rate_outlier` (the ratio and the reference
+ * in the answer), unless the member confirms it — which is recorded.
+ */
+async function checkEntryMagnitude(db: SupabaseClient, input: { item_key: string; unit: string; rate_aed: number }, confirmed: boolean): Promise<{ ratio: number; reference_rate_aed: number } | null> {
+  const shadow = (await loadShadowRates(db, [input.item_key])).get(input.item_key) ?? null;
+  const ref = shadow && (shadow.unit == null || shadow.unit === input.unit) ? shadow.rate_aed : null;
+  const m = checkMagnitude(input.rate_aed, ref);
+  if (!m?.outlier || ref == null) return null;
+  if (!confirmed) {
+    throw new StoreError(409, "rate_outlier", `${m.reason}: ${input.rate_aed} per ${input.unit} against ${ref}. Confirm to keep it.`, {
+      ratio: m.ratio,
+      reference_rate_aed: ref,
+    });
+  }
+  return { ratio: m.ratio, reference_rate_aed: ref };
+}
+
+export async function createEntry(db: SupabaseClient, firmId: string, input: EntryInput, caller: Caller | null): Promise<FirmRateEntry> {
+  await requireFirm(db, firmId, caller);
   assertValid(input);
-  const book = await ensureBook(db, firmId);
-  const row = {
-    book_id: book.id,
-    firm_id: firmId,
+  const outlier = await checkEntryMagnitude(db, input, input.confirm_outlier === true);
+  await ensureBook(db, firmId);
+  const { entry, superseded } = await replaceEntry(db, firmId, {
     item_key: input.item_key,
     grade: input.grade ?? null,
     unit: input.unit,
     rate_aed: input.rate_aed,
     kind: input.kind,
-    origin: input.origin,
-    correction_id: null,
+    origin: "firm_entry",
     note: input.note ?? null,
-    created_by: input.created_by,
-  };
-  let res = await db.from("firm_rate_entries").insert(row).select(FIRM_ENTRY_COLUMNS).single();
-  if (res.error && isMissingSchema(res.error)) {
-    // Pre-046: no created_by column yet.
-    const { created_by: _drop, ...pre046 } = row;
-    void _drop;
-    res = await db.from("firm_rate_entries").insert(pre046).select(FIRM_ENTRY_COLUMNS_PRE045).single();
-  }
-  if (res.error) fail(res.error, `entry ${input.item_key}${input.grade ? `/${input.grade}` : ""} (${input.origin})`);
-  return toFirmEntry(res.data as Record<string, unknown>);
-}
-
-export async function createEntry(db: SupabaseClient, firmId: string, input: EntryInput, caller: Caller | null): Promise<FirmRateEntry> {
-  await requireFirm(db, firmId, caller);
-  const entry = await insertEntry(db, firmId, { ...input, origin: "firm_entry", created_by: caller!.id });
+    actor: caller!.id,
+    retire_reason: "superseded by a new entry",
+  });
   await touchBook(db, firmId);
   // L5: a rate-book change is a firm event (no project).
-  await recordPilotEvent(db, null, "rate_book_change", { action: "entry", item_key: entry.item_key, grade: entry.grade, entry_id: entry.id }, { actor: caller!.id, firmId });
+  await recordPilotEvent(db, null, "rate_book_change", { action: "entry", item_key: entry.item_key, grade: entry.grade, entry_id: entry.id, superseded_entry_id: superseded }, { actor: caller!.id, firmId });
+  if (outlier) {
+    await recordPilotEvent(db, null, "rate_book_change", { action: "outlier_confirmed", item_key: entry.item_key, grade: entry.grade, entry_id: entry.id, rate_aed: entry.rate_aed, unit: entry.unit, reference_rate_aed: outlier.reference_rate_aed, ratio: outlier.ratio }, { actor: caller!.id, firmId });
+  }
   return entry;
 }
+
 
 /** Origins whose figures are DERIVED from another record and must not drift from it (U4). */
 const LOCKED_ORIGINS = new Set(["promoted_correction", "quote_import"]);
@@ -454,7 +518,7 @@ export async function updateEntry(
   db: SupabaseClient,
   firmId: string,
   entryId: string,
-  patch: Partial<Pick<EntryInput, "rate_aed" | "unit" | "kind" | "grade" | "note">>,
+  patch: Partial<Pick<EntryInput, "rate_aed" | "unit" | "kind" | "grade" | "note" | "confirm_outlier">>,
   caller: Caller | null,
 ): Promise<FirmRateEntry> {
   await requireFirm(db, firmId, caller);
@@ -474,7 +538,8 @@ export async function updateEntry(
       );
     }
   }
-  const next = { ...current, ...patch };
+  const { confirm_outlier, ...figures } = patch;
+  const next = { ...current, ...figures };
   assertValid(next);
   // UV: a FIGURE edit (rate / unit / kind / grade) is a rate movement, and the
   // revision diff and the history row name a movement only from a record — so
@@ -482,11 +547,11 @@ export async function updateEntry(
   // figure it carried, a new row takes the book, and a rate_book_change event
   // is written. Editing in place had left no trail and no cause. A note-only
   // edit stays in place (a note is not a figure).
-  const figureKeys = (["rate_aed", "unit", "kind", "grade"] as const).filter((k) => patch[k] !== undefined && patch[k] !== current[k]);
+  const figureKeys = (["rate_aed", "unit", "kind", "grade"] as const).filter((k) => figures[k] !== undefined && figures[k] !== current[k]);
   if (figureKeys.length === 0) {
     const { data, error } = await db
       .from("firm_rate_entries")
-      .update({ ...patch, updated_at: new Date().toISOString() })
+      .update({ ...figures, updated_at: new Date().toISOString() })
       .eq("id", entryId)
       .eq("firm_id", firmId)
       .select(FIRM_ENTRY_COLUMNS)
@@ -496,30 +561,27 @@ export async function updateEntry(
     await touchBook(db, firmId);
     return toFirmEntry(data as Record<string, unknown>);
   }
-  const now = new Date().toISOString();
+  // H8: a moved figure is checked like a new entry.
+  const outlier = figures.rate_aed !== undefined || figures.unit !== undefined ? await checkEntryMagnitude(db, next, confirm_outlier === true) : null;
   const was = `was ${current.rate_aed} per ${current.unit}${current.grade ? ` (${current.grade})` : ""}`;
   const { data: noteRow } = await db.from("firm_rate_entries").select("note").eq("id", entryId).eq("firm_id", firmId).maybeSingle<{ note: string | null }>();
-  const retired = await db
-    .from("firm_rate_entries")
-    .update({ superseded_at: now, retired_by: caller!.id, retire_reason: `edited by a member — ${was}`, updated_at: now })
-    .eq("id", entryId)
-    .eq("firm_id", firmId)
-    .is("superseded_at", null)
-    .select("id")
-    .maybeSingle();
-  if (retired.error) fail(retired.error, "retire edited entry");
-  if (!retired.data) throw new StoreError(409, "entry_retired", "This entry was changed by someone else; reload the book.");
-  const entry = await insertEntry(db, firmId, {
+  const sameGrade = (next.grade ?? null) === (current.grade ?? null);
+  // H8: ONE transaction — the edited row is retired with the figure it carried
+  // and the new row takes the book; a grade change also supersedes whatever is
+  // active at the new grade.
+  const { entry } = await replaceEntry(db, firmId, {
     item_key: current.item_key,
     grade: next.grade ?? null,
     unit: next.unit,
     rate_aed: next.rate_aed,
     kind: next.kind,
-    note: patch.note !== undefined ? patch.note : (noteRow?.note ?? null),
     origin: "firm_entry",
-    created_by: caller!.id,
+    note: figures.note !== undefined ? (figures.note ?? null) : (noteRow?.note ?? null),
+    actor: caller!.id,
+    retire_reason: sameGrade ? `edited by a member — ${was}` : "superseded by an edited entry",
+    also_retire: sameGrade ? null : entryId,
+    also_reason: sameGrade ? null : `edited by a member — ${was}`,
   });
-  await db.from("firm_rate_entries").update({ superseded_by: entry.id }).eq("id", entryId).eq("firm_id", firmId).then(() => undefined, () => undefined);
   await touchBook(db, firmId);
   await recordPilotEvent(
     db,
@@ -528,6 +590,9 @@ export async function updateEntry(
     { action: "edit", item_key: entry.item_key, grade: entry.grade, entry_id: entry.id, superseded_entry_id: entryId, fields: figureKeys, from_rate_aed: current.rate_aed, to_rate_aed: entry.rate_aed },
     { actor: caller!.id, firmId },
   );
+  if (outlier) {
+    await recordPilotEvent(db, null, "rate_book_change", { action: "outlier_confirmed", item_key: entry.item_key, grade: entry.grade, entry_id: entry.id, rate_aed: entry.rate_aed, unit: entry.unit, reference_rate_aed: outlier.reference_rate_aed, ratio: outlier.ratio }, { actor: caller!.id, firmId });
+  }
   return entry;
 }
 
