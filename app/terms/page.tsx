@@ -13,7 +13,7 @@ const doc = loadLegalDocument("terms");
 const published = doc.meta.status === "published";
 
 export const metadata: Metadata = published
-  ? legalMetadata(doc, "The terms that govern use of the RennovAIte platform.")
+  ? legalMetadata(doc, "The terms that govern use of the RenovAIte platform.")
   : TERMS_PLACEHOLDER_METADATA;
 
 export default function TermsPage() {

@@ -10,7 +10,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Layers, Plus, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { RoomAreaDispute } from "@/lib/parse/disputes";
@@ -1016,7 +1015,7 @@ export function EditablePlanViewer({
             onClick={fixOverlaps}
             className="bg-brass-600 text-on-primary hover:bg-primary"
           >
-            <Layers />
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }} aria-hidden="true">layers</span>
             Fix overlaps
           </Button>
         </div>
@@ -1032,7 +1031,7 @@ export function EditablePlanViewer({
             onClick={addRoom}
             className="border-ink-100 bg-paper text-ink-900 hover:bg-surface-container"
           >
-            <Plus />
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }} aria-hidden="true">add</span>
             Add room
           </Button>
           <Button
@@ -1043,7 +1042,7 @@ export function EditablePlanViewer({
             disabled={!canUndo}
             className="text-on-surface-variant hover:text-ink-900"
           >
-            <Undo2 />
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }} aria-hidden="true">undo</span>
             Undo
             {canUndo && (
               <span className="ml-1 text-xs text-ink-500">
@@ -1062,7 +1061,7 @@ export function EditablePlanViewer({
                 "border-status-error/60 text-status-error hover:bg-status-error/10",
             )}
           >
-            <Layers />
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }} aria-hidden="true">layers</span>
             Fix overlaps
             {overlappingIds.size > 0 && (
               <span className="ml-1 text-xs">({overlappingIds.size})</span>

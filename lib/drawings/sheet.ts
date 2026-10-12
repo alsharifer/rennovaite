@@ -111,7 +111,7 @@ function titleBlock(meta: SheetMeta, sheetNumber: string, sheetTitle: string): s
     <text x="${x + TITLE_W - 3}" y="${y + 2 * rowH + 6.5}" text-anchor="end" font-size="3" fill="${INK_500}" style="font-family:${FONT_UI}">SHEET</text>
     <text x="${x + TITLE_W - 3}" y="${y + 2 * rowH + 12}" text-anchor="end" font-size="4.6" fill="${BRASS}" style="font-family:${FONT_MONO}">${esc(sheetNumber)}</text>
 
-    <text x="${x + TITLE_W - 3}" y="${y + 12}" text-anchor="end" font-size="4.4" fill="${BRASS}" style="font-family:${FONT_DISPLAY};letter-spacing:0.02em">RennovAIte</text>
+    <text x="${x + TITLE_W - 3}" y="${y + 12}" text-anchor="end" font-size="4.4" fill="${BRASS}" style="font-family:${FONT_DISPLAY};letter-spacing:0.02em">RenovAIte</text>
   </g>`;
 }
 

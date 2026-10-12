@@ -13,7 +13,7 @@ const doc = loadLegalDocument("privacy");
 const published = doc.meta.status === "published";
 
 export const metadata: Metadata = published
-  ? legalMetadata(doc, "How RennovAIte collects, uses and protects your data.")
+  ? legalMetadata(doc, "How RenovAIte collects, uses and protects your data.")
   : PRIVACY_PLACEHOLDER_METADATA;
 
 export default function PrivacyPage() {

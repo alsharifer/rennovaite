@@ -61,7 +61,7 @@ export function buildRevisionDiffPages(input: RevisionDiffPdfInput): string[] {
   const rowH = (r: Row) => (r.kind === "section" ? 9 : DESC_H * Math.max(r.desc.length, 2) + SUB_H * r.sub.length + 2.6);
 
   const header = (n: number) => {
-    let s = t(M, 14, "RennovAIte", { size: 4.4, fill: BRASS, font: FONT_DISPLAY });
+    let s = t(M, 14, "RenovAIte", { size: 4.4, fill: BRASS, font: FONT_DISPLAY });
     s += t(BOQ_PAGE_W - M, 14, `${input.projectName} · BoQ revision diff`, { size: 2.6, fill: INK_500, anchor: "end" });
     s += `<line x1="${M}" y1="18" x2="${BOQ_PAGE_W - M}" y2="18" stroke="${INK_100}" stroke-width="0.3"/>`;
     s += t(BOQ_PAGE_W - M, BOQ_PAGE_H - 8, `${n}`, { size: 2.4, fill: INK_500, font: FONT_MONO, anchor: "end" });

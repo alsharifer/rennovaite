@@ -1,6 +1,5 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -127,7 +126,7 @@ export function GenerateBoqButton({ projectId }: { projectId: string }) {
       >
         {status === "submitting" ? (
           <>
-            <Loader2 className="mr-2 size-4 animate-spin" />
+            <span className="material-symbols-outlined mr-2 animate-spin" style={{ fontSize: 16 }} aria-hidden="true">progress_activity</span>
             Generating BoQ… (~1 minute)
           </>
         ) : (

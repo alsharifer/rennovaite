@@ -49,10 +49,10 @@ describe("buildProposalPages", () => {
     expect(pages[0]).toContain('data-headline-excludes="true"'); // D4: the QS-to-price lines are named
   });
 
-  it("the firm is the brand: no RennovAIte heading; only the discreet mark, on every page", () => {
+  it("the firm is the brand: no RenovAIte heading; only the discreet mark, on every page", () => {
     for (const p of pages) expect(p).toContain('data-prepared-with="true"');
     expect(all).toContain(PREPARED_WITH_MARK);
-    expect(all).not.toMatch(/font-size="(?:[4-9]|\d{2})[\d.]*"[^>]*>[^<]*RennovAIte/);
+    expect(all).not.toMatch(/font-size="(?:[4-9]|\d{2})[\d.]*"[^>]*>[^<]*RenovAIte/);
     for (const p of pages.slice(1)) expect(p).toContain('data-firm-brand="header"');
   });
 

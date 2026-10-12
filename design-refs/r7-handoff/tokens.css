@@ -1,0 +1,162 @@
+/* RenovAIte Blueprint tokens — generated from Figma file vgibM0F9SdEQErBaTxjUqH (R7 J5, 5 Oct 2026).
+   Do not hand-edit values here: change the Figma variable, re-export. Semantic names only in components.
+   Modes: Light (default) · Dark ([data-theme="dark"]) · Warm owner skin ([data-skin="warm"], light only this cycle).
+   SCOPED (K0, 12 Oct): everything applies only inside [data-system="blueprint"] (set on the AppShell root of Blueprint pages) so Atelier pages are untouched.
+   data-theme may sit on <html> or on the Blueprint root; data-skin sits on the Blueprint root.
+   Fonts: K1 must load next/font/local with variable names --font-plex-sans, --font-jetbrains-mono, --font-eb-garamond. */
+
+[data-system="blueprint"] {
+  --prim-paper-50: #FBFAF6;
+  --prim-paper-100: #F5F2EA;
+  --prim-paper-200: #ECE8DE;
+  --prim-paper-300: #D6D1C5;
+  --prim-paper-400: #A8A294;
+  --prim-ink-900: #1A1D1F;
+  --prim-ink-700: #4A5054;
+  --prim-ink-600: #62676B;
+  --prim-graphite-950: #0B0D0F;
+  --prim-graphite-900: #111416;
+  --prim-graphite-850: #181C1F;
+  --prim-graphite-800: #2C3236;
+  --prim-graphite-700: #4A5157;
+  --prim-bone-300: #B4B0A7;
+  --prim-bone-500: #8E8A82;
+  --prim-brass-200: #D4AE74;
+  --prim-brass-300: #C9A064;
+  --prim-brass-500: #A4793A;
+  --prim-brass-600: #86612A;
+  --prim-teal-300: #7FB8CB;
+  --prim-teal-400: #5FA3BA;
+  --prim-teal-700: #1F4E5F;
+  --prim-green-300: #86C29F;
+  --prim-green-400: #6DB38A;
+  --prim-green-600: #3C7A57;
+  --prim-green-700: #2F6446;
+  --prim-ochre-300: #E6B96E;
+  --prim-ochre-400: #E0AE5C;
+  --prim-ochre-500: #C78F3A;
+  --prim-ochre-600: #A8741F;
+  --prim-ochre-700: #825B1C;
+  --prim-terra-300: #EA9A80;
+  --prim-terra-400: #E3876A;
+  --prim-terra-600: #C75D3A;
+  --prim-terra-700: #A5452A;
+  --prim-warm-50: #FFFBF5;
+  --prim-warm-100: #F7F0E6;
+  --prim-warm-200: #EFE5D6;
+  --prim-warm-300: #DDD0BC;
+  --prim-warm-400: #B3A58E;
+
+  --color-surface-base: var(--prim-paper-100);
+  --color-surface-raised: var(--prim-paper-50);
+  --color-surface-sunken: var(--prim-paper-200);
+  --color-ink-primary: var(--prim-ink-900);
+  --color-ink-secondary: var(--prim-ink-700);
+  --color-ink-tertiary: var(--prim-ink-600);
+  --color-ink-on-inverse: var(--prim-paper-100);
+  --color-line-hairline: var(--prim-paper-300);
+  --color-line-strong: var(--prim-paper-400);
+  --color-line-control: var(--prim-ink-600);
+  --color-active-brass: var(--prim-brass-500);
+  --color-active-brass-text: var(--prim-brass-600);
+  --color-focus-ring: var(--prim-brass-500);
+  --color-focus-ring-inverse: var(--prim-paper-100);
+  --color-prov-measured-mark: var(--prim-teal-700);
+  --color-prov-measured-text: var(--prim-teal-700);
+  --color-prov-validated-mark: var(--prim-green-600);
+  --color-prov-validated-text: var(--prim-green-700);
+  --color-prov-market-mark: var(--prim-ochre-600);
+  --color-prov-market-text: var(--prim-ochre-700);
+  --color-prov-derived-mark: var(--prim-terra-600);
+  --color-prov-derived-text: var(--prim-terra-700);
+  --color-prov-unpriced-mark: var(--prim-ink-600);
+  --color-alert-surface: var(--prim-ink-900);
+  --color-alert-ink: var(--prim-paper-100);
+
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+  --radius-none: 0;
+  --stroke-hairline: 1px;
+  --stroke-rule: 2px;
+  --layout-grid-minor: 8px;
+  --layout-grid-major: 96px;
+  --layout-rail-width: 232px;
+  --layout-rail-collapsed: 56px;
+  --font-sans: var(--font-plex-sans), 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
+  --font-serif: var(--font-eb-garamond), 'EB Garamond', Georgia, serif;
+  color-scheme: light;
+}
+
+[data-theme="dark"] [data-system="blueprint"],
+[data-system="blueprint"][data-theme="dark"] {
+  color-scheme: dark;
+  --color-focus-ring-inverse: var(--prim-graphite-900);
+  --color-surface-base: var(--prim-graphite-900);
+  --color-surface-raised: var(--prim-graphite-850);
+  --color-surface-sunken: var(--prim-graphite-950);
+  --color-ink-primary: var(--prim-paper-200);
+  --color-ink-secondary: var(--prim-bone-300);
+  --color-ink-tertiary: var(--prim-bone-500);
+  --color-ink-on-inverse: var(--prim-graphite-900);
+  --color-line-hairline: var(--prim-graphite-800);
+  --color-line-strong: var(--prim-graphite-700);
+  --color-line-control: var(--prim-bone-500);
+  --color-active-brass: var(--prim-brass-300);
+  --color-active-brass-text: var(--prim-brass-200);
+  --color-focus-ring: var(--prim-brass-300);
+  --color-prov-measured-mark: var(--prim-teal-400);
+  --color-prov-measured-text: var(--prim-teal-300);
+  --color-prov-validated-mark: var(--prim-green-400);
+  --color-prov-validated-text: var(--prim-green-300);
+  --color-prov-market-mark: var(--prim-ochre-400);
+  --color-prov-market-text: var(--prim-ochre-300);
+  --color-prov-derived-mark: var(--prim-terra-400);
+  --color-prov-derived-text: var(--prim-terra-300);
+  --color-prov-unpriced-mark: var(--prim-bone-500);
+  --color-alert-surface: var(--prim-paper-200);
+  --color-alert-ink: var(--prim-graphite-900);
+}
+
+/* Owner front door (landing, intake). Dark owner pages use [data-theme="dark"] unchanged. */
+:root:not([data-theme="dark"]) [data-system="blueprint"][data-skin="warm"]:not([data-theme="dark"]) {
+  --color-focus-ring-inverse: var(--prim-warm-100);
+  --color-surface-base: var(--prim-warm-100);
+  --color-surface-raised: var(--prim-warm-50);
+  --color-surface-sunken: var(--prim-warm-200);
+  --color-ink-on-inverse: var(--prim-warm-100);
+  --color-line-hairline: var(--prim-warm-300);
+  --color-line-strong: var(--prim-warm-400);
+  --color-alert-ink: var(--prim-warm-100);
+}
+
+/* Type ramp — apply as utility classes or map into the Tailwind theme. Numbers are ALWAYS mono + tabular. */
+[data-system="blueprint"] .t-display-serif { font-family: var(--font-serif); font-weight: 400; font-size: 44px; line-height: 52px; letter-spacing: -0.5px; text-transform: none; }
+[data-system="blueprint"] .t-display-warm { font-family: var(--font-serif); font-weight: 400; font-size: 64px; line-height: 72px; letter-spacing: -1px; text-transform: none; }
+[data-system="blueprint"] .t-heading-lg { font-family: var(--font-sans); font-weight: 500; font-size: 24px; line-height: 32px; letter-spacing: -0.2px; text-transform: none; }
+[data-system="blueprint"] .t-heading-md { font-family: var(--font-sans); font-weight: 500; font-size: 18px; line-height: 24px; letter-spacing: 0; text-transform: none; }
+[data-system="blueprint"] .t-heading-sm { font-family: var(--font-sans); font-weight: 600; font-size: 14px; line-height: 20px; letter-spacing: 0; text-transform: none; }
+[data-system="blueprint"] .t-body-md { font-family: var(--font-sans); font-weight: 400; font-size: 15px; line-height: 24px; letter-spacing: 0; text-transform: none; }
+[data-system="blueprint"] .t-body-sm { font-family: var(--font-sans); font-weight: 400; font-size: 13px; line-height: 20px; letter-spacing: 0; text-transform: none; }
+[data-system="blueprint"] .t-nav-item { font-family: var(--font-sans); font-weight: 400; font-size: 14px; line-height: 20px; letter-spacing: 0; text-transform: none; }
+[data-system="blueprint"] .t-nav-item-active { font-family: var(--font-sans); font-weight: 600; font-size: 14px; line-height: 20px; letter-spacing: 0; text-transform: none; }
+[data-system="blueprint"] .t-label-caps { font-family: var(--font-mono); font-weight: 500; font-size: 11px; line-height: 16px; letter-spacing: 0.08em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+[data-system="blueprint"] .t-label-md { font-family: var(--font-mono); font-weight: 400; font-size: 12px; line-height: 16px; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+[data-system="blueprint"] .t-num-xl { font-family: var(--font-mono); font-weight: 500; font-size: 32px; line-height: 40px; letter-spacing: -1px; text-transform: none; font-variant-numeric: tabular-nums; }
+[data-system="blueprint"] .t-num-lg { font-family: var(--font-mono); font-weight: 500; font-size: 20px; line-height: 28px; letter-spacing: -0.5px; text-transform: none; font-variant-numeric: tabular-nums; }
+[data-system="blueprint"] .t-num-md { font-family: var(--font-mono); font-weight: 400; font-size: 14px; line-height: 20px; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+[data-system="blueprint"] .t-num-sm { font-family: var(--font-mono); font-weight: 400; font-size: 12px; line-height: 16px; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+
+/* Hard rules: radius is always 0; brass (--color-active-brass) only as lines/rules/focus; provenance colours only as marks; no status hues. */
+/* Radius: --radius is not wired in this app (K0) — setting it does nothing. Blueprint components simply never use rounded-* (use --radius-none / rounded-none). No global border-radius reset. */
+[data-system="blueprint"] :focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+[data-system="blueprint"] .surface-inverse :focus-visible { outline-color: var(--color-focus-ring-inverse); } /* alert + gate-refusal blocks */
+@media (prefers-reduced-motion: reduce) { [data-system="blueprint"] *, [data-system="blueprint"] *::before, [data-system="blueprint"] *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }

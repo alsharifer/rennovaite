@@ -32,7 +32,7 @@ export function TopNav() {
         href="/"
         className="font-display text-headline-md text-primary tracking-tight"
       >
-        RennovAIte
+        RenovAIte
       </Link>
 
       <div className="flex items-center gap-xl">

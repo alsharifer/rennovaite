@@ -33,10 +33,10 @@ export function WatchDemoButton() {
       >
         <DialogContent className="w-[92vw] max-w-[880px] border border-ink-100 bg-paper p-0 duration-200 sm:max-w-[880px]">
           <DialogTitle className="sr-only">
-            RennovAIte product demo
+            RenovAIte product demo
           </DialogTitle>
           <DialogDescription className="sr-only">
-            A three-minute walkthrough of the RennovAIte flow.
+            A three-minute walkthrough of the RenovAIte flow.
           </DialogDescription>
           <div className="flex aspect-video w-full items-center justify-center bg-ink-900 text-paper">
             <div className="flex flex-col items-center gap-md text-center">

@@ -37,7 +37,7 @@ export function Footer() {
         <div className="mb-xl grid grid-cols-12 gap-gutter border-b border-white/10 pb-xl">
           <div className="col-span-12 md:col-span-3">
             <div className="mb-md font-display text-headline-md text-brass-600 tracking-tight">
-              RennovAIte
+              RenovAIte
             </div>
             <p className="font-body-sm text-body-sm text-white/60">
               Architectural intelligence for the modern Dubai homeowner.

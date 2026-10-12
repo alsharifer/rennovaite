@@ -465,7 +465,7 @@ export default async function PlanPage({
               {authored ? "Back to projects" : "Back to upload"}
             </Link>
             <p className="font-body text-body-sm italic text-on-surface-variant">
-              {authored ? "Drawn by you" : "Parsed by RennovAIte"} ·{" "}
+              {authored ? "Drawn by you" : "Parsed by RenovAIte"} ·{" "}
               {roomList.length} {authored ? "zones" : "rooms"} ·{" "}
               {formatM2(totalArea)}
               {authored && plot

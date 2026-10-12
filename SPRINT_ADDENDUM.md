@@ -1,3 +1,45 @@
+# K1 — Blueprint foundations: tokens, type, icons, theme, number + provenance primitives (2026-10-12)
+
+- **K0 rulings (design owner, 12 Oct) that govern K**: `/` flag-off branch →
+  new OwnerLanding (K6), `/rennovaite` stays HomeLanding; §3.6 wins
+  (`/drawings` = firm step 06 Documents, Blueprint); R7 + Gate 3 = signoff for
+  dark / Plex / Sharp on Blueprint pages; proposal settings = firm defaults +
+  per-project `project_proposals` (052, copy-on-first-open, source revision id);
+  preview-as-client = proposal-only mode of the guarded pack pipeline
+  (`preview: true`, watermarked, not issued); garden sensitivity copy follows
+  the engine; firm rail 00 hub · 01 Project & Plan · 02 Scope · 03
+  Specification · 04 Rates & Basis · 05 BoQ & Review · 06 Documents · 07
+  Revisions & Approval · 08 Proposal (separate from the owner journey).
+- **Production facts**: `PROPERTY_OS_LANDING` is ON in production (`/` serves
+  "Property OS — by RenovAIte" to visitors), so the K6 OwnerLanding on the
+  flag-off branch will not show in production until that flag is turned off.
+  Vercel rejects request bodies over ~4.5 MB (`FUNCTION_PAYLOAD_TOO_LARGE`,
+  4.3 MB passed / 4.7 MB refused on prod, 12 Oct) → H9.
+- **Scoped tokens**: the regenerated `design-refs/r7-handoff/tokens.css` (every
+  rule under `[data-system="blueprint"]`) is now tracked
+  (`.gitignore`: `/design-refs/*` + `!/design-refs/r7-handoff/`) and imported
+  once by `app/globals.css`; Tailwind names are `bp-*`. A test asserts every
+  selector in it is Blueprint-scoped.
+- **One icon font**: Material Symbols Sharp. Google's stylesheet sets
+  `font-size: 24px` on the class named after its font, so swapping the font
+  would have shrunk every Atelier icon — the Atelier class now carries the 24px
+  itself (unlayered, as Google's was). Measured: Atelier pages are pixel-
+  identical to master with icons hidden except the wordmark rename; with icons
+  shown, only the Sharp glyph corners differ (ruled acceptable).
+- **lucide redone, not merged**: 6 icon sites converted, 3 dead files deleted,
+  `lucide-react` uninstalled, `components.json` `iconLibrary: "none"`.
+- **Theme**: `rv_theme` cookie + a no-flash inline script (`lib/theme.ts`). The
+  root layout now reads a cookie, so every page renders dynamically except the
+  two `force-static` legal pages (they render the default and the script
+  corrects them before paint).
+- **tierOf** reproduces J3 to the fil from the stored Arabella rev (6 / 9 / 3,
+  102,892.03, ≈ 116,679.56) with H7's rounding applied — the pergola is the
+  only line H7 moved.
+- **Also in K1**: user-facing "RennovAIte" → "RenovAIte" (29 files; not the
+  LLM prompts or counsel's legal drafts); `/api/upload` answers the structured
+  413 and the intake plan limit is 20 MB (it was 25 client / 20 server).
+  Parked items: `docs/K_BACKLOG.md`.
+
 # U7 — element-section resolution across viewer flag states (2026-09-28)
 
 - **The bug** (TV only evidenced ON): `generate-boq` gated the P4 element

@@ -40,8 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local design references — not part of the codebase
-/design-refs/
+# Design references are local-only — except the R7 handoff, whose generated
+# tokens.css the app imports (K1). j-series-inputs stays private.
+/design-refs/*
+!/design-refs/r7-handoff/
 /.claude/worktrees
 
 # ground-truth client documents (real contract/quotation data + PII) — the

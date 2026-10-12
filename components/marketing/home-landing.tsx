@@ -5,7 +5,7 @@ import { journeyFlagsFromEnv, journeySteps } from "@/lib/journey";
 import { Footer } from "@/components/marketing/Footer";
 import { TopNav } from "@/components/marketing/TopNav";
 
-// The RennovAIte marketing homepage. Extracted from app/page.tsx so it can be
+// The RenovAIte marketing homepage. Extracted from app/page.tsx so it can be
 // rendered both at `/rennovaite` (its permanent home) and at `/` when the
 // PROPERTY_OS_LANDING flag is off (unchanged from before the flag).
 

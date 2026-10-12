@@ -47,9 +47,10 @@ export async function POST(request: NextRequest) {
       );
     }
     if (file.size > MAX_SIZE_BYTES) {
+      // The same structured 413 as /api/project-asset and /api/room-photo (K1).
       return NextResponse.json(
-        { error: "File is larger than 20 MB." },
-        { status: 400 },
+        { error: "This file is too large to upload. Please keep a floorplan under 20 MB.", code: "payload_too_large" },
+        { status: 413 },
       );
     }
 

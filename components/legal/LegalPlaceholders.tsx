@@ -14,15 +14,15 @@ import { TopNav } from "@/components/marketing/TopNav";
 // from reviewed ones.
 
 export const PRIVACY_PLACEHOLDER_METADATA: Metadata = {
-  title: "Privacy — RennovAIte",
+  title: "Privacy — RenovAIte",
   description:
-    "RennovAIte's privacy policy is being finalised. Contact hello@rennovaite.fit with any question about your data in the meantime.",
+    "RenovAIte's privacy policy is being finalised. Contact hello@rennovaite.fit with any question about your data in the meantime.",
 };
 
 export const TERMS_PLACEHOLDER_METADATA: Metadata = {
-  title: "Terms — RennovAIte",
+  title: "Terms — RenovAIte",
   description:
-    "RennovAIte's terms of service are being finalised. Contact hello@rennovaite.fit in the meantime.",
+    "RenovAIte's terms of service are being finalised. Contact hello@rennovaite.fit in the meantime.",
 };
 
 export function PrivacyPlaceholder() {
@@ -59,7 +59,7 @@ export function PrivacyPlaceholder() {
           href="/rennovaite"
           className="focus-ring mt-xl inline-flex font-body text-body-sm text-brass-600 hover:underline"
         >
-          &larr; Back to RennovAIte
+          &larr; Back to RenovAIte
         </Link>
       </main>
       <Footer />
@@ -100,7 +100,7 @@ export function TermsPlaceholder() {
             the platform.
           </li>
           <li>
-            RennovAIte produces a tender-ready package &mdash; designs, an
+            RenovAIte produces a tender-ready package &mdash; designs, an
             itemised BoQ, drawings and a permit check. It does not carry out
             construction, and it is not a party to any contract you sign with a
             contractor.
@@ -115,7 +115,7 @@ export function TermsPlaceholder() {
           href="/rennovaite"
           className="focus-ring mt-xl inline-flex font-body text-body-sm text-brass-600 hover:underline"
         >
-          &larr; Back to RennovAIte
+          &larr; Back to RenovAIte
         </Link>
       </main>
       <Footer />

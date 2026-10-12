@@ -74,7 +74,7 @@ export function Sidebar() {
           href="/"
           className="font-display text-headline-md text-primary tracking-tight"
         >
-          RennovAIte
+          RenovAIte
         </Link>
         <p className="mt-xs font-body-sm text-body-sm text-on-surface-variant">
           Project fee &middot; AED 1,000

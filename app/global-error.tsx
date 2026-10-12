@@ -29,7 +29,7 @@ export default function GlobalError({
       >
         <div style={{ maxWidth: 520 }}>
           <h1 style={{ fontSize: 24, fontWeight: 600, margin: "0 0 12px" }}>
-            RennovAIte didn&apos;t load.
+            RenovAIte didn&apos;t load.
           </h1>
           <p style={{ fontSize: 15, lineHeight: 1.6, color: "#334155", margin: "0 0 24px" }}>
             Something failed before the page could start. Your projects and

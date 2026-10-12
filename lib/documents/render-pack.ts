@@ -354,7 +354,7 @@ function page(body: string): string {
 
 function chrome(input: RenderPackInput, title: string, n: number, total: number): string {
   return (
-    text(M, 14, "RennovAIte", { size: 5, fill: BRASS, font: FONT_DISPLAY }) +
+    text(M, 14, "RenovAIte", { size: 5, fill: BRASS, font: FONT_DISPLAY }) +
     text(PAGE_W - M, 14, `${input.projectName} · Garden render pack${input.draft ? " · DRAFT FOR REVIEW" : ""}`, { size: 3, fill: input.draft ? TERRACOTTA : INK_500, anchor: "end" }) +
     `<line x1="${M}" y1="18" x2="${PAGE_W - M}" y2="18" stroke="${BONE}" stroke-width="0.4"/>` +
     `<line x1="${M}" y1="${PAGE_H - 14}" x2="${PAGE_W - M}" y2="${PAGE_H - 14}" stroke="${BONE}" stroke-width="0.4"/>` +

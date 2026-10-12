@@ -300,9 +300,9 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   const { PDFDocument } = await import("pdf-lib");
   const pdf = stampPdfDay(await PDFDocument.create());
   pdf.setTitle(curateText(`${projectRes.name} — render pack`, withheld));
-  pdf.setAuthor("RennovAIte");
-  pdf.setCreator("RennovAIte");
-  pdf.setProducer("RennovAIte");
+  pdf.setAuthor("RenovAIte");
+  pdf.setCreator("RenovAIte");
+  pdf.setProducer("RenovAIte");
 
   const embedded = new Map<string, Awaited<ReturnType<typeof pdf.embedPng>>>();
   const imageFor = async (renderId: string) => {

@@ -34,6 +34,22 @@
       "unicode_range": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
     },
     {
+      "file": "ibm-plex-sans-latin.woff2",
+      "family": "ibm-plex-sans",
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "variable": true,
+      "subset": "latin",
+      "bytes": 40240,
+      "source": "https://fonts.gstatic.com/s/ibmplexsans/v23/zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxeKYbSB4Zh.woff2",
+      "unicode_range": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+      "fetched": "2026-10-12",
+      "note": "K1 (Blueprint UI face). Same user agent; css2?family=IBM+Plex+Sans:wght@400;500;600 — Google serves one variable file for the three weights."
+    },
+    {
       "file": "jetbrains-mono-latin.woff2",
       "family": "jetbrains-mono",
       "weights": [
