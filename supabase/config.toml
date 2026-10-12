@@ -242,10 +242,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# K8 #18 (Figma 69:1422 / 69:1438): the Blueprint auth e-mails. The hosted
+# projects take the same subject + HTML in the dashboard (Auth → Email
+# Templates) — this file only configures the local stack.
+[auth.email.template.magic_link]
+subject = "Your sign-in link"
+content_path = "./supabase/templates/magic-link.html"
+
+[auth.email.template.invite]
+subject = "You've been added to a project on RenovAIte"
+content_path = "./supabase/templates/invite.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
