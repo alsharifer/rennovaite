@@ -50,7 +50,7 @@ export function railSteps(ctx: RailContext, flags: JourneyFlags, pathname = ""):
 // rail keeps the step you came from (./step-memory).
 const SIDE_SURFACE = /\/viewer$/;
 
-export function ShellFrame({ ctx, flags, skin, children }: { ctx: RailContext; flags: JourneyFlags; skin?: "warm"; children: ReactNode }) {
+export function ShellFrame({ ctx, flags, skin, title, children }: { ctx: RailContext; flags: JourneyFlags; skin?: "warm"; title?: string; children: ReactNode }) {
   const pathname = usePathname();
   const steps = railSteps(ctx, flags, pathname);
   const projectId = ctx.project?.id ?? null;
@@ -63,7 +63,7 @@ export function ShellFrame({ ctx, flags, skin, children }: { ctx: RailContext; f
   const activeKey = stepKey ?? (side && remembered && steps.some((x) => x.key === remembered) ? remembered : null);
   // K4: Revisions & Approval (21:450) takes the compact rail too — a seven-column diff beside a 360 column.
   const compactWide = activeKey === "boq_review" || activeKey === "revisions" || (ctx.persona === "owner" && /\/boq(\/revisions)?$/.test(pathname));
-  const pageTitle = PAGE_TITLES.find(([re]) => re.test(pathname))?.[1] ?? null;
+  const pageTitle = title ?? PAGE_TITLES.find(([re]) => re.test(pathname))?.[1] ?? null;
 
   return (
     <div data-system="blueprint" data-skin={skin} data-rail={compactWide ? "compact-wide" : "standard"} className="bp-shell min-h-screen bg-bp-surface-base font-bp-sans text-bp-ink-primary">

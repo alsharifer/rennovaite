@@ -2,31 +2,37 @@
 
 // =============================================================================
 // components/blueprint/shell/SegmentError.tsx — a segment's error.tsx body
-// (R7 §2 State block Error, 18:355): the inverse block with the cause, what is
-// safe, Try again, and a ref code (Next's error digest — the server log key).
-// It renders inside the segment's layout, so the rail and top bar stay.
-// Not role="alert": it replaces the page on load, it is not the result of a
-// click (spec §4.2 #13).
+// (K8 #11, spec §6.8, 63:1175): "Something went wrong on our side", what is
+// safe, Try again, Contact support and the reference code (Next's error digest
+// — the server log key). It renders inside the segment's layout, so the rail
+// and top bar stay. Not role="alert": it replaces the page on load, it is not
+// the result of a click (spec §4.2 #13).
 // =============================================================================
 
-import { Button } from "../Button";
-import { StateBlock } from "../StateBlock";
+import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
-export function SegmentError({ what, safe, error, reset }: { what: string; safe: string; error: Error & { digest?: string }; reset: () => void }) {
+import { Button } from "../Button";
+import { PageMessage, errorRef } from "./PageMessage";
+
+export function SegmentError({ safe, error, reset }: { what?: string; safe: string; error: Error & { digest?: string }; reset: () => void }) {
+  const pathname = usePathname();
+  useEffect(() => {
+    // Route context is the point: the same message with the route tells support where to look.
+    console.error("[route-error]", { route: pathname, digest: error.digest ?? null, message: error.message });
+  }, [error, pathname]);
   return (
-    <div data-system="blueprint" className="mx-auto max-w-[720px]">
-      <StateBlock
-        kind="error"
-        title={`Couldn't load ${what}`}
-        refCode={error.digest ? `ERR-${error.digest.slice(0, 10).toUpperCase()}` : undefined}
-        actions={
-          <Button kind="secondary" tone="inverse" onClick={reset}>
-            Try again
-          </Button>
-        }
-      >
-        <p>Something went wrong on our side. {safe}</p>
-      </StateBlock>
-    </div>
+    <PageMessage
+      icon="error"
+      title="Something went wrong on our side"
+      refCode={errorRef(error.digest)}
+      action={
+        <Button kind="primary" onClick={reset}>
+          Try again
+        </Button>
+      }
+    >
+      {safe}
+    </PageMessage>
   );
 }

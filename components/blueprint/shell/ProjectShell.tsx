@@ -43,12 +43,13 @@ export async function ProjectShell({ projectId, children }: { projectId: string;
 }
 
 /** Settings, the firm book and quote review: the chrome without a project. */
-export async function AccountShell({ firmId, skin, children }: { firmId?: string; skin?: "warm"; children: ReactNode }) {
+/** `title` names a page the pathname cannot (a not-found page, K8 #11). */
+export async function AccountShell({ firmId, skin, title, children }: { firmId?: string; skin?: "warm"; title?: string; children: ReactNode }) {
   const caller = await getPageCaller();
   if (!caller) return <>{children}</>;
   const ctx = await loadRailContextWithoutProject(db(), caller, { firmId });
   return (
-    <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()} skin={skin}>
+    <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()} skin={skin} title={title}>
       {children}
     </ShellFrame>
   );
