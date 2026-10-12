@@ -114,14 +114,14 @@ export function BrandingPanel({ firmId }: { firmId: string }) {
         </label>
         <div>
           <span className="t-label-caps text-bp-ink-tertiary">Logo (PNG or JPG, under 1 MB)</span>
-          <div className="mt-1 flex items-center gap-3">
+          <div className="mt-1 flex flex-wrap items-center gap-3">
             {b?.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={b.logo_url} alt="Firm logo" className="h-12 w-auto border border-bp-line-hairline" data-testid="branding-logo" />
             ) : (
               <span className="t-label-md text-bp-ink-tertiary">No logo yet.</span>
             )}
-            <input ref={file} type="file" accept="image/png,image/jpeg" aria-label="Logo file" className="t-body-sm" />
+            <input ref={file} type="file" accept="image/png,image/jpeg" aria-label="Logo file" className="t-body-sm min-w-0 max-w-full" />
             <button type="button" onClick={upload} disabled={busy} className="inline-flex h-9 items-center gap-2 border border-bp-line-control px-4 t-nav-item-active text-bp-ink-primary hover:bg-bp-surface-sunken disabled:opacity-50">
               Upload
             </button>

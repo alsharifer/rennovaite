@@ -310,6 +310,63 @@ from the journey (`lib/journey-eyebrow.ts`), never a literal.
   escapes it (absolute, no positioned ancestor) and widens the phone page —
   give every scroll region `relative`.
 
+### Hub, scope, front door, a11y (K5a · K5 · K6 · K7)
+
+- **00 Project hub** (`/project/[id]`, §3.1 / 11:48) is Blueprint for BOTH
+  journeys — `lib/hub/hub-view.ts` + `components/blueprint/hub/`. Headline =
+  the stored grand total (≈ … * + weakest mark + the lines to be priced named);
+  "Basis of this number" = counted lines by amount mark, and the chain line
+  under it carries the counted total to the headline to the fil (Arabella:
+  6 · 21,074.00 / 9 · 81,818.03 / 3 TBP → 102,892.03 → ≈ 116,679.56). Next =
+  `nextFromRail` over the rail's OWN statuses (persona's journey, max 3; else
+  the first step not done) — no rule of its own. Revisions = the diff's counts
+  + recorded causes; documents = the gates' answers. The rail facts are loaded
+  once per request: `loadProjectRail` (React `cache`, in `ProjectShell.tsx`)
+  is shared by the shell and the page. The old Atelier hub, `ApprovalsCard` and
+  `PermitsCard` are gone; project files are `HubFiles` (Blueprint).
+- **02 Scope / Layout** (`/project/[id]/plan`, §3.8 / 24:814) — chrome only:
+  Blueprint page, layer tabs with the brass underline, Undo + Save changes in
+  the TOP BAR (Save disabled with its reason until something changed; a save
+  `router.refresh()`es the server panel), and the **Plan check** panel
+  (`components/blueprint/plan/PlanCheckPanel.tsx` over `lib/plan/plan-check.ts`
+  → THE detector `findOverlaps`): the inverse block (pairs, share counted
+  twice, parser total, consequence) with Fix overlaps · N / Re-run parse, the
+  pairs largest first (a row selects BOTH rooms), and what the rail blocks
+  downstream. The panel drives the editor through window events
+  `rv:plan-fix-overlaps` and `rv:plan-select-rooms`. Canvas: handles ink; with
+  overlaps rooms ink 5% and the shared floor ink 30% dashed, plus a legend.
+  Fixture: `lib/plan/__fixtures__/j0-bad-parse.json` (the J0 worst pre-repair
+  parse, polygons only — 12 pairs, 23.6%); live: `scripts/k5-bad-parse.mjs
+  seed|teardown` + `scripts/k5-plan-check.mjs`.
+- **Sign in** (`/auth`, §3.9a / 35:1152) is Dark Blueprint
+  (`data-system="blueprint" data-theme="dark"` on the page root) —
+  `components/blueprint/auth/`. The design view is a FICTIONAL villa from our
+  own three.js stage `/dev/villa-orbit` (dev only), captured by
+  `scripts/k6-capture-villa.mjs` (MediaRecorder; no ffmpeg) into
+  `public/design-view/` — WebM + MP4 ≤ 2 MB and a poster. Poster first; the
+  video plays only without reduced motion / Save-Data / 2G-3G; decorative
+  (`aria-hidden`, muted, no controls); no live WebGL on the page. Never a
+  client project, never stock or AI imagery.
+- **01 Intake** (`/project/new`, §3.9 / 29:1016): `AccountShell
+  content="blueprint" skin="warm"` (the rail draws the owner steps with 01
+  active, `railSteps(..., pathname)`); three ways in as one radio group (Draw /
+  Photos need the garden pilot), a too-large plan is the inverse block,
+  queued photos/drawings are uploaded BEFORE leaving on the draw path, and
+  Continue is disabled with its reason. The owner landing stays parked.
+- **K7 (§4.2)**: on a coarse pointer every Blueprint control gets a centred
+  ≥ 44 px hit area (`app/globals.css`, unlayered; `[data-atelier]` — the
+  `AtelierCanvas` body — is excluded so Atelier pages do not move); every
+  disabled control's `aria-describedby` resolves; the quote summary is
+  `aria-live`. `scripts/k-page-check.mjs` checks axe light/dark, a 320 px
+  reflow, horizontal overflow and dangling describedby (`--who=`, `--anon`).
+- **KV checks**: `scripts/kv-keyboard-k4.mjs` (the K4 loop by keyboard, on the
+  walkthrough's scratch state), `scripts/kv-atelier-unchanged.mjs <base>
+  <head> <project>` (pixel-compares the out-of-scope Atelier pages against a
+  baseline server — run the baseline from a worktree with `next dev --webpack`:
+  Turbopack refuses a junctioned node_modules), `scripts/k6-front-door-check.mjs`.
+  **If a dev server starts 404ing whole route trees mid-session (it did in KV,
+  after many edits and a second server), restart it** — K2's note holds.
+
 ## Brand — Atelier Precise (pages not yet redesigned)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

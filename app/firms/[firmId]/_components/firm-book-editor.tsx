@@ -226,9 +226,12 @@ export function FirmBookEditor({
   return (
     <div data-firm-id={firmId} className="mx-auto max-w-[1180px] px-6 pb-16 pt-8 md:px-12">
       <TopBarActions>
-        <Button kind="quiet" href={`/api/firms/${firmId}/quotes/template`}>
-          Download quote template
-        </Button>
+        {/* K7: below 1280 px the top bar keeps two actions; the template is also in Quote imports. */}
+        <span className="bp-boq-wide-only">
+          <Button kind="quiet" href={`/api/firms/${firmId}/quotes/template`}>
+            Download quote template
+          </Button>
+        </span>
         <Button
           kind="secondary"
           onClick={() => {
@@ -385,7 +388,7 @@ export function FirmBookEditor({
                 onCancel={() => setAdding(false)}
               />
             ) : null}
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring" tabIndex={0} role="region" aria-label="Rates in the book">
               <table className="w-full min-w-[920px]" data-testid="entries">
                 <thead>
                   <tr className="t-label-caps whitespace-nowrap bg-bp-surface-sunken text-left text-bp-ink-tertiary">

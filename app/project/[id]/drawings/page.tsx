@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { PlanLayers, type PlanInspectData } from "@/app/project/[id]/plan/_components/plan-layers";
 import { Button } from "@/components/blueprint/Button";
 import { DocumentsExport } from "@/components/blueprint/documents/DocumentsExport";
-import { AtelierCanvas } from "@/components/blueprint/shell/ShellFrame";
 import { StateBlock } from "@/components/blueprint/StateBlock";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { latestPackJobs } from "@/lib/documents/pack-export/job";
@@ -204,9 +203,12 @@ export default async function DrawingsPage({
           ) : null}
 
           {inspectPlan ? (
-            <section className="mt-10" aria-label="Explore your plan">
-              <AtelierCanvas>
-                <p className="label-caps mb-md text-ink-500">Explore your plan — tap a room to see what it is and what it costs</p>
+            <section className="mt-10" aria-labelledby="explore-h">
+              <h2 id="explore-h" className="t-label-caps text-bp-ink-tertiary">
+                EXPLORE YOUR PLAN — TAP A ROOM TO SEE WHAT IT IS AND WHAT IT COSTS
+              </h2>
+              {/* The canvas on the sunken surface, as on 02 Scope (K5): its internals are the editor's own. */}
+              <div className="mt-3 border border-bp-line-hairline bg-bp-surface-sunken p-4">
                 <PlanLayers
                   mode="read"
                   projectId={projectId}
@@ -216,7 +218,7 @@ export default async function DrawingsPage({
                   overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
                   inspect={inspectPlan.inspect}
                 />
-              </AtelierCanvas>
+              </div>
             </section>
           ) : null}
 

@@ -239,7 +239,7 @@ export function QuoteReview({ firmId, initialQuote, initialLines }: { firmId: st
         </div>
       ) : null}
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="relative mt-4 overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring" tabIndex={0} role="region" aria-label="Quoted lines">
         <table className="w-full min-w-[1080px]" data-testid="quote-lines">
           <thead>
             <tr className="t-label-caps bg-bp-surface-sunken text-left text-bp-ink-tertiary">

@@ -52,7 +52,11 @@ export function railSteps(ctx: RailContext, flags: JourneyFlags, pathname = ""):
 
 /** An Atelier page body inside the Blueprint chrome (its own light canvas, Inter). */
 export function AtelierCanvas({ children }: { children: ReactNode }) {
-  return <div className="min-h-[calc(100vh-var(--bp-topbar-h))] bg-canvas p-4 font-sans text-on-background md:p-12">{children}</div>;
+  return (
+    <div data-atelier className="min-h-[calc(100vh-var(--bp-topbar-h))] bg-canvas p-4 font-sans text-on-background md:p-12">
+      {children}
+    </div>
+  );
 }
 
 export function ShellFrame({ ctx, flags, content = "atelier", skin, children }: { ctx: RailContext; flags: JourneyFlags; content?: "atelier" | "blueprint"; skin?: "warm"; children: ReactNode }) {
