@@ -1,44 +1,39 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { useDropzone } from "react-dropzone";
+// =============================================================================
+// app/project/new/_components/villa-intake.tsx — 01 Intake (K6, R7 §3.9,
+// Figma 29:1016). The owner front door's working half, in Blueprint (warm skin).
+//
+// "How would you like to start?" — three ways in, as option tiles (a radio
+// group; selected = brass left rule + raised): Upload a drawing · Draw it
+// yourself · Start from photos (the last two need the garden pilot, which owns
+// /api/draw-plan). The way chosen shows its zone; a file that is too large is
+// the inverse block saying what to do instead (never a raw 413). Site photos
+// and existing drawings stay optional, queued until the project exists — and
+// flushed BEFORE leaving when the project is created by drawing. Continue is
+// disabled, with its reason, until a way to start is valid.
+//
+// The data flow is unchanged: H9 direct uploads (lib/uploads/client.ts) →
+// /api/uploads/complete creates the project; /api/parse-plan reads it;
+// /api/draw-plan creates an authored plan.
+// =============================================================================
 
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useId, useState } from "react";
+import { useDropzone, type FileRejection } from "react-dropzone";
+
+import { Icon } from "@/components/blueprint/Icon";
+import { EMPTY_PLOT, parsePlot, PlotSizeFields, type PlotDraft } from "@/components/plan/plot-size-fields";
 import { AnalyticsEvent, track } from "@/lib/analytics";
-import {
-  DRAWING_DISCIPLINES,
-  KIND_LABEL,
-  type AssetKind,
-} from "@/lib/assets/types";
-import {
-  EMPTY_PLOT,
-  parsePlot,
-  PlotSizeFields,
-  type PlotDraft,
-} from "@/components/plan/plot-size-fields";
+import { DRAWING_DISCIPLINES, KIND_LABEL, type AssetKind } from "@/lib/assets/types";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
 import { completeUpload, uploadDirect, uploadFile } from "@/lib/uploads/client";
 import { UPLOAD_LIMITS } from "@/lib/uploads/limits";
-import { cn } from "@/lib/utils";
-import { formatAed } from "@/lib/format/aed";
 
-// The existing /api/upload only accepts PDF/PNG/JPG. The design copy mentions
-// DWG/RVT but the data flow is unchanged, so the picker is restricted to what
-// the API can actually ingest.
-const PLAN_ACCEPT = {
-  "application/pdf": [".pdf"],
-  "image/png": [".png"],
-  "image/jpeg": [".jpg", ".jpeg"],
-};
-const PHOTO_ACCEPT = {
-  "image/png": [".png"],
-  "image/jpeg": [".jpg", ".jpeg"],
-  "image/heic": [".heic"],
-  "image/heif": [".heif"],
-};
-// Existing drawings: PDF/DWG/DXF + images. DWG/DXF rarely carry a reliable MIME
-// (often octet-stream), so they're matched by extension too.
+// The plan route ingests PDF / PNG / JPG only (the picker says what it accepts).
+const PLAN_ACCEPT = { "application/pdf": [".pdf"], "image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"] };
+const PHOTO_ACCEPT = { "image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"], "image/heic": [".heic"], "image/heif": [".heif"] };
+// DWG/DXF rarely carry a reliable MIME (often octet-stream), so they're matched by extension too.
 const DRAWING_ACCEPT = {
   "application/pdf": [".pdf"],
   "image/png": [".png"],
@@ -48,703 +43,366 @@ const DRAWING_ACCEPT = {
   "application/dxf": [".dxf"],
   "application/octet-stream": [".dwg", ".dxf"],
 };
-// Size limits are lib/uploads/limits.ts (H9) — the same table the sign and
-// complete routes read, so the dropzone can never disagree with the server.
+// Size limits are lib/uploads/limits.ts (H9) — the table the sign and complete routes read.
 const PLAN_MAX_BYTES = UPLOAD_LIMITS.plan.maxBytes;
 const ASSET_MAX_BYTES = UPLOAD_LIMITS.project_asset.maxBytes;
-
 const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ras Al Khaimah", "Ajman"];
 
-type UploadResponse = {
-  project_id: string;
-  plan_id: string;
-  pdf_url: string;
-};
-
+type Way = "upload" | "draw" | "photos";
+type UploadResponse = { project_id: string; plan_id: string; pdf_url: string };
 type PlanState =
   | { kind: "idle" }
   | { kind: "uploading"; name: string; progress: number }
   | { kind: "ready"; name: string; size: number; res: UploadResponse }
+  | { kind: "too_large"; name: string; size: number }
   | { kind: "error"; message: string };
-
-// A queued/in-flight/finished library upload (photo or drawing). Photos and
-// drawings need a project, which is created when the plan uploads — items
-// dropped before that are "queued" and flushed once the project exists.
 type AssetStatus = "queued" | "uploading" | "done" | "error";
-type AssetItem = {
-  id: string;
-  file: File;
-  name: string;
-  kind: AssetKind;
-  previewUrl?: string;
-  status: AssetStatus;
-  error?: string;
-};
+type AssetItem = { id: string; file: File; name: string; kind: AssetKind; previewUrl?: string; status: AssetStatus; error?: string };
 
-/**
- * H9: the plan goes STRAIGHT to Storage on a signed URL (progress from the
- * upload itself), then /api/uploads/complete verifies it and creates the
- * project. No function body carries the file, so Vercel's ~4.5 MB request cap
- * no longer applies; the only limits are lib/uploads/limits.ts.
- */
-async function uploadWithProgress(
-  file: File,
-  onProgress: (pct: number) => void,
-): Promise<UploadResponse> {
+/** H9: the plan goes straight to Storage on a signed URL, then /complete verifies it and creates the project. */
+async function uploadWithProgress(file: File, onProgress: (pct: number) => void): Promise<UploadResponse> {
   const { path } = await uploadDirect(file, { kind: "plan", onProgress });
   return completeUpload<UploadResponse>(path, "plan", { filename: file.name });
 }
 
-function formatBytes(b: number): string {
-  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-
+const mb = (b: number) => `${(b / (1024 * 1024)).toFixed(1)} MB`;
 const isImageType = (t: string) => /^image\/(png|jpeg)$/.test(t);
+const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring";
+const INPUT = `h-11 w-full rounded-none border border-bp-line-control bg-bp-surface-raised px-3 t-body-sm text-bp-ink-primary placeholder:text-bp-ink-tertiary ${FOCUS}`;
+
+const WAYS: { key: Way; icon: string; title: string; body: string; garden: boolean }[] = [
+  { key: "upload", icon: "upload_file", title: "Upload a drawing", body: "A PDF or image of your floor plan. We read rooms, openings and dimensions — then you confirm them.", garden: false },
+  { key: "draw", icon: "draw", title: "Draw it yourself", body: "No drawing? Sketch rooms or garden zones on a grid with your own measurements.", garden: true },
+  { key: "photos", icon: "photo_camera", title: "Start from photos", body: "For gardens: photos of each side. We draw the zones with you.", garden: true },
+];
 
 export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) {
   const router = useRouter();
+  const ids = useId();
+  const [way, setWay] = useState<Way>("upload");
   const [plan, setPlan] = useState<PlanState>({ kind: "idle" });
   const [plot, setPlot] = useState<PlotDraft>(EMPTY_PLOT);
-  const [drawingPlan, setDrawingPlan] = useState(false);
-  const [drawError, setDrawError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<AssetItem[]>([]);
   const [drawings, setDrawings] = useState<AssetItem[]>([]);
   const [discipline, setDiscipline] = useState<AssetKind>("drawing_mep");
   const [projectName, setProjectName] = useState("");
   const [city, setCity] = useState("Dubai");
-  const [budget, setBudget] = useState(850_000);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<null | "parse" | "draw">(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // The project is created by the plan upload; assets can only be written once
-  // it exists.
+  const ways = WAYS.filter((w) => !w.garden || gardenPilot);
   const projectId = plan.kind === "ready" ? plan.res.project_id : null;
 
-  const patchPhoto = useCallback((id: string, p: Partial<AssetItem>) => {
-    setPhotos((prev) => prev.map((it) => (it.id === id ? { ...it, ...p } : it)));
-  }, []);
-  const patchDrawing = useCallback((id: string, p: Partial<AssetItem>) => {
-    setDrawings((prev) => prev.map((it) => (it.id === id ? { ...it, ...p } : it)));
-  }, []);
+  const patchPhoto = useCallback((id: string, p: Partial<AssetItem>) => setPhotos((prev) => prev.map((it) => (it.id === id ? { ...it, ...p } : it))), []);
+  const patchDrawing = useCallback((id: string, p: Partial<AssetItem>) => setDrawings((prev) => prev.map((it) => (it.id === id ? { ...it, ...p } : it))), []);
 
-  const uploadAssetItem = useCallback(
-    async (
-      item: AssetItem,
-      pid: string,
-      patch: (id: string, p: Partial<AssetItem>) => void,
-    ) => {
-      patch(item.id, { status: "uploading", error: undefined });
-      try {
-        let file = item.file;
-        // Photos are downscaled/compressed client-side (S1) so a 12 MP phone
-        // shot lands ~1 MB. Drawings (PDF/DWG) upload as-is.
-        if (item.kind === "photo") {
-          try {
-            file = (await compressImage(item.file)).file;
-          } catch (err) {
-            patch(item.id, {
-              status: "error",
-              error:
-                err instanceof ImageProcessingError
-                  ? err.message
-                  : "We couldn’t read that image. Please try a JPG or PNG.",
-            });
-            return;
-          }
-        }
-        // H9: straight to Storage, then verified + registered (lib/uploads/client.ts).
-        const body = await uploadFile<{ asset_id?: string }>(
-          file,
-          { kind: "project_asset", projectId: pid, assetKind: item.kind },
-          { asset_kind: item.kind, source: "intake" },
-        );
-        if (!body?.asset_id) {
-          patch(item.id, { status: "error", error: "The upload didn't complete. Please try again." });
+  const uploadAssetItem = useCallback(async (item: AssetItem, pid: string, patch: (id: string, p: Partial<AssetItem>) => void) => {
+    patch(item.id, { status: "uploading", error: undefined });
+    try {
+      let file = item.file;
+      // Photos are compressed client-side (S1): a 12 MP phone shot lands ~1 MB.
+      if (item.kind === "photo") {
+        try {
+          file = (await compressImage(item.file)).file;
+        } catch (err) {
+          patch(item.id, { status: "error", error: err instanceof ImageProcessingError ? err.message : "We couldn’t read that image. Please try a JPG or PNG." });
           return;
         }
-        patch(item.id, { status: "done" });
-      } catch (err) {
-        patch(item.id, {
-          status: "error",
-          error: err instanceof Error ? err.message : "Upload failed.",
-        });
       }
-    },
-    [],
-  );
+      const body = await uploadFile<{ asset_id?: string }>(file, { kind: "project_asset", projectId: pid, assetKind: item.kind }, { asset_kind: item.kind, source: "intake" });
+      patch(item.id, body?.asset_id ? { status: "done" } : { status: "error", error: "The upload didn't complete. Please try again." });
+    } catch (err) {
+      patch(item.id, { status: "error", error: err instanceof Error ? err.message : "Upload failed." });
+    }
+  }, []);
 
-  // Flush any queued items once the project exists. Guarded on status, so items
-  // already uploading/done are skipped and each is processed exactly once (no
-  // loop despite `photos`/`drawings` being in the dep list).
+  // Flush queued items once an uploaded plan has created the project (each exactly once — guarded on status).
   useEffect(() => {
     if (!projectId) return;
-    for (const it of photos) {
-      if (it.status === "queued") void uploadAssetItem(it, projectId, patchPhoto);
-    }
-    for (const it of drawings) {
-      if (it.status === "queued") void uploadAssetItem(it, projectId, patchDrawing);
-    }
+    for (const it of photos) if (it.status === "queued") void uploadAssetItem(it, projectId, patchPhoto);
+    for (const it of drawings) if (it.status === "queued") void uploadAssetItem(it, projectId, patchDrawing);
   }, [projectId, photos, drawings, uploadAssetItem, patchPhoto, patchDrawing]);
 
   const onPlanDrop = useCallback(async (accepted: File[]) => {
     const f = accepted[0];
     if (!f) return;
+    setError(null);
     setPlan({ kind: "uploading", name: f.name, progress: 0 });
     try {
-      const res = await uploadWithProgress(f, (pct) =>
-        setPlan({ kind: "uploading", name: f.name, progress: pct }),
-      );
+      const res = await uploadWithProgress(f, (pct) => setPlan({ kind: "uploading", name: f.name, progress: pct }));
       setPlan({ kind: "ready", name: f.name, size: f.size, res });
-      // A project row is created on upload — this is the funnel entry point.
       track(AnalyticsEvent.ProjectStarted, { project_id: res.project_id });
     } catch (err) {
-      setPlan({
-        kind: "error",
-        message: err instanceof Error ? err.message : "Upload failed.",
-      });
+      const message = err instanceof Error ? err.message : "Upload failed.";
+      setPlan(/too large|413|payload/i.test(message) ? { kind: "too_large", name: f.name, size: f.size } : { kind: "error", message });
     }
   }, []);
 
-  const onPhotoDrop = useCallback(
-    (accepted: File[]) => {
+  const onPlanRejected = useCallback((rejections: FileRejection[]) => {
+    const r = rejections[0];
+    if (r?.errors.some((e) => e.code === "file-too-large")) setPlan({ kind: "too_large", name: r.file.name, size: r.file.size });
+    else setPlan({ kind: "error", message: "That file can't be used as a plan — upload a PDF, PNG or JPG." });
+  }, []);
+
+  const addAssets = useCallback(
+    (accepted: File[], kind: AssetKind, setList: typeof setPhotos, patch: typeof patchPhoto) => {
       const items: AssetItem[] = accepted.map((f) => ({
         id: crypto.randomUUID(),
         file: f,
         name: f.name,
-        kind: "photo",
-        previewUrl: URL.createObjectURL(f),
+        kind,
+        previewUrl: kind === "photo" || isImageType(f.type) ? URL.createObjectURL(f) : undefined,
         status: projectId ? "uploading" : "queued",
       }));
-      setPhotos((p) => [...p, ...items]);
-      if (projectId) {
-        for (const it of items) void uploadAssetItem(it, projectId, patchPhoto);
-      }
+      setList((p) => [...p, ...items]);
+      if (projectId) for (const it of items) void uploadAssetItem(it, projectId, patch);
     },
-    [projectId, uploadAssetItem, patchPhoto],
+    [projectId, uploadAssetItem],
   );
 
-  const onDrawingDrop = useCallback(
-    (accepted: File[]) => {
-      const items: AssetItem[] = accepted.map((f) => ({
-        id: crypto.randomUUID(),
-        file: f,
-        name: f.name,
-        kind: discipline,
-        previewUrl: isImageType(f.type) ? URL.createObjectURL(f) : undefined,
-        status: projectId ? "uploading" : "queued",
-      }));
-      setDrawings((p) => [...p, ...items]);
-      if (projectId) {
-        for (const it of items) void uploadAssetItem(it, projectId, patchDrawing);
-      }
-    },
-    [projectId, discipline, uploadAssetItem, patchDrawing],
-  );
-
-  const planDz = useDropzone({
-    onDrop: onPlanDrop,
-    onDropRejected: () =>
-      setPlan({
-        kind: "error",
-        message: "That file can't be used as a plan — upload a PDF, PNG or JPG within the size limit.",
-      }),
-    accept: PLAN_ACCEPT,
-    maxSize: PLAN_MAX_BYTES,
-    multiple: false,
-    disabled: plan.kind === "uploading",
-  });
-
-  const photoDz = useDropzone({
-    onDrop: onPhotoDrop,
-    accept: PHOTO_ACCEPT,
-    maxSize: ASSET_MAX_BYTES,
-    multiple: true,
-  });
-
-  const drawingDz = useDropzone({
-    onDrop: onDrawingDrop,
-    accept: DRAWING_ACCEPT,
-    maxSize: ASSET_MAX_BYTES,
-    multiple: true,
-  });
+  const planDz = useDropzone({ onDrop: onPlanDrop, onDropRejected: onPlanRejected, accept: PLAN_ACCEPT, maxSize: PLAN_MAX_BYTES, multiple: false, disabled: plan.kind === "uploading" });
+  const photoDz = useDropzone({ onDrop: (f) => addAssets(f, "photo", setPhotos, patchPhoto), accept: PHOTO_ACCEPT, maxSize: ASSET_MAX_BYTES, multiple: true });
+  const drawingDz = useDropzone({ onDrop: (f) => addAssets(f, discipline, setDrawings, patchDrawing), accept: DRAWING_ACCEPT, maxSize: ASSET_MAX_BYTES, multiple: true });
 
   async function analyze() {
-    if (plan.kind !== "ready" || analyzing) return;
-    setAnalyzing(true);
-    setAnalyzeError(null);
+    if (plan.kind !== "ready" || busy) return;
+    setBusy("parse");
+    setError(null);
     try {
-      const r = await fetch("/api/parse-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan_id: plan.res.plan_id }),
-      });
-      const b = (await r.json().catch(() => null)) as
-        | { success?: boolean; error?: string }
-        | null;
-      if (!r.ok || !b?.success) {
-        throw new Error(b?.error ?? `Analysis failed (${r.status}).`);
-      }
+      const r = await fetch("/api/parse-plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan_id: plan.res.plan_id }) });
+      const b = (await r.json().catch(() => null)) as { success?: boolean; error?: string } | null;
+      if (!r.ok || !b?.success) throw new Error(b?.error ?? `Reading the plan failed (${r.status}).`);
       track(AnalyticsEvent.PlanParsed, { project_id: plan.res.project_id });
       router.push(`/project/${plan.res.project_id}/plan`);
     } catch (err) {
-      setAnalyzing(false);
-      setAnalyzeError(
-        err instanceof Error ? err.message : "Analysis failed.",
-      );
+      setBusy(null);
+      setError(err instanceof Error ? err.message : "Reading the plan failed.");
     }
   }
 
-  /**
-   * Start a project with nothing to parse (G1). The project is created by the
-   * plan upload everywhere else in this app, which is exactly why a project
-   * could not exist without a drawing; this is the other door, and it needs the
-   * plot because a drawn plan has no other source of scale.
-   */
+  /** G1: a project with nothing to parse — the plot is its scale. Queued photos and drawings upload before we leave. */
   async function startDrawnPlan() {
     const size = parsePlot(plot);
-    if (!size || drawingPlan) return;
-    setDrawingPlan(true);
-    setDrawError(null);
+    if (!size || busy) return;
+    setBusy("draw");
+    setError(null);
     try {
-      const res = await fetch("/api/draw-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...size,
-          name: projectName.trim() || undefined,
-          city,
-        }),
-      });
-      const body = (await res.json().catch(() => null)) as
-        | { project_id?: string; error?: string }
-        | null;
-      if (!res.ok || !body?.project_id) {
-        throw new Error(body?.error ?? `Could not start a drawn plan (${res.status}).`);
-      }
-      router.push(`/project/${body.project_id}/plan`);
+      const res = await fetch("/api/draw-plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...size, name: projectName.trim() || undefined, city }) });
+      const body = (await res.json().catch(() => null)) as { project_id?: string; error?: string } | null;
+      if (!res.ok || !body?.project_id) throw new Error(body?.error ?? `Could not start a drawn plan (${res.status}).`);
+      const pid = body.project_id;
+      await Promise.all([...photos.filter((p) => p.status === "queued").map((p) => uploadAssetItem(p, pid, patchPhoto)), ...drawings.filter((d) => d.status === "queued").map((d) => uploadAssetItem(d, pid, patchDrawing))]);
+      router.push(`/project/${pid}/plan`);
     } catch (err) {
-      setDrawingPlan(false);
-      setDrawError(err instanceof Error ? err.message : "Could not start a drawn plan.");
+      setBusy(null);
+      setError(err instanceof Error ? err.message : "Could not start a drawn plan.");
     }
   }
 
-  const planReady = plan.kind === "ready";
-  const queuedNote =
-    !projectId && (photos.length > 0 || drawings.length > 0)
-      ? "Saved to your project once the plan is added."
-      : null;
+  // Continue: one action per way, disabled with the reason until that way is valid.
+  const plotOk = !!parsePlot(plot);
+  const blockReason =
+    busy === "parse"
+      ? "Reading your plan…"
+      : busy === "draw"
+        ? "Opening the canvas…"
+        : way === "upload"
+          ? plan.kind === "ready"
+            ? null
+            : plan.kind === "uploading"
+              ? "Wait for the upload to finish"
+              : "Add a plan file that uploads, or choose another way to start"
+          : way === "photos" && photos.length === 0
+            ? "Add at least one photo of the garden"
+            : !plotOk
+              ? "Enter the plot's width and depth in metres"
+              : null;
+  const onContinue = () => (blockReason ? undefined : way === "upload" ? void analyze() : void startDrawnPlan());
 
   return (
-    <div className="flex flex-col gap-gutter">
-      {/* Dropzone grid -------------------------------------------------- */}
-      <div className="grid grid-cols-1 gap-gutter lg:grid-cols-2">
-        {/* Floorplans & CAD */}
-        <section className="rounded-lg border border-ink-100 bg-paper p-8">
-          <p className="label-caps mb-md text-ink-500">Floorplans &amp; CAD</p>
+    <div className="flex flex-col gap-10" data-intake>
+      <div role="radiogroup" aria-label="How would you like to start?" className={`grid grid-cols-1 gap-4 ${ways.length === 3 ? "md:grid-cols-3" : ways.length === 2 ? "md:grid-cols-2" : ""}`}>
+        {ways.map((w) => {
+          const on = way === w.key;
+          return (
+            <button
+              key={w.key}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => setWay(w.key)}
+              className={`flex flex-col items-start gap-3 border p-5 text-left ${FOCUS} ${on ? "border-bp-line-hairline border-l-2 border-l-bp-brass bg-bp-surface-raised" : "border-bp-line-control hover:bg-bp-surface-raised"}`}
+              data-way={w.key}
+            >
+              <Icon name={w.icon} size={20} className="text-bp-ink-secondary" />
+              <span className="t-heading-md text-bp-ink-primary">{w.title}</span>
+              <span className="t-body-sm text-bp-ink-secondary">{w.body}</span>
+            </button>
+          );
+        })}
+      </div>
 
-          <AnimatePresence mode="wait">
-            {plan.kind === "uploading" ? (
-              <motion.div
-                key="uploading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.24 }}
-                className="flex h-[240px] flex-col items-center justify-center gap-lg rounded-md px-8"
-              >
-                <p className="font-display text-body-lg italic text-ink-700">
-                  Uploading {plan.name}…
-                </p>
-                <div className="h-2 w-full max-w-[360px] overflow-hidden rounded-full bg-bone">
-                  <div
-                    className="h-full rounded-full bg-brass-600 transition-[width] duration-200"
-                    style={{ width: `${Math.max(4, plan.progress)}%` }}
-                  />
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="dz"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.24 }}
-              >
-                <div
-                  {...planDz.getRootProps()}
-                  className={cn(
-                    "flex h-[240px] cursor-pointer flex-col items-center justify-center gap-md rounded-md border-2 border-dashed px-8 text-center transition-colors duration-200 outline-none",
-                    planDz.isDragActive
-                      ? "border-brass-600 bg-primary-fixed/40"
-                      : plan.kind === "error"
-                        ? "border-error bg-error/5"
-                        : "border-ink-100 hover:border-brass-600 hover:bg-primary-fixed/30",
-                  )}
-                >
-                  <input {...planDz.getInputProps()} />
-                  <span
-                    className="material-symbols-outlined text-[32px] text-brass-600"
-                    aria-hidden="true"
-                  >
-                    upload_file
-                  </span>
-                  <p className="font-body text-body-md text-on-surface-variant">
-                    Drop your DWG, RVT, or PDF
-                    <span className="text-ink-500">
-                      {" "}
-                      · or click to browse
-                    </span>
-                  </p>
-                  {plan.kind === "error" && (
-                    <p className="font-body-sm text-body-sm text-error">
-                      {plan.message}
-                    </p>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {planReady && plan.kind === "ready" && (
-            <div className="mt-md flex items-center gap-md rounded-md border border-ink-100 bg-canvas px-md py-sm">
-              <span
-                className="material-symbols-outlined text-[20px] text-on-surface-variant"
-                aria-hidden="true"
-              >
-                description
+      {way === "upload" ? (
+        <section aria-label="Your plan file" className="flex flex-col gap-3">
+          {plan.kind === "ready" ? (
+            <div className="flex flex-wrap items-center gap-4 border border-dashed border-bp-line-control px-5 py-4" data-plan-ready>
+              <Icon name="description" size={20} className="text-bp-ink-secondary" />
+              <span className="min-w-0 flex-1">
+                <span className="t-body-sm block truncate text-bp-ink-primary">{plan.name}</span>
+                <span className="t-label-md block font-bp-mono text-bp-ink-secondary">{mb(plan.size)} · uploaded</span>
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-body-sm text-body-sm text-ink-900">
-                  {plan.name}
-                </p>
-                <p className="font-mono text-[12px] text-ink-500">
-                  {formatBytes(plan.size)}
+              <button type="button" onClick={() => setPlan({ kind: "idle" })} className={`inline-flex h-11 items-center border border-bp-line-control px-4 t-nav-item-active text-bp-ink-primary hover:bg-bp-surface-sunken ${FOCUS}`}>
+                Choose another file
+              </button>
+            </div>
+          ) : plan.kind === "uploading" ? (
+            <div className="border border-dashed border-bp-line-control px-5 py-6" aria-live="polite" aria-busy="true">
+              <p className="t-body-sm text-bp-ink-primary">Uploading {plan.name}…</p>
+              <div className="mt-3 h-1 w-full max-w-[420px] bg-bp-surface-sunken" aria-hidden="true">
+                <div className="h-1 bg-bp-ink-primary transition-[width]" style={{ width: `${Math.max(4, plan.progress)}%` }} />
+              </div>
+            </div>
+          ) : (
+            <div {...planDz.getRootProps({ "aria-label": "Upload your floor plan — PDF, PNG or JPG" })} className={`flex min-h-[140px] cursor-pointer flex-col items-center justify-center gap-2 border border-dashed px-6 text-center ${FOCUS} ${planDz.isDragActive ? "border-bp-ink-primary bg-bp-surface-raised" : "border-bp-line-control hover:bg-bp-surface-raised"}`}>
+              <input {...planDz.getInputProps({ "aria-label": "Floor plan file" })} />
+              <Icon name="upload_file" size={24} className="text-bp-ink-secondary" />
+              <p className="t-body-sm text-bp-ink-primary">Drop your floor plan here, or choose a file</p>
+              <p className="t-label-md font-bp-mono text-bp-ink-secondary">PDF, PNG or JPG · up to {mb(PLAN_MAX_BYTES)}</p>
+            </div>
+          )}
+          {plan.kind === "too_large" ? (
+            <div role="alert" className="surface-inverse flex gap-3 bg-bp-alert-surface px-5 py-4 text-bp-alert-ink" data-plan-too-large>
+              <Icon name="error" size={20} />
+              <div>
+                <p className="t-label-caps">THAT FILE IS TOO LARGE TO UPLOAD</p>
+                <p className="t-body-sm mt-1">
+                  {plan.name} is {mb(plan.size)}. Export just the floor-plan sheet (one page, PDF or image) and try again — the rest of the set isn&rsquo;t needed to price your plan.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setPlan({ kind: "idle" })}
-                className="focus-ring font-body-sm text-body-sm font-semibold text-brass-600 hover:underline"
-              >
-                Replace
-              </button>
             </div>
-          )}
-
-          {/* G1: the other way in. A garden, an extension, a villa whose only
-              drawing is a photograph of a drawing — none of those have a
-              floorplan to parse, and until now none of them could become a
-              project at all. */}
-          {gardenPilot && !planReady && plan.kind !== "uploading" && (
-            <div className="mt-lg border-t border-ink-100 pt-lg">
-              <p className="label-caps mb-md text-ink-500">Or draw your plan</p>
-              <p className="mb-md font-body-sm text-body-sm text-on-surface-variant">
-                No drawing to upload? Start from a blank canvas and outline the
-                rooms or garden zones yourself.
-              </p>
-              <PlotSizeFields
-                value={plot}
-                onChange={setPlot}
-                idPrefix="intake"
-                disabled={drawingPlan}
-              />
-              {drawError && (
-                <p className="mt-md font-body-sm text-body-sm text-error">{drawError}</p>
-              )}
-              <button
-                type="button"
-                onClick={startDrawnPlan}
-                disabled={!parsePlot(plot) || drawingPlan}
-                className="focus-ring mt-lg flex h-12 items-center gap-sm rounded-lg border border-brass-600 px-lg font-body-sm text-body-sm font-semibold text-brass-600 transition-colors hover:bg-primary-fixed/40 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                  draw
-                </span>
-                {drawingPlan ? "Opening the canvas…" : "Draw your plan"}
-              </button>
+          ) : plan.kind === "error" ? (
+            <div role="alert" className="surface-inverse flex gap-3 bg-bp-alert-surface px-5 py-4 text-bp-alert-ink">
+              <Icon name="error" size={20} />
+              <p className="t-body-sm">{plan.message}</p>
             </div>
-          )}
+          ) : null}
         </section>
-
-        {/* Site photography */}
-        <section className="rounded-lg border border-ink-100 bg-paper p-8">
-          <p className="label-caps mb-md text-ink-500">Site photography</p>
-          <div
-            {...photoDz.getRootProps()}
-            className={cn(
-              "flex h-[240px] cursor-pointer flex-col items-center justify-center gap-md rounded-md border-2 border-dashed px-8 text-center transition-colors duration-200 outline-none",
-              photoDz.isDragActive
-                ? "border-brass-600 bg-primary-fixed/40"
-                : "border-ink-100 hover:border-brass-600 hover:bg-primary-fixed/30",
-            )}
-          >
-            <input {...photoDz.getInputProps()} />
-            <span
-              className="material-symbols-outlined text-[32px] text-brass-600"
-              aria-hidden="true"
-            >
-              add_photo_alternate
-            </span>
-            <p className="font-body text-body-md text-on-surface-variant">
-              Drop JPG, PNG, or HEIC
-              <span className="text-ink-500"> · or click to browse</span>
-            </p>
+      ) : (
+        <section aria-label="Your plot" className="flex flex-col gap-3">
+          <p className="t-body-sm text-bp-ink-secondary">{way === "draw" ? "The canvas is your plot, so what you draw comes out in real metres." : "The canvas is your plot; your photos stay with the project and we draw the zones with you."}</p>
+          <div className="max-w-[560px]">
+            <PlotSizeFields value={plot} onChange={setPlot} idPrefix="intake" disabled={busy === "draw"} />
           </div>
-
-          {photos.length > 0 && (
-            <div className="mt-md grid grid-cols-4 gap-sm">
-              {photos.map((p) => (
-                <AssetThumb key={p.id} item={p} />
-              ))}
-            </div>
-          )}
         </section>
-      </div>
-
-      {/* Existing drawings (MEP · electrical · HVAC) -------------------- */}
-      <section className="rounded-lg border border-ink-100 bg-paper p-8">
-        <div className="mb-md flex flex-wrap items-center justify-between gap-md">
-          <div>
-            <p className="label-caps text-ink-500">
-              Existing drawings (MEP · electrical · HVAC)
-            </p>
-            <p className="mt-xs font-body-sm text-body-sm text-on-surface-variant">
-              Optional. Stored with your project today; revised MEP,
-              electrical and HVAC drawings are a roadmap deliverable.
-            </p>
-          </div>
-          {/* Discipline the next dropped files are filed under. */}
-          <div className="flex overflow-hidden rounded border border-ink-100">
-            {DRAWING_DISCIPLINES.map((d) => (
-              <button
-                key={d.kind}
-                type="button"
-                onClick={() => setDiscipline(d.kind)}
-                className={cn(
-                  "px-md py-xs font-body-sm text-body-sm font-semibold transition-colors",
-                  discipline === d.kind
-                    ? "bg-brass-600 text-on-primary"
-                    : "bg-paper text-ink-700 hover:bg-surface-container-low",
-                )}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div
-          {...drawingDz.getRootProps()}
-          className={cn(
-            "flex h-[160px] cursor-pointer flex-col items-center justify-center gap-md rounded-md border-2 border-dashed px-8 text-center transition-colors duration-200 outline-none",
-            drawingDz.isDragActive
-              ? "border-brass-600 bg-primary-fixed/40"
-              : "border-ink-100 hover:border-brass-600 hover:bg-primary-fixed/30",
-          )}
-        >
-          <input {...drawingDz.getInputProps()} />
-          <span
-            className="material-symbols-outlined text-[32px] text-brass-600"
-            aria-hidden="true"
-          >
-            description
-          </span>
-          <p className="font-body text-body-md text-on-surface-variant">
-            Drop PDF, DWG, DXF, or images as{" "}
-            <span className="font-semibold text-ink-900">
-              {KIND_LABEL[discipline]}
-            </span>
-            <span className="text-ink-500"> · or click to browse</span>
-          </p>
-        </div>
-
-        {drawings.length > 0 && (
-          <ul className="mt-md flex flex-col gap-xs">
-            {drawings.map((d) => (
-              <li
-                key={d.id}
-                className="flex items-center gap-md rounded-md border border-ink-100 bg-canvas px-md py-sm"
-              >
-                <span
-                  className="material-symbols-outlined text-[20px] text-on-surface-variant"
-                  aria-hidden="true"
-                >
-                  description
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-body-sm text-body-sm text-ink-900">
-                    {d.name}
-                  </p>
-                  <p className="font-mono text-[11px] text-ink-500">
-                    {KIND_LABEL[d.kind]}
-                  </p>
-                </div>
-                <StatusBadge item={d} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {queuedNote && (
-        <p className="font-body-sm text-body-sm text-on-surface-variant">
-          {queuedNote}
-        </p>
       )}
 
-      {/* Project basics ------------------------------------------------- */}
-      <section className="rounded-lg border border-ink-100 bg-paper p-8">
-        <p className="label-caps mb-lg text-ink-500">Project basics</p>
-        <div className="grid grid-cols-1 gap-gutter md:grid-cols-3">
-          <label className="flex flex-col gap-xs">
-            <span className="label-caps text-ink-500">Project name</span>
-            <input
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Mudon Al Naseem villa"
-              className="h-12 rounded border border-ink-100 bg-paper px-md font-body-sm text-body-sm text-ink-900 outline-none focus:border-brass-600 focus:ring-1 focus:ring-brass-600"
-            />
-          </label>
-          <label className="flex flex-col gap-xs">
-            <span className="label-caps text-ink-500">City</span>
-            <select
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="h-12 rounded border border-ink-100 bg-paper px-md font-body-sm text-body-sm text-ink-900 outline-none focus:border-brass-600 focus:ring-1 focus:ring-brass-600"
-            >
+      <section aria-labelledby={`${ids}-more`} className="flex flex-col gap-4">
+        <h2 id={`${ids}-more`} className="t-label-caps text-bp-ink-tertiary">
+          {way === "photos" ? "PHOTOS OF THE GARDEN" : "ADD MORE · OPTIONAL"}
+        </h2>
+        <div className={`grid grid-cols-1 gap-4 ${way === "photos" ? "" : "lg:grid-cols-2"}`}>
+          <div>
+            <div {...photoDz.getRootProps({ "aria-label": "Add site photos — JPG, PNG or HEIC" })} className={`flex min-h-[110px] cursor-pointer flex-col items-center justify-center gap-1 border border-dashed px-6 text-center ${FOCUS} ${photoDz.isDragActive ? "border-bp-ink-primary bg-bp-surface-raised" : "border-bp-line-control hover:bg-bp-surface-raised"}`}>
+              <input {...photoDz.getInputProps({ "aria-label": "Site photos" })} />
+              <Icon name="add_photo_alternate" size={22} className="text-bp-ink-secondary" />
+              <p className="t-body-sm text-bp-ink-primary">Site photos</p>
+              <p className="t-label-md font-bp-mono text-bp-ink-secondary">JPG, PNG or HEIC</p>
+            </div>
+            {photos.length > 0 ? (
+              <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+                {photos.map((p) => (
+                  <li key={p.id} className="relative aspect-square overflow-hidden border border-bp-line-hairline" title={p.error ?? p.status}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the user's own file */}
+                    {p.previewUrl ? <img src={p.previewUrl} alt={p.name} className="size-full object-cover" /> : null}
+                    <span className="t-label-md absolute inset-x-0 bottom-0 bg-bp-surface-base/90 px-1 text-bp-ink-primary">{STATUS[p.status]}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          {way !== "photos" ? (
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="File the next drawings under">
+                {DRAWING_DISCIPLINES.map((d) => (
+                  <button key={d.kind} type="button" aria-pressed={discipline === d.kind} onClick={() => setDiscipline(d.kind)} className={`inline-flex min-h-9 items-center border-b-2 px-1 t-label-md ${FOCUS} ${discipline === d.kind ? "border-bp-brass text-bp-ink-primary" : "border-transparent text-bp-ink-secondary"}`}>
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+              <div {...drawingDz.getRootProps({ "aria-label": `Add existing drawings as ${KIND_LABEL[discipline]}` })} className={`flex min-h-[110px] cursor-pointer flex-col items-center justify-center gap-1 border border-dashed px-6 text-center ${FOCUS} ${drawingDz.isDragActive ? "border-bp-ink-primary bg-bp-surface-raised" : "border-bp-line-control hover:bg-bp-surface-raised"}`}>
+                <input {...drawingDz.getInputProps({ "aria-label": "Existing drawings" })} />
+                <Icon name="description" size={22} className="text-bp-ink-secondary" />
+                <p className="t-body-sm text-bp-ink-primary">Existing drawings · {KIND_LABEL[discipline]}</p>
+                <p className="t-label-md font-bp-mono text-bp-ink-secondary">PDF, DWG, DXF or images · stored with the project</p>
+              </div>
+              {drawings.length > 0 ? (
+                <ul className="mt-3">
+                  {drawings.map((d) => (
+                    <li key={d.id} className="flex items-center gap-3 border-b border-bp-line-hairline py-2">
+                      <span className="t-body-sm min-w-0 flex-1 truncate text-bp-ink-primary">{d.name}</span>
+                      <span className="t-label-md text-bp-ink-secondary">{KIND_LABEL[d.kind]}</span>
+                      <span className="t-label-md text-bp-ink-secondary" title={d.error}>
+                        {STATUS[d.status]}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {!projectId && (photos.length > 0 || drawings.length > 0) ? <p className="t-label-md text-bp-ink-secondary">Saved to your project once it exists.</p> : null}
+      </section>
+
+      <section aria-labelledby={`${ids}-about`} className="flex flex-col gap-4">
+        <h2 id={`${ids}-about`} className="t-label-caps text-bp-ink-tertiary">
+          ABOUT THE PROJECT
+        </h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${ids}-name`} className="t-label-caps text-bp-ink-tertiary">
+              PROJECT NAME
+            </label>
+            <input id={`${ids}-name`} value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="e.g. Our villa — ground floor" className={INPUT} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${ids}-city`} className="t-label-caps text-bp-ink-tertiary">
+              CITY
+            </label>
+            <select id={`${ids}-city`} value={city} onChange={(e) => setCity(e.target.value)} className={INPUT}>
               {CITIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+                <option key={c}>{c}</option>
               ))}
             </select>
-          </label>
-          <label className="flex flex-col gap-xs">
-            <span className="label-caps text-ink-500">
-              Estimated budget
-            </span>
-            <div className="flex h-12 items-center gap-sm rounded border border-ink-100 bg-paper px-md">
-              <span className="font-mono text-body-sm text-ink-500">AED</span>
-              <span className="font-mono text-body-sm tabular-nums text-ink-900">
-                {budget.toLocaleString("en-US")}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={200_000}
-              max={2_000_000}
-              step={10_000}
-              value={budget}
-              onChange={(e) => setBudget(Number(e.target.value))}
-              className="mt-xs accent-brass-600"
-              aria-label="Estimated budget"
-            />
-          </label>
+          </div>
         </div>
       </section>
 
-      {analyzeError && (
-        <p className="font-body-sm text-body-sm text-error">{analyzeError}</p>
-      )}
-
-      {/* Action row ----------------------------------------------------- */}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard")}
-          className="focus-ring flex h-12 items-center rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
-        >
-          Save and continue later
-        </button>
-        <button
-          type="button"
-          onClick={analyze}
-          disabled={!planReady || analyzing}
-          className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-xl font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {analyzing ? "Analyzing…" : "Analyze my villa"}
-          <span
-            className="material-symbols-outlined text-[18px]"
-            aria-hidden="true"
-          >
-            arrow_forward
-          </span>
-        </button>
-      </div>
-
-      <p className="font-mono text-[12px] uppercase tracking-wider text-ink-500">
-        {formatAed(budget)} budget · {city}
-        {projectName ? ` · ${projectName}` : ""}
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Small status helpers
-// ---------------------------------------------------------------------------
-
-function statusMeta(status: AssetStatus): { icon: string; label: string; tone: string } {
-  switch (status) {
-    case "done":
-      return { icon: "check_circle", label: "Saved", tone: "text-brass-600" };
-    case "uploading":
-      return { icon: "progress_activity", label: "Uploading…", tone: "text-ink-500" };
-    case "error":
-      return { icon: "error", label: "Failed", tone: "text-error" };
-    default:
-      return { icon: "schedule", label: "Queued", tone: "text-ink-500" };
-  }
-}
-
-function AssetThumb({ item }: { item: AssetItem }) {
-  const meta = statusMeta(item.status);
-  return (
-    <div
-      className="relative aspect-square overflow-hidden rounded-md border border-ink-100"
-      title={item.error ?? meta.label}
-    >
-      {item.previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={item.previewUrl}
-          alt={item.name}
-          className="size-full object-cover"
-        />
-      ) : (
-        <div className="flex size-full items-center justify-center bg-bone">
-          <span className="material-symbols-outlined text-ink-500" aria-hidden="true">
-            description
-          </span>
+      {error ? (
+        <div role="alert" className="surface-inverse bg-bp-alert-surface px-5 py-4 text-bp-alert-ink">
+          <p className="t-body-sm">{error}</p>
         </div>
-      )}
-      <span
-        className={cn(
-          "absolute inset-x-0 bottom-0 flex items-center gap-xs bg-paper/90 px-1.5 py-0.5 font-body-sm text-[10px] font-semibold",
-          meta.tone,
-        )}
-      >
-        <span className="material-symbols-outlined text-[12px]" aria-hidden="true">
-          {meta.icon}
-        </span>
-        {meta.label}
-      </span>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-4">
+        <button
+          type="button"
+          onClick={onContinue}
+          aria-disabled={!!blockReason}
+          aria-describedby={blockReason ? `${ids}-why` : undefined}
+          className={`inline-flex h-11 items-center px-5 t-nav-item-active rounded-none ${FOCUS} ${blockReason ? "cursor-not-allowed bg-bp-surface-sunken text-bp-ink-tertiary" : "bg-bp-ink-primary text-bp-ink-on-inverse hover:bg-bp-ink-secondary"}`}
+          data-testid="intake-continue"
+        >
+          Continue
+        </button>
+        {blockReason ? (
+          <span id={`${ids}-why`} className="t-label-md font-bp-mono text-bp-ink-secondary" aria-live="polite">
+            {blockReason}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function StatusBadge({ item }: { item: AssetItem }) {
-  const meta = statusMeta(item.status);
-  return (
-    <span
-      className={cn("flex items-center gap-xs font-body-sm text-[12px] font-semibold", meta.tone)}
-      title={item.error ?? meta.label}
-    >
-      <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
-        {meta.icon}
-      </span>
-      {meta.label}
-    </span>
-  );
-}
+const STATUS: Record<AssetStatus, string> = { queued: "Queued", uploading: "Uploading…", done: "Saved", error: "Failed" };

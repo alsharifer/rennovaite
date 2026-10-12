@@ -43,12 +43,12 @@ export async function ProjectShell({ projectId, content = "atelier", children }:
 }
 
 /** Settings, the firm book and quote review: the chrome without a project. */
-export async function AccountShell({ firmId, content = "atelier", children }: { firmId?: string; content?: "atelier" | "blueprint"; children: ReactNode }) {
+export async function AccountShell({ firmId, content = "atelier", skin, children }: { firmId?: string; content?: "atelier" | "blueprint"; skin?: "warm"; children: ReactNode }) {
   const caller = await getPageCaller();
   if (!caller) return <>{children}</>;
   const ctx = await loadRailContextWithoutProject(db(), caller, { firmId });
   return (
-    <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()} content={content}>
+    <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()} content={content} skin={skin}>
       {children}
     </ShellFrame>
   );

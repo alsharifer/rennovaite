@@ -3,7 +3,7 @@
 // dark, at desktop / tablet / phone (K4–K7, KV).
 //
 //   node scripts/k-page-check.mjs [port] --shots=screenshots/k4 [--projects=<id,id>] \
-//        name=/project/<id>/boq/revisions [name2=/firms/<id> …] [--sizes=desktop,tablet,phone]
+//        name=/project/<id>/boq/revisions [name2=/firms/<id> …] [--sizes=desktop,tablet,phone] [--anon]
 //
 // Signs in as the pipeline dev account (scripts/lib/dev-auth.mjs — a real
 // session, no bypass) and makes it a member of --projects. A page is checked
@@ -26,7 +26,8 @@ const pages = args.filter((a) => !a.startsWith("--") && a.includes("=")).map((a)
 const SIZE = { desktop: [1440, 1000], tablet: [834, 1112], phone: [390, 844] };
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 
-const b = await openBrowser({ script: "k-page-check", projects });
+const anon = args.includes("--anon");
+const b = await openBrowser({ script: "k-page-check", projects, signedIn: !anon });
 let failures = 0;
 try {
   for (const [name, path] of pages) {
