@@ -81,7 +81,7 @@ describe("the UI has no direct link to a document route", () => {
       "app/project/[id]/boq/page.tsx",
       "app/project/[id]/drawings/page.tsx",
       "components/blueprint/boq/BoqReview.tsx",
-      "components/documents/PackExport.tsx",
+      "components/blueprint/documents/DocumentsExport.tsx",
     ]);
   });
 });

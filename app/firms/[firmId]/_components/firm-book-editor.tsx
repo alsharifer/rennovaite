@@ -324,7 +324,7 @@ export function FirmBookEditor({
             </p>
           )}
         </section>
-        <section aria-labelledby={`${ids}-rb`}>
+        <section id="reference-basis" className="scroll-mt-20" aria-labelledby={`${ids}-rb`}>
           <h2 id={`${ids}-rb`} className="t-label-caps text-bp-ink-tertiary">
             REFERENCE BASIS
           </h2>
