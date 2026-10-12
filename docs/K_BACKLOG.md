@@ -4,6 +4,30 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## Found in K4 (2026-10-12)
+
+- **"Link causes to lines" has no record behind it** (07 Revisions, 21:450).
+  A window event (a session decision, a plan edit) can only be shown as "not
+  linked to lines": nothing stores which lines an event moved. Needs a
+  `cause_links (event, boq_id, line_key)` record + a route; the button is
+  disabled with that reason until then.
+- **Internal review pack** (06 Documents, 22:548) — a DRAFT-watermarked pack
+  for the firm's own team that would leave without the client gates. Not
+  built: it is a release-rule decision (T5 says every document leaves through
+  the one gate) before it is a watermark. Shown disabled with its reason.
+- **Reference basis locks the proposal, not the pack.** The frame says
+  "BLOCKS CLIENT PACK"; today's gate (L4) refuses only the client proposal —
+  drawings, render pack and BoQ PDF still export on a market basis. Extending
+  the gate is a pricing-policy change; Documents labels the row truthfully
+  ("BLOCKS CLIENT PROPOSAL") until it is decided.
+- **Conflicts cannot occur since H8** (051's one-active-entry index); the
+  conflict UI in Rates & Basis is kept for data that predates 051 and was not
+  exercisable on dev. The walkthrough covers outliers and unit checks only.
+- **Revisions "cause" on the hub / revisions table** shows the FIRST recorded
+  cause of a revision; a revision with several causes reads "Rates · … " for
+  one of them. A per-revision cause summary wants the same record as
+  "Link causes".
+
 ## Found in K3 (2026-10-12)
 
 - **"Show on plan" opens the plan, not the element.** The plan page takes no

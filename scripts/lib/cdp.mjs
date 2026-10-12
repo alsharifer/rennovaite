@@ -39,14 +39,14 @@ const KEYS = {
 };
 
 /**
- * @param {{ who?: string, script?: string, projects?: string[], host?: string, signedIn?: boolean }} [opts]
+ * @param {{ who?: string, script?: string, projects?: string[], host?: string, signedIn?: boolean, args?: string[] }} [opts]
  */
 export async function openBrowser(opts = {}) {
   const chromePath = CHROMES.find((p) => fs.existsSync(p));
   if (!chromePath) throw new Error("needs Chrome or Edge");
   const port = 9300 + Math.floor(Math.random() * 600);
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "k-cdp-"));
-  const chrome = spawn(chromePath, ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--window-size=1440,1000", "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
+  const chrome = spawn(chromePath, ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--window-size=1440,1000", "--hide-scrollbars", ...(opts.args ?? []), "about:blank"], { stdio: "ignore" });
 
   let wsUrl;
   for (let i = 0; i < 60 && !wsUrl; i++) {

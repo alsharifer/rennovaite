@@ -233,7 +233,7 @@ export function OverlayEditor({
       {/* Palette + delete toolbar (edit only) */}
       {!readOnly && (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="label-caps mr-1 text-ink-500">Add:</span>
+        <span className="label-caps mr-1 text-bp-ink-secondary">Add:</span>
         {types.map((t) => {
           const active = paletteType === t;
           return (
@@ -362,7 +362,7 @@ export function OverlayEditor({
         </svg>
       </div>
 
-      <p className="text-xs text-ink-500">
+      <p className="text-xs text-bp-ink-secondary">
         {loading
           ? "Loading fixtures…"
           : error
@@ -388,7 +388,7 @@ function FixtureInspector({ f, readOnly, onSpec }: { f: Fixture; readOnly: boole
       <span className="font-semibold text-ink-900">{name}</span>
       {sizeKeys.map(([k, label]) => (
         <label key={k} className="flex items-center gap-1">
-          <span className="text-ink-500">{label}</span>
+          <span className="text-bp-ink-secondary">{label}</span>
           <input type="number" step={50} disabled={readOnly} value={draft[k] ?? 0} onChange={(e) => setDraft({ ...draft, [k]: Number(e.target.value) })} className="focus-ring w-[72px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums" />
         </label>
       ))}
@@ -399,7 +399,7 @@ function FixtureInspector({ f, readOnly, onSpec }: { f: Fixture; readOnly: boole
       )}
       {isLight && (
         <label className="flex items-center gap-1">
-          <span className="text-ink-500">Fitting</span>
+          <span className="text-bp-ink-secondary">Fitting</span>
           <select disabled={readOnly} value={String(spec.fitting ?? "spike")} onChange={(e) => onSpec({ ...spec, fitting: e.target.value, source: "as_designed" })} className="focus-ring rounded border border-ink-100 bg-paper px-1.5 py-0.5">
             {LIGHT_FITTINGS.map((x) => (
               <option key={x} value={x}>{x}</option>

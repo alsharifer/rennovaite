@@ -11,9 +11,11 @@ import {
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
-import { Button } from "@/components/ui/button";
+import { TopBarActions } from "@/components/blueprint/shell/TopBar";
 import type { RoomAreaDispute } from "@/lib/parse/disputes";
 import { defaultUnroofed, roomTypeOptions } from "@/lib/plan/zones";
+import polygonClipping from "polygon-clipping";
+
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { polygonArea } from "@/lib/plan/polygon";
 import { separateOverlappingRooms } from "@/lib/plan/separate";
@@ -32,9 +34,13 @@ const PADDING = 24;
 const HISTORY_LIMIT = 20;
 // Atelier viewer palette — bone room fills at 50% on a paper canvas with
 // ink-900 walls.
+const TOOL_BTN = "inline-flex h-9 items-center gap-1.5 rounded-none border border-bp-line-control px-3 t-label-md text-bp-ink-primary hover:bg-bp-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring disabled:cursor-not-allowed disabled:text-bp-ink-tertiary";
 const BONE_FILL = "#EDE6D8";
 const PRIMARY_FIXED = "#FFDDB3";
 const INK_900 = "#0F1B2D";
+// K5: Blueprint ink (falls back to the Atelier ink outside a Blueprint root).
+const INK = "var(--color-ink-primary, #0F1B2D)";
+const INK_ON = "var(--color-surface-base, #FFFFFF)";
 const INK_700 = "#4F4539";
 // G1: open zones read as ground, not as floor — a muted sage against the bone.
 const OPEN_ZONE_FILL = "#DCE3D2";
@@ -376,22 +382,43 @@ export function EditablePlanViewer({
   // rooms whose boxes crossed while their polygons did not — every L-shaped
   // room next to a neighbour — so the banner could say "uncostable" about a
   // plan the costing route would happily accept.
-  const overlappingIds = useMemo(
+  const overlapReport = useMemo(
     () =>
-      new Set(
-        findOverlaps(
-          rooms
-            // G5: a removed site-reference zone is not in the design; a zone
-            // drawn over its footprint is not an overlap.
-            .filter((r) => {
-              const s = siteRefs?.[r.id] ?? r;
-              return !r.isDeleted && !(s.site_reference && s.disposition === "remove");
-            })
-            .map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
-        ).room_ids,
+      findOverlaps(
+        rooms
+          // G5: a removed site-reference zone is not in the design; a zone
+          // drawn over its footprint is not an overlap.
+          .filter((r) => {
+            const s = siteRefs?.[r.id] ?? r;
+            return !r.isDeleted && !(s.site_reference && s.disposition === "remove");
+          })
+          .map((r) => ({ id: r.id, name: r.name_en, polygon: r.polygon })),
       ),
     [rooms, siteRefs],
   );
+  const overlappingIds = useMemo(() => new Set(overlapReport.room_ids), [overlapReport]);
+  // K5 (24:814): the floor each overlapping pair counts twice, drawn as its own
+  // shape — ink 30% with a dashed ink outline — over rooms at ink 5%.
+  const overlapShapes = useMemo(() => {
+    if (!overlapReport.has_overlaps) return [] as [number, number][][];
+    const byId = new Map(rooms.map((r) => [r.id, r.polygon]));
+    const out: [number, number][][] = [];
+    for (const p of overlapReport.pairs) {
+      const a = byId.get(p.a_id);
+      const b = byId.get(p.b_id);
+      if (!a || !b) continue;
+      try {
+        const ring = (pts: [number, number][]) => [...pts, pts[0]!];
+        const mp = polygonClipping.intersection([ring(a)] as never, [ring(b)] as never) as unknown as [number, number][][][];
+        for (const poly of mp) if (poly[0]) out.push(poly[0]);
+      } catch {
+        /* a degenerate ring: the pair is still listed in the plan check */
+      }
+    }
+    return out;
+  }, [overlapReport, rooms]);
+  // K5: the plan check's overlap list selects BOTH rooms of a pair.
+  const [focusIds, setFocusIds] = useState<string[]>([]);
   // Rooms the parser flagged low-confidence — surfaced for review in the editor.
   const lowConfidenceIds = useMemo(() => {
     const ids = new Set<string>();
@@ -830,6 +857,25 @@ export function EditablePlanViewer({
     );
   }, [rooms, snapshot, recomputeArea, flashInfo]);
 
+  // K5: the plan page's Plan check panel drives the editor through two window
+  // events — "Fix overlaps · N" runs the same separation as the toolbar, and an
+  // overlap row selects both rooms of its pair.
+  useEffect(() => {
+    if (!editing) return;
+    const onFix = () => fixOverlaps();
+    const onSelect = (e: Event) => {
+      const ids = (e as CustomEvent<{ ids?: string[] }>).detail?.ids ?? [];
+      setFocusIds(ids);
+      setSelectedId(ids[0] ?? null);
+    };
+    window.addEventListener("rv:plan-fix-overlaps", onFix);
+    window.addEventListener("rv:plan-select-rooms", onSelect);
+    return () => {
+      window.removeEventListener("rv:plan-fix-overlaps", onFix);
+      window.removeEventListener("rv:plan-select-rooms", onSelect);
+    };
+  }, [editing, fixOverlaps]);
+
   // Best-effort parse-metrics post (table/route may be absent pre-025).
   const postParseMetrics = useCallback(
     async (body: Record<string, unknown>) => {
@@ -939,6 +985,8 @@ export function EditablePlanViewer({
       }
       setSaveStatus("saved");
       setHistory([]);
+      // K5: the plan page's Plan check (and the rail) are read on the server — refresh them.
+      router.refresh();
       // The server trims overlapping rooms on the way in. Show what was stored
       // rather than what was dragged, and say so — a silent reshape on the next
       // page load would read as data loss.
@@ -978,95 +1026,27 @@ export function EditablePlanViewer({
   };
 
   const canUndo = history.length > 0;
+  // K5: every edit snapshots history and a save clears it, so "something to save" = history, or a save that failed.
+  const dirty = canUndo || saveStatus === "error";
 
   return (
     <div className="space-y-3">
-      {/* D3: persistent and non-dismissible while overlaps exist. Saving stays
-          ENABLED — an overlap is a normal transient state mid-edit, and
-          blocking the save would leave unsaved work one refresh from being
-          lost. What overlaps actually block is COSTING, so the banner says
-          exactly that rather than nagging. */}
-      {editing && overlappingIds.size > 0 && (
-        <div
-          role="status"
-          className="flex flex-wrap items-center gap-md rounded-lg border border-[#E8C9A0] bg-[#FEF6EC] px-lg py-md"
-        >
-          <span
-            className="material-symbols-outlined text-[20px] text-[#92400E]"
-            aria-hidden="true"
-          >
-            layers
-          </span>
-          <div className="min-w-[18rem] flex-1">
-            <p className="font-body-sm text-body-sm font-semibold text-ink-900">
-              {overlappingIds.size} overlapping{" "}
-              {overlappingIds.size === 1 ? "room" : "rooms"} — this plan
-              can&apos;t be costed until they&apos;re resolved.
-            </p>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Overlaps double-count floor and wall area, so the BoQ would be
-              wrong. Your changes still save normally. Fixing moves the rooms
-              apart rather than reshaping them, so every room keeps its area.
-            </p>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={fixOverlaps}
-            className="bg-brass-600 text-on-primary hover:bg-primary"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }} aria-hidden="true">layers</span>
-            Fix overlaps
-          </Button>
-        </div>
-      )}
-
+      {/* D3 / K5: overlaps block COSTING, never saving. On the plan page the
+          Plan check panel states them (the inverse block, the pairs, what is
+          blocked downstream); the canvas draws the floor counted twice. */}
       {editing && (
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addRoom}
-            className="border-ink-100 bg-paper text-ink-900 hover:bg-surface-container"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }} aria-hidden="true">add</span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={addRoom} className={TOOL_BTN}>
+            <span className="bp-icon text-[16px]" aria-hidden="true">add_box</span>
             Add room
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={undo}
-            disabled={!canUndo}
-            className="text-on-surface-variant hover:text-ink-900"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }} aria-hidden="true">undo</span>
-            Undo
-            {canUndo && (
-              <span className="ml-1 text-xs text-ink-500">
-                ({history.length})
-              </span>
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={fixOverlaps}
-            className={cn(
-              "border-ink-100 bg-paper text-ink-900 hover:bg-surface-container",
-              overlappingIds.size > 0 &&
-                "border-status-error/60 text-status-error hover:bg-status-error/10",
-            )}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }} aria-hidden="true">layers</span>
+          </button>
+          <button type="button" onClick={fixOverlaps} className={TOOL_BTN} aria-describedby={overlappingIds.size > 0 ? undefined : "fix-overlaps-none"}>
+            <span className="bp-icon text-[16px]" aria-hidden="true">layers</span>
             Fix overlaps
-            {overlappingIds.size > 0 && (
-              <span className="ml-1 text-xs">({overlappingIds.size})</span>
-            )}
-          </Button>
+            {overlappingIds.size > 0 && <span className="t-num-sm">· {overlapReport.pairs.length}</span>}
+          </button>
+          {overlappingIds.size === 0 && <span id="fix-overlaps-none" className="sr-only">No overlaps on this plan</span>}
           {lowConfidenceIds.size > 0 && (
             <span className="ml-1 rounded-full bg-[#FEF3C7] px-2 py-0.5 text-xs font-medium text-[#92400E]">
               {lowConfidenceIds.size} to review
@@ -1076,7 +1056,7 @@ export function EditablePlanViewer({
               bucket, overlay seeding — keys off this one field, and until now a
               drawn room could not set it at all. */}
           {selectedRoom && (
-            <span className="ml-2 flex items-center gap-1.5 text-xs text-ink-500">
+            <span className="ml-2 flex items-center gap-1.5 text-xs text-bp-ink-secondary">
               <label htmlFor="room-type-picker" className="sr-only">
                 Room or zone type
               </label>
@@ -1121,7 +1101,7 @@ export function EditablePlanViewer({
             </span>
           )}
           {selectedId && (
-            <span className="ml-2 flex items-center gap-1 text-xs text-ink-500">
+            <span className="ml-2 flex items-center gap-1 text-xs text-bp-ink-secondary">
               Flag:
               <button
                 type="button"
@@ -1147,27 +1127,33 @@ export function EditablePlanViewer({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          {infoMessage && (
-            <span className="text-xs text-on-surface-variant">{infoMessage}</span>
-          )}
-          {saveStatus === "saved" && (
-            <span className="text-xs text-status-success">Saved.</span>
-          )}
+        <div className="flex items-center gap-3" aria-live="polite">
+          {infoMessage && <span className="t-label-md text-bp-ink-secondary">{infoMessage}</span>}
+          {saveStatus === "saved" && <span className="t-label-md text-bp-ink-secondary">Saved.</span>}
           {saveStatus === "error" && saveError && (
-            <span className="max-w-[260px] truncate text-xs text-status-error">
+            <span role="alert" className="t-label-md max-w-[260px] truncate text-bp-ink-primary">
               {saveError}
             </span>
           )}
-          <Button
+        </div>
+        {/* K5 (24:814): undo and Save changes live in the top bar; Save is disabled, with its reason, until something changed. */}
+        <TopBarActions>
+          <button type="button" onClick={undo} disabled={!canUndo} className={TOOL_BTN} aria-label={canUndo ? `Undo (${history.length})` : "Undo — nothing to undo"}>
+            <span className="bp-icon text-[16px]" aria-hidden="true">undo</span>
+            <span className="bp-boq-wide-only">Undo</span>
+          </button>
+          <button
             type="button"
-            size="sm"
-            onClick={save}
-            disabled={saveStatus === "saving"}
+            onClick={dirty && saveStatus !== "saving" ? save : undefined}
+            aria-disabled={!dirty || saveStatus === "saving"}
+            aria-describedby={!dirty ? "save-why" : undefined}
+            className={`inline-flex h-9 items-center px-4 t-label-md rounded-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring ${dirty ? "bg-bp-ink-primary text-bp-ink-on-inverse hover:bg-bp-ink-secondary" : "bg-bp-surface-sunken text-bp-ink-tertiary cursor-not-allowed"}`}
+            data-testid="plan-save"
           >
             {saveStatus === "saving" ? "Saving…" : "Save changes"}
-          </Button>
-        </div>
+          </button>
+          {!dirty && <span id="save-why" className="sr-only">Nothing to save — no change since the last save</span>}
+        </TopBarActions>
       </div>
       )}
 
@@ -1246,7 +1232,7 @@ export function EditablePlanViewer({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-ink-100 bg-paper">
+      <div className="overflow-hidden border border-bp-line-hairline bg-bp-surface-raised">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
@@ -1350,8 +1336,8 @@ export function EditablePlanViewer({
                     points={room.polygon
                       .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                       .join(" ")}
-                    fill={room.unroofed ? OPEN_ZONE_FILL : BONE_FILL}
-                    fillOpacity={removed ? 0.12 : room.unroofed ? 0.45 : 0.5}
+                    fill={overlapReport.has_overlaps ? INK : room.unroofed ? OPEN_ZONE_FILL : BONE_FILL}
+                    fillOpacity={overlapReport.has_overlaps ? 0.05 : removed ? 0.12 : room.unroofed ? 0.45 : 0.5}
                     stroke={room.site_reference ? BRASS_600 : room.unroofed ? INK_700 : INK_900}
                     strokeOpacity={room.unroofed ? 0.7 : 1}
                     strokeDasharray={room.site_reference ? "3 3" : room.unroofed ? "6 4" : undefined}
@@ -1382,16 +1368,18 @@ export function EditablePlanViewer({
                     </text>
                   )}
 
-                  {overlapping && (
+                  {/* K5: a room picked from the plan check's overlap list —
+                      selection is a brass line (R7: brass draws lines only). */}
+                  {focusIds.includes(room.id) && (
                     <polygon
                       points={room.polygon
                         .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                         .join(" ")}
                       fill="none"
-                      stroke="#F87171"
-                      strokeWidth={1.5}
-                      strokeDasharray="4 3"
+                      stroke={BRASS_600}
+                      strokeWidth={3}
                       pointerEvents="none"
+                      data-focus-room={room.id}
                     />
                   )}
 
@@ -1537,8 +1525,8 @@ export function EditablePlanViewer({
                           cx={hx}
                           cy={hy}
                           r={7}
-                          fill="#A855F7"
-                          stroke="#0B0712"
+                          fill={INK}
+                          stroke={INK_ON}
                           strokeWidth={2}
                           style={{ cursor: "move" }}
                           onPointerDown={(e) => onVertexPointerDown(e, room, vertexIndex)}
@@ -1559,8 +1547,8 @@ export function EditablePlanViewer({
                           cx={bb.xR + 10}
                           cy={bb.yT - 10}
                           r={11}
-                          fill="#F87171"
-                          stroke="#0B0712"
+                          fill={INK}
+                          stroke={INK_ON}
                           strokeWidth={2}
                         />
                         <line
@@ -1568,7 +1556,7 @@ export function EditablePlanViewer({
                           y1={bb.yT - 14}
                           x2={bb.xR + 14}
                           y2={bb.yT - 6}
-                          stroke="#0B0712"
+                          stroke={INK_ON}
                           strokeWidth={2}
                           strokeLinecap="round"
                         />
@@ -1577,7 +1565,7 @@ export function EditablePlanViewer({
                           y1={bb.yT - 14}
                           x2={bb.xR + 6}
                           y2={bb.yT - 6}
-                          stroke="#0B0712"
+                          stroke={INK_ON}
                           strokeWidth={2}
                           strokeLinecap="round"
                         />
@@ -1588,10 +1576,40 @@ export function EditablePlanViewer({
               );
             })
           )}
+          {/* K5 (24:814): the floor each overlapping pair counts twice, over the
+              rooms — ink 30% with a dashed ink outline — and the legend. */}
+          {overlapShapes.length > 0 && (
+            <g pointerEvents="none" data-overlap-fill={overlapShapes.length}>
+              {overlapShapes.map((poly, i) => (
+                <polygon
+                  key={i}
+                  points={poly.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
+                  fill={INK}
+                  fillOpacity={0.3}
+                  stroke={INK}
+                  strokeWidth={1.25}
+                  strokeDasharray="4 3"
+                />
+              ))}
+            </g>
+          )}
+          {overlapShapes.length > 0 && (
+            <g pointerEvents="none" data-overlap-legend aria-hidden="true">
+              <rect x={8} y={8} width={410} height={36} fill={INK_ON} stroke={INK} strokeOpacity={0.25} />
+              <rect x={20} y={18} width={16} height={16} fill={INK} fillOpacity={0.05} stroke={INK} strokeWidth={1} />
+              <text x={44} y={31} fontSize={15} fill={INK} style={{ fontFamily: "var(--font-mono), monospace" }}>
+                room as parsed
+              </text>
+              <rect x={206} y={18} width={16} height={16} fill={INK} fillOpacity={0.3} stroke={INK} strokeWidth={1} strokeDasharray="3 2" />
+              <text x={230} y={31} fontSize={15} fill={INK} style={{ fontFamily: "var(--font-mono), monospace" }}>
+                floor counted twice
+              </text>
+            </g>
+          )}
         </svg>
       </div>
 
-      <p className="text-xs text-ink-500">
+      <p className="text-xs text-bp-ink-secondary">
         {editing ? (
           <>
             Click a room to select. Drag the body to move, drag a vertex to
@@ -1606,7 +1624,7 @@ export function EditablePlanViewer({
         ) : (
           <>Click a room to see what it is and what it costs. Total:{" "}</>
         )}
-        <span className="text-on-surface-variant">
+        <span className="text-bp-ink-secondary">
           {liveTotalM2.toFixed(1)} m²
         </span>
         .
@@ -1648,7 +1666,7 @@ function ZoneGeometryBar({
   const apply = () => onRect(v.x, v.y, v.w, v.d);
   const field = (k: keyof typeof v, label: string) => (
     <label className="flex items-center gap-1">
-      <span className="text-ink-500">{label}</span>
+      <span className="text-bp-ink-secondary">{label}</span>
       <input
         type="number"
         step={0.05}
@@ -1670,7 +1688,7 @@ function ZoneGeometryBar({
           {field("y", "Y")}
           {field("w", "W")}
           {field("d", "D")}
-          <span className="text-ink-500">m</span>
+          <span className="text-bp-ink-secondary">m</span>
           <button type="button" onClick={apply} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
             Apply
           </button>
@@ -1681,7 +1699,7 @@ function ZoneGeometryBar({
       <button type="button" onClick={onAddVertex} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
         + Vertex
       </button>
-      <span className="text-ink-500">Shift-click a vertex to remove it. X/Y from the plot&apos;s top-left corner.</span>
+      <span className="text-bp-ink-secondary">Shift-click a vertex to remove it. X/Y from the plot&apos;s top-left corner.</span>
       {room.dims_derived && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Derived outline</span>}
     </div>
   );

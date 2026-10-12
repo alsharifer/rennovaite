@@ -125,3 +125,44 @@ describe("proposalChecklistItems", () => {
     expect(rev.detail).toContain("marked reviewed");
   });
 });
+
+// K4 — the setup (053): client, validity, payment terms, cover note, the
+// line-rate choice (OFF by default in the setup), exclusions, assumptions, and
+// the in-app preview's mark.
+describe("buildProposalPages — K4 setup", () => {
+  const setup = { clientLabel: "Private homeowner — Villa garden", validity: "Valid for 30 days from issue — until 27 Oct 2026", paymentTerms: "30% on signing · 40% on hardscape · 30% on handover", coverNote: "Thank you for the walk-through." };
+  const lineRateAttr = (pages: string[]) => pages.join("").includes(">RATE<");
+
+  it("line rates off: quantities and section totals, no line rate or line total; the sum and chain unchanged", () => {
+    const off = buildProposalPages(input({ ...setup, showLineRates: false }));
+    const on = buildProposalPages(input({ ...setup, showLineRates: true }));
+    expect(lineRateAttr(off)).toBe(false);
+    expect(lineRateAttr(on)).toBe(true);
+    expect(off.join("")).toContain("SCHEDULE OF WORKS · PRICED BY SECTION");
+    for (const p of [off, on]) expect(p.join("")).toContain(`data-grand-total="${arabella.grand_total_aed}"`);
+    // L4 callers that never set the option still get the priced schedule.
+    expect(lineRateAttr(buildProposalPages(input()))).toBe(true);
+  });
+
+  it("prints the client on the cover, the validity on cover and terms, payment terms and the cover note", () => {
+    const pp = buildProposalPages(input({ ...setup, showLineRates: false }));
+    expect(pp[0]).toContain('data-client="true"');
+    expect(pp[0]).toContain("Prepared for Private homeowner — Villa garden");
+    expect(pp.filter((p) => p.includes('data-validity="true"')).length).toBeGreaterThanOrEqual(2);
+    expect(pp.join("")).toContain('data-payment-terms="true"');
+    expect(pp.join("")).toContain('data-cover-note="true"');
+  });
+
+  it("names the lines to be priced and states the assumptions", () => {
+    const pp = buildProposalPages(input({ ...setup, showLineRates: false }));
+    expect(pp.join("")).toContain('data-excluded="true"');
+    expect(pp.join("")).toContain('data-assumption="true"');
+    expect(text(pp)).not.toMatch(/QS to price|market reference/i);
+  });
+
+  it("the preview carries PREVIEW · NOT ISSUED on every page; the document never does", () => {
+    const pv = buildProposalPages(input({ ...setup, showLineRates: false, preview: true }));
+    expect(pv.every((p) => p.includes('data-preview="true"') && p.includes("PREVIEW · NOT ISSUED"))).toBe(true);
+    expect(buildProposalPages(input({ ...setup, showLineRates: false })).some((p) => p.includes("data-preview"))).toBe(false);
+  });
+});

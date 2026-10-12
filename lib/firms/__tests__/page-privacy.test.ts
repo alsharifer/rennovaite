@@ -19,7 +19,8 @@ const read = (f: string) => readFileSync(path.join(ROOT, f), "utf8");
 
 describe("the firm book editor", () => {
   const src = read("app/firms/[firmId]/_components/firm-book-editor.tsx");
-  const urls = [...src.matchAll(/fetch\(\s*(`[^`]*`|"[^"]*"|'[^']*')/g)].map((m) => m[1]!.slice(1, -1));
+  // K4: EVERY /api/ URL in the file — passed to fetch() or to the act() helper, or linked.
+  const urls = [...src.matchAll(/(`\/api\/[^`]*`|"\/api\/[^"]*"|'\/api\/[^']*')/g)].map((m) => m[1]!.slice(1, -1));
 
   it("makes requests", () => {
     expect(urls.length).toBeGreaterThan(3);
@@ -28,16 +29,16 @@ describe("the firm book editor", () => {
   it("only to this firm's routes and the vocabulary", () => {
     for (const u of urls) {
       // U4: the item trail — this firm's history route, keyed by the item (never an id from elsewhere).
-      expect(u, u).toMatch(/^\/api\/firms\/\$\{firmId\}(\/rates(\/\$\{e\.id\}|\/history\?item_key=\$\{encodeURIComponent\(itemKey\)\})?)?$|^\/api\/rate-vocabulary$/);
+      // K4: attention actions on an entry (e / o = this book's own entries), promotion, the quote template link.
+      expect(u, u).toMatch(/^\/api\/firms\/\$\{firmId\}(\/rates(\/\$\{(e|o)\.id\}|\/history\?item_key=\$\{encodeURIComponent\(itemKey\)\})?|\/promote|\/quotes\/template)?$|^\/api\/rate-vocabulary$/);
     }
   });
 
   it("firmId is the page's, taken from the firm it was opened with", () => {
     expect(src).toMatch(/const firmId = initialFirm\.id;/);
     // No URL is built from anything but firmId and an entry's own id.
-    for (const u of urls) expect(u.match(/\$\{[^}]+\}/g) ?? []).toEqual(expect.arrayContaining([]));
     const vars = urls.flatMap((u) => u.match(/\$\{([^}]+)\}/g) ?? []);
-    expect(new Set(vars)).toEqual(new Set(["${firmId}", "${e.id}", "${encodeURIComponent(itemKey)}"].filter((v) => vars.includes(v))));
+    for (const v of vars) expect(["${firmId}", "${e.id}", "${o.id}", "${encodeURIComponent(itemKey)}"], v).toContain(v);
   });
 });
 
@@ -72,11 +73,12 @@ describe("the firm list", () => {
 });
 
 describe("the server pages read through the store with the caller", () => {
-  it("the book (one component, K2) uses getCaller + getFirmSummary/listEntries and renders a 403 card, never the book", () => {
+  it("the book (one component, K2/K4) reads through the store with the caller and renders a 403 block, never the book", () => {
     const src = read("app/firms/[firmId]/_components/firm-book.tsx");
-    expect(src).toMatch(/await getCaller\(\)/);
-    expect(src).toMatch(/getFirmSummary\(db, firmId, caller\)/);
-    expect(src).toMatch(/listEntries\(db, firmId, caller\)/);
+    expect(src).toMatch(/await getPageCaller\(\)/);
+    expect(src).toMatch(/loadBookView\(db, firmId, caller, projectId\)/);
+    // loadBookView starts with the member check.
+    expect(read("lib/firms/book-view.ts")).toMatch(/const summary = await getFirmSummary\(db, firmId, caller\)/);
     expect(src).toMatch(/e\.status === 403/);
     expect(src).not.toMatch(/from\("firm_rate_entries"\)/);
   });

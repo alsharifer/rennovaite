@@ -46,7 +46,27 @@ export interface ProposalInput {
   dateISO: string;
   rooms: ProposalScopeRoom[];
   boq: BoqPdfInput["boq"];
+  // --- K4 setup (053). All optional: absent = the L4 document, unchanged. ---------
+  /** Who the cover names as the client. Printed on the cover only. */
+  clientLabel?: string | null;
+  /** "Valid for 30 days from issue — until …" (proposal-setup validityText). */
+  validity?: string | null;
+  /** The proposal's payment terms (the firm's words). */
+  paymentTerms?: string | null;
+  /** A short letter from the firm, opening the scope page. */
+  coverNote?: string | null;
+  /**
+   * Line rates and line totals in the priced schedule. Absent = shown (L4).
+   * The K4 setup defaults it OFF: the client sees quantities and section
+   * totals, and the firm's book stays private.
+   */
+  showLineRates?: boolean;
+  /** "PREVIEW · NOT ISSUED" across every page — the in-app preview, never a release. */
+  preview?: boolean;
 }
+
+/** The preview's mark: it is on every page, so a preview can never pass for the proposal. */
+export const PREVIEW_MARK = "PREVIEW · NOT ISSUED";
 
 // H7: the proposal's BoQ to the fils, like the firm's own BoQ PDF.
 const aed = (n: number) => formatAed(n, "money");
@@ -77,6 +97,11 @@ export function buildProposalPages(input: ProposalInput): string[] {
   const refs = assignRefs(boq.sections);
   const pages: string[] = [];
   let n = 0;
+  const showRates = input.showLineRates !== false;
+  const previewMark = input.preview
+    ? `<text x="${f1(BOQ_PAGE_W / 2)}" y="${f1(BOQ_PAGE_H / 2)}" text-anchor="middle" transform="rotate(-35 ${f1(BOQ_PAGE_W / 2)} ${f1(BOQ_PAGE_H / 2)})" font-family="${FONT_MONO}" font-size="11" letter-spacing="1.2" fill="${INK_500}" fill-opacity="0.28" data-preview="true">${esc(PREVIEW_MARK)}</text>`
+    : "";
+  const push = (body: string) => pages.push(page(body + previewMark));
 
   // --- chrome: every page but the cover -------------------------------------------
   const header = () => {
@@ -116,12 +141,20 @@ export function buildProposalPages(input: ProposalInput): string[] {
   svg += t(M, y, input.projectName, { size: 5.2, fill: INK_700 });
   y += 7;
   svg += t(M, y, input.community, { size: 3.2, fill: INK_500 });
+  if (input.clientLabel) {
+    y += 7;
+    svg += t(M, y, `Prepared for ${input.clientLabel}`, { size: 3.2, fill: INK_700 }).replace("<text ", '<text data-client="true" ');
+  }
   y += 16;
   svg += t(M, y, "Proposed contract sum", { size: 2.4, fill: INK_500, spacing: "0.06em" });
   y += 8;
   svg += t(M, y, total.text, { size: 8.5, font: FONT_MONO, fill: INK_900 }).replace("<text ", `<text data-grand-total="${boq.grand_total_aed}" `);
   y += 6;
   svg += t(M, y, "incl. overheads & profit, contingency and VAT", { size: 2.4, fill: INK_500 });
+  if (input.validity) {
+    y += 5;
+    svg += t(M, y, input.validity, { size: 2.6, fill: INK_700 }).replace("<text ", '<text data-validity="true" ');
+  }
   if (total.excludes) {
     y += 5;
     svg += t(M, y, total.excludes, { size: 2.6, fill: TERRACOTTA, weight: 700 }).replace("<text ", '<text data-headline-excludes="true" ');
@@ -140,17 +173,32 @@ export function buildProposalPages(input: ProposalInput): string[] {
   }
   svg += t(M, BOQ_PAGE_H - 24, `Prepared by ${brand} · ${input.dateISO}`, { size: 2.8, fill: INK_700 });
   svg += footer();
-  pages.push(page(svg));
+  push(svg);
 
   // --- scope summary + BoQ ---------------------------------------------------------------
   ({ svg, y } = header());
   const bottom = BOQ_PAGE_H - 30;
   const flush = () => {
-    pages.push(page(svg));
+    push(svg);
     ({ svg, y } = header());
     y += 4;
   };
   y += 6;
+  if (input.coverNote && input.coverNote.trim()) {
+    for (const para of input.coverNote.split(/\r?\n/)) {
+      if (!para.trim()) {
+        y += 2.5;
+        continue;
+      }
+      for (const line of wrap(para, 96)) {
+        if (y + 4 > bottom) flush();
+        svg += t(M, y, line, { size: 2.7, fill: INK_900 }).replace("<text ", '<text data-cover-note="true" ');
+        y += 3.4 * K;
+      }
+      y += 1.5;
+    }
+    y += 6;
+  }
   svg += t(M, y, "SCOPE OF WORKS", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
   y += 6;
   const scopeLines: string[] = [];
@@ -190,11 +238,10 @@ export function buildProposalPages(input: ProposalInput): string[] {
     t(M + 18, yy, "DESCRIPTION", { size: 2.1, fill: INK_500, spacing: "0.06em" }) +
     t(128, yy, "QTY", { size: 2.1, fill: INK_500, anchor: "end" }) +
     t(131, yy, "UNIT", { size: 2.1, fill: INK_500 }) +
-    t(162, yy, "RATE", { size: 2.1, fill: INK_500, anchor: "end" }) +
-    t(BOQ_PAGE_W - M, yy, "TOTAL", { size: 2.1, fill: INK_500, anchor: "end" }) +
+    (showRates ? t(162, yy, "RATE", { size: 2.1, fill: INK_500, anchor: "end" }) + t(BOQ_PAGE_W - M, yy, "TOTAL", { size: 2.1, fill: INK_500, anchor: "end" }) : "") +
     `<line x1="${M}" y1="${f1(yy + 1.6)}" x2="${BOQ_PAGE_W - M}" y2="${f1(yy + 1.6)}" stroke="${INK_100}" stroke-width="0.3"/>`;
   if (y + 30 > bottom) flush();
-  svg += t(M, y, "PRICED SCHEDULE OF WORKS", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
+  svg += t(M, y, showRates ? "PRICED SCHEDULE OF WORKS" : "SCHEDULE OF WORKS · PRICED BY SECTION", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
   y += 6;
   svg += colHead(y);
   y += 6;
@@ -221,8 +268,11 @@ export function buildProposalPages(input: ProposalInput): string[] {
       });
       svg += t(128, y + 2.6, `${l.qty_derived ? "≈ " : ""}${l.quantity}`, { size: 2.55, font: FONT_MONO, anchor: "end", fill: l.qty_derived ? TERRACOTTA : INK_900 });
       svg += t(131, y + 2.6, l.unit, { size: 2.4, fill: INK_700 });
-      svg += t(162, y + 2.6, aed(l.rate_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
-      svg += t(BOQ_PAGE_W - M, y + 2.6, aed(l.total_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
+      // K4: with line rates off the client reads the work and its quantity; the money is per section.
+      if (showRates) {
+        svg += t(162, y + 2.6, aed(l.rate_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
+        svg += t(BOQ_PAGE_W - M, y + 2.6, aed(l.total_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
+      }
       let sy = y + 2.6 + r.desc.length * DESC_H;
       for (const s of r.sub) {
         svg += t(M + 18, sy - 0.4, s, { size: 2.1, fill: TERRACOTTA });
@@ -250,22 +300,61 @@ export function buildProposalPages(input: ProposalInput): string[] {
     svg += t(BOQ_PAGE_W - M, y, total.excludes, { size: 2.4, fill: TERRACOTTA, anchor: "end", weight: 700 }).replace("<text ", '<text data-headline-excludes="true" ');
     y += 5;
   }
-  pages.push(page(svg));
 
-  // --- terms (the firm's words) --------------------------------------------------------------
-  if (input.termsText && input.termsText.trim()) {
+  // K4: what the sum leaves out, named (D4), and what it rests on — a client
+  // reads both before the terms. Absent when there is nothing to say.
+  const block = (title: string, paras: string[], attr: string) => {
+    if (paras.length === 0) return;
+    if (y + 16 > bottom) flush();
+    y += 6;
+    svg += t(M, y, title, { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
+    y += 6;
+    for (const para of paras) {
+      for (const line of wrap(para, 96)) {
+        if (y + 4 > bottom) flush();
+        svg += t(M, y, line, { size: 2.6, fill: INK_700 }).replace("<text ", `<text ${attr} `);
+        y += 3.2 * K;
+      }
+      y += 1.2;
+    }
+  };
+  if (input.showLineRates !== undefined) {
+    block("EXCLUSIONS & TO BE PRICED", total.excluded.map((x) => `${x.work_section} — ${clientDescription(x.description)}: not in the sum above; priced when confirmed.`), 'data-excluded="true"');
+    const assumptions: string[] = [];
+    if (statement) assumptions.push(statement);
+    if (info.derivedLines > 0) assumptions.push(`${info.derivedLines} quantit${info.derivedLines === 1 ? "y is" : "ies are"} derived from the plan (marked ≈) and firm after site verification.`);
+    block("ASSUMPTIONS", assumptions, 'data-assumption="true"');
+  }
+  push(svg);
+
+  // --- terms (validity, payment terms, the firm's words) ---------------------------------------
+  const hasTerms = !!(input.termsText && input.termsText.trim());
+  if (hasTerms || input.validity || input.paymentTerms) {
     ({ svg, y } = header());
     y += 6;
     svg += t(M, y, "TERMS", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
     y += 6;
-    for (const para of input.termsText.split(/\r?\n/)) {
+    if (input.validity) {
+      svg += t(M, y, input.validity, { size: 2.6, fill: INK_900 }).replace("<text ", '<text data-validity="true" ');
+      y += 3.4 * K + 2;
+    }
+    if (input.paymentTerms) {
+      svg += t(M, y, "Payment terms", { size: 2.6, fill: INK_900, weight: 700 });
+      y += 3.4 * K;
+      for (const line of wrap(input.paymentTerms, 96)) {
+        svg += t(M, y, line, { size: 2.6, fill: INK_700 }).replace("<text ", '<text data-payment-terms="true" ');
+        y += 3.2 * K;
+      }
+      y += 3;
+    }
+    for (const para of hasTerms ? input.termsText!.split(/\r?\n/) : []) {
       if (!para.trim()) {
         y += 2.5;
         continue;
       }
       for (const line of wrap(para, 96)) {
         if (y + 4 > bottom) {
-          pages.push(page(svg));
+          push(svg);
           ({ svg, y } = header());
           y += 6;
         }
@@ -274,7 +363,7 @@ export function buildProposalPages(input: ProposalInput): string[] {
       }
       y += 1.5;
     }
-    pages.push(page(svg));
+    push(svg);
   }
 
   // --- programme (indicative) -----------------------------------------------------------------
@@ -298,7 +387,7 @@ export function buildProposalPages(input: ProposalInput): string[] {
     }
     svg += t(barX, y + 1.5, "day 1", { size: 2.1, fill: INK_500, font: FONT_MONO });
     svg += t(BOQ_PAGE_W - M, y + 1.5, `day ${prog.total_days}`, { size: 2.1, fill: INK_500, font: FONT_MONO, anchor: "end" });
-    pages.push(page(svg));
+    push(svg);
   }
 
   return pages;

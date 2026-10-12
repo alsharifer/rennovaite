@@ -94,58 +94,58 @@ export function BrandingPanel({ firmId }: { firmId: string }) {
   }
 
   return (
-    <section className="rounded-xl border border-ink-100 bg-paper p-md" aria-label="Proposal branding" data-testid="branding-panel">
-      <p className="label-caps text-ink-500">Proposal branding — what your client sees</p>
-      <p className="mt-xs max-w-[672px] text-body-sm text-ink-700">
+    <section className="border-t border-bp-line-hairline pt-4" aria-label="Proposal branding" data-testid="branding-panel">
+      <p className="t-label-caps text-bp-ink-tertiary">Proposal branding — what your client sees</p>
+      <p className="mt-1 max-w-[672px] t-body-sm text-bp-ink-secondary">
         A client proposal is your document: it carries this name and logo on the cover and your terms at the end. RenovAIte appears only
         as a small &ldquo;prepared with&rdquo; mark. Contractor and reference identities never appear on it.
       </p>
-      <div className="mt-md grid grid-cols-1 gap-md md:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="label-caps text-ink-500">Display name on proposals</span>
+          <span className="t-label-caps text-bp-ink-tertiary">Display name on proposals</span>
           <input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder={b?.name ?? "Registered name"}
             aria-label="Display name"
-            className="focus-ring mt-xs w-full rounded border border-ink-100 bg-paper px-sm py-xs text-body-sm text-ink-900"
+            className="t-body-sm mt-1 h-10 w-full rounded-none border border-bp-line-control bg-bp-surface-base px-3 text-bp-ink-primary"
           />
-          <span className="mt-xs block text-[12px] text-ink-500">Empty = the registered name{b ? ` (${b.name})` : ""}.</span>
+          <span className="mt-1 block t-label-md text-bp-ink-tertiary">Empty = the registered name{b ? ` (${b.name})` : ""}.</span>
         </label>
         <div>
-          <span className="label-caps text-ink-500">Logo (PNG or JPG, under 1 MB)</span>
-          <div className="mt-xs flex items-center gap-sm">
+          <span className="t-label-caps text-bp-ink-tertiary">Logo (PNG or JPG, under 1 MB)</span>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
             {b?.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={b.logo_url} alt="Firm logo" className="matte-image h-12 w-auto" data-testid="branding-logo" />
+              <img src={b.logo_url} alt="Firm logo" className="h-12 w-auto border border-bp-line-hairline" data-testid="branding-logo" />
             ) : (
-              <span className="text-[12px] text-ink-500">No logo yet.</span>
+              <span className="t-label-md text-bp-ink-tertiary">No logo yet.</span>
             )}
-            <input ref={file} type="file" accept="image/png,image/jpeg" aria-label="Logo file" className="text-body-sm" />
-            <button type="button" onClick={upload} disabled={busy} className="focus-ring rounded-lg border border-ink-100 px-sm py-[3px] text-[12px] text-ink-700 disabled:opacity-50">
+            <input ref={file} type="file" accept="image/png,image/jpeg" aria-label="Logo file" className="t-body-sm min-w-0 max-w-full" />
+            <button type="button" onClick={upload} disabled={busy} className="inline-flex h-9 items-center gap-2 border border-bp-line-control px-4 t-nav-item-active text-bp-ink-primary hover:bg-bp-surface-sunken disabled:opacity-50">
               Upload
             </button>
           </div>
         </div>
         <label className="block md:col-span-2">
-          <span className="label-caps text-ink-500">Terms (printed as written)</span>
+          <span className="t-label-caps text-bp-ink-tertiary">Terms (printed as written)</span>
           <textarea
             value={terms}
             onChange={(e) => setTerms(e.target.value)}
             rows={5}
             aria-label="Terms text"
-            className="focus-ring mt-xs w-full rounded border border-ink-100 bg-paper px-sm py-xs font-body text-body-sm text-ink-900"
+            className="t-body-sm mt-1 h-10 w-full rounded-none border border-bp-line-control bg-bp-surface-base px-3 text-bp-ink-primary h-auto py-2"
             placeholder="Validity, payment schedule, exclusions, variations…"
           />
         </label>
       </div>
-      <div className="mt-md flex flex-wrap items-center gap-md">
-        <button type="button" onClick={save} disabled={busy || !b} className="focus-ring rounded-lg bg-brass-600 px-md py-xs text-body-sm font-semibold text-white disabled:opacity-50" data-testid="branding-save">
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <button type="button" onClick={save} disabled={busy || !b} className="inline-flex h-9 items-center bg-bp-ink-primary px-4 t-nav-item-active text-bp-ink-on-inverse hover:bg-bp-ink-secondary aria-disabled:opacity-50 disabled:opacity-50" data-testid="branding-save">
           Save branding
         </button>
-        {msg && <span className="text-body-sm text-ink-700">{msg}</span>}
+        {msg && <span className="t-body-sm text-bp-ink-secondary">{msg}</span>}
         {error && (
-          <span role="alert" className="text-body-sm text-error">
+          <span role="alert" className="t-body-sm text-bp-ink-primary">
             {error}
           </span>
         )}

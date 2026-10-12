@@ -132,7 +132,8 @@ export function PlanLayers({
 
   return (
     <div className="space-y-3">
-      <div className="inline-flex gap-0.5 rounded-lg border border-ink-100 bg-paper p-0.5">
+      {/* K5 (24:814): layer tabs — brass underline on the active one (R7: brass draws lines). */}
+      <div className="flex flex-wrap gap-x-6 border-b border-bp-line-hairline" aria-label="Plan layers">
         {layers.map((l) => {
           const active = layer === l.key;
           return (
@@ -142,13 +143,11 @@ export function PlanLayers({
               onClick={() => setLayer(l.key)}
               aria-pressed={active}
               className={
-                "focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-body-sm font-semibold transition-colors " +
-                (active
-                  ? "bg-brass-600 text-on-primary"
-                  : "text-ink-700 hover:bg-surface-container")
+                "-mb-px inline-flex min-h-11 items-center gap-1.5 border-b-2 t-nav-item focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring " +
+                (active ? "border-bp-brass text-bp-ink-primary" : "border-transparent text-bp-ink-secondary hover:text-bp-ink-primary")
               }
             >
-              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              <span className="bp-icon text-[18px]" aria-hidden="true">
                 {l.glyph}
               </span>
               {l.label}

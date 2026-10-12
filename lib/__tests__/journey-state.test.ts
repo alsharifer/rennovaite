@@ -227,7 +227,9 @@ describe("chrome wiring + route triage (spec §3.10)", () => {
     expect(read("app/firms/[firmId]/layout.tsx")).toContain("<AccountShell");
     expect(read("app/settings/layout.tsx")).toContain("<AccountShell");
     // The hub sits at the [id] level and frames itself; its loading draws the chrome.
-    expect(read("app/project/[id]/page.tsx")).toContain("<ProjectShell projectId={projectId}>");
+    expect(read("app/project/[id]/page.tsx")).toContain(`<ProjectShell projectId={projectId} content="blueprint">`);
+    // K6: the intake is Blueprint too (warm skin), framed without a project.
+    expect(read("app/project/new/page.tsx")).toContain(`<AccountShell content="blueprint" skin="warm">`);
     expect(read("app/project/[id]/loading.tsx")).toContain("ShellSkeleton");
   });
 

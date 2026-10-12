@@ -241,14 +241,131 @@ except `design-refs/r7-handoff/`.
   total and Δ and links the U4 diff. Test ids `regenerate`,
   `regenerate-button`, `regenerate-result`, `regenerate-diff-link` are kept
   for the walkthrough.
-- **The revisions page** (K4) keeps its Atelier body on `AtelierCanvas`
-  (`components/blueprint/shell/ShellFrame.tsx`) — the boq segment layout is
-  `content="blueprint"`.
 - **Checks**: `node scripts/boq-review-check.mjs [port] [--shots=dir] [ids…]`
   (stored = displayed, rate × qty = amount, page height ≤ 4,500, §4.3 keyboard,
   axe light + dark, tablet / phone) over `scripts/lib/cdp.mjs` (a signed-in
   headless Chrome); the onboarding walkthrough covers Add to my book,
   Unchanged → Ready → Running → Done and the firm-rate popovers.
+
+### Firm surfaces (K4)
+
+Steps 04 · 06 · 07 · 08 and quote review are Blueprint (spec §3.3–§3.7;
+frames 19:48, 20:263, 21:450, 22:548, 23:689). A page's step eyebrow comes
+from the journey (`lib/journey-eyebrow.ts`), never a literal.
+
+- **04 Rates & Basis** (`/firms/[firmId]`, `/project/[id]/rates`) —
+  `lib/firms/book-view.ts` (`loadBookView`, member-checked first): NEEDS
+  ATTENTION (H8 unit check with the conversion offer and its project
+  consequence · outlier · conflict) above IN USE, the status strip (book
+  status · this project's lines · reference basis with the L4 accept control,
+  anchored `#reference-basis`), Entries / Quote imports / Corrections /
+  History. **Mark book reviewed is refused while attention is open** — on the
+  screen and at the route (`updateFirm` → 409 `attention_open`); an outlier
+  confirmed with no figure change writes `outlier_confirmed` with its
+  `entry_id`, which is what clears it.
+- **Quote review** — one status per line (READY · CONFIRM MATCH · HELD:
+  outlier / unit check / currency / not a number · NO MATCH · REJECTED · IN
+  BOOK); a foreign-currency hold takes an AED rate (`enter_rate_aed`,
+  recorded as `rate_entered` with a conversion note).
+- **07 Revisions & Approval** — `lib/boq/revisions-view.ts` shapes U4's ONE
+  diff object: rev N labels (oldest = rev 1, Dubai time), chain A · B · Δ,
+  lines with marks and RECORDED causes linked to their record ("none
+  recorded" otherwise), a reconciliation sentence that names any gap, the
+  window events no line names, and the later revision's approval trail.
+  Client approval = name + date + how it was given + reference (kept in the
+  approval's note — no migration). **"Link causes to lines" is shown disabled
+  with its reason: there is no record behind it** (backlog). Compact rail
+  like the BoQ page.
+- **06 Documents** — `components/blueprint/documents/DocumentsExport.tsx`:
+  EXPORT CHECKS (the run's gate, server-computed; PASS / BLOCKS EXPORT), the
+  reference basis on a firm project (BLOCKS CLIENT PROPOSAL — the gate locks
+  the proposal, not the pack), and the printed-page checks from the latest
+  IN-APP run. Run export is disabled with the number of blocking checks. The
+  **internal review pack is NOT built** — shown disabled with its reason (it
+  needs a watermark and a release rule; a decision, not a build).
+- **08 Proposal** (`/project/[id]/proposal`) — the gate first (same verdict
+  as the export), then SETUP (migration **053**: firm defaults
+  `proposal_validity_days` / `proposal_payment_terms` /
+  `proposal_show_line_rates`, and `project_proposals` per project — client,
+  validity, payment terms, cover note, line rates), saved on leaving each
+  field via `PUT /api/projects/:id/proposal-setup`; validity, payment terms
+  and the line-rate choice also become the firm's defaults. **Line rates
+  default OFF**: the client reads quantities and section totals. The document
+  gains client, validity, cover note, payment terms, EXCLUSIONS & TO BE
+  PRICED and ASSUMPTIONS (`lib/documents/proposal.ts`; an L4 caller that
+  passes no setup gets the L4 document). **Preview as client** =
+  `GET /api/projects/:id/proposal-preview` → SVG pages with `PREVIEW · NOT
+  ISSUED` on every page, firm members only, identity-scanned — never a PDF,
+  never a release. **Generate proposal** opens 06 Documents with the proposal
+  included (`?export=1&proposal=1`): the proposal still leaves only through
+  the gated export. One loader for both: `lib/documents/proposal-load.ts`.
+- **Checks**: `node scripts/k-page-check.mjs [port] --shots=dir --projects=<ids>
+  name=/path …` (axe + shots, light/dark, desktop/tablet/phone); the onboarding
+  walkthrough runs the K4 loop (quote → pergola held → convert → reviewed →
+  04 clears → 08 locked/unlocked → regenerate → diff with cause → approvals →
+  setup → preview → Documents with the proposal) and scans every K4 payload
+  for withheld identities with the member's session;
+  `scripts/document-identity-scan.mjs` scans them too.
+- **Gotcha (K4)**: an `sr-only` span inside an `overflow-x-auto` region
+  escapes it (absolute, no positioned ancestor) and widens the phone page —
+  give every scroll region `relative`.
+
+### Hub, scope, front door, a11y (K5a · K5 · K6 · K7)
+
+- **00 Project hub** (`/project/[id]`, §3.1 / 11:48) is Blueprint for BOTH
+  journeys — `lib/hub/hub-view.ts` + `components/blueprint/hub/`. Headline =
+  the stored grand total (≈ … * + weakest mark + the lines to be priced named);
+  "Basis of this number" = counted lines by amount mark, and the chain line
+  under it carries the counted total to the headline to the fil (Arabella:
+  6 · 21,074.00 / 9 · 81,818.03 / 3 TBP → 102,892.03 → ≈ 116,679.56). Next =
+  `nextFromRail` over the rail's OWN statuses (persona's journey, max 3; else
+  the first step not done) — no rule of its own. Revisions = the diff's counts
+  + recorded causes; documents = the gates' answers. The rail facts are loaded
+  once per request: `loadProjectRail` (React `cache`, in `ProjectShell.tsx`)
+  is shared by the shell and the page. The old Atelier hub, `ApprovalsCard` and
+  `PermitsCard` are gone; project files are `HubFiles` (Blueprint).
+- **02 Scope / Layout** (`/project/[id]/plan`, §3.8 / 24:814) — chrome only:
+  Blueprint page, layer tabs with the brass underline, Undo + Save changes in
+  the TOP BAR (Save disabled with its reason until something changed; a save
+  `router.refresh()`es the server panel), and the **Plan check** panel
+  (`components/blueprint/plan/PlanCheckPanel.tsx` over `lib/plan/plan-check.ts`
+  → THE detector `findOverlaps`): the inverse block (pairs, share counted
+  twice, parser total, consequence) with Fix overlaps · N / Re-run parse, the
+  pairs largest first (a row selects BOTH rooms), and what the rail blocks
+  downstream. The panel drives the editor through window events
+  `rv:plan-fix-overlaps` and `rv:plan-select-rooms`. Canvas: handles ink; with
+  overlaps rooms ink 5% and the shared floor ink 30% dashed, plus a legend.
+  Fixture: `lib/plan/__fixtures__/j0-bad-parse.json` (the J0 worst pre-repair
+  parse, polygons only — 12 pairs, 23.6%); live: `scripts/k5-bad-parse.mjs
+  seed|teardown` + `scripts/k5-plan-check.mjs`.
+- **Sign in** (`/auth`, §3.9a / 35:1152) is Dark Blueprint
+  (`data-system="blueprint" data-theme="dark"` on the page root) —
+  `components/blueprint/auth/`. The design view is a FICTIONAL villa from our
+  own three.js stage `/dev/villa-orbit` (dev only), captured by
+  `scripts/k6-capture-villa.mjs` (MediaRecorder; no ffmpeg) into
+  `public/design-view/` — WebM + MP4 ≤ 2 MB and a poster. Poster first; the
+  video plays only without reduced motion / Save-Data / 2G-3G; decorative
+  (`aria-hidden`, muted, no controls); no live WebGL on the page. Never a
+  client project, never stock or AI imagery.
+- **01 Intake** (`/project/new`, §3.9 / 29:1016): `AccountShell
+  content="blueprint" skin="warm"` (the rail draws the owner steps with 01
+  active, `railSteps(..., pathname)`); three ways in as one radio group (Draw /
+  Photos need the garden pilot), a too-large plan is the inverse block,
+  queued photos/drawings are uploaded BEFORE leaving on the draw path, and
+  Continue is disabled with its reason. The owner landing stays parked.
+- **K7 (§4.2)**: on a coarse pointer every Blueprint control gets a centred
+  ≥ 44 px hit area (`app/globals.css`, unlayered; `[data-atelier]` — the
+  `AtelierCanvas` body — is excluded so Atelier pages do not move); every
+  disabled control's `aria-describedby` resolves; the quote summary is
+  `aria-live`. `scripts/k-page-check.mjs` checks axe light/dark, a 320 px
+  reflow, horizontal overflow and dangling describedby (`--who=`, `--anon`).
+- **KV checks**: `scripts/kv-keyboard-k4.mjs` (the K4 loop by keyboard, on the
+  walkthrough's scratch state), `scripts/kv-atelier-unchanged.mjs <base>
+  <head> <project>` (pixel-compares the out-of-scope Atelier pages against a
+  baseline server — run the baseline from a worktree with `next dev --webpack`:
+  Turbopack refuses a junctioned node_modules), `scripts/k6-front-door-check.mjs`.
+  **If a dev server starts 404ing whole route trees mid-session (it did in KV,
+  after many edits and a second server), restart it** — K2's note holds.
 
 ## Brand — Atelier Precise (pages not yet redesigned)
 

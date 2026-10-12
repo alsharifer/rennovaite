@@ -462,3 +462,30 @@
   }
 }
 
+
+/* K5a: the hub's revisions table drops Date + Total on tablet and phone (11:639). */
+@media (max-width: 1023.98px) {
+  .bp-hub-wide {
+    display: none;
+  }
+}
+
+/* K7 (R7 §4.2 #10): on a coarse pointer every Blueprint control gets a hit
+   area of at least 44 × 44 px, centred on it, without changing how it looks.
+   Positioned controls (absolute / fixed / sticky) keep their own positioning
+   and are sized where they are drawn. An Atelier body inside the shell
+   ([data-atelier], AtelierCanvas) is left exactly as it was. Unlayered on purpose. */
+@media (pointer: coarse) {
+  [data-system="blueprint"] :is(button, a[href], [role="tab"], [role="radio"], summary):not(.absolute, .fixed, .sticky, [data-atelier] *) {
+    position: relative;
+  }
+  [data-system="blueprint"] :is(button, a[href], [role="tab"], [role="radio"], summary):not([data-atelier] *)::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}

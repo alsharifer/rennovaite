@@ -189,7 +189,7 @@ export function GardenSitePanel({
                               onClick={() => setDisposition(item, active ? null : d.value)}
                               className={cn(
                                 "focus-ring rounded-md px-2 py-0.5 text-[12px] transition-colors disabled:opacity-50",
-                                active ? (d.value === "remove" ? "bg-[#9A3412] text-white" : "bg-brass-600 text-on-primary") : "text-ink-700 hover:bg-surface-container",
+                                active ? (d.value === "remove" ? "bg-[#9A3412] text-white" : "bg-primary text-on-primary") : "text-ink-700 hover:bg-surface-container",
                               )}
                             >
                               {d.label}
@@ -271,7 +271,7 @@ export function GardenSitePanel({
         <p className="label-caps mb-1 text-ink-500">Friction log</p>
         <p className="mb-sm text-[12px] text-ink-500">Anything that slowed the design down or needed a workaround. Timestamped; it is pilot data.</p>
         <div className="flex flex-wrap gap-2">
-          <select value={frictionArea} onChange={(e) => setFrictionArea(e.target.value)} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-1 text-[13px]">
+          <select aria-label="Where the friction was" value={frictionArea} onChange={(e) => setFrictionArea(e.target.value)} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-1 text-[13px]">
             {["plan", "elements", "landscape", "lighting", "drainage", "renders", "boq", "pack", "other"].map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}

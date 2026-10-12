@@ -318,6 +318,13 @@ export interface LinePatch {
   apply_conversion?: true;
   /** H8: accept a rate outside the magnitude band as quoted — an explicit act, recorded as an event. */
   confirm_outlier?: true;
+  /**
+   * K4 (spec §3.4 "HELD · CURRENCY — Enter AED rate"): a foreign-currency line
+   * the platform never converts; the member states the AED rate. Only on a line
+   * held for its currency with no usable rate; recorded as an event and on the
+   * line, beside what was quoted.
+   */
+  enter_rate_aed?: number;
 }
 
 interface Assessment {
@@ -404,6 +411,15 @@ export async function updateQuoteLine(
     next.conversion_note = offer.note;
     next.outlier_confirmed_at = null;
     next.outlier_confirmed_by = null;
+  }
+  if (patch.enter_rate_aed !== undefined) {
+    if (next.rate_aed !== null || !/^currency /.test(next.hold_reason ?? "")) {
+      throw new StoreError(409, "not_a_currency_hold", "Only a line held for its currency takes an entered AED rate.");
+    }
+    const r = Math.round(patch.enter_rate_aed * 100) / 100;
+    next.rate_aed = r;
+    next.conversion_note = `entered by a member: AED ${r} (quoted ${next.rate_raw ?? "?"} ${next.currency ?? ""} — no exchange rate applied by the platform)`;
+    event = { action: "rate_entered", quote_id: quoteId, line_id: lineId, item_key: next.item_key, rate_aed: r, quoted: next.rate_raw, currency: next.currency };
   }
   if (patch.confirm_outlier) {
     const before = assessLine(next, shadow);

@@ -9,8 +9,9 @@ export const dynamic = "force-dynamic";
 // SAME store functions the API uses, with the same caller, so a non-member gets
 // the 403 card and never a byte of the book) live in FirmBook, which the
 // project's step 04 (/project/[id]/rates) renders too.
-export default async function FirmBookPage({ params }: { params: Promise<{ firmId: string }> }) {
+export default async function FirmBookPage({ params, searchParams }: { params: Promise<{ firmId: string }>; searchParams: Promise<{ add?: string }> }) {
   const { firmId } = await params;
+  const { add } = await searchParams;
   if (!z.string().uuid().safeParse(firmId).success) notFound();
-  return <FirmBook firmId={firmId} />;
+  return <FirmBook firmId={firmId} startAdding={!!add} />;
 }

@@ -452,7 +452,7 @@ export function OpeningsEditor({
     <div className="space-y-3">
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-ink-500">
+          <span className="text-xs text-bp-ink-secondary">
             {selectedWall ? "Add to selected wall:" : "Select a wall to add an opening"}
           </span>
           {KINDS.map((k) => (
@@ -465,7 +465,7 @@ export function OpeningsEditor({
                 "flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors",
                 selectedWall && !busy
                   ? "border-ink-100 bg-paper text-ink-900 hover:bg-surface-container"
-                  : "cursor-not-allowed border-ink-100 bg-paper text-ink-500 opacity-50",
+                  : "cursor-not-allowed border-ink-100 bg-paper text-bp-ink-secondary opacity-50",
               )}
             >
               <span className="material-symbols-outlined text-sm">{k.glyph}</span>
@@ -485,16 +485,16 @@ export function OpeningsEditor({
               "flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs transition-colors",
               undoStack.length > 0 && !busy
                 ? "text-ink-700 hover:bg-surface-container hover:text-ink-900"
-                : "cursor-not-allowed text-ink-500 opacity-50",
+                : "cursor-not-allowed text-bp-ink-secondary opacity-50",
             )}
           >
             <span className="material-symbols-outlined text-sm">undo</span>
             Undo
             {undoStack.length > 0 && (
-              <span className="text-ink-500">({undoStack.length})</span>
+              <span className="text-bp-ink-secondary">({undoStack.length})</span>
             )}
           </button>
-          <span className="ml-auto flex items-center gap-2 text-xs text-ink-500">
+          <span className="ml-auto flex items-center gap-2 text-xs text-bp-ink-secondary">
             <span>
               {openings.length} opening{openings.length === 1 ? "" : "s"}
             </span>
@@ -612,10 +612,10 @@ export function OpeningsEditor({
         </svg>
 
         {loading && (
-          <p className="absolute left-3 top-3 text-xs text-ink-500">Loading openings…</p>
+          <p className="absolute left-3 top-3 text-xs text-bp-ink-secondary">Loading openings…</p>
         )}
         {!loading && walls.length === 0 && (
-          <p className="absolute left-3 top-3 text-xs text-ink-500">
+          <p className="absolute left-3 top-3 text-xs text-bp-ink-secondary">
             No walls derived from this plan — confirm the room geometry first.
           </p>
         )}
@@ -845,7 +845,7 @@ function OpeningProperties({
             </option>
           ))}
         </select>
-        <span className="rounded-full border border-ink-100 px-2 py-0.5 text-[11px] text-ink-500">
+        <span className="rounded-full border border-ink-100 px-2 py-0.5 text-[11px] text-bp-ink-secondary">
           {o.source === "parsed" ? "From parse" : "User drawn"}
         </span>
         {o.derived && (
@@ -856,7 +856,7 @@ function OpeningProperties({
             derived — defaulted size
           </span>
         )}
-        <span className="ml-auto font-mono text-xs tabular-nums text-ink-500">
+        <span className="ml-auto font-mono text-xs tabular-nums text-bp-ink-secondary">
           {areaM2} m²
         </span>
         <button
@@ -876,7 +876,7 @@ function OpeningProperties({
           ] as const
         ).map(([label, val, set]) => (
           <label key={label} className="flex flex-col gap-1">
-            <span className="text-[11px] uppercase tracking-wider text-ink-500">{label}</span>
+            <span className="text-[11px] uppercase tracking-wider text-bp-ink-secondary">{label}</span>
             <input
               type="number"
               value={val}
@@ -892,7 +892,7 @@ function OpeningProperties({
             />
           </label>
         ))}
-        <p className="text-[11px] text-ink-500">
+        <p className="text-[11px] text-bp-ink-secondary">
           Entering a width <em>and</em> height records a measurement and clears the
           derived flag.
         </p>

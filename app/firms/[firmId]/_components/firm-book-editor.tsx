@@ -1,53 +1,46 @@
 "use client";
 
-import Link from "next/link";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+// =============================================================================
+// Rates & Basis — a firm's rate book (K4, R7 §3.3, frame 19:48). One component
+// for /firms/[firmId] and, in a project's journey, step 04 /project/[id]/rates.
+//
+// The server builds the view (lib/firms/book-view.ts): what needs attention
+// (H8 unit checks with their conversion, outliers, conflicts), what is in use
+// beside the figure it shadows, the history, and the corrections waiting to be
+// promoted. Every change goes to /api/firms/${firmId}/… (or the vocabulary) —
+// the static privacy test (lib/firms/__tests__/page-privacy.test.ts) asserts no
+// other URL appears here — then the server view is re-read (router.refresh).
+//
+// "Mark book reviewed" is disabled WITH its reason while anything needs
+// attention; the route refuses the same thing (409 attention_open).
+// =============================================================================
 
-import { Figure } from "@/components/figures/Figure";
+import { useRouter } from "next/navigation";
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+
+import { Button } from "@/components/blueprint/Button";
+import { Icon } from "@/components/blueprint/Icon";
+import { ProvenanceMark } from "@/components/blueprint/ProvenanceMark";
+import { TopBarActions } from "@/components/blueprint/shell/TopBar";
+import { formatAED } from "@/lib/format/aed";
+import type { BookEntryView, BookView } from "@/lib/firms/book-view";
 import { checkMagnitude } from "@/lib/firms/magnitude";
 import { ENTRY_KINDS, groupBySection, validateDraftAgainst, type EntryKind, type VocabularyItem } from "@/lib/firms/vocabulary-client";
 
-/** H8: the single figure an item shadows (market reference, or the built-in element / allowance constant). */
-const shadowFigure = (v: VocabularyItem | null | undefined): number | null =>
-  !v ? null : v.reference.kind === "market" ? v.reference.rate_aed : v.reference.kind === "builtin" ? (v.reference.rate_aed ?? null) : null;
-
-// =============================================================================
-// U2 — a firm's rate book: OH&P, status, and its entries, each shown beside
-// what it SHADOWS (the market-reference rate, or the built-in interior pricing).
-//
-// Every request goes to /api/firms/${firmId}/… or /api/rate-vocabulary — the
-// static privacy test (lib/firms/__tests__/page-privacy.test.ts) asserts no
-// other URL appears here, and the CDP page check watches the network for the
-// same thing live. Validation is the same four rules the API enforces
-// (lib/firms/vocabulary-client.ts), shown inline; an API 422 that slips past
-// (a stale vocabulary, say) is shown inline too, never as a raw message dump.
-// =============================================================================
+import { BrandingPanel } from "./branding-panel";
+import { QuotesPanel } from "./quotes-panel";
 
 type Grade = "economy" | "standard" | "premium";
+type Tab = "entries" | "quotes" | "candidates" | "history";
+type ApiError = { error?: string; code?: string };
 
 interface FirmSummary {
   id: string;
   name: string;
-  private: boolean;
-  book_id: string | null;
   ohp_pct: number;
-  entry_count: number;
   status: "draft" | "reviewed";
   reviewed_at: string | null;
-}
-
-interface Entry {
-  id: string;
-  firm_id: string;
-  item_key: string;
-  grade: Grade | null;
-  unit: string;
-  rate_aed: number;
-  kind: EntryKind;
-  origin: "firm_entry" | "quote_import" | "promoted_correction";
-  note?: string | null;
-  quote_id?: string | null;
-  superseded_at?: string | null;
+  private: boolean;
 }
 
 interface Draft {
@@ -60,55 +53,53 @@ interface Draft {
 }
 
 const EMPTY: Draft = { item_key: "", grade: "", unit: "", kind: "supply_and_install", rate_aed: "", note: "" };
-const KIND_LABEL: Record<EntryKind, string> = { labour: "Labour", supply: "Supply", supply_and_install: "Supply & install", lump: "Lump" };
-const BUILTIN_LABEL = { catalog: "built-in — catalogue SKU pick", labour_book: "built-in — labour book", allowance: "built-in — allowance", element_def: "built-in — element rate" } as const;
+const KIND_LABEL: Record<string, string> = { labour: "labour", supply: "supply", supply_and_install: "supply & install", lump: "lump" };
+const unitText = (u: string) => u.replace(/\bm2\b/g, "m²").replace(/\bm3\b/g, "m³");
 
-type ApiError = { error?: string; code?: string };
-
-/** U4: one row of an item's trail (GET /api/firms/:id/rates/history). */
-interface HistoryRow {
-  id: string;
-  grade: Grade | null;
-  unit: string;
-  rate_aed: number;
-  kind: EntryKind;
-  origin: Entry["origin"];
-  correction_id: string | null;
-  quote_id: string | null;
-  note: string | null;
-  created_by: string | null;
-  created_at: string;
-  superseded_at: string | null;
-  superseded_by: string | null;
-  retired_by: string | null;
-  retire_reason: string | null;
-}
-const ORIGIN_LABEL: Record<Entry["origin"], string> = { firm_entry: "typed", quote_import: "from a quotation", promoted_correction: "promoted correction" };
-/** Only a typed rate's figures may be edited; a promoted or imported rate is its record's figure (U4 origin guard). */
-const isLocked = (e: { origin: Entry["origin"] }) => e.origin !== "firm_entry";
+/** H8: the single figure an item shadows (market reference, or the built-in element / allowance constant). */
+const shadowFigure = (v: VocabularyItem | null | undefined): number | null =>
+  !v ? null : v.reference.kind === "market" ? v.reference.rate_aed : v.reference.kind === "builtin" ? (v.reference.rate_aed ?? null) : null;
 
 /** Turn an API failure into the inline messages the form shows. */
 function inlineErrors(status: number, body: ApiError): string[] {
   if (status === 422 && body.error) return body.error.split(/;\s*/).filter(Boolean);
   if (status === 409 && body.code === "entry_locked") return [body.error ?? "This rate's figures come from its record and cannot be edited here."];
   if (status === 409 && body.code === "entry_retired") return ["This entry is already history."];
-  // H8: a rate far from the figure it shadows needs an explicit "save anyway".
   if (status === 409 && body.code === "rate_outlier") return [body.error ?? "This rate is far from the reference — check the unit."];
+  if (status === 409 && body.code === "attention_open") return [body.error ?? "Resolve the entries that need attention first."];
   if (status === 409) return ["The book changed while you were editing — reload it."];
   if (status === 401) return ["Your session has ended — sign in again."];
   if (status === 403) return ["You are no longer a member of this firm."];
   return [body.error ?? `The request failed (${status}).`];
 }
 
-export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: FirmSummary; initialEntries: Entry[] }) {
+export function FirmBookEditor({
+  initialFirm,
+  view,
+  basisControl,
+  startAdding = false,
+}: {
+  initialFirm: FirmSummary;
+  view: BookView;
+  /** Step 04 in a project: the reference-basis accept control (a project route — kept out of this file). */
+  basisControl?: ReactNode;
+  /** The page was opened with ?add= (the BoQ inspector's "Add to my book"). */
+  startAdding?: boolean;
+}) {
   const firmId = initialFirm.id;
-  const [firm, setFirm] = useState<FirmSummary>(initialFirm);
-  const [entries, setEntries] = useState<Entry[]>(initialEntries);
+  const router = useRouter();
+  const ids = useId();
+  const [tab, setTab] = useState<Tab>("entries");
+  const [importOpen, setImportOpen] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [vocab, setVocab] = useState<VocabularyItem[] | null>(null);
   const [vocabError, setVocabError] = useState<string | null>(null);
-  const [banner, setBanner] = useState<string | null>(null);
+  // The add form starts open on an empty book, and when "Add to my book" sent the member here (?add=).
+  const [adding, setAdding] = useState(view.entries.length === 0 || startAdding);
+  const firm = view.firm;
+  const reviewed = firm.status === "reviewed";
 
-  // --- vocabulary ------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
     fetch("/api/rate-vocabulary")
@@ -124,72 +115,623 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
     };
   }, []);
   const byKey = useMemo(() => new Map((vocab ?? []).map((v) => [v.item_key, v])), [vocab]);
-  const sections = useMemo(() => groupBySection(vocab ?? []), [vocab]);
 
-  async function refresh() {
-    const [f, e] = await Promise.all([
-      fetch(`/api/firms/${firmId}`).then((r) => r.json() as Promise<{ firm?: FirmSummary }>),
-      fetch(`/api/firms/${firmId}/rates`).then((r) => r.json() as Promise<{ entries?: Entry[] }>),
-    ]);
-    if (f.firm) setFirm(f.firm);
-    if (e.entries) setEntries(e.entries);
+  /** One action against this firm's routes, then the server view is read again. */
+  async function act(key: string, url: string, init: RequestInit): Promise<{ ok: boolean; status: number; body: ApiError & Record<string, unknown> }> {
+    setBusy(key);
+    setBanner(null);
+    try {
+      const res = await fetch(url, { ...init, headers: { "content-type": "application/json", ...(init.headers ?? {}) } });
+      const body = (await res.json().catch(() => ({}))) as ApiError & Record<string, unknown>;
+      if (!res.ok) setBanner(inlineErrors(res.status, body).join(" "));
+      else router.refresh();
+      return { ok: res.ok, status: res.status, body };
+    } finally {
+      setBusy(null);
+    }
   }
 
-  // --- OH&P + status -----------------------------------------------------------
-  const [ohp, setOhp] = useState(String(initialFirm.ohp_pct));
+  // --- status + OH&P ---------------------------------------------------------------
+  const setStatus = (status: "draft" | "reviewed") => act("status", `/api/firms/${firmId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+  const [ohpOpen, setOhpOpen] = useState(false);
+  const [ohp, setOhp] = useState(String(firm.ohp_pct));
   const [ohpError, setOhpError] = useState<string | null>(null);
-  const [ohpSaving, setOhpSaving] = useState(false);
   async function saveOhp() {
     const n = Number(ohp);
     if (!Number.isFinite(n) || n < 0 || n > 50) {
       setOhpError("OH&P must be a percentage between 0 and 50.");
       return;
     }
-    setOhpSaving(true);
     setOhpError(null);
-    try {
-      const res = await fetch(`/api/firms/${firmId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ohp_pct: n }) });
-      const body = (await res.json().catch(() => ({}))) as { firm?: FirmSummary } & ApiError;
-      if (!res.ok || !body.firm) {
-        setOhpError(inlineErrors(res.status, body).join(" "));
-        return;
-      }
-      setFirm(body.firm);
-    } finally {
-      setOhpSaving(false);
-    }
+    const r = await act("ohp", `/api/firms/${firmId}`, { method: "PATCH", body: JSON.stringify({ ohp_pct: n }) });
+    if (r.ok) setOhpOpen(false);
   }
-  const [statusSaving, setStatusSaving] = useState(false);
-  async function setStatus(status: "draft" | "reviewed") {
-    setStatusSaving(true);
-    setBanner(null);
+
+  // --- attention actions -------------------------------------------------------------
+  const keep = (e: BookEntryView) => act(`keep-${e.id}`, `/api/firms/${firmId}/rates/${e.id}`, { method: "PATCH", body: JSON.stringify({ confirm_outlier: true }) });
+  const retire = (e: BookEntryView) => act(`retire-${e.id}`, `/api/firms/${firmId}/rates/${e.id}`, { method: "DELETE" });
+  const convert = (e: BookEntryView) =>
+    act(`convert-${e.id}`, `/api/firms/${firmId}/rates`, {
+      method: "POST",
+      body: JSON.stringify({ item_key: e.item_key, grade: e.grade, unit: e.attention!.offer!.unit, kind: e.kind, rate_aed: e.attention!.offer!.rate_aed, note: `converted on review — ${e.attention!.offer!.note}` }),
+    });
+  const [conflictPick, setConflictPick] = useState<Record<string, string>>({});
+  async function resolveConflict(item: string, options: BookEntryView[]) {
+    const keepId = conflictPick[item] ?? options[0]!.id;
+    for (const o of options) if (o.id !== keepId) await act(`retire-${o.id}`, `/api/firms/${firmId}/rates/${o.id}`, { method: "DELETE" });
+  }
+
+  // --- edit (typed entries only — a promoted or imported rate is its record's) --------
+  const [editing, setEditing] = useState<string | null>(null);
+  const [edit, setEdit] = useState<{ rate_aed: string; kind: EntryKind; grade: Grade | ""; note: string }>({ rate_aed: "", kind: "labour", grade: "", note: "" });
+  const [editErrors, setEditErrors] = useState<string[]>([]);
+  const [editOutlier, setEditOutlier] = useState(false);
+  function startEdit(e: BookEntryView) {
+    setEditing(e.id);
+    setEdit({ rate_aed: String(e.rate_aed), kind: e.kind as EntryKind, grade: (e.grade ?? "") as Grade | "", note: e.note ?? "" });
+    setEditErrors([]);
+    setEditOutlier(false);
+  }
+  async function saveEdit(e: BookEntryView, confirmOutlier = false) {
+    const item = byKey.get(e.item_key) ?? null;
+    const errs = validateDraftAgainst(item, { item_key: e.item_key, unit: e.unit, kind: edit.kind, rate_aed: Number(edit.rate_aed) });
+    if (edit.rate_aed.trim() === "") errs.unshift("Enter a rate.");
+    if (errs.length) {
+      setEditErrors(errs);
+      return;
+    }
+    const r = await act(`edit-${e.id}`, `/api/firms/${firmId}/rates/${e.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ rate_aed: Number(edit.rate_aed), kind: edit.kind, grade: edit.grade || null, note: edit.note.trim() || null, ...(confirmOutlier ? { confirm_outlier: true } : {}) }),
+    });
+    if (!r.ok) {
+      setBanner(null);
+      setEditErrors(inlineErrors(r.status, r.body));
+      setEditOutlier(r.status === 409 && r.body.code === "rate_outlier");
+      return;
+    }
+    setEditing(null);
+  }
+
+  // --- item trail (U4) -----------------------------------------------------------------
+  const [trail, setTrail] = useState<Record<string, { id: string; rate_aed: number; unit: string; created_at: string; superseded_at: string | null; retire_reason: string | null; origin: string }[] | "loading" | "error">>({});
+  async function toggleHistory(itemKey: string) {
+    if (trail[itemKey]) {
+      setTrail(({ [itemKey]: _drop, ...rest }) => (void _drop, rest));
+      return;
+    }
+    setTrail((t) => ({ ...t, [itemKey]: "loading" }));
     try {
-      const res = await fetch(`/api/firms/${firmId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) });
-      const body = (await res.json().catch(() => ({}))) as { firm?: FirmSummary } & ApiError;
-      if (!res.ok || !body.firm) {
-        setBanner(inlineErrors(res.status, body).join(" "));
-        return;
-      }
-      setFirm(body.firm);
-    } finally {
-      setStatusSaving(false);
+      const res = await fetch(`/api/firms/${firmId}/rates/history?item_key=${encodeURIComponent(itemKey)}`);
+      const body = (await res.json().catch(() => ({}))) as { history?: { id: string; rate_aed: number; unit: string; created_at: string; superseded_at: string | null; retire_reason: string | null; origin: string }[] };
+      setTrail((t) => ({ ...t, [itemKey]: res.ok && body.history ? body.history : "error" }));
+    } catch {
+      setTrail((t) => ({ ...t, [itemKey]: "error" }));
     }
   }
 
-  // --- add entry ---------------------------------------------------------------
+  // --- corrections to promote --------------------------------------------------------------
+  const promote = (id: string) => act(`promote-${id}`, `/api/firms/${firmId}/promote`, { method: "POST", body: JSON.stringify({ correction_id: id }) });
+
+  const counts = { entries: view.entries.length, quotes: view.quotes, candidates: view.candidates.length };
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "entries", label: `Entries · ${counts.entries}` },
+    { key: "quotes", label: `Quote imports · ${counts.quotes}` },
+    { key: "candidates", label: `Corrections to promote · ${counts.candidates}` },
+    { key: "history", label: "History" },
+  ];
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const reviewWhy = `${ids}-review-why`;
+
+  return (
+    <div data-firm-id={firmId} className="mx-auto max-w-[1180px] px-6 pb-16 pt-8 md:px-12">
+      <TopBarActions>
+        {/* K7: below 1280 px the top bar keeps two actions; the template is also in Quote imports. */}
+        <span className="bp-boq-wide-only">
+          <Button kind="quiet" href={`/api/firms/${firmId}/quotes/template`}>
+            Download quote template
+          </Button>
+        </span>
+        <Button
+          kind="secondary"
+          onClick={() => {
+            setTab("quotes");
+            setImportOpen(true);
+            requestAnimationFrame(() => document.getElementById("quote-upload")?.scrollIntoView({ block: "start" }));
+          }}
+        >
+          Import a quote
+        </Button>
+        <Button
+          kind="secondary"
+          onClick={() => {
+            setTab("entries");
+            setAdding(true);
+            requestAnimationFrame(() => document.getElementById("new-entry")?.scrollIntoView({ block: "start" }));
+          }}
+        >
+          Add rate
+        </Button>
+      </TopBarActions>
+
+      <p className="t-label-caps text-bp-brass-text">{view.project ? "04 · RATES & BASIS" : "RATE BOOK"}</p>
+      <h1 className="t-heading-lg mt-2">Your rate book</h1>
+      <p className="t-label-md mt-1 text-bp-ink-tertiary">
+        {firm.name} · {firm.private ? "private to your firm" : "shared"} ·{" "}
+        <button type="button" onClick={() => setOhpOpen((o) => !o)} className="underline decoration-bp-line-strong underline-offset-2 hover:text-bp-ink-primary" aria-expanded={ohpOpen}>
+          OH&amp;P {firm.ohp_pct}% at assembly
+        </button>{" "}
+        · {view.entries.length} active {view.entries.length === 1 ? "entry" : "entries"}
+        {view.lastChange ? ` · last change ${view.lastChange}` : ""}
+      </p>
+      {ohpOpen ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label htmlFor={`${ids}-ohp`} className="t-label-caps text-bp-ink-tertiary">
+            OH&amp;P %
+          </label>
+          <input id={`${ids}-ohp`} value={ohp} onChange={(e) => setOhp(e.target.value)} inputMode="decimal" aria-invalid={!!ohpError} className="t-num-md h-9 w-20 rounded-none border border-bp-line-control bg-bp-surface-base px-2 text-right" />
+          <Button kind="secondary" onClick={busy ? undefined : saveOhp}>
+            Save OH&amp;P
+          </Button>
+          <span className="t-label-md text-bp-ink-tertiary">Applied once at BoQ assembly as its own line — never inside a rate. 0–50%.</span>
+          {ohpError ? (
+            <span role="alert" className="t-body-sm text-bp-ink-primary">
+              {ohpError}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Status strip (3 columns, hairline top) */}
+      <div className="mt-6 grid grid-cols-1 gap-6 border-t border-bp-line-strong pt-5 md:grid-cols-3">
+        <section aria-labelledby={`${ids}-st`}>
+          <h2 id={`${ids}-st`} className="t-label-caps text-bp-ink-tertiary">
+            BOOK STATUS
+          </h2>
+          <p className="t-heading-sm mt-2" data-testid="book-status" data-status={firm.status}>
+            <span>{reviewed ? "Reviewed" : "Draft"}</span>
+            {reviewed ? ` · ${firm.reviewed_at ? new Date(firm.reviewed_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""}` : " — not reviewed"}
+          </p>
+          <div className="mt-3 flex flex-wrap items-start gap-3">
+            {reviewed ? (
+              <Button kind="quiet" onClick={() => setStatus("draft")}>
+                Back to draft
+              </Button>
+            ) : (
+              <Button kind="secondary" onClick={() => setStatus("reviewed")} disabled={view.reviewBlock ? { reason: view.reviewBlock, reasonId: reviewWhy, showReason: true } : false} testId="mark-reviewed">
+                Mark book reviewed
+              </Button>
+            )}
+          </div>
+        </section>
+        <section aria-labelledby={`${ids}-op`}>
+          <h2 id={`${ids}-op`} className="t-label-caps text-bp-ink-tertiary">
+            {view.project ? "ON THIS PROJECT" : "PROJECTS"}
+          </h2>
+          {view.project ? (
+            view.project.basis === "no_boq" ? (
+              <p className="t-body-sm mt-2 text-bp-ink-secondary">No BoQ yet on this project.</p>
+            ) : (
+              <>
+                <p className="t-heading-sm mt-2">
+                  {view.project.firmLines} of {view.project.totalLines} lines price from your book
+                </p>
+                <p className="t-label-md mt-1 text-bp-ink-tertiary">
+                  {view.project.referenceLines} from market reference or derived · {view.project.unpricedLines} to be priced
+                </p>
+              </>
+            )
+          ) : (
+            <p className="t-heading-sm mt-2">
+              {view.projectCount} {view.projectCount === 1 ? "project prices" : "projects price"} from this book
+            </p>
+          )}
+        </section>
+        <section id="reference-basis" className="scroll-mt-20" aria-labelledby={`${ids}-rb`}>
+          <h2 id={`${ids}-rb`} className="t-label-caps text-bp-ink-tertiary">
+            REFERENCE BASIS
+          </h2>
+          {view.project ? (
+            basisControl
+          ) : (
+            <p className="t-body-sm mt-2 text-bp-ink-secondary">Accepted per project, on its BoQ, or by marking this book reviewed.</p>
+          )}
+        </section>
+      </div>
+
+      {banner ? (
+        <p role="alert" className="surface-inverse t-body-sm mt-6 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink">
+          {banner}
+        </p>
+      ) : null}
+
+      {/* Tabs */}
+      <div role="tablist" aria-label="Rate book" className="mt-8 flex gap-6 border-b border-bp-line-hairline">
+        {tabs.map((t, i) => (
+          <button
+            key={t.key}
+            ref={(el) => {
+              tabRefs.current[i] = el;
+            }}
+            role="tab"
+            type="button"
+            id={`${ids}-tab-${t.key}`}
+            aria-selected={tab === t.key}
+            aria-controls={`${ids}-panel`}
+            tabIndex={tab === t.key ? 0 : -1}
+            onClick={() => setTab(t.key)}
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+              e.preventDefault();
+              const n = (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+              setTab(tabs[n]!.key);
+              tabRefs.current[n]?.focus();
+            }}
+            className={`-mb-px border-b-2 pb-3 ${tab === t.key ? "t-nav-item-active border-bp-brass" : "t-nav-item border-transparent text-bp-ink-secondary hover:text-bp-ink-primary"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div role="tabpanel" id={`${ids}-panel`} aria-labelledby={`${ids}-tab-${tab}`} className="mt-4">
+        {tab === "entries" ? (
+          <>
+            {adding ? (
+              <AddEntry
+                firmId={firmId}
+                vocab={vocab}
+                vocabError={vocabError}
+                byKey={byKey}
+                entries={view.entries}
+                onDone={() => router.refresh()}
+                onCancel={() => setAdding(false)}
+              />
+            ) : null}
+            <div className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring" tabIndex={0} role="region" aria-label="Rates in the book">
+              <table className="w-full min-w-[920px]" data-testid="entries">
+                <thead>
+                  <tr className="t-label-caps whitespace-nowrap bg-bp-surface-sunken text-left text-bp-ink-tertiary">
+                    <th scope="col" className="px-3 py-3 font-normal">ITEM</th>
+                    <th scope="col" className="px-3 py-3 font-normal">KIND</th>
+                    <th scope="col" className="px-3 py-3 font-normal">UNIT</th>
+                    <th scope="col" className="px-3 py-3 text-right font-normal">YOUR RATE</th>
+                    <th scope="col" className="px-3 py-3 text-right font-normal">MARKET REF</th>
+                    <th scope="col" className="px-3 py-3 text-right font-normal">VS REF</th>
+                    <th scope="col" className="px-3 py-3 font-normal">ORIGIN</th>
+                    <th scope="col" className="px-3 py-3 font-normal">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                {view.attention.length + view.conflicts.length > 0 ? (
+                  <tbody data-group="attention">
+                    <tr>
+                      <th colSpan={8} scope="rowgroup" className="t-label-caps px-3 pb-2 pt-5 text-left font-normal text-bp-ink-primary">
+                        NEEDS ATTENTION · {view.attention.length + view.conflicts.length}
+                      </th>
+                    </tr>
+                    {view.attention.map((e) => (
+                      <Fragment key={e.id}>
+                        <EntryRow e={e} raised icon={e.attention!.kind === "unit_check" ? "straighten" : "priority_high"} />
+                        <tr className="bg-bp-surface-raised" data-attention={e.attention!.kind} data-attention-for={e.item_key}>
+                          <td colSpan={8} className="border-b border-bp-line-hairline px-10 pb-5 pt-1">
+                            <p className="t-label-caps text-bp-ink-primary">{e.attention!.headline}</p>
+                            <p className="t-body-sm mt-2 max-w-[90ch] text-bp-ink-secondary">{e.attention!.sentence}</p>
+                            <div className="mt-4 flex flex-wrap items-center gap-6">
+                              {e.attention!.offer ? (
+                                <>
+                                  <Button kind="primary" onClick={busy ? undefined : () => convert(e)} testId="convert">
+                                    Convert to {formatAED(e.attention!.offer.rate_aed)} / {unitText(e.attention!.offer.unit)}
+                                  </Button>
+                                  <Button kind="quiet" onClick={busy ? undefined : () => keep(e)} testId="keep">
+                                    Keep {formatAED(e.rate_aed)}
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button kind="secondary" onClick={busy ? undefined : () => keep(e)} testId="keep">
+                                  Confirm {formatAED(e.rate_aed)}
+                                </Button>
+                              )}
+                              <Button kind="quiet" onClick={busy ? undefined : () => retire(e)}>
+                                Retire entry
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      </Fragment>
+                    ))}
+                    {view.conflicts.map((c) => (
+                      <tr key={`${c.item_key}|${c.grade ?? "*"}`} className="bg-bp-surface-raised" data-attention="conflict">
+                        <td colSpan={8} className="border-b border-bp-line-hairline px-3 py-4">
+                          <p className="t-body-sm flex items-center gap-2">
+                            <Icon name="call_split" size={18} />
+                            {c.label} <span className="t-label-md text-bp-ink-tertiary">{c.item_key}</span>
+                          </p>
+                          <fieldset className="mt-3 pl-7">
+                            <legend className="t-label-caps text-bp-ink-primary">Conflict — two active rates for the same item. Keep one; the other is retired with its history.</legend>
+                            {c.options.map((o) => (
+                              <label key={o.id} className="mt-2 flex cursor-pointer items-center gap-4">
+                                <input type="radio" name={`conflict-${c.item_key}`} checked={(conflictPick[c.item_key] ?? c.options[0]!.id) === o.id} onChange={() => setConflictPick((p) => ({ ...p, [c.item_key]: o.id }))} />
+                                <span className="t-num-md w-24">{formatAED(o.rate_aed)}</span>
+                                <ProvenanceMark tier="measured" />
+                                <span className="t-label-md w-16 text-bp-ink-secondary">{o.vsRef}</span>
+                                <span className="t-label-md text-bp-ink-secondary">{o.originLabel}</span>
+                              </label>
+                            ))}
+                            <div className="mt-4">
+                              <Button kind="secondary" onClick={busy ? undefined : () => resolveConflict(c.item_key, c.options)}>
+                                Keep selected, retire the other
+                              </Button>
+                            </div>
+                          </fieldset>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                ) : null}
+                <tbody data-group="in-use">
+                  <tr>
+                    <th colSpan={8} scope="rowgroup" className="t-label-caps px-3 pb-2 pt-5 text-left font-normal text-bp-ink-primary">
+                      IN USE · {view.inUse.length}
+                    </th>
+                  </tr>
+                  {view.inUse.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="t-body-sm px-3 py-4 text-bp-ink-secondary">
+                        No entries yet. Every item this firm does not price falls back to the figure it shadows.
+                      </td>
+                    </tr>
+                  ) : null}
+                  {view.inUse.map((e) => (
+                    <Fragment key={e.id}>
+                      {editing === e.id ? (
+                        <tr data-entry-id={e.id} data-item-key={e.item_key} data-rate={e.rate_aed} className="bg-bp-surface-raised">
+                          <td className="px-3 py-3" colSpan={3}>
+                            <p className="t-body-sm">{e.label}</p>
+                            <p className="t-label-md text-bp-ink-tertiary">{e.item_key}</p>
+                            <div className="mt-2 flex gap-2">
+                              <select aria-label="Grade" value={edit.grade} onChange={(ev) => setEdit((d) => ({ ...d, grade: ev.target.value as Grade | "" }))} className="t-body-sm h-9 rounded-none border border-bp-line-control bg-bp-surface-base px-2">
+                                <option value="">all grades</option>
+                                <option value="economy">economy</option>
+                                <option value="standard">standard</option>
+                                <option value="premium">premium</option>
+                              </select>
+                              <select aria-label="Kind" value={edit.kind} onChange={(ev) => setEdit((d) => ({ ...d, kind: ev.target.value as EntryKind }))} className="t-body-sm h-9 rounded-none border border-bp-line-control bg-bp-surface-base px-2">
+                                {(byKey.get(e.item_key)?.kinds ?? ENTRY_KINDS).map((k) => (
+                                  <option key={k} value={k}>
+                                    {KIND_LABEL[k]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <input aria-label="Rate AED" value={edit.rate_aed} onChange={(ev) => setEdit((d) => ({ ...d, rate_aed: ev.target.value }))} inputMode="decimal" className="t-num-md h-9 w-28 rounded-none border border-bp-line-control bg-bp-surface-base px-2 text-right" />
+                          </td>
+                          <td colSpan={4} className="px-3 py-3">
+                            <div className="flex flex-wrap items-center gap-4">
+                              <Button kind="primary" onClick={busy ? undefined : () => saveEdit(e)}>
+                                Save
+                              </Button>
+                              <Button kind="quiet" onClick={() => setEditing(null)}>
+                                Cancel
+                              </Button>
+                              {editOutlier ? (
+                                <Button kind="quiet" onClick={() => saveEdit(e, true)} testId="edit-confirm-outlier">
+                                  Save anyway — my confirmation is recorded
+                                </Button>
+                              ) : null}
+                            </div>
+                            {editErrors.length ? (
+                              <ul role="alert" className="t-body-sm mt-2 text-bp-ink-primary" data-testid="edit-errors">
+                                {editErrors.map((m) => (
+                                  <li key={m}>{m}</li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ) : (
+                        <EntryRow
+                          e={e}
+                          actions={
+                            <span className="flex items-center justify-end gap-1">
+                              {e.locked ? (
+                                <span className="flex size-8 items-center justify-center text-bp-ink-tertiary" title="Figures come from the record this rate cites">
+                                  <Icon name="lock" size={16} label={`${e.item_key} is ${e.origin === "quote_import" ? "from a quotation" : "a promoted correction"} — its figures cannot be edited`} />
+                                </span>
+                              ) : (
+                                <button type="button" onClick={() => startEdit(e)} aria-label={`Edit ${e.item_key}`} className="flex size-8 items-center justify-center text-bp-ink-secondary hover:text-bp-ink-primary">
+                                  <Icon name="edit" size={16} />
+                                </button>
+                              )}
+                              <button type="button" onClick={() => toggleHistory(e.item_key)} aria-label={`History of ${e.item_key}`} aria-expanded={!!trail[e.item_key]} className="flex size-8 items-center justify-center text-bp-ink-secondary hover:text-bp-ink-primary">
+                                <Icon name="history" size={16} />
+                              </button>
+                              <button type="button" onClick={busy ? undefined : () => retire(e)} aria-label={`Retire ${e.item_key}`} title="Retire — kept in the book's history, stops pricing" className="flex size-8 items-center justify-center text-bp-ink-secondary hover:text-bp-ink-primary">
+                                <Icon name="archive" size={16} />
+                              </button>
+                            </span>
+                          }
+                        />
+                      )}
+                      {trail[e.item_key] ? (
+                        <tr data-history-for={e.item_key}>
+                          <td colSpan={8} className="bg-bp-surface-sunken px-10 py-3">
+                            {trail[e.item_key] === "loading" ? (
+                              <p className="t-label-md text-bp-ink-tertiary">Loading the trail…</p>
+                            ) : trail[e.item_key] === "error" ? (
+                              <p role="alert" className="t-body-sm">
+                                The trail could not be loaded.
+                              </p>
+                            ) : (
+                              <ul className="t-label-md space-y-1" data-testid="entry-history">
+                                {(trail[e.item_key] as { id: string; rate_aed: number; unit: string; created_at: string; superseded_at: string | null; retire_reason: string | null; origin: string }[]).map((h, i) => (
+                                  <li key={h.id ?? i} data-history-id={h.id} data-active={!h.superseded_at} className="flex flex-wrap gap-4">
+                                    <span className="w-36 text-bp-ink-tertiary">{h.created_at.slice(0, 16).replace("T", " ")}</span>
+                                    <span className="w-32">
+                                      {formatAED(h.rate_aed)} / {unitText(h.unit)}
+                                    </span>
+                                    <span className="text-bp-ink-secondary">{h.superseded_at ? `retired ${h.superseded_at.slice(0, 10)}${h.retire_reason ? ` — ${h.retire_reason}` : ""}` : "active"}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : tab === "quotes" ? (
+          <div id="quote-upload">
+            <QuotesPanel firmId={firmId} open={importOpen} onOpenChange={setImportOpen} />
+          </div>
+        ) : tab === "candidates" ? (
+          view.candidates.length === 0 ? (
+            <p className="t-body-sm py-4 text-bp-ink-secondary">No rate corrections are waiting. A correction captured on a BoQ with “Promote to our rate book after review” appears here; promoting it puts its rate in the book, and the next regeneration prices from it.</p>
+          ) : (
+            <ul className="divide-y divide-bp-line-hairline border-y border-bp-line-hairline" data-testid="candidates">
+              {view.candidates.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-start justify-between gap-4 py-4">
+                  <div className="min-w-0">
+                    <p className="t-body-sm">
+                      {c.label} <span className="t-label-md text-bp-ink-tertiary">{c.item_key}</span>
+                    </p>
+                    <p className="t-num-sm mt-1">
+                      {c.old_value != null ? formatAED(c.old_value) : "—"} → {c.new_value != null ? formatAED(c.new_value) : "—"}
+                      {c.unit ? ` / ${unitText(c.unit)}` : ""}
+                    </p>
+                    <p className="t-label-md mt-1 text-bp-ink-tertiary">
+                      {c.line_description} · {c.recorded_at.slice(0, 10)}
+                      {c.note ? ` · ${c.note}` : ""}
+                    </p>
+                  </div>
+                  <Button kind="secondary" onClick={busy ? undefined : () => promote(c.id)} disabled={c.new_value == null ? { reason: "No corrected figure to promote", reasonId: `${ids}-np-${c.id}`, showReason: true } : false}>
+                    Promote to the book
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : (
+          <table className="w-full" data-testid="book-history">
+            <thead>
+              <tr className="t-label-caps bg-bp-surface-sunken text-left text-bp-ink-tertiary">
+                <th className="px-3 py-3 font-normal">WHEN</th>
+                <th className="px-3 py-3 font-normal">ITEM</th>
+                <th className="px-3 py-3 text-right font-normal">RATE</th>
+                <th className="px-3 py-3 font-normal">ORIGIN</th>
+                <th className="px-3 py-3 font-normal">STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {view.history.map((h) => (
+                <tr key={h.id} className="border-b border-bp-line-hairline" data-active={!h.superseded_at}>
+                  <td className="t-label-md px-3 py-2.5 text-bp-ink-tertiary">{h.created_at.slice(0, 16).replace("T", " ")}</td>
+                  <td className="t-body-sm px-3 py-2.5">
+                    {h.label} <span className="t-label-md text-bp-ink-tertiary">{h.item_key}</span>
+                  </td>
+                  <td className="t-num-sm px-3 py-2.5 text-right">
+                    {formatAED(h.rate_aed)} / {unitText(h.unit)}
+                  </td>
+                  <td className="t-label-md px-3 py-2.5 text-bp-ink-secondary">{h.origin === "quote_import" ? "quotation" : h.origin === "promoted_correction" ? "promoted correction" : "firm entry"}</td>
+                  <td className="t-label-md px-3 py-2.5 text-bp-ink-secondary">{h.superseded_at ? `retired ${h.superseded_at.slice(0, 10)}${h.retire_reason ? ` — ${h.retire_reason}` : ""}` : "active"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <details className="mt-12 border-t border-bp-line-hairline pt-5">
+        <summary className="t-label-caps cursor-pointer text-bp-ink-tertiary">PROPOSAL BRANDING · DISPLAY NAME, LOGO, TERMS</summary>
+        <div className="mt-4">
+          <BrandingPanel firmId={firmId} />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function EntryRow({ e, raised, icon, actions }: { e: BookEntryView; raised?: boolean; icon?: string; actions?: ReactNode }) {
+  return (
+    <tr data-entry-id={e.id} data-item-key={e.item_key} data-rate={e.rate_aed} className={`border-b border-bp-line-hairline ${raised ? "bg-bp-surface-raised" : ""}`}>
+      <td className="px-3 py-3">
+        <p className="t-body-sm flex items-center gap-2">
+          {icon ? <Icon name={icon} size={18} className="text-bp-ink-secondary" /> : null}
+          {e.label}
+        </p>
+        <p className="t-label-md text-bp-ink-tertiary">
+          {e.item_key}
+          {e.grade ? ` · ${e.grade}` : ""}
+        </p>
+      </td>
+      <td className="t-label-md px-3 py-3 text-bp-ink-secondary">{KIND_LABEL[e.kind] ?? e.kind}</td>
+      <td className="t-label-md px-3 py-3 text-bp-ink-secondary">{unitText(e.unit)}</td>
+      <td className="px-3 py-3 text-right">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="t-num-md">{formatAED(e.rate_aed)}</span>
+          <ProvenanceMark tier="measured" />
+          <span className="sr-only">
+            AED {formatAED(e.rate_aed)} per {unitText(e.unit)}, own basis
+          </span>
+        </span>
+      </td>
+      <td className="px-3 py-3 text-right">
+        {e.shadow ? (
+          e.shadow.builtin ? (
+            <span className="t-label-md text-bp-ink-tertiary">built-in</span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="t-num-md text-bp-ink-secondary">{formatAED(e.shadow.rate_aed)}</span>
+              <ProvenanceMark tier="market" />
+              <span className="sr-only">AED {formatAED(e.shadow.rate_aed)}, market reference</span>
+            </span>
+          )
+        ) : (
+          <span className="t-label-md text-bp-ink-tertiary">no reference</span>
+        )}
+      </td>
+      <td className="t-label-md px-3 py-3 text-right text-bp-ink-secondary">{e.vsRef}</td>
+      <td className="t-label-md px-3 py-3 text-bp-ink-secondary">{e.originLabel}</td>
+      <td className="px-3 py-3">{actions}</td>
+    </tr>
+  );
+}
+
+function AddEntry({
+  firmId,
+  vocab,
+  vocabError,
+  byKey,
+  entries,
+  onDone,
+  onCancel,
+}: {
+  firmId: string;
+  vocab: VocabularyItem[] | null;
+  vocabError: string | null;
+  byKey: Map<string, VocabularyItem>;
+  entries: BookEntryView[];
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const ids = useId();
   const [draft, setDraft] = useState<Draft>(EMPTY);
-  const [draftErrors, setDraftErrors] = useState<string[]>([]);
-  const [adding, setAdding] = useState(false);
-  const draftItem = byKey.get(draft.item_key) ?? null;
+  const [errors, setErrors] = useState<string[]>([]);
+  const [outlier, setOutlier] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const sections = useMemo(() => groupBySection(vocab ?? []), [vocab]);
+  const item = byKey.get(draft.item_key) ?? null;
   function pickItem(item_key: string) {
     const v = byKey.get(item_key);
-    setDraft((d) => ({
-      ...d,
-      item_key,
-      unit: v?.unit ?? d.unit,
-      kind: v && !v.kinds.includes(d.kind) ? v.default_kind : d.kind,
-    }));
-    setDraftErrors([]);
+    setDraft((d) => ({ ...d, item_key, unit: v?.unit ?? d.unit, kind: v && !v.kinds.includes(d.kind) ? v.default_kind : d.kind }));
+    setErrors([]);
   }
   // K3: "Add to my book" from the BoQ inspector — ?add=<item_key>&rate=<n>
   // prefills this form (nothing is saved until the member presses Add).
@@ -200,542 +742,150 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
     const key = q.get("add");
     if (!key || !byKey.has(key)) return;
     prefilled.current = true;
+    // One-time prefill from the URL, once the vocabulary it needs has arrived (guarded by the ref).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     pickItem(key);
     const rate = q.get("rate");
     if (rate && Number.isFinite(Number(rate))) setDraft((d) => ({ ...d, rate_aed: rate }));
     document.getElementById("new-entry")?.scrollIntoView({ block: "center" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vocab, byKey]);
-  // H8: an outlier the server refused; the member may save it anyway (recorded).
-  const [addOutlier, setAddOutlier] = useState(false);
-  const draftMagnitude = useMemo(() => {
+  const magnitude = useMemo(() => {
     const r = Number(draft.rate_aed);
-    return draft.item_key && draft.rate_aed.trim() !== "" && Number.isFinite(r) ? checkMagnitude(r, shadowFigure(draftItem)) : null;
-  }, [draft, draftItem]);
-  // H8: the active entry this one would supersede (one active entry per item/grade).
-  const draftReplaces = draft.item_key ? (entries.find((e) => e.item_key === draft.item_key && (e.grade ?? null) === (draft.grade || null)) ?? null) : null;
-  const liveErrors = useMemo(() => {
-    if (!draft.item_key) return [];
-    return validateDraftAgainst(draftItem, { item_key: draft.item_key, unit: draft.unit, kind: draft.kind, rate_aed: Number(draft.rate_aed) });
-  }, [draft, draftItem]);
+    return draft.item_key && draft.rate_aed.trim() !== "" && Number.isFinite(r) ? checkMagnitude(r, shadowFigure(item)) : null;
+  }, [draft, item]);
+  const replaces = draft.item_key ? (entries.find((e) => e.item_key === draft.item_key && (e.grade ?? null) === (draft.grade || null)) ?? null) : null;
+  const live = useMemo(() => (draft.item_key ? validateDraftAgainst(item, { item_key: draft.item_key, unit: draft.unit, kind: draft.kind, rate_aed: Number(draft.rate_aed) }) : []), [draft, item]);
+
   async function add(confirmOutlier = false) {
-    const errs = [...(draft.item_key ? [] : ["Choose an item."]), ...(draft.rate_aed.trim() === "" ? ["Enter a rate."] : []), ...liveErrors];
+    const errs = [...(draft.item_key ? [] : ["Choose an item."]), ...(draft.rate_aed.trim() === "" ? ["Enter a rate."] : []), ...live];
     if (errs.length) {
-      setDraftErrors(errs);
+      setErrors(errs);
       return;
     }
-    setAdding(true);
-    setDraftErrors([]);
+    setSaving(true);
+    setErrors([]);
     try {
       const res = await fetch(`/api/firms/${firmId}/rates`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          item_key: draft.item_key,
-          grade: draft.grade || null,
-          unit: draft.unit,
-          kind: draft.kind,
-          rate_aed: Number(draft.rate_aed),
-          note: draft.note.trim() || null,
-          ...(confirmOutlier ? { confirm_outlier: true } : {}),
-        }),
+        body: JSON.stringify({ item_key: draft.item_key, grade: draft.grade || null, unit: draft.unit, kind: draft.kind, rate_aed: Number(draft.rate_aed), note: draft.note.trim() || null, ...(confirmOutlier ? { confirm_outlier: true } : {}) }),
       });
-      const body = (await res.json().catch(() => ({}))) as { entry?: Entry } & ApiError;
-      if (!res.ok || !body.entry) {
-        setDraftErrors(inlineErrors(res.status, body));
-        setAddOutlier(res.status === 409 && body.code === "rate_outlier");
-        return;
-      }
-      setAddOutlier(false);
-      setDraft(EMPTY);
-      await refresh();
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  // --- edit / delete -------------------------------------------------------------
-  const [editing, setEditing] = useState<string | null>(null);
-  const [edit, setEdit] = useState<{ rate_aed: string; kind: EntryKind; grade: Grade | ""; note: string }>({ rate_aed: "", kind: "labour", grade: "", note: "" });
-  const [editErrors, setEditErrors] = useState<string[]>([]);
-  const [rowBusy, setRowBusy] = useState<string | null>(null);
-  const [editOutlier, setEditOutlier] = useState(false);
-  function startEdit(e: Entry) {
-    setEditing(e.id);
-    setEdit({ rate_aed: String(e.rate_aed), kind: e.kind, grade: e.grade ?? "", note: e.note ?? "" });
-    setEditErrors([]);
-  }
-  async function saveEdit(e: Entry, confirmOutlier = false) {
-    const item = byKey.get(e.item_key) ?? null;
-    const errs = validateDraftAgainst(item, { item_key: e.item_key, unit: e.unit, kind: edit.kind, rate_aed: Number(edit.rate_aed) });
-    if (edit.rate_aed.trim() === "") errs.unshift("Enter a rate.");
-    if (errs.length) {
-      setEditErrors(errs);
-      return;
-    }
-    setRowBusy(e.id);
-    setEditErrors([]);
-    try {
-      const res = await fetch(`/api/firms/${firmId}/rates/${e.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ rate_aed: Number(edit.rate_aed), kind: edit.kind, grade: edit.grade || null, note: edit.note.trim() || null, ...(confirmOutlier ? { confirm_outlier: true } : {}) }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { entry?: Entry } & ApiError;
-      if (!res.ok || !body.entry) {
-        setEditErrors(inlineErrors(res.status, body));
-        setEditOutlier(res.status === 409 && body.code === "rate_outlier");
-        return;
-      }
-      setEditOutlier(false);
-      setEditing(null);
-      await refresh();
-    } finally {
-      setRowBusy(null);
-    }
-  }
-  // U4: the trail of one item — every entry ever made for it, active and retired.
-  const [history, setHistory] = useState<Record<string, HistoryRow[] | "loading" | "error">>({});
-  const [actors, setActors] = useState<Record<string, string>>({});
-  async function toggleHistory(itemKey: string) {
-    if (history[itemKey]) {
-      setHistory((h) => {
-        const { [itemKey]: _closed, ...rest } = h;
-        void _closed;
-        return rest;
-      });
-      return;
-    }
-    setHistory((h) => ({ ...h, [itemKey]: "loading" }));
-    try {
-      const res = await fetch(`/api/firms/${firmId}/rates/history?item_key=${encodeURIComponent(itemKey)}`);
-      const body = (await res.json().catch(() => ({}))) as { history?: HistoryRow[]; actors?: Record<string, string> } & ApiError;
-      if (!res.ok || !body.history) {
-        setHistory((h) => ({ ...h, [itemKey]: "error" }));
-        return;
-      }
-      setActors((a) => ({ ...a, ...(body.actors ?? {}) }));
-      setHistory((h) => ({ ...h, [itemKey]: body.history! }));
-    } catch {
-      setHistory((h) => ({ ...h, [itemKey]: "error" }));
-    }
-  }
-
-  // U4: RETIRE, never delete — the entry stays in the book's history and stops pricing.
-  async function remove(e: Entry) {
-    if (!window.confirm(`Retire the ${e.item_key}${e.grade ? ` / ${e.grade}` : ""} rate? It stays in the book's history and stops pricing; projects priced by this book fall back to what it shadows.${e.origin === "promoted_correction" ? " The correction it came from can be promoted again." : ""}`)) return;
-    setRowBusy(e.id);
-    setBanner(null);
-    try {
-      const res = await fetch(`/api/firms/${firmId}/rates/${e.id}`, { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as ApiError;
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as ApiError;
-        setBanner(inlineErrors(res.status, body).join(" "));
+        setErrors(inlineErrors(res.status, body));
+        setOutlier(res.status === 409 && body.code === "rate_outlier");
         return;
       }
-      await refresh();
+      setOutlier(false);
+      setDraft(EMPTY);
+      onDone();
     } finally {
-      setRowBusy(null);
+      setSaving(false);
     }
   }
 
-  // --- render ----------------------------------------------------------------------
-  const reviewed = firm.status === "reviewed";
+  const field = "t-body-sm mt-1 h-10 w-full rounded-none border border-bp-line-control bg-bp-surface-base px-3 text-bp-ink-primary";
   return (
-    <div className="space-y-lg" data-firm-id={firmId}>
-      <header className="flex flex-wrap items-end justify-between gap-md">
-        <div>
-          <p className="label-caps text-ink-500">
-            <Link href="/firms" className="focus-ring hover:text-brass-600">
-              Rate books
-            </Link>{" "}
-            / firm
-          </p>
-          <h1 className="font-display text-headline-lg text-ink-900">{firm.name}</h1>
-          <p className="mt-xs text-body-sm text-ink-700">
-            {firm.entry_count} {firm.entry_count === 1 ? "entry" : "entries"} · OH&amp;P {firm.ohp_pct}% · {firm.private ? "private" : "shared"} book
-          </p>
-        </div>
-        <div className="flex items-center gap-sm" data-testid="book-status">
-          <span
-            className={[
-              "label-caps rounded-full border px-sm py-[3px]",
-              reviewed ? "border-brass-600 bg-brass-600/10 text-brass-600" : "border-ink-100 bg-canvas text-ink-500",
-            ].join(" ")}
-          >
-            {reviewed ? "Reviewed" : "Draft"}
-          </span>
-          {reviewed && firm.reviewed_at && <span className="font-mono text-[12px] text-ink-500">{new Date(firm.reviewed_at).toLocaleDateString("en-GB")}</span>}
-          <button
-            type="button"
-            onClick={() => setStatus(reviewed ? "draft" : "reviewed")}
-            disabled={statusSaving}
-            className="focus-ring rounded-lg border border-ink-100 bg-paper px-sm py-xs text-body-sm text-ink-700 hover:border-brass-600 disabled:opacity-50"
-          >
-            {reviewed ? "Back to draft" : "Mark reviewed"}
-          </button>
-        </div>
-      </header>
-
-      {banner && (
-        <p role="alert" className="rounded-lg border border-error/40 bg-error/5 px-md py-sm text-body-sm text-error">
-          {banner}
+    <section id="new-entry" aria-labelledby={`${ids}-h`} className="mb-8 border border-bp-line-strong bg-bp-surface-raised p-5">
+      <h2 id={`${ids}-h`} className="t-heading-sm">
+        Add a rate
+      </h2>
+      {vocabError ? (
+        <p role="alert" className="t-body-sm mt-2">
+          {vocabError}
         </p>
-      )}
-
-      <p className="text-body-sm text-ink-500">
-        A book is a draft until a member marks it reviewed; any later change — an entry, the OH&amp;P — puts it back to draft. Status changes nothing
-        about pricing; the export gate reads it.
-      </p>
-
-      {/* OH&P */}
-      <section className="rounded-xl border border-ink-100 bg-paper p-md" aria-label="Overheads and profit">
-        <p className="label-caps text-ink-500">Overheads &amp; profit</p>
-        <div className="mt-sm flex flex-wrap items-center gap-sm">
-          <label className="flex items-center gap-xs text-body-sm text-ink-700">
-            <span>OH&amp;P</span>
-            <input
-              value={ohp}
-              onChange={(e) => {
-                setOhp(e.target.value);
-                setOhpError(null);
-              }}
-              inputMode="decimal"
-              aria-label="OH&P percent"
-              aria-invalid={!!ohpError}
-              className="focus-ring w-20 rounded border border-ink-100 bg-paper px-sm py-xs text-right font-mono text-body-sm tabular-nums text-ink-900"
-            />
-            <span>%</span>
-          </label>
-          <button type="button" onClick={saveOhp} disabled={ohpSaving} className="focus-ring rounded-lg bg-brass-600 px-md py-xs text-body-sm font-semibold text-white disabled:opacity-50">
-            {ohpSaving ? "Saving…" : "Save OH&P"}
-          </button>
-          <span className="text-body-sm text-ink-500">Applied once at BoQ assembly as its own line — never inside a rate. 0–50%.</span>
-        </div>
-        {ohpError && (
-          <p role="alert" className="mt-xs text-body-sm text-error">
-            {ohpError}
-          </p>
-        )}
-      </section>
-
-      {/* Entries */}
-      <section className="rounded-xl border border-ink-100 bg-paper p-md" aria-label="Rate entries">
-        <p className="label-caps text-ink-500">Entries — your rate beside what it shadows</p>
-        {entries.length === 0 ? (
-          <p className="mt-sm text-body-md text-ink-700">No entries yet. Every item this firm does not price falls back to what it shadows.</p>
-        ) : (
-          <table className="mt-sm w-full text-body-sm" data-testid="entries">
-            <thead>
-              <tr className="label-caps text-left text-ink-500">
-                <th className="py-xs pr-sm font-normal">Item</th>
-                <th className="py-xs pr-sm font-normal">Grade</th>
-                <th className="py-xs pr-sm font-normal">Kind</th>
-                <th className="py-xs pr-sm text-right font-normal">Your rate</th>
-                <th className="py-xs pr-sm text-right font-normal">Shadows</th>
-                <th className="py-xs font-normal"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100">
-              {entries.map((e) => {
-                const v = byKey.get(e.item_key);
-                const ref = v?.reference;
-                const isEditing = editing === e.id;
-                const trail = history[e.item_key];
-                return (
-                  <Fragment key={e.id}>
-                  <tr data-entry-id={e.id} data-item-key={e.item_key} className="align-top">
-                    <td className="py-sm pr-sm">
-                      <div className="text-ink-900">{v?.label ?? e.item_key}</div>
-                      <div className="font-mono text-[12px] text-ink-500">
-                        {e.item_key} · {e.unit}
-                        {e.origin === "promoted_correction" && " · promoted correction"}
-                        {e.origin === "quote_import" && " · from a quotation"}
-                      </div>
-                      {e.note && <div className="text-[12px] text-ink-500">{e.note}</div>}
-                    </td>
-                    <td className="py-sm pr-sm">
-                      {isEditing ? (
-                        <select value={edit.grade} onChange={(ev) => setEdit((d) => ({ ...d, grade: ev.target.value as Grade | "" }))} className="focus-ring rounded border border-ink-100 bg-paper px-xs py-[3px] text-body-sm">
-                          <option value="">all grades</option>
-                          <option value="economy">economy</option>
-                          <option value="standard">standard</option>
-                          <option value="premium">premium</option>
-                        </select>
-                      ) : (
-                        <span className="text-ink-700">{e.grade ?? "all grades"}</span>
-                      )}
-                    </td>
-                    <td className="py-sm pr-sm">
-                      {isEditing ? (
-                        <select value={edit.kind} onChange={(ev) => setEdit((d) => ({ ...d, kind: ev.target.value as EntryKind }))} className="focus-ring rounded border border-ink-100 bg-paper px-xs py-[3px] text-body-sm">
-                          {(v?.kinds ?? ENTRY_KINDS).map((k) => (
-                            <option key={k} value={k}>
-                              {KIND_LABEL[k]}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-ink-700">{KIND_LABEL[e.kind]}</span>
-                      )}
-                    </td>
-                    <td className="py-sm pr-sm text-right">
-                      {isEditing ? (
-                        <input
-                          value={edit.rate_aed}
-                          onChange={(ev) => setEdit((d) => ({ ...d, rate_aed: ev.target.value }))}
-                          inputMode="decimal"
-                          aria-label="Rate AED"
-                          className="focus-ring w-24 rounded border border-ink-100 bg-paper px-xs py-[3px] text-right font-mono text-body-sm tabular-nums"
-                        />
-                      ) : (
-                        <span className="font-mono tabular-nums text-ink-900">
-                          <Figure value={e.rate_aed} format="rate" /> / {e.unit}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-sm pr-sm text-right">
-                      {!ref || ref.kind === "none" ? (
-                        <span className="text-ink-500">no reference rate</span>
-                      ) : ref.kind === "market" ? (
-                        <span className="font-mono tabular-nums text-ink-700" title={`market reference · ${ref.provenance}${ref.grade ? ` · ${ref.grade}` : ""}`}>
-                          <Figure value={ref.rate_aed} format="rate" /> / {ref.unit}
-                          <span className="ml-xs font-sans text-[12px] text-ink-500">market reference</span>
-                        </span>
-                      ) : (
-                        <span className="text-[12px] text-ink-500">{BUILTIN_LABEL[ref.how]}</span>
-                      )}
-                    </td>
-                    <td className="py-sm text-right whitespace-nowrap">
-                      {isEditing ? (
-                        <>
-                          <button type="button" onClick={() => saveEdit(e)} disabled={rowBusy === e.id} className="focus-ring rounded-lg bg-brass-600 px-sm py-[3px] text-[12px] font-semibold text-white disabled:opacity-50">
-                            Save
-                          </button>
-                          <button type="button" onClick={() => setEditing(null)} className="focus-ring ml-xs rounded-lg border border-ink-100 px-sm py-[3px] text-[12px] text-ink-700">
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          {isLocked(e) ? (
-                            <span className="material-symbols-outlined text-[18px] text-ink-100" aria-label={`${e.item_key} is a ${ORIGIN_LABEL[e.origin]} — its figures cannot be edited`} title="Figures come from the record this rate cites">
-                              lock
-                            </span>
-                          ) : (
-                            <button type="button" onClick={() => startEdit(e)} aria-label={`Edit ${e.item_key}`} className="focus-ring material-symbols-outlined text-[18px] text-ink-500 hover:text-brass-600">
-                              edit
-                            </button>
-                          )}
-                          <button type="button" onClick={() => toggleHistory(e.item_key)} aria-label={`History of ${e.item_key}`} aria-expanded={!!trail} className="focus-ring material-symbols-outlined ml-xs text-[18px] text-ink-500 hover:text-brass-600">
-                            history
-                          </button>
-                          <button type="button" onClick={() => remove(e)} disabled={rowBusy === e.id} aria-label={`Retire ${e.item_key}`} title="Retire — kept in the book's history, stops pricing" className="focus-ring material-symbols-outlined ml-xs text-[18px] text-ink-500 hover:text-error disabled:opacity-50">
-                            archive
-                          </button>
-                        </>
-                      )}
-                      {isEditing && editErrors.length > 0 && (
-                        <ul role="alert" className="mt-xs text-left text-[12px] text-error" data-testid="edit-errors">
-                          {editErrors.map((m) => (
-                            <li key={m}>{m}</li>
-                          ))}
-                        </ul>
-                      )}
-                      {isEditing && editOutlier && (
-                        <button type="button" onClick={() => saveEdit(e, true)} disabled={rowBusy === e.id} data-testid="edit-confirm-outlier" className="focus-ring mt-xs block text-[12px] text-ink-500 hover:text-error">
-                          save anyway — my confirmation is recorded
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                  {trail && (
-                    <tr data-history-for={e.item_key}>
-                      <td colSpan={6} className="bg-canvas px-sm py-sm">
-                        {trail === "loading" ? (
-                          <p className="text-[12px] text-ink-500">Loading the trail…</p>
-                        ) : trail === "error" ? (
-                          <p role="alert" className="text-[12px] text-error">
-                            The trail could not be loaded.
-                          </p>
-                        ) : (
-                          <table className="w-full text-[12px]" data-testid="entry-history">
-                            <thead>
-                              <tr className="label-caps text-left text-ink-500">
-                                <th className="py-xs pr-sm font-normal">When</th>
-                                <th className="py-xs pr-sm font-normal">Rate</th>
-                                <th className="py-xs pr-sm font-normal">Origin</th>
-                                <th className="py-xs pr-sm font-normal">By</th>
-                                <th className="py-xs font-normal">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-ink-100">
-                              {trail.map((h) => (
-                                <tr key={h.id} data-history-id={h.id} data-active={!h.superseded_at}>
-                                  <td className="py-xs pr-sm font-mono text-ink-700">{h.created_at.slice(0, 16).replace("T", " ")}</td>
-                                  <td className="py-xs pr-sm font-mono tabular-nums text-ink-900">
-                                    <Figure value={h.rate_aed} format="rate" /> / {h.unit}
-                                    {h.grade ? <span className="ml-xs text-ink-500">{h.grade}</span> : null}
-                                  </td>
-                                  <td className="py-xs pr-sm text-ink-700">
-                                    {ORIGIN_LABEL[h.origin]}
-                                    {h.note ? <span className="text-ink-500"> — {h.note}</span> : null}
-                                  </td>
-                                  <td className="py-xs pr-sm text-ink-700">{h.created_by ? actors[h.created_by] ?? "a member" : "—"}</td>
-                                  <td className="py-xs text-ink-700">
-                                    {h.superseded_at ? (
-                                      <>
-                                        retired {h.superseded_at.slice(0, 10)}
-                                        {h.retired_by ? ` by ${actors[h.retired_by] ?? "a member"}` : ""}
-                                        {h.retire_reason ? ` — ${h.retire_reason}` : ""}
-                                        {h.superseded_by ? " · replaced" : ""}
-                                      </>
-                                    ) : (
-                                      <span className="font-semibold text-brass-600">active</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      {/* Add entry */}
-      <section id="new-entry" className="rounded-xl border border-ink-100 bg-paper p-md" aria-label="Add a rate entry">
-        <p className="label-caps text-ink-500">Add an entry</p>
-        {vocabError && (
-          <p role="alert" className="mt-xs text-body-sm text-error">
-            {vocabError}
-          </p>
-        )}
-        <div className="mt-sm grid grid-cols-1 gap-sm md:grid-cols-6">
-          <label className="md:col-span-3">
-            <span className="label-caps text-ink-500">Item</span>
-            <select
-              value={draft.item_key}
-              onChange={(e) => pickItem(e.target.value)}
-              aria-label="Item"
-              className="focus-ring mt-xs w-full rounded border border-ink-100 bg-paper px-sm py-xs text-body-sm text-ink-900"
-              disabled={!vocab}
-            >
-              <option value="">{vocab ? "Choose an item the take-off prices…" : "Loading vocabulary…"}</option>
-              {sections.map((s) => (
-                <optgroup key={s.section} label={s.section}>
-                  {s.items.map((it) => (
-                    <option key={it.item_key} value={it.item_key}>
-                      {it.label} ({it.item_key}{it.unit ? ` · ${it.unit}` : ""})
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="label-caps text-ink-500">Grade</span>
-            <select value={draft.grade} onChange={(e) => setDraft((d) => ({ ...d, grade: e.target.value as Grade | "" }))} aria-label="Grade" className="focus-ring mt-xs w-full rounded border border-ink-100 bg-paper px-sm py-xs text-body-sm">
-              <option value="">all grades</option>
-              <option value="economy">economy</option>
-              <option value="standard">standard</option>
-              <option value="premium">premium</option>
-            </select>
-          </label>
-          <label>
-            <span className="label-caps text-ink-500">Unit</span>
-            <input
-              value={draft.unit}
-              onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))}
-              aria-label="Unit"
-              readOnly={!!draftItem?.unit}
-              placeholder="m2"
-              className={["focus-ring mt-xs w-full rounded border border-ink-100 px-sm py-xs font-mono text-body-sm", draftItem?.unit ? "bg-canvas text-ink-500" : "bg-paper text-ink-900"].join(" ")}
-            />
-          </label>
-          <label>
-            <span className="label-caps text-ink-500">Kind</span>
-            <select value={draft.kind} onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value as EntryKind }))} aria-label="Kind" className="focus-ring mt-xs w-full rounded border border-ink-100 bg-paper px-sm py-xs text-body-sm">
-              {(draftItem?.kinds ?? ENTRY_KINDS).map((k) => (
-                <option key={k} value={k}>
-                  {KIND_LABEL[k]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="md:col-span-2">
-            <span className="label-caps text-ink-500">Rate (AED per unit)</span>
-            <input
-              value={draft.rate_aed}
-              onChange={(e) => setDraft((d) => ({ ...d, rate_aed: e.target.value }))}
-              inputMode="decimal"
-              aria-label="Rate AED"
-              placeholder="0.00"
-              className="focus-ring mt-xs w-full rounded border border-ink-100 bg-paper px-sm py-xs text-right font-mono text-body-sm tabular-nums text-ink-900"
-            />
-          </label>
-          <label className="md:col-span-3">
-            <span className="label-caps text-ink-500">Note (optional)</span>
-            <input value={draft.note} onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))} aria-label="Note" className="focus-ring mt-xs w-full rounded border border-ink-100 bg-paper px-sm py-xs text-body-sm text-ink-900" />
-          </label>
-          <div className="flex items-end md:col-span-1">
-            <button type="button" onClick={() => add()} disabled={adding || !vocab} className="focus-ring w-full rounded-lg bg-brass-600 px-md py-xs text-body-sm font-semibold text-white disabled:opacity-50">
-              {adding ? "Adding…" : "Add entry"}
-            </button>
-          </div>
-        </div>
-        {draftItem && (
-          <p className="mt-xs text-[12px] text-ink-500">
-            Shadows:{" "}
-            {draftItem.reference.kind === "market" ? (
-              <>
-                market reference <span className="font-mono tabular-nums">AED {draftItem.reference.rate_aed} / {draftItem.reference.unit}</span>
-              </>
-            ) : draftItem.reference.kind === "builtin" ? (
-              BUILTIN_LABEL[draftItem.reference.how]
-            ) : (
-              "no reference rate (a QS-to-price item)"
-            )}
-            {draftItem.reference.kind === "builtin" && draftItem.reference.rate_aed != null && (
-              <>
-                {" "}
-                <span className="font-mono tabular-nums">AED {draftItem.reference.rate_aed} / {draftItem.reference.unit ?? draftItem.unit}</span>
-              </>
-            )}
-            {" · "}accepts {draftItem.kinds.map((k) => KIND_LABEL[k]).join(" / ")}
-          </p>
-        )}
-        {draftMagnitude?.outlier && (
-          <p className="mt-xs text-[12px] font-semibold text-[#9A3412]" data-testid="magnitude-warning">
-            {draftMagnitude.reason}
-          </p>
-        )}
-        {draftReplaces && (
-          <p className="mt-xs text-[12px] text-ink-500" data-testid="replaces-hint">
-            Saving replaces the current entry —{" "}
-            <span className="font-mono tabular-nums">AED {draftReplaces.rate_aed} / {draftReplaces.unit}</span> ({ORIGIN_LABEL[draftReplaces.origin]}); it stays in the item&apos;s history.
-          </p>
-        )}
-        {(draftErrors.length > 0 || (draft.item_key && liveErrors.length > 0)) && (
-          <ul role="alert" className="mt-xs text-body-sm text-error" data-testid="add-errors">
-            {(draftErrors.length ? draftErrors : liveErrors).map((m) => (
-              <li key={m}>{m}</li>
+      ) : null}
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-6">
+        <label className="md:col-span-3">
+          <span className="t-label-caps text-bp-ink-tertiary">ITEM</span>
+          <select value={draft.item_key} onChange={(e) => pickItem(e.target.value)} aria-label="Item" disabled={!vocab} className={field}>
+            <option value="">{vocab ? "Choose an item the take-off prices…" : "Loading vocabulary…"}</option>
+            {sections.map((s) => (
+              <optgroup key={s.section} label={s.section}>
+                {s.items.map((it) => (
+                  <option key={it.item_key} value={it.item_key}>
+                    {it.label} ({it.item_key}
+                    {it.unit ? ` · ${it.unit}` : ""})
+                  </option>
+                ))}
+              </optgroup>
             ))}
-          </ul>
-        )}
-        {addOutlier && (
-          <button type="button" onClick={() => add(true)} disabled={adding} data-testid="add-confirm-outlier" className="focus-ring mt-xs text-[12px] text-ink-500 hover:text-error">
+          </select>
+        </label>
+        <label>
+          <span className="t-label-caps text-bp-ink-tertiary">GRADE</span>
+          <select value={draft.grade} onChange={(e) => setDraft((d) => ({ ...d, grade: e.target.value as Grade | "" }))} aria-label="Grade" className={field}>
+            <option value="">all grades</option>
+            <option value="economy">economy</option>
+            <option value="standard">standard</option>
+            <option value="premium">premium</option>
+          </select>
+        </label>
+        <label>
+          <span className="t-label-caps text-bp-ink-tertiary">UNIT</span>
+          <input value={draft.unit} onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))} aria-label="Unit" readOnly={!!item?.unit} placeholder="m2" className={field} />
+        </label>
+        <label>
+          <span className="t-label-caps text-bp-ink-tertiary">KIND</span>
+          <select value={draft.kind} onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value as EntryKind }))} aria-label="Kind" className={field}>
+            {(item?.kinds ?? ENTRY_KINDS).map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="md:col-span-2">
+          <span className="t-label-caps text-bp-ink-tertiary">RATE (AED PER UNIT)</span>
+          <input value={draft.rate_aed} onChange={(e) => setDraft((d) => ({ ...d, rate_aed: e.target.value }))} inputMode="decimal" aria-label="Rate AED" placeholder="0.00" className={`${field} t-num-md text-right`} />
+        </label>
+        <label className="md:col-span-3">
+          <span className="t-label-caps text-bp-ink-tertiary">NOTE (OPTIONAL)</span>
+          <input value={draft.note} onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))} aria-label="Note" className={field} />
+        </label>
+      </div>
+      {item ? (
+        <p className="t-label-md mt-3 text-bp-ink-tertiary">
+          Shadows{" "}
+          {item.reference.kind === "market"
+            ? `market reference AED ${formatAED(item.reference.rate_aed)} / ${unitText(item.reference.unit)}`
+            : item.reference.kind === "builtin"
+              ? `built-in pricing${item.reference.rate_aed != null ? ` AED ${formatAED(item.reference.rate_aed)}` : ""}`
+              : "no reference rate (a QS-to-price item)"}{" "}
+          · accepts {item.kinds.map((k) => KIND_LABEL[k]).join(" / ")}
+        </p>
+      ) : null}
+      {magnitude?.outlier ? (
+        <p className="t-body-sm mt-2 text-bp-ink-primary" data-testid="magnitude-warning">
+          {magnitude.reason}
+        </p>
+      ) : null}
+      {replaces ? (
+        <p className="t-label-md mt-2 text-bp-ink-secondary" data-testid="replaces-hint">
+          Saving replaces the current entry — AED {replaces.rate_aed} / {unitText(replaces.unit)} ({replaces.originLabel}); it stays in the item&apos;s history.
+        </p>
+      ) : null}
+      {errors.length > 0 || (draft.item_key && live.length > 0) ? (
+        <ul role="alert" className="t-body-sm mt-2 text-bp-ink-primary" data-testid="add-errors">
+          {(errors.length ? errors : live).map((m) => (
+            <li key={m}>{m}</li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="mt-5 flex flex-wrap items-center gap-6">
+        <Button kind="primary" onClick={saving || !vocab ? undefined : () => add()}>
+          {saving ? "Adding…" : "Add entry"}
+        </Button>
+        <Button kind="quiet" onClick={onCancel}>
+          Cancel
+        </Button>
+        {outlier ? (
+          <Button kind="quiet" onClick={() => add(true)} testId="add-confirm-outlier">
             Save anyway — my confirmation is recorded
-          </button>
-        )}
-      </section>
-    </div>
+          </Button>
+        ) : null}
+      </div>
+    </section>
   );
 }

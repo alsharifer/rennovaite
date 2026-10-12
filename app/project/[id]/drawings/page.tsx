@@ -1,11 +1,18 @@
-import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
-import Link from "next/link";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
-import { PackExport } from "@/components/documents/PackExport";
-import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { PlanLayers, type PlanInspectData } from "@/app/project/[id]/plan/_components/plan-layers";
+import { Button } from "@/components/blueprint/Button";
+import { DocumentsExport } from "@/components/blueprint/documents/DocumentsExport";
+import { StateBlock } from "@/components/blueprint/StateBlock";
+import { packExportEnabled } from "@/lib/documents/pack-export/guard";
+import { latestPackJobs } from "@/lib/documents/pack-export/job";
+import { preflightChecklist } from "@/lib/documents/pack-export/preflight";
 import { generateDrawingSet } from "@/lib/drawings/export";
+import { loadBookAttention } from "@/lib/firms/book-view";
+import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
+import { journeyFlagsFromEnv } from "@/lib/journey";
+import { stepEyebrow } from "@/lib/journey-eyebrow";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -46,23 +53,38 @@ export default async function DrawingsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ export?: string }>;
+  searchParams: Promise<{ export?: string; proposal?: string }>;
 }) {
   // Whole surface is gated by DRAWINGS_ENABLED — invisible (404) when off.
   if (process.env.DRAWINGS_ENABLED !== "true") notFound();
 
   const { id: projectId } = await params;
-  const exportOpen = (await searchParams).export === "1";
+  // ?export=1 (the document-route redirect) lands here — the export panel is always open now;
+  // ?proposal=1 (08 Proposal → Generate) starts with the client proposal included.
+  const wantsProposal = (await searchParams).proposal === "1";
   // T5: documents leave the app only through Export pack (every gate on).
   const canExport = packExportEnabled();
+  const db = getSupabaseAdmin() as unknown as SupabaseClient;
 
-  let set: Awaited<ReturnType<typeof generateDrawingSet>> | null = null;
-  let error: string | null = null;
-  try {
-    set = await generateDrawingSet(projectId);
-  } catch (err) {
-    error = err instanceof Error ? err.message : "Failed to generate drawings.";
-  }
+  const [setResult, project, revCount, jobs] = await Promise.all([
+    generateDrawingSet(projectId).then(
+      (v) => ({ set: v, error: null as string | null }),
+      (err: unknown) => ({ set: null, error: err instanceof Error ? err.message : "Failed to generate drawings." }),
+    ),
+    db.from("projects").select("firm_id").eq("id", projectId).maybeSingle<{ firm_id: string | null }>(),
+    db.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", projectId),
+    // Only in-app runs: a CLI run releases into a local folder, and a verification read releases nothing.
+    canExport ? latestPackJobs(db, projectId, 5).then((js) => js.filter((j) => j.source === "app")).catch(() => []) : Promise.resolve([]),
+  ]);
+  const { set, error } = setResult;
+  const firmId = project.data?.firm_id ?? null;
+  // Persona invariant (K2): on a firm project every member is the firm's.
+  const persona = firmId ? "firm" : "owner";
+  const [preflight, bookOpen] =
+    canExport && set && set.sheets.length > 0
+      ? await Promise.all([preflightChecklist(db, projectId, { proposal: !!firmId }), firmId ? loadBookAttention(db, firmId).catch(() => null) : Promise.resolve(null)])
+      : [null, null];
+  const rev = revCount.count || null;
 
   // Read-mode tap-to-inspect plan (P4 Step 4) — flagged with the viewer/inspect
   // feature. Same inspect data shape the 3D host builds.
@@ -71,7 +93,7 @@ export default async function DrawingsPage({
     | null = null;
   if (process.env.VIEWER_3D_ENABLED === "true") {
     try {
-      const supabase = getSupabaseAdmin();
+      const supabase = db;
       const graph = await derivePlanGraph(projectId);
       if (graph.walls.length > 0 && graph.planId) {
         const [{ data: rawRooms }, { data: boqRows }, { data: styleRows }] = await Promise.all([
@@ -127,48 +149,66 @@ export default async function DrawingsPage({
   }
 
   const isGardenSet = !!set?.sheets.some((s) => s.kind === "site_plan");
+  const eyebrow = stepEyebrow(persona, "documents", "downloads", journeyFlagsFromEnv(), "Documents");
+  const checkedAt = new Date()
+    .toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Dubai" })
+    .replace(",", "")
+    .toUpperCase();
 
   return (
-    <>
-      <div className="mx-auto max-w-[1440px] pb-24">
-        <header className="mb-xl">
-          <p className="label-caps mb-md text-brass-600">
-            {isGardenSet ? "Drawing set · A3 · scaled to fit" : "Drawing set · A3 · 1:100"}
-          </p>
-          <h1 className="mb-md font-display text-headline-lg text-ink-900">
-            Auto-generated drawings
-          </h1>
-          <p className="max-w-[720px] font-body text-body-lg text-on-surface-variant">
-            Deterministic, dimensioned drawings derived from your plan geometry —
-            no AI in this output.{" "}
-            {canExport && "The print-ready set is released through Export pack."}
-          </p>
-          {set && set.sheets.length > 0 && canExport && (
-            <div className="mt-lg">
-              <PackExport projectId={projectId} autoOpen={exportOpen} />
-            </div>
-          )}
-        </header>
+    <div className="mx-auto max-w-[1344px] px-6 py-8 pb-24 lg:px-10">
+      <p className="t-label-caps text-bp-brass-text">{eyebrow}</p>
+      <h1 className="t-heading-lg mt-2 text-bp-ink-primary">{canExport ? "Export pack" : "Drawings"}</h1>
+      <p className="t-body-md mt-2 max-w-[760px] text-bp-ink-secondary">
+        {canExport
+          ? `Every document leaves through one gate. Drawings, renders and BoQ are checked together${rev ? ` against rev ${rev}` : ""}; nothing downloads until its checks pass.`
+          : "Deterministic, dimensioned drawings derived from your plan geometry — no AI in this output."}
+      </p>
 
-        {error || !set ? (
-          <div className="rounded-md border border-ink-100 bg-paper p-lg">
-            <p className="text-body-md text-error">
-              {error ?? "No drawings available."}
-            </p>
-            <Link
-              href={`/project/${projectId}/plan`}
-              className="focus-ring mt-md inline-flex text-body-sm font-semibold text-brass-600"
+      {error || !set || set.sheets.length === 0 ? (
+        <div className="mt-8 max-w-[720px]">
+          {error ? (
+            <StateBlock
+              kind="error"
+              title="The drawings could not be generated"
+              actions={
+                <Button kind="primary" tone="inverse" href={`/project/${projectId}/plan`}>
+                  Open the plan
+                </Button>
+              }
             >
-              Back to plan
-            </Link>
-          </div>
-        ) : (
-          <>
-            {inspectPlan && (
-              <section className="mb-xl rounded-xl border border-ink-100 bg-paper p-lg">
-                <p className="label-caps mb-md text-ink-500">
-                  Explore your plan — tap a room to see what it is and what it costs
-                </p>
+              {error} Nothing was saved or sent.
+            </StateBlock>
+          ) : (
+            <StateBlock
+              kind="empty"
+              icon="draft"
+              title="No drawings yet"
+              actions={
+                <Button kind="primary" href={`/project/${projectId}/plan`}>
+                  Open the plan
+                </Button>
+              }
+            >
+              The drawing set is generated from the confirmed plan. Confirm or draw the plan and the sheets appear here, dimensioned.
+            </StateBlock>
+          )}
+        </div>
+      ) : (
+        <>
+          {canExport && preflight ? (
+            <div className="mt-8">
+              <DocumentsExport projectId={projectId} rev={rev} checkedAt={checkedAt} initial={preflight} initialProposal={wantsProposal} latestJobId={jobs[0]?.id ?? null} sheetCount={set.sheets.length} bookOpen={bookOpen} />
+            </div>
+          ) : null}
+
+          {inspectPlan ? (
+            <section className="mt-10" aria-labelledby="explore-h">
+              <h2 id="explore-h" className="t-label-caps text-bp-ink-tertiary">
+                EXPLORE YOUR PLAN — TAP A ROOM TO SEE WHAT IT IS AND WHAT IT COSTS
+              </h2>
+              {/* The canvas on the sunken surface, as on 02 Scope (K5): its internals are the editor's own. */}
+              <div className="mt-3 border border-bp-line-hairline bg-bp-surface-sunken p-4">
                 <PlanLayers
                   mode="read"
                   projectId={projectId}
@@ -178,53 +218,49 @@ export default async function DrawingsPage({
                   overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
                   inspect={inspectPlan.inspect}
                 />
-              </section>
-            )}
+              </div>
+            </section>
+          ) : null}
 
-            <div className="grid grid-cols-1 gap-gutter lg:grid-cols-3">
+          <section className="mt-10" aria-labelledby="sheets-h">
+            <h2 id="sheets-h" className="t-label-caps text-bp-ink-tertiary">
+              {isGardenSet ? "DRAWING SET · A3 · SCALED TO FIT" : "DRAWING SET · A3 · 1:100"} · {set.sheets.length} SHEET{set.sheets.length === 1 ? "" : "S"}
+            </h2>
+            <div className="mt-3 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
               {set.sheets.map((sheet) => (
-                <article
-                  key={sheet.sheetNumber}
-                  className="flex flex-col rounded-xl border border-ink-100 bg-paper p-lg"
-                >
-                  <div className="mb-md flex items-baseline justify-between">
-                    <h2 className="font-display text-headline-md text-ink-900">
-                      {sheet.title}
-                    </h2>
-                    <span className="font-mono text-[12px] text-ink-500">
-                      {sheet.sheetNumber}
-                    </span>
+                <article key={sheet.sheetNumber} className="flex flex-col border border-bp-line-hairline bg-bp-surface-raised p-4" data-sheet={sheet.sheetNumber}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="t-heading-sm text-bp-ink-primary">{sheet.title}</h3>
+                    <span className="t-num-sm text-bp-ink-tertiary">{sheet.sheetNumber}</span>
                   </div>
+                  {/* A sheet is paper: it stays white in either theme, inside a hairline frame. */}
                   <div
-                    className="matte-image mb-md"
+                    className="mt-3 border border-bp-line-hairline bg-white"
+                    role="img"
+                    aria-label={`Sheet ${sheet.sheetNumber} — ${sheet.title}`}
                     // Deterministic, server-generated SVG (no user input) — safe to inline.
                     dangerouslySetInnerHTML={{ __html: toDisplaySvg(sheet.svg) }}
                   />
-                  <p className="mb-md flex-1 font-body text-body-sm text-on-surface-variant">
-                    {SHEET_BLURB[sheet.kind]}
-                  </p>
+                  <p className="t-body-sm mt-3 flex-1 text-bp-ink-secondary">{SHEET_BLURB[sheet.kind]}</p>
                 </article>
               ))}
             </div>
+          </section>
 
-            {set.derivedNotes.length > 0 && (
-              <section className="mt-xl rounded-xl border border-ink-100 bg-paper p-lg">
-                <p className="label-caps mb-md text-ink-500">
-                  Confidence — derived values
-                </p>
-                <ul className="flex flex-col gap-xs">
-                  {set.derivedNotes.map((n, i) => (
-                    <li key={i} className="flex gap-sm font-body text-body-sm text-on-surface-variant">
-                      <span className="text-brass-600" aria-hidden="true">•</span>
-                      {n}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </>
-        )}
-      </div>
-    </>
+          {set.derivedNotes.length > 0 ? (
+            <section className="mt-10 border-t border-bp-line-hairline pt-4" aria-labelledby="derived-h">
+              <h2 id="derived-h" className="t-label-caps text-bp-ink-tertiary">
+                CONFIDENCE — DERIVED VALUES
+              </h2>
+              <ul className="t-body-sm mt-3 space-y-1 text-bp-ink-secondary">
+                {set.derivedNotes.map((n, i) => (
+                  <li key={i}>· {n}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </>
+      )}
+    </div>
   );
 }
