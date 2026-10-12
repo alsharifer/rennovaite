@@ -128,7 +128,7 @@ try {
   void dup;
 
   console.log("\n4. review, then edit → back to draft");
-  await clickByText("button", "Mark reviewed");
+  await clickByText("button", "Mark book reviewed");
   check("marked Reviewed", await until(`(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Reviewed"`));
   await shot("u2-05-reviewed");
   await click('[aria-label="Edit garden.pcc_base"]');

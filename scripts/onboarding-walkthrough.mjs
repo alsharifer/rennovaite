@@ -201,17 +201,19 @@ try {
   await until(`[...document.querySelectorAll('[data-testid="hold-reason"]')].some((n) => n.textContent.includes("17.9×"))`, 30000);
   const heldText = await evaluate(`[...document.querySelectorAll('[data-testid="hold-reason"]')].map((n) => n.textContent).find((t) => t.includes("pergola") || t.includes("17.9")) ?? ""`);
   check("the pergola line is HELD: rate is 17.9× the reference — check the unit", /17\.9× the reference — check the unit/.test(heldText), heldText);
-  check("the conversion is offered: 2,000.00 / m2 plan (24,500 ÷ 12.25)", await until(`(document.querySelector('[data-testid="apply-conversion"]')?.textContent ?? "").includes("2000.00")`, 10000), await text('[data-testid="apply-conversion"]'));
+  check("the conversion is offered: 2,000.00 / m2 plan (24,500 ÷ 12.25)", await until(`(document.querySelector('[data-testid="apply-conversion"]')?.textContent ?? "").includes("2,000.00")`, 10000), await text('[data-testid="apply-conversion"]'));
   await shot("h8-pergola-held-conversion-offered");
   await click('[data-testid="apply-conversion"]');
   check("applied: the pergola line matches at 2,000 / m2 plan", await until(`(document.querySelector('[data-testid="conversion-note"]')?.textContent ?? "").includes("÷ 12.25")`, 30000), await text('[data-testid="conversion-note"]'));
   await shot("h8-pergola-converted");
   // Left in review: the book the later steps price from is the one built above.
   await goto(`${BASE}/firms/${firmId}`);
-  await until(`document.querySelectorAll('[aria-label="Item"] option').length > 20`, 20000);
-  await clickByText("button", "Mark reviewed");
+  await until(`!!document.querySelector('[data-testid="mark-reviewed"]')`, 20000);
+  await clickByText("button", "Mark book reviewed");
   check("book marked Reviewed", await until(`(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Reviewed"`, 60000));
   await shot("book-reviewed");
+  // K4: branding sits in the book's "Proposal branding" disclosure.
+  await evaluate(`document.querySelector('[data-testid="branding-panel"]')?.closest('details')?.setAttribute('open', '')`);
   check("branding panel present", await until(`!!document.querySelector('[data-testid="branding-panel"]')`));
   await setValue('[aria-label="Display name"]', BRAND);
   await setValue('[aria-label="Terms text"]', "Valid for 30 days.\nPayment: 40% on order, 50% on completion, 10% on handover.");
@@ -308,7 +310,7 @@ try {
   await click('[aria-label="Edit wall_plaster"]');
   await setValue('[data-item-key="wall_plaster"] [aria-label="Rate AED"]', "45");
   await clickByText("button", "Save");
-  check("plaster rate edited 41.5 → 45 (book returns to Draft)", await until(`(() => { const t = document.querySelector('[data-item-key="wall_plaster"]')?.textContent ?? ""; return t.includes("45 / m2") && !t.includes("41.5 / m2"); })() &&(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Draft"`, 60000));
+  check("plaster rate edited 41.5 → 45 (book returns to Draft)", await until(`(() => { const r = document.querySelector('[data-item-key="wall_plaster"]'); return r?.getAttribute("data-rate") === "45"; })() &&(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Draft"`, 60000));
   await shot("rate-edited");
   // H4: the member regenerates from the BoQ page's own control — the payoff
   // loop: edit a rate → Regenerate → the diff link shows exactly what moved.

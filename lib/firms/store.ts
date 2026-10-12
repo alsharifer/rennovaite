@@ -298,6 +298,16 @@ export async function updateFirm(
       .eq("firm_id", firmId);
     if (error) fail(error, "update OH&P");
   }
+  if (patch.status === "reviewed") {
+    // K4 (spec §3.3): a book is not "reviewed" while it carries an open conflict
+    // or an unconfirmed outlier (H8) — the same rule the Rates & Basis screen
+    // shows beside the disabled button. (Dynamic import: book-view reads the
+    // summary from this module.)
+    const { loadBookAttention, reviewBlockText } = await import("./book-view");
+    const open = await loadBookAttention(db, firmId);
+    const block = reviewBlockText(open.conflicts, open.outliers);
+    if (block) throw new StoreError(409, "attention_open", `${block} — the book cannot be marked reviewed yet.`, open);
+  }
   if (patch.status !== undefined) {
     // Marking reviewed is an explicit act; it needs a book to mark (created
     // empty if the firm has none yet — a reviewed empty book is a statement too).
@@ -549,6 +559,16 @@ export async function updateEntry(
   // is written. Editing in place had left no trail and no cause. A note-only
   // edit stays in place (a note is not a figure).
   const figureKeys = (["rate_aed", "unit", "kind", "grade"] as const).filter((k) => figures[k] !== undefined && figures[k] !== current[k]);
+  if (figureKeys.length === 0 && confirm_outlier === true) {
+    // K4: "Keep" on the Rates & Basis screen — the member confirms an outlier
+    // as it stands (any origin; no figure moves). Recorded like every H8
+    // confirmation; the book's attention reads this event.
+    const outlier = await checkEntryMagnitude(db, current, true);
+    if (outlier) {
+      await recordPilotEvent(db, null, "rate_book_change", { action: "outlier_confirmed", item_key: current.item_key, grade: current.grade, entry_id: current.id, rate_aed: current.rate_aed, unit: current.unit, reference_rate_aed: outlier.reference_rate_aed, ratio: outlier.ratio }, { actor: caller!.id, firmId });
+    }
+    if (figures.note === undefined) return current;
+  }
   if (figureKeys.length === 0) {
     const { data, error } = await db
       .from("firm_rate_entries")
