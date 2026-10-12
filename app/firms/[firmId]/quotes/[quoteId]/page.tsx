@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
-import { getCaller } from "@/lib/auth/caller";
+import { StateBlock } from "@/components/blueprint/StateBlock";
+import { getPageCaller } from "@/lib/auth/caller";
 import { StoreError } from "@/lib/firms/store";
 import { reviewQuote, type LineReview, type Quote, type QuoteLine } from "@/lib/quotes/store";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -19,11 +20,11 @@ export const dynamic = "force-dynamic";
 export default async function QuoteReviewPage({ params }: { params: Promise<{ firmId: string; quoteId: string }> }) {
   const { firmId, quoteId } = await params;
   if (!z.string().uuid().safeParse(firmId).success || !z.string().uuid().safeParse(quoteId).success) notFound();
-  const caller = await getCaller();
+  const caller = await getPageCaller();
   if (!caller) {
     return (
       <>
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-4xl px-6 py-8">
           <SignInCard what="this quotation" />
         </div>
       </>
@@ -39,11 +40,10 @@ export default async function QuoteReviewPage({ params }: { params: Promise<{ fi
     if (e instanceof StoreError && e.status === 403) {
       return (
         <>
-          <div className="mx-auto max-w-4xl">
-            <section className="rounded-xl border border-ink-100 bg-paper p-lg" aria-label="Not a member">
-              <p className="label-caps text-ink-500">Members only</p>
-              <h2 className="mt-xs font-display text-headline-md text-ink-900">You are not a member of this firm</h2>
-            </section>
+          <div className="mx-auto max-w-[720px] px-6 py-8">
+            <StateBlock kind="gate" title="Members only">
+              A quotation is visible to the firm&rsquo;s members and to nobody else.
+            </StateBlock>
           </div>
         </>
       );
@@ -52,9 +52,7 @@ export default async function QuoteReviewPage({ params }: { params: Promise<{ fi
   }
   return (
     <>
-      <div className="mx-auto max-w-6xl">
-        <QuoteReview firmId={firmId} initialQuote={quote} initialLines={lines} />
-      </div>
+      <QuoteReview firmId={firmId} initialQuote={quote} initialLines={lines} />
     </>
   );
 }

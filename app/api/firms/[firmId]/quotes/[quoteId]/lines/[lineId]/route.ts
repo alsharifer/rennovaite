@@ -28,6 +28,8 @@ const PatchSchema = z
     // H8: take the converted rate the review offered, or accept an outlier as quoted.
     apply_conversion: z.literal(true).optional(),
     confirm_outlier: z.literal(true).optional(),
+    // K4: the AED rate for a line held for its currency (the member's figure, recorded).
+    enter_rate_aed: z.number().finite().positive().max(10_000_000).optional(),
   })
   .refine((b) => Object.keys(b).length > 0, "Body needs at least one field.");
 
