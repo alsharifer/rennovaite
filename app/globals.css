@@ -462,3 +462,10 @@
   }
 }
 
+
+/* K5a: the hub's revisions table drops Date + Total on tablet and phone (11:639). */
+@media (max-width: 1023.98px) {
+  .bp-hub-wide {
+    display: none;
+  }
+}

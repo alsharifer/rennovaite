@@ -8,11 +8,12 @@
 // this reads the rail's facts (lib/journey-facts.ts) and frames the page.
 // =============================================================================
 
-import type { ReactNode } from "react";
+import { cache, type ReactNode } from "react";
 
 import { getPageCaller } from "@/lib/auth/caller";
 import { journeyFlagsFromEnv } from "@/lib/journey";
 import { loadRailContext, loadRailContextWithoutProject } from "@/lib/journey-facts";
+import type { RailContext } from "@/lib/journey-state";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -20,10 +21,19 @@ import { ShellFrame } from "./ShellFrame";
 
 const db = () => getSupabaseAdmin() as unknown as SupabaseClient;
 
-export async function ProjectShell({ projectId, content = "atelier", children }: { projectId: string; content?: "atelier" | "blueprint"; children: ReactNode }) {
+/**
+ * The rail's facts for this request's caller on a project — memoised per
+ * request (React cache), so a page that reads the same state (the hub's
+ * "Next", K5a) shares ONE load with its shell instead of repeating every gate.
+ */
+export const loadProjectRail = cache(async (projectId: string): Promise<RailContext | null> => {
   const caller = await getPageCaller();
   // The [id] layout redirected a signed-out visit already; this is the backstop.
-  const ctx = caller ? await loadRailContext(db(), projectId, caller) : null;
+  return caller ? loadRailContext(db(), projectId, caller) : null;
+});
+
+export async function ProjectShell({ projectId, content = "atelier", children }: { projectId: string; content?: "atelier" | "blueprint"; children: ReactNode }) {
+  const ctx = await loadProjectRail(projectId);
   if (!ctx) return <>{children}</>;
   return (
     <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()} content={content}>

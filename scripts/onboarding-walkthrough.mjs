@@ -288,7 +288,8 @@ try {
 
   console.log("\n5. export the client proposal through the gate");
   await goto(`${BASE}/project/${villa}/drawings?export=1`);
-  check("Export pack panel open with the gate", await until(`!!document.querySelector('[data-pack-checklist]')`, 60000));
+  // K4: the gate is server-rendered now; act only once the panel is interactive (hydrated).
+  check("Export pack panel open with the gate", await until(`!!document.querySelector('[data-pack-export][data-hydrated] [data-pack-checklist]')`, 60000));
   await setValue('[data-pack-export] input[placeholder]', DOC_NAME);
   check("proposal toggle offered (the project has a firm)", await until(`!!document.querySelector('[data-testid="proposal-toggle"] input')`, 10000));
   await click('[data-testid="proposal-toggle"] input');
@@ -312,6 +313,28 @@ try {
   await clickByText("button", "Save");
   check("plaster rate edited 41.5 → 45 (book returns to Draft)", await until(`(() => { const r = document.querySelector('[data-item-key="wall_plaster"]'); return r?.getAttribute("data-rate") === "45"; })() &&(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Draft"`, 60000));
   await shot("rate-edited");
+
+  // K4 — the loop on the firm surfaces: the edit put the book back in Draft, so
+  // step 04 needs attention and the proposal is locked; reviewing the book
+  // again (from the project's own Rates & Basis step) clears 04 and unlocks 08.
+  console.log("\n6a. K4 — step 04 needs attention and 08 Proposal is locked until the book is reviewed");
+  const railState = (key) => evaluate(`document.querySelector('[data-step="${key}"]')?.getAttribute("data-state") ?? "-"`);
+  await goto(`${BASE}/project/${villa}/rates`);
+  check("rail: 04 Rates & Basis needs attention (book not reviewed)", await until(`document.querySelector('[data-step="rates_basis"]')?.getAttribute("data-state") === "attention"`, 30000), await railState("rates_basis"));
+  check("rail: 08 Proposal blocked", (await railState("proposal")) === "blocked", await railState("proposal"));
+  await goto(`${BASE}/project/${villa}/proposal`);
+  check("08 Proposal: the gate-refusal block, both ways out, Generate disabled with its reason", await until(`document.querySelector('[data-proposal]')?.getAttribute("data-gate") === "locked" && document.body.textContent.includes("Accept market basis") && document.querySelector('[data-testid="generate-proposal"]')?.getAttribute("aria-disabled") === "true"`, 30000));
+  await shot("k4-proposal-locked");
+  await goto(`${BASE}/project/${villa}/rates`);
+  await until(`!!document.querySelector('[data-testid="mark-reviewed"]')`, 20000);
+  check("Mark book reviewed is enabled (no attention open)", (await evaluate(`document.querySelector('[data-testid="mark-reviewed"]')?.getAttribute("aria-disabled")`)) !== "true");
+  await clickByText("button", "Mark book reviewed");
+  check("book Reviewed again, from step 04", await until(`(document.querySelector('[data-testid="book-status"] span')?.textContent ?? "") === "Reviewed"`, 60000));
+  await goto(`${BASE}/project/${villa}/rates`);
+  check("rail: 04 Rates & Basis clears", await until(`["done", "available"].includes(document.querySelector('[data-step="rates_basis"]')?.getAttribute("data-state") ?? "")`, 30000), await railState("rates_basis"));
+  check("rail: 08 Proposal no longer blocked", (await railState("proposal")) !== "blocked", await railState("proposal"));
+  await shot("k4-step04-clear");
+
   // H4: the member regenerates from the BoQ page's own control — the payoff
   // loop: edit a rate → Regenerate → the diff link shows exactly what moved.
   await goto(`${BASE}/project/${villa}/boq`);
@@ -337,6 +360,62 @@ try {
   check("the Plaster line moved (rate), and only what the rate change touched", (moved ?? []).some((k) => k.includes("wall_plaster")), (moved ?? []).join(" · "));
   check("the moved line carries the recorded cause — the firm's rate-book change", await evaluate(`[...document.querySelectorAll('[data-line-key*="wall_plaster"] [data-causes="recorded"]')].some((ul) => /contractor rate book/i.test(ul.textContent))`), await evaluate(`(document.querySelector('[data-line-key*="wall_plaster"] [data-causes]')?.textContent ?? "").slice(0, 160)`));
   await shot("revision-diff-with-cause");
+  check("the diff's reconciliation sentence reconciles the moved lines to the subtotal", /= Δ counted subtotal/.test(await text('[data-testid="diff-reconciliation"]')), await text('[data-testid="diff-reconciliation"]'));
+
+  console.log("\n6b. K4 — approvals on 07, then the proposal: setup, preview, generate");
+  await until(`!!document.querySelector('[data-diff-from][data-hydrated]')`, 30000);
+  await click('[data-testid="approve"]');
+  check("firm approval recorded for the new revision", await until(`[...document.querySelectorAll('[data-approval-kind="firm"]')].some((li) => li.textContent.includes("Approved by the firm"))`, 30000), await text('[data-testid="approvals-panel"]'));
+  await click('[data-testid="record-client"]');
+  await until(`!!document.querySelector('[data-testid="client-approval-form"]')`, 10000);
+  await setValue('[data-testid="client-approval-form"] input:not([type=date])', "Walkthrough client (synthetic)");
+  await setValue('[data-testid="client-approval-form"] input[type=date]', "2026-10-12");
+  await click('[data-testid="record-client-submit"]');
+  check("client approval recorded by the firm: name, date and how it was given", await until(`[...document.querySelectorAll('[data-approval-kind="client"]')].some((li) => li.textContent.includes("Walkthrough client (synthetic)") && li.textContent.includes("Signed proposal"))`, 30000), await text('[data-testid="approvals-panel"]'));
+  await shot("k4-approvals");
+
+  await goto(`${BASE}/project/${villa}/proposal`);
+  check("08 Proposal unlocks (book reviewed): no gate block, Generate enabled", await until(`document.querySelector('[data-proposal]')?.getAttribute("data-gate") === "open" && document.querySelector('[data-testid="generate-proposal"]')?.getAttribute("aria-disabled") !== "true"`, 30000));
+  await until(`!!document.querySelector('[data-proposal][data-hydrated]')`, 30000);
+  check("line rates are OFF by default", (await evaluate(`document.querySelector('[data-testid="show-line-rates"] input')?.checked`)) === false);
+  await setValue("#pp-client", "Walkthrough client (synthetic)");
+  await evaluate(`document.querySelector("#pp-client").dispatchEvent(new FocusEvent("focusout", { bubbles: true }))`);
+  check("setup saved on leaving the field (client)", await until(`(document.querySelector('[data-testid="setup-status"]')?.textContent ?? "").includes("Client saved")`, 30000), await text('[data-testid="setup-status"]'));
+  await setValue("#pp-terms", "30% on signing · 40% mid-way · 30% on handover");
+  await evaluate(`document.querySelector("#pp-terms").dispatchEvent(new FocusEvent("focusout", { bubbles: true }))`);
+  check("payment terms saved", await until(`(document.querySelector('[data-testid="setup-status"]')?.textContent ?? "").includes("Payment terms saved")`, 30000));
+  const { data: setupRow } = await sb.from("project_proposals").select("client_label, payment_terms, show_line_rates").eq("project_id", villa).maybeSingle();
+  const { data: firmDefaults } = await sb.from("firms").select("proposal_payment_terms, proposal_show_line_rates").eq("id", firmId).maybeSingle();
+  check("stored: the project's setup, and the payment terms reused as the firm's default", setupRow?.client_label === "Walkthrough client (synthetic)" && setupRow?.show_line_rates === false && firmDefaults?.proposal_payment_terms === setupRow?.payment_terms, JSON.stringify({ setupRow, firmDefaults }));
+  check("the price summary previews the stored chain", await until(`!!document.querySelector('[data-testid="price-preview"] [data-price-row="total"]')`, 10000));
+  await shot("k4-proposal-setup");
+  await click('[data-testid="preview-as-client"]');
+  check("Preview as client: every page carries PREVIEW · NOT ISSUED, the client and no line rates", await until(`(() => { const d = document.querySelector('[data-testid="proposal-preview"]'); if (!d) return false; const pp = [...d.querySelectorAll('[role="img"]')]; return pp.length >= 2 && pp.every((p) => p.innerHTML.includes('data-preview="true"')) && d.innerHTML.includes("Walkthrough client (synthetic)") && !d.innerHTML.includes(">RATE<"); })()`, 60000));
+  await shot("k4-proposal-preview");
+  await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))`);
+  check("the preview closes on Escape", await until(`!document.querySelector('[data-testid="proposal-preview"]')`, 5000));
+  check("Generate proposal goes through the gated export (06 Documents, proposal included)", (await evaluate(`document.querySelector('[data-testid="generate-proposal"]')?.getAttribute("href")`)) === `/project/${villa}/drawings?export=1&proposal=1`);
+  await goto(`${BASE}/project/${villa}/drawings?export=1&proposal=1`);
+  check("06 Documents opens with the proposal included and its gate passing", await until(`document.querySelector('[data-testid="proposal-toggle"] input')?.checked === true && document.querySelector('[data-check="reference_basis"]')?.getAttribute("data-ok") === "true" && document.querySelector('[data-proposal-state]')?.getAttribute("data-proposal-state") === "open"`, 60000));
+  await shot("k4-documents-proposal-open");
+
+  console.log("\n6c. K5a — the hub reads the same state");
+  await goto(`${BASE}/project/${villa}`);
+  const { data: latestRow } = await sb.from("boqs").select("sections").eq("project_id", villa).order("created_at", { ascending: false }).limit(1).single();
+  check("the hub is the firm hub (Blueprint) with the estimate", await until(`!!document.querySelector('[data-hub] [data-hub-estimate]')`, 60000));
+  const hubCounted = Number(await evaluate(`document.querySelector('[data-basis-total]')?.getAttribute("data-basis-total")`));
+  check("the basis table adds up to the stored counted subtotal", hubCounted === Number(latestRow?.sections?.subtotal_aed), `hub ${hubCounted} · stored ${latestRow?.sections?.subtotal_aed}`);
+  const { count: revCount } = await sb.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", villa);
+  const expectRevs = Array.from({ length: Math.min(revCount ?? 0, 6) }, (_, i) => (revCount ?? 0) - i).join(",");
+  check("revisions table lists the revisions, newest first", (await evaluate(`[...document.querySelectorAll('[data-testid="hub-revisions"] tbody tr')].map((tr) => tr.getAttribute("data-rev")).join(",")`)) === expectRevs, await evaluate(`[...document.querySelectorAll('[data-testid="hub-revisions"] tbody tr')].map((tr) => tr.getAttribute("data-rev")).join(",")`));
+  check("documents: the client proposal is not locked (book reviewed)", (await evaluate(`document.querySelector('[data-document="proposal"]')?.getAttribute("data-locked")`)) === "false");
+  await shot("k5a-hub");
+
+  // K4 leak assertions: every new payload, read with the member's session.
+  const LEAK_NAMES = ["KAME", "Atrium", "QTN20261407", "Global Creation", "3936/R1", "Laspinas", "46703", "Villa 94", "Villa94", "V94", "RAK tiles quotation", "Newspace"];
+  const k4Paths = [`/project/${villa}`, `/project/${villa}/rates`, `/firms/${firmId}`, `/firms/${firmId}/quotes/${quoteId}`, `/project/${villa}/boq/revisions`, `/project/${villa}/drawings`, `/project/${villa}/proposal`, `/api/projects/${villa}/proposal-setup`, `/api/projects/${villa}/proposal-preview`, `/api/projects/${villa}/pack-export?proposal=1`];
+  const leaks = await evaluate(`(async () => { const names = ${JSON.stringify(LEAK_NAMES)}; const out = []; for (const p of ${JSON.stringify(k4Paths)}) { const r = await fetch(p, { cache: "no-store" }); const t = await r.text(); if (!r.ok) { out.push(p + " HTTP " + r.status); continue; } for (const n of names) if (t.includes(n)) out.push(p + " → " + n); } return out; })()`);
+  check(`no withheld identity on any K4 payload (${k4Paths.length} surfaces, member session)`, Array.isArray(leaks) && leaks.length === 0, (leaks ?? []).join(" · "));
 
   console.log("\n7. the milestone report prints the firm and the villa");
   const report = execFileSync(process.execPath, ["--experimental-transform-types", "--import", "./scripts/_alias-hook.mjs", "scripts/three-firms-report.ts", "--firm", firmId], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
