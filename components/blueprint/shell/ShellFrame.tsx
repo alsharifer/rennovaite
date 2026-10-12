@@ -48,7 +48,8 @@ export function ShellFrame({ ctx, flags, content = "atelier", children }: { ctx:
   const pathname = usePathname();
   const steps = railSteps(ctx, flags);
   const activeKey = activeStepKey(ctx.persona, pathname, ctx.project?.id ?? null, flags);
-  const compactWide = activeKey === "boq_review" || (ctx.persona === "owner" && pathname.endsWith("/boq"));
+  // K4: Revisions & Approval (21:450) takes the compact rail too — a seven-column diff beside a 360 column.
+  const compactWide = activeKey === "boq_review" || activeKey === "revisions" || (ctx.persona === "owner" && /\/boq(\/revisions)?$/.test(pathname));
   const pageTitle = PAGE_TITLES.find(([re]) => re.test(pathname))?.[1] ?? null;
 
   return (

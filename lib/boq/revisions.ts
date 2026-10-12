@@ -72,6 +72,8 @@ export interface ProjectRevisionDiff {
   before: RevisionDocument;
   after: RevisionDocument;
   approvals: { before: RevisionApprovalStatus; after: RevisionApprovalStatus; all: BoqApproval[] };
+  /** K4: what tierOf() needs to mark the lines (rate_book QS validation). Not in the JSON route. */
+  tierCtx: { qsValidated: Record<string, boolean> };
 }
 
 async function loadRow(db: SupabaseClient, projectId: string, boqId: string): Promise<BoqRow | null> {
@@ -127,5 +129,6 @@ export async function buildProjectRevisionDiff(db: SupabaseClient, projectId: st
     before,
     after,
     approvals: { before: approvalStatus(approvals, before.boq_id), after: approvalStatus(approvals, after.boq_id), all: approvals },
+    tierCtx: { qsValidated: ctx.qsValidated },
   };
 }
