@@ -267,8 +267,13 @@
 
 /* The phone step drawer and the help drawer are native <dialog>s. */
 .bp-sheet::backdrop,
+/* K8 #13 (65:1247): a 32 % ink scrim; in dark, black at 55 % — never ink/primary,
+   which is light in dark (spec §6.11). */
 .bp-drawer::backdrop {
-  background: color-mix(in srgb, var(--color-ink-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--color-ink-primary) 32%, transparent);
+}
+:root[data-theme="dark"] .bp-drawer::backdrop {
+  background: rgb(0 0 0 / 0.55);
 }
 
 /* ------------------------------------------------------------------ */

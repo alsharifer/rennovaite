@@ -73,7 +73,13 @@ export function ShellFrame({ ctx, flags, skin, title, children }: { ctx: RailCon
         {children}
       </main>
       <Suspense fallback={null}>
-        <HelpDrawer projectId={ctx.project?.id ?? null} area={activeKey ?? pageTitle ?? "app"} />
+        <HelpDrawer
+          projectId={projectId}
+          firmId={ctx.firm?.id ?? null}
+          area={pageTitle ?? activeKey ?? "app"}
+          areaLabel={pageTitle ?? steps.find((x) => x.key === activeKey)?.label}
+          rev={ctx.project?.rev ?? null}
+        />
       </Suspense>
     </div>
   );
