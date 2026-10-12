@@ -91,7 +91,7 @@ export interface TimelineEstimate {
   total_weeks_low: number;
   total_weeks_high: number;
   /** Phases dropped because the project has no value in their sections. */
-  excluded: { key: string; label: string; reason: string }[];
+  excluded: { key: string; label: string; reason: string; sections: string[] }[];
   derived: true;
   basis: string;
 }
@@ -223,6 +223,7 @@ export function estimateTimeline(input: EstimateInput): TimelineEstimate {
         key: anchor.key,
         label: anchor.label,
         reason: `No BoQ value in ${anchor.sections.join(", ")}`,
+        sections: [...anchor.sections],
       });
       continue;
     }
