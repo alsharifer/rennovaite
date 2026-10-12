@@ -8,6 +8,7 @@ import { guardDocumentRoute } from "@/lib/documents/pack-export/guard";
 import { generateDrawingSet, renderSetPdf, renderSheetPdf, type SheetKind } from "@/lib/drawings/export";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { fileResponse } from "@/lib/documents/file-response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,14 +72,8 @@ export async function GET(
       // G4: the whole set as one PDF — the deliverable a contractor is sent.
       if (sheetParam === "all") {
         const pdf = await renderSetPdf(set.sheets.map((s) => s.svg));
-        return new NextResponse(new Uint8Array(pdf), {
-          status: 200,
-          headers: {
-            "Content-Type": "application/pdf",
-            "Content-Disposition": `attachment; filename="drawing-set-${projectId.slice(0, 8)}.pdf"`,
-            "Cache-Control": "no-store",
-          },
-        });
+        // H9: over ~4 MB a PDF cannot be a function response — a signed download instead.
+    return fileResponse((getSupabaseAdmin() as unknown as SupabaseClient), new Uint8Array(pdf), { filename: `drawing-set-${projectId.slice(0, 8)}.pdf`, contentType: "application/pdf", projectId: projectId });
       }
       // A sheet number addresses one sheet exactly (zone sheets share a kind);
       // a kind still works for every sheet that is the only one of its kind.
@@ -90,14 +85,8 @@ export async function GET(
         return NextResponse.json({ error: "Sheet not found." }, { status: 404 });
       }
       const pdf = await renderSheetPdf(sheet.svg);
-      return new NextResponse(new Uint8Array(pdf), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${sheet.sheetNumber}-${kind}.pdf"`,
-          "Cache-Control": "no-store",
-        },
-      });
+      // H9: over ~4 MB a PDF cannot be a function response — a signed download instead.
+    return fileResponse((getSupabaseAdmin() as unknown as SupabaseClient), new Uint8Array(pdf), { filename: `${sheet.sheetNumber}-${kind}.pdf`, contentType: "application/pdf", projectId: projectId });
     }
 
     return NextResponse.json({

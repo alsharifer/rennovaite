@@ -1,3 +1,38 @@
+# H9 — direct-to-storage uploads, one limits table, signed downloads (2026-10-12)
+
+- **The finding** (12 Oct, prod): Vercel answers a function request over ~4.5 MB
+  itself (`413 FUNCTION_PAYLOAD_TOO_LARGE`), and caps responses the same, so
+  our 20 / 25 / 20 / 5 MB upload limits were fiction above 4.5 MB.
+- **Step-0 audit** (`docs/H9_DIRECT_UPLOADS.md`): plan, assets, room photos and
+  logos went through function bodies into the PUBLIC `plan-uploads`; quotes
+  were parsed in memory. Files returned: the render pack (7.28 MB, reference
+  garden) and the drawing set (4.58 MB) exceed the cap; BoQ PDF, proposal and
+  revision-diff PDF do not yet.
+- **Built**: `lib/uploads/limits.ts` (the one table, magic-byte types; a grep
+  test refuses any other numeric limit); `POST /api/uploads/sign` (session +
+  membership, structured 413 / 415 before any byte moves, signed URL into the
+  new PRIVATE `uploads` bucket — migration **052**, no policies); browser PUT
+  straight to Storage with progress; `POST /api/uploads/complete` (signer =
+  caller, real size, magic bytes, sha256, out of `pending/`, then the old
+  pipeline — the multipart branches are gone); `fileResponse` (> 4 MiB ⇒ 302 to
+  a 300 s signed URL for one object, after the gates); the daily orphan sweep
+  (Vercel Cron, `CRON_SECRET`, dry-run until `UPLOAD_SWEEP_APPLY="true"`); one
+  error shape `{code, kind, error}`.
+- **Verified on dev** (previews cannot be signed into): 23/23 live
+  (`scripts/upload-direct-check.mjs`) — 6 MB plan → parse 200 (14 rooms), 16 MB
+  photo, every refusal, the 7.28 MB / 4.58 MB documents by redirect; route-auth
+  sweep (99 handlers + the cron route), isolation sweep 76/76 · 15/15 mixed ·
+  15/15 pages (upload routes and the upload-mixed attacks added), quote-import
+  check, proposal-export check, onboarding walkthrough (a real headless-Chrome
+  PUT to Storage). Unit: 26 new tests; full suite 1,349 green.
+- **Scripts that uploaded multipart** now go through `scripts/lib/direct-upload.mjs`.
+  `proposal-export-check` also needed the K2 persona invariant: its outsider
+  account is no longer made a member of the firm-attached stand-in.
+- **Migrations**: 052 is the upload bucket, so `project_proposals` /
+  `revision_no` (planned as 052 at K0) move to **053**.
+- **Deploy order**: `db:push` 052 on prod BEFORE merge; set `CRON_SECRET` in
+  Vercel; after merge, Abdallah uploads a real 6 MB plan on prod.
+
 # K2 review fixes (2026-10-13)
 
 - **Persona invariant**: on a firm-attached project every project member is a
@@ -67,7 +102,7 @@
   new OwnerLanding (K6), `/rennovaite` stays HomeLanding; §3.6 wins
   (`/drawings` = firm step 06 Documents, Blueprint); R7 + Gate 3 = signoff for
   dark / Plex / Sharp on Blueprint pages; proposal settings = firm defaults +
-  per-project `project_proposals` (052, copy-on-first-open, source revision id);
+  per-project `project_proposals` (052 → **053** since H9, copy-on-first-open, source revision id);
   preview-as-client = proposal-only mode of the guarded pack pipeline
   (`preview: true`, watermarked, not issued); garden sensitivity copy follows
   the engine; firm rail 00 hub · 01 Project & Plan · 02 Scope · 03

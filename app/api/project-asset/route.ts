@@ -2,18 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { ASSET_BUCKET, assetStoragePath, publicUrlForPath } from "@/lib/assets/load";
-import {
-  assetExtension,
-  isAssetKind,
-  isAssetSource,
-  MAX_ASSET_BYTES,
-  validateAssetFile,
-  type AssetKind,
-} from "@/lib/assets/types";
+import { publicUrlForPath } from "@/lib/assets/load";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { uploadErrorResponse } from "@/lib/uploads/http";
+import { finishUpload } from "@/lib/uploads/register";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,114 +28,23 @@ async function mirrorRoomPhoto(roomId: string, storagePath: string) {
     .insert({ room_id: roomId, storage_path: storagePath, public_url: publicUrl });
 }
 
-// POST — create an asset from a multipart upload. Fields: file, project_id,
-// kind, source?, room_id?. Images should be compressed client-side first.
+// POST — register an asset the browser uploaded straight to Storage (H9: POST
+// /api/uploads/sign with kind "project_asset", then this). Body: { path, kind
+// (the asset kind), source?, room_id?, filename? }. Images are compressed
+// client-side first. The checks (real size, magic bytes, the room is this
+// project's) and the write are lib/uploads/register.ts — the same pipeline as
+// /api/uploads/complete.
 export async function POST(request: NextRequest) {
   const caller = await getCaller(request);
   if (!caller) return unauthenticated();
-  let uploadedPath: string | null = null;
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body || typeof body.path !== "string") return NextResponse.json({ error: "Upload the file first, then send its path.", code: "bad_request" }, { status: 400 });
+  const str = (v: unknown) => (typeof v === "string" ? v : null);
   try {
-    const form = await request.formData();
-    const file = form.get("file");
-    const projectId = z.string().uuid().safeParse(form.get("project_id"));
-    const kindRaw = form.get("kind");
-    const sourceRaw = form.get("source");
-    const roomIdRaw = form.get("room_id");
-
-    if (!projectId.success) {
-      return NextResponse.json({ error: "A valid project_id is required." }, { status: 400 });
-    }
-    if (!isAssetKind(kindRaw)) {
-      return NextResponse.json({ error: "A valid asset kind is required." }, { status: 400 });
-    }
-    const kind = kindRaw as AssetKind;
-    const source = isAssetSource(sourceRaw) ? sourceRaw : null;
-    const roomId =
-      typeof roomIdRaw === "string" && Uuid.safeParse(roomIdRaw).success ? roomIdRaw : null;
-    const access = await projectAccess(db(), caller, { project_id: projectId.data, room_id: roomId });
-    if (access.denied) return access.denied;
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "No file provided." }, { status: 400 });
-    }
-    const check = validateAssetFile(kind, file.type, file.name);
-    if (!check.ok) {
-      return NextResponse.json({ error: check.reason }, { status: 400 });
-    }
-    if (file.size > MAX_ASSET_BYTES) {
-      return NextResponse.json(
-        {
-          error: "This file is too large to upload. Please keep files under 25 MB.",
-          code: "payload_too_large",
-        },
-        { status: 413 },
-      );
-    }
-
-    // Confirm the project exists before writing anything.
-    const { data: project, error: projErr } = await db()
-      .from("projects")
-      .select("id")
-      .eq("id", projectId.data)
-      .maybeSingle();
-    if (projErr) throw projErr;
-    if (!project) {
-      return NextResponse.json({ error: "Project not found." }, { status: 404 });
-    }
-
-    const path = assetStoragePath(
-      projectId.data,
-      crypto.randomUUID(),
-      assetExtension(file.type, file.name),
-    );
-    const bytes = await file.arrayBuffer();
-    const { error: uploadErr } = await db()
-      .storage.from(ASSET_BUCKET)
-      .upload(path, bytes, { contentType: file.type || "application/octet-stream", upsert: false });
-    if (uploadErr) throw uploadErr;
-    uploadedPath = path;
-
-    const { data: row, error: insertErr } = await db()
-      .from("project_assets")
-      .insert({
-        project_id: projectId.data,
-        kind,
-        room_id: kind === "photo" ? roomId : null,
-        storage_path: path,
-        filename: file.name,
-        mime: file.type || null,
-        bytes: file.size,
-        source,
-      })
-      .select("id")
-      .single();
-    if (insertErr || !row) {
-      throw insertErr ?? new Error("Failed to save asset row.");
-    }
-
-    // Newly uploaded photo already targeted at a room → make it active.
-    if (kind === "photo" && roomId) {
-      await mirrorRoomPhoto(roomId, path);
-    }
-
-    return NextResponse.json({
-      asset_id: row.id,
-      kind,
-      room_id: kind === "photo" ? roomId : null,
-      public_url: publicUrlForPath(path),
-    });
-  } catch (err) {
-    console.error("[api/project-asset] POST error", err);
-    if (uploadedPath) {
-      await db().storage.from(ASSET_BUCKET).remove([uploadedPath]);
-    }
-    const message =
-      err instanceof Error
-        ? err.message
-        : err && typeof err === "object" && "message" in err
-          ? String((err as { message: unknown }).message)
-          : "Upload failed unexpectedly.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const fields = { asset_kind: str(body.kind), source: str(body.source), room_id: str(body.room_id), filename: str(body.filename) };
+    return NextResponse.json(await finishUpload(db(), caller, body.path, fields, "project_asset"));
+  } catch (e) {
+    return uploadErrorResponse(e, "api/project-asset");
   }
 }
 

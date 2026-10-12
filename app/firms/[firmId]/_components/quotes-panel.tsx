@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { UploadFailed, uploadDirect } from "@/lib/uploads/client";
 
 // U3 — the firm's quotations: download the template, upload a filled one
 // (→ review), and see what has been imported. Every request is to
@@ -54,10 +55,16 @@ export function QuotesPanel({ firmId }: { firmId: string }) {
     setBusy(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      for (const [k, v] of Object.entries(meta)) fd.append(k, v);
-      const res = await fetch(`/api/firms/${firmId}/quotes`, { method: "POST", body: fd });
+      // H9: the workbook goes straight to Storage on a URL signed for THIS firm;
+      // this firm's quote route then verifies it and runs the import.
+      let path: string;
+      try {
+        path = (await uploadDirect(file, { kind: "quote", firmId })).path;
+      } catch (err) {
+        setError(err instanceof UploadFailed ? err.message : "The upload didn't complete. Please try again.");
+        return;
+      }
+      const res = await fetch(`/api/firms/${firmId}/quotes`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path, filename: file.name, ...meta }) });
       const body = (await res.json().catch(() => ({}))) as { quote?: { id: string }; error?: string; code?: string };
       if (!res.ok || !body.quote) {
         setError(body.error ?? `Upload failed (${res.status}).`);

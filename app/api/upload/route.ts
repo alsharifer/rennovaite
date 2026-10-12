@@ -1,141 +1,29 @@
-import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
-import { addProjectMember } from "@/lib/projects/access";
+import { uploadErrorResponse } from "@/lib/uploads/http";
+import { finishUpload } from "@/lib/uploads/register";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BUCKET = "plan-uploads";
-const MAX_SIZE_BYTES = 20 * 1024 * 1024;
-const ALLOWED_TYPES = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-]);
-
-function extensionFor(file: File): string {
-  const fromName = file.name.split(".").pop()?.toLowerCase();
-  if (fromName && /^[a-z0-9]+$/.test(fromName)) return fromName;
-  if (file.type === "application/pdf") return "pdf";
-  if (file.type === "image/png") return "png";
-  if (file.type === "image/jpeg") return "jpg";
-  return "bin";
-}
-
+// The intake floorplan. H9: the file is no longer the request body — the
+// browser uploaded it straight to Storage (POST /api/uploads/sign with kind
+// "plan"), and this takes { path, filename? }. Completing it creates the
+// project (the uploader becomes its member, H5 — addProjectMember in
+// lib/uploads/register.ts), stores the plan and records it in the asset
+// library: the same pipeline as before, now behind the upload checks.
 export async function POST(request: NextRequest) {
   const caller = await getCaller(request);
   if (!caller) return unauthenticated();
-  let createdProjectId: string | null = null;
-
+  const body = (await request.json().catch(() => null)) as { path?: unknown; filename?: unknown } | null;
+  if (!body || typeof body.path !== "string") return NextResponse.json({ error: "Upload the plan first, then send its path.", code: "bad_request" }, { status: 400 });
   try {
-    const form = await request.formData();
-    const file = form.get("file");
-
-    if (!(file instanceof File)) {
-      return NextResponse.json(
-        { error: "No file provided." },
-        { status: 400 },
-      );
-    }
-    if (!ALLOWED_TYPES.has(file.type)) {
-      return NextResponse.json(
-        { error: "Unsupported file type. Please upload a PDF, PNG, or JPG." },
-        { status: 400 },
-      );
-    }
-    if (file.size > MAX_SIZE_BYTES) {
-      // The same structured 413 as /api/project-asset and /api/room-photo (K1).
-      return NextResponse.json(
-        { error: "This file is too large to upload. Please keep a floorplan under 20 MB.", code: "payload_too_large" },
-        { status: 413 },
-      );
-    }
-
-    const { data: project, error: projectErr } = await supabaseAdmin
-      .from("projects")
-      .insert({ city: "Dubai", name: "Untitled" })
-      .select("id")
-      .single();
-
-    if (projectErr || !project) {
-      throw projectErr ?? new Error("Failed to create project row.");
-    }
-    createdProjectId = project.id;
-    // H5: creating a project makes the uploader its member (rolled back with it).
-    await addProjectMember(supabaseAdmin as unknown as SupabaseClient, project.id, caller.id);
-
-    const path = `${project.id}/${crypto.randomUUID()}.${extensionFor(file)}`;
-    const bytes = await file.arrayBuffer();
-
-    const { error: uploadErr } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(path, bytes, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadErr) {
-      throw uploadErr;
-    }
-
-    const {
-      data: { publicUrl: pdf_url },
-    } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
-
-    const { data: plan, error: planErr } = await supabaseAdmin
-      .from("plans")
-      .insert({ project_id: project.id, pdf_url })
-      .select("id")
-      .single();
-
-    if (planErr || !plan) {
-      throw planErr ?? new Error("Failed to create plan row.");
-    }
-
-    // Best-effort: record the floorplan in the project asset library (024) so
-    // it appears in the hub "Project files" panel. The plan/parse flow does not
-    // depend on this, so a missing table (pre-migration) is swallowed.
-    try {
-      await (supabaseAdmin as unknown as SupabaseClient)
-        .from("project_assets")
-        .insert({
-          project_id: project.id,
-          kind: "floorplan",
-          storage_path: path,
-          filename: file.name,
-          mime: file.type || null,
-          bytes: file.size,
-          source: "intake",
-        });
-    } catch {
-      /* project_assets not applied yet — non-fatal */
-    }
-
-    return NextResponse.json({
-      project_id: project.id,
-      plan_id: plan.id,
-      pdf_url,
-    });
-  } catch (err) {
-    console.error("[api/upload] error", err);
-    if (createdProjectId) {
-      await supabaseAdmin
-        .from("projects")
-        .delete()
-        .eq("id", createdProjectId);
-    }
-    // Supabase throws plain objects with `.message`, not Error instances —
-    // `err instanceof Error` would miss those and fall back to the generic
-    // string. Pull `.message` off any object that has one.
-    const message =
-      err instanceof Error
-        ? err.message
-        : err && typeof err === "object" && "message" in err
-          ? String((err as { message: unknown }).message)
-          : "Upload failed unexpectedly.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const result = await finishUpload(supabaseAdmin as unknown as SupabaseClient, caller, body.path, { filename: typeof body.filename === "string" ? body.filename : null }, "plan");
+    return NextResponse.json(result);
+  } catch (e) {
+    return uploadErrorResponse(e, "api/upload");
   }
 }

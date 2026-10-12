@@ -18,6 +18,8 @@ import {
   type PlotDraft,
 } from "@/components/plan/plot-size-fields";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
+import { completeUpload, uploadDirect, uploadFile } from "@/lib/uploads/client";
+import { UPLOAD_LIMITS } from "@/lib/uploads/limits";
 import { cn } from "@/lib/utils";
 import { formatAed } from "@/lib/format/aed";
 
@@ -46,11 +48,10 @@ const DRAWING_ACCEPT = {
   "application/dxf": [".dxf"],
   "application/octet-stream": [".dwg", ".dxf"],
 };
-// Asset-library uploads (photos, drawings) — /api/project-asset accepts 25 MB.
-const MAX_SIZE_BYTES = 25 * 1024 * 1024;
-// The floorplan goes to /api/upload, which accepts 20 MB (K1: the two limits
-// used to disagree, so a 20–25 MB plan passed here and was refused there).
-const PLAN_MAX_BYTES = 20 * 1024 * 1024;
+// Size limits are lib/uploads/limits.ts (H9) — the same table the sign and
+// complete routes read, so the dropzone can never disagree with the server.
+const PLAN_MAX_BYTES = UPLOAD_LIMITS.plan.maxBytes;
+const ASSET_MAX_BYTES = UPLOAD_LIMITS.project_asset.maxBytes;
 
 const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ras Al Khaimah", "Ajman"];
 
@@ -80,39 +81,18 @@ type AssetItem = {
   error?: string;
 };
 
-function uploadWithProgress(
+/**
+ * H9: the plan goes STRAIGHT to Storage on a signed URL (progress from the
+ * upload itself), then /api/uploads/complete verifies it and creates the
+ * project. No function body carries the file, so Vercel's ~4.5 MB request cap
+ * no longer applies; the only limits are lib/uploads/limits.ts.
+ */
+async function uploadWithProgress(
   file: File,
   onProgress: (pct: number) => void,
 ): Promise<UploadResponse> {
-  return new Promise((resolve, reject) => {
-    const form = new FormData();
-    form.append("file", file);
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/upload");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
-    };
-    xhr.onload = () => {
-      let body: unknown = null;
-      try {
-        body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
-      } catch {
-        reject(new Error(`Upload failed (${xhr.status}).`));
-        return;
-      }
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(body as UploadResponse);
-      } else {
-        const msg =
-          body && typeof body === "object" && "error" in body
-            ? String((body as { error: unknown }).error)
-            : `Upload failed (${xhr.status}).`;
-        reject(new Error(msg));
-      }
-    };
-    xhr.onerror = () => reject(new Error("Network error — try again."));
-    xhr.send(form);
-  });
+  const { path } = await uploadDirect(file, { kind: "plan", onProgress });
+  return completeUpload<UploadResponse>(path, "plan", { filename: file.name });
 }
 
 function formatBytes(b: number): string {
@@ -173,20 +153,14 @@ export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) 
             return;
           }
         }
-        const form = new FormData();
-        form.append("file", file);
-        form.append("project_id", pid);
-        form.append("kind", item.kind);
-        form.append("source", "intake");
-        const res = await fetch("/api/project-asset", { method: "POST", body: form });
-        const body = (await res.json().catch(() => null)) as
-          | { asset_id?: string; error?: string }
-          | null;
-        if (!res.ok || !body?.asset_id) {
-          patch(item.id, {
-            status: "error",
-            error: body?.error ?? `Upload failed (${res.status}).`,
-          });
+        // H9: straight to Storage, then verified + registered (lib/uploads/client.ts).
+        const body = await uploadFile<{ asset_id?: string }>(
+          file,
+          { kind: "project_asset", projectId: pid, assetKind: item.kind },
+          { asset_kind: item.kind, source: "intake" },
+        );
+        if (!body?.asset_id) {
+          patch(item.id, { status: "error", error: "The upload didn't complete. Please try again." });
           return;
         }
         patch(item.id, { status: "done" });
@@ -273,7 +247,7 @@ export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) 
     onDropRejected: () =>
       setPlan({
         kind: "error",
-        message: "Please upload a PDF, PNG, or JPG under 20 MB.",
+        message: "That file can't be used as a plan — upload a PDF, PNG or JPG within the size limit.",
       }),
     accept: PLAN_ACCEPT,
     maxSize: PLAN_MAX_BYTES,
@@ -284,14 +258,14 @@ export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) 
   const photoDz = useDropzone({
     onDrop: onPhotoDrop,
     accept: PHOTO_ACCEPT,
-    maxSize: MAX_SIZE_BYTES,
+    maxSize: ASSET_MAX_BYTES,
     multiple: true,
   });
 
   const drawingDz = useDropzone({
     onDrop: onDrawingDrop,
     accept: DRAWING_ACCEPT,
-    maxSize: MAX_SIZE_BYTES,
+    maxSize: ASSET_MAX_BYTES,
     multiple: true,
   });
 

@@ -21,6 +21,8 @@ export const PUBLIC_ROUTE_FILES: Readonly<Record<string, string>> = {
   // Liveness for uptime checks. Anonymous callers get presence booleans only;
   // the key fingerprints are for a signed-in caller.
   "app/api/health/route.ts": "health: liveness + env presence, fingerprints only when signed in",
+  // H9: Vercel Cron has no session; the route checks Authorization: Bearer <CRON_SECRET> and fails closed without it.
+  "app/api/cron/uploads-sweep/route.ts": "cron: the daily orphan-upload sweep, authenticated by CRON_SECRET",
 };
 
 /**
@@ -55,7 +57,7 @@ export const NON_PROJECT_ROUTE_FILES: Readonly<Record<string, string>> = {
 };
 
 /** URL paths of the public route handlers above (exact match). */
-export const PUBLIC_API_PATHS: readonly string[] = ["/api/health"];
+export const PUBLIC_API_PATHS: readonly string[] = ["/api/health", "/api/cron/uploads-sweep"];
 
 /**
  * Pages a visitor may see signed out: the landing surfaces, sign-in itself and

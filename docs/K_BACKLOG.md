@@ -18,9 +18,9 @@ says where it is and why it waits. Newest first.
   the rail already does — and the runbook check (no recorded change ⇒
   regenerating leaves the BoQ unchanged) is its test.
 - **Revision number = count of BoQ rows.** The rail's "rev N" counts the
-  project's `boqs` rows (as the K0 ruling allowed until 052 stores
-  `revision_no`); `listRevisions` drops rows whose sections are not a valid BoQ,
-  so the two can differ on a project with a malformed row. Migration 052
+  project's `boqs` rows (as the K0 ruling allowed until 053 stores
+  `revision_no` — 052 went to H9's upload bucket); `listRevisions` drops rows whose sections are not a valid BoQ,
+  so the two can differ on a project with a malformed row. Migration 053
   settles it.
 - **Owner rail: "Intake" links to `/project/new`** (the owner list is
   untouched) — on an existing project that starts a new one. K6.
@@ -49,7 +49,7 @@ says where it is and why it waits. Newest first.
   A returning firm probably wants its project list — K2's route triage.
 - **The sign-in rate-limit message says "wait a minute"**; Supabase's built-in
   mailer limits magic links per HOUR. With H9, or when custom SMTP is set up.
-- **Uploads over ~4.5 MB never reach the app** (Vercel's function body limit —
+- **DONE in H9 (12 Oct)** — ~~Uploads over ~4.5 MB never reach the app~~ (Vercel's function body limit —
   measured 12 Oct: 4.3 MB → app, 4.7 MB → `413 FUNCTION_PAYLOAD_TOO_LARGE`).
   Floorplan PDFs and drawings are not compressed. **H9**: direct-to-storage
   signed uploads for `/api/upload`, `/api/project-asset`, quote import. K1 only

@@ -9,7 +9,6 @@
 // Pre-047 a read degrades to the registered name and no logo, never an error.
 // =============================================================================
 
-import { randomUUID } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -29,8 +28,6 @@ export interface FirmBranding {
   brand: string;
 }
 
-export const LOGO_MAX_BYTES = 1_000_000;
-export const LOGO_MIMES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg" };
 
 function toBranding(r: Record<string, unknown>): FirmBranding {
   const display = typeof r.display_name === "string" && r.display_name.trim() ? r.display_name.trim() : null;
@@ -78,18 +75,17 @@ export async function updateBranding(db: SupabaseClient, firmId: string, patch: 
   return (await loadFirmBranding(db, firmId))!;
 }
 
-/** Store a logo and point the firm at it. The previous file is left in place (a proposal already exported may reference it). */
-export async function setLogo(db: SupabaseClient, firmId: string, file: { bytes: Uint8Array; mime: string }, caller: Caller | null): Promise<FirmBranding> {
+/**
+ * Point the firm at a stored logo (H9: the file was uploaded straight to
+ * Storage, verified — size and PNG / JPG magic bytes, lib/uploads/limits.ts —
+ * and moved into place by lib/uploads/register.ts). The previous file is left
+ * in place: a proposal already exported may reference it.
+ */
+export async function setLogoPath(db: SupabaseClient, firmId: string, logoPath: string, caller: Caller | null): Promise<FirmBranding> {
   await requireFirm(db, firmId, caller);
-  const ext = LOGO_MIMES[file.mime];
-  if (!ext) throw new StoreError(422, "logo_type", "A logo must be a PNG or JPG.");
-  if (file.bytes.byteLength === 0 || file.bytes.byteLength > LOGO_MAX_BYTES) throw new StoreError(422, "logo_size", `A logo must be under ${LOGO_MAX_BYTES / 1e6} MB.`);
-  const path = `firms/${firmId}/logo-${randomUUID()}.${ext}`;
-  const up = await db.storage.from(ASSET_BUCKET).upload(path, file.bytes, { contentType: file.mime, upsert: false });
-  if (up.error) throw new Error(`logo upload failed: ${up.error.message}`);
-  const { error } = await db.from("firms").update({ logo_path: path }).eq("id", firmId);
+  if (!logoPath.startsWith(`firms/${firmId}/`)) throw new StoreError(400, "logo_path", "That logo is not this firm's.");
+  const { error } = await db.from("firms").update({ logo_path: logoPath }).eq("id", firmId);
   if (error) {
-    await db.storage.from(ASSET_BUCKET).remove([path]);
     if (isMissingSchema(error)) throw new StoreError(500, "branding_unavailable", "Firm branding needs migration 047.");
     throw new Error(`firm logo update failed: ${error.message}`);
   }

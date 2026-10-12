@@ -13,6 +13,7 @@ import { loadDocumentProject } from "@/lib/documents/project-name";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { projectAccess } from "@/lib/projects/http";
+import { fileResponse } from "@/lib/documents/file-response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,14 +73,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // T5: exactly the pages this PDF printed, for the pack's printed-content checks.
     if (format === "pages") return NextResponse.json({ readiness, pages, boq_id: boq.data.id });
     await recordPilotEvent(sb, projectId, "pack_exported", { document: "boq_pdf", boq_id: boq.data.id, pages: pages.length }, { actor: await packJobActor(request) });
-    return new NextResponse(new Uint8Array(pdf), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="boq-${projectId.slice(0, 8)}.pdf"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    // H9: over ~4 MB a PDF cannot be a function response — a signed download instead.
+    return fileResponse(sb, new Uint8Array(pdf), { filename: `boq-${projectId.slice(0, 8)}.pdf`, contentType: "application/pdf", projectId: projectId });
   } catch (err) {
     console.error("[api/boq-pdf] error", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "BoQ PDF failed." }, { status: 500 });

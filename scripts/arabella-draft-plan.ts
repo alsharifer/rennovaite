@@ -23,6 +23,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { devFetch } from "./lib/dev-auth.mjs";
+import { directUpload } from "./lib/direct-upload.mjs";
 
 import {
   arabellaReferenceRecords,
@@ -161,14 +162,10 @@ async function main() {
   // --- client photos → asset library (unassigned) --------------------------------------------
   let uploaded = 0;
   for (const file of photoAssetFiles()) {
-    const fd = new FormData();
-    fd.append("file", new Blob([readFileSync(`${PHOTOS}/${file}`)], { type: "image/jpeg" }), file);
-    fd.append("project_id", projectId);
-    fd.append("kind", "photo");
-    fd.append("source", "intake");
-    const res = await api(`${BASE}/api/project-asset`, { method: "POST", body: fd });
-    if (res.ok) uploaded++;
-    else console.log(`  upload ${file} → ${res.status} ${(await res.text()).slice(0, 160)}`);
+    // H9: sign → PUT straight to Storage → the asset route completes the path.
+    const res = await directUpload(BASE, { authorization: await api.authorization() }, { kind: "project_asset", project_id: projectId, asset_kind: "photo", bytes: readFileSync(`${PHOTOS}/${file}`), type: "image/jpeg", filename: file }, "/api/project-asset", { kind: "photo", source: "intake" });
+    if (res.status === 201) uploaded++;
+    else console.log(`  upload ${file} → ${res.status} ${JSON.stringify(res.body).slice(0, 160)}`);
   }
   check("all 14 client photos are in the project's asset library", uploaded === 14, `${uploaded}/14`);
 

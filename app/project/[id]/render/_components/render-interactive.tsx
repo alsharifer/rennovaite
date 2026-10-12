@@ -14,6 +14,7 @@ import { AssetPicker } from "@/components/assets/AssetPicker";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import type { AssetLite } from "@/lib/assets/types";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
+import { UploadFailed, uploadFile } from "@/lib/uploads/client";
 import { formatAed } from "@/lib/format/aed";
 import { cn } from "@/lib/utils";
 import { MATERIALS, SURFACE_SPECS, type Material } from "@/lib/materials";
@@ -926,10 +927,6 @@ function RoomPhotoPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Post-compression backstop — the client compresses first, so this should
-  // essentially never trip.
-  const MAX_BYTES = 18 * 1024 * 1024;
-
   const selectedAssetId =
     currentPhotoUrl != null
       ? (assets.find((a) => a.url === currentPhotoUrl)?.id ?? null)
@@ -977,32 +974,19 @@ function RoomPhotoPanel({
         );
         return;
       }
-      if (toUpload.size > MAX_BYTES) {
-        setError("This image is too large to upload even after optimisation. Please try a smaller photo.");
-        return;
-      }
-
-      const form = new FormData();
-      form.append("file", toUpload);
-      form.append("project_id", projectId);
-      form.append("kind", "photo");
-      form.append("source", "render");
-      form.append("room_id", roomId);
-
-      const res = await fetch("/api/project-asset", { method: "POST", body: form });
-      const body = (await res.json().catch(() => null)) as
-        | { asset_id?: string; public_url?: string; error?: string }
-        | null;
-      if (!res.ok || !body?.asset_id || !body?.public_url) {
-        if (res.status === 413) {
-          setError(
-            body?.error ??
-              "This image is too large to upload even after optimisation. Please try a smaller photo.",
-          );
+      // H9: straight to Storage, then verified + registered (lib/uploads/client.ts);
+      // the size and type limits are lib/uploads/limits.ts, checked on both sides.
+      let body: { asset_id?: string; public_url?: string };
+      try {
+        body = await uploadFile(toUpload, { kind: "project_asset", projectId, assetKind: "photo" }, { asset_kind: "photo", source: "render", room_id: roomId, filename: file.name });
+      } catch (err) {
+        if (err instanceof UploadFailed && err.code === "payload_too_large") {
+          setError("This image is too large to upload even after optimisation. Please try a smaller photo.");
           return;
         }
-        throw new Error(body?.error ?? `Upload failed (${res.status}).`);
+        throw err;
       }
+      if (!body?.asset_id || !body?.public_url) throw new Error("The upload didn't complete. Please try again.");
       onNewAsset({
         id: body.asset_id,
         url: body.public_url,

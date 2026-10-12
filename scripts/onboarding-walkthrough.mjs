@@ -187,10 +187,12 @@ try {
   const fixtureB64 = fs.readFileSync("lib/quotes/__fixtures__/synthetic-quote.xlsx").toString("base64");
   const quoteId = await evaluate(`(async () => {
     const bytes = Uint8Array.from(atob(${JSON.stringify(fixtureB64)}), (c) => c.charCodeAt(0));
-    const fd = new FormData();
-    fd.append("file", new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "synthetic-quote.xlsx");
-    for (const [k, v] of Object.entries({ supplier_label: "Example Supplier (synthetic)", supplier_role: "supplier", quote_ref: "WALK-H8-001", quote_date: "2026-10-01", valid_until: "2026-12-31", currency: "AED", vat_treatment: "excl", rates_are: "net", discount_pct: "0" })) fd.append(k, v);
-    const r = await fetch("/api/firms/${firmId}/quotes", { method: "POST", body: fd });
+    // H9: as the quotes panel does — sign, PUT straight to Storage, complete the path.
+    const type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const sign = await (await fetch("/api/uploads/sign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "quote", firm_id: "${firmId}", size: bytes.byteLength, type, filename: "synthetic-quote.xlsx" }) })).json();
+    if (!sign.signedUrl) return null;
+    await fetch(sign.signedUrl, { method: "PUT", headers: { "content-type": sign.contentType, "x-upsert": "false" }, body: bytes });
+    const r = await fetch("/api/firms/${firmId}/quotes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: sign.path, filename: "synthetic-quote.xlsx", supplier_label: "Example Supplier (synthetic)", supplier_role: "supplier", quote_ref: "WALK-H8-001", quote_date: "2026-10-01", valid_until: "2026-12-31", currency: "AED", vat_treatment: "excl", rates_are: "net", discount_pct: "0" }) });
     return (await r.json()).quote?.id ?? null;
   })()`);
   check("the synthetic quote uploaded from the member's session", !!quoteId, String(quoteId));

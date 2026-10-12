@@ -3,8 +3,10 @@ import { z } from "zod";
 
 import { publicUrlForPath } from "@/lib/assets/load";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
-import { LOGO_MAX_BYTES, getBranding, setLogo, updateBranding, type FirmBranding } from "@/lib/firms/branding";
+import { getBranding, updateBranding, type FirmBranding } from "@/lib/firms/branding";
 import { UuidSchema, badRequest, firmDb, storeErrorResponse } from "@/lib/firms/http";
+import { uploadErrorResponse } from "@/lib/uploads/http";
+import { finishUpload } from "@/lib/uploads/register";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +15,7 @@ export const dynamic = "force-dynamic";
 //
 //   GET   /api/firms/:firmId/branding            { display_name, logo_url, terms_text, brand }
 //   PATCH /api/firms/:firmId/branding            { display_name?, terms_text? }
-//   POST  /api/firms/:firmId/branding            multipart `logo` (PNG / JPG ≤ 1 MB)
+//   POST  /api/firms/:firmId/branding            { path } of the uploaded logo (H9; PNG / JPG — lib/uploads/limits.ts)
 
 const PatchSchema = z
   .object({ display_name: z.string().trim().max(120).nullable().optional(), terms_text: z.string().trim().max(8000).nullable().optional() })
@@ -54,14 +56,13 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   if (!caller) return unauthenticated("Sign in to work with a firm.");
   const { firmId } = await ctx.params;
   if (!UuidSchema.safeParse(firmId).success) return badRequest("Invalid firm id.");
-  const form = await request.formData().catch(() => null);
-  const file = form?.get("logo");
-  if (!(file instanceof File)) return badRequest("Send the logo as multipart field `logo`.");
-  if (file.size > LOGO_MAX_BYTES) return NextResponse.json({ success: false, error: `A logo must be under ${LOGO_MAX_BYTES / 1e6} MB.`, code: "logo_size" }, { status: 413 });
+  // H9: the logo was uploaded straight to Storage (kind "logo", signed for THIS firm).
+  const body = (await request.json().catch(() => null)) as { path?: unknown } | null;
+  if (!body || typeof body.path !== "string") return badRequest("Upload the logo first, then send its path.");
+  if (!body.path.startsWith(`pending/logo/${firmId}/`)) return badRequest("That upload is not for this firm.");
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    return NextResponse.json({ success: true, branding: view(await setLogo(firmDb(), firmId, { bytes, mime: file.type }, caller)) }, { status: 201 });
+    return NextResponse.json(await finishUpload(firmDb(), caller, body.path, {}, "logo"), { status: 201 });
   } catch (e) {
-    return storeErrorResponse(e);
+    return uploadErrorResponse(e, "api/firms/branding");
   }
 }

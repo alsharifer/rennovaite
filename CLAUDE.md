@@ -376,8 +376,8 @@ tracing.
 ### Room-photo uploads (client compression)
 
 The photo path's source image is uploaded from the render page's
-`RoomPhotoPanel` to `POST /api/room-photo` (multipart `file` + `room_id`, bucket
-`plan-uploads`). Raw phone photos (8–15 MB / 12 MP) used to hit an upstream
+`RoomPhotoPanel` through the asset library (since H9 a direct-to-storage
+upload — see "Direct-to-storage uploads (H9)"). Raw phone photos (8–15 MB / 12 MP) used to hit an upstream
 body-cap and fail with a raw **HTTP 413** before ever reaching the route. So the
 client **compresses first** (`lib/image/compress.ts`): decode with EXIF
 orientation baked in, downscale to long edge ≤ **2048 px**, re-encode JPEG
@@ -387,11 +387,9 @@ browser can decode it, otherwise the user gets a friendly "use JPG/PNG" message
 (never a raw 413). The pure decision logic (`fitWithin`, `planImageProcessing`,
 `isHeic`) is unit-tested in `lib/image/__tests__`.
 
-Server limits (backstops — the client keeps uploads far under them):
-`app/api/room-photo` rejects `> 20 MB` with a **structured 413** (`{ error, code:
-"payload_too_large" }`) rendered as an Atelier error state; `next.config.ts`
-sets `experimental.proxyClientMaxBodySize: "25mb"` (above the route cap) so a
-future proxy/middleware can't silently truncate an upload below it.
+Server limits: the one table, `lib/uploads/limits.ts` (H9) — compression keeps
+photos far under it, and an over-limit file gets the structured
+`{ code: "payload_too_large", kind }` rendered as an Atelier error state.
 
 ## Project asset library (A3/A4/C2)
 
@@ -409,9 +407,10 @@ intake is **reusable at the render step** instead of being re-uploaded per room
   url column. Vocabulary + validation are pure in `lib/assets/types.ts`
   (unit-tested); server reads/paths in `lib/assets/load.ts` (degrade to `[]`
   when the table is absent).
-- **Route** `POST /api/project-asset` (multipart `file` + `project_id` + `kind`
-  + `source?` + `room_id?`) validates per-kind (images = PNG/JPG; drawings =
-  PDF/DWG/DXF/images), enforces a 25 MB structured 413, stores + inserts, and
+- **Route** `POST /api/project-asset` (since H9 JSON `{ path, kind, source?,
+  room_id?, filename? }` — the file was uploaded straight to Storage first)
+  verifies the upload against `lib/uploads/limits.ts` (per asset kind: images =
+  PNG/JPG; drawings = PDF/DWG/DXF/images, by magic bytes), stores + inserts, and
   rolls back storage on failure. `PATCH` assigns an existing photo asset to a
   room. Images are compressed client-side (the S1 pipeline) before upload.
 - **Intake** (`/project/new`): the floorplan (recorded from `/api/upload`) and
@@ -1438,7 +1437,7 @@ resolved line carries **`rate_tier`**.
   ignores it; the export gate (U5) reads it.
 - **Quote import (L2 / U3, migration `045`)** — `lib/quotes/`. Template
   (`GET /api/firms/:id/quotes/template`, xlsx: Quote · How to fill ·
-  Vocabulary) → upload (`POST /api/firms/:id/quotes`, multipart + the quote's
+  Vocabulary) → upload (direct to Storage, then `POST /api/firms/:id/quotes` `{ path, … }` + the quote's
   terms: supplier label/role, ref, dates, currency, VAT treatment, net|list,
   discount) → `firm_quotes` record + one `firm_quote_lines` row per sheet row
   with a **suggested** item_key (`lib/quotes/match.ts`, idf-weighted; never
@@ -1532,8 +1531,8 @@ its logo. Built on the T5 path, never beside it.
 
 - **Branding** (migration 047: `firms.display_name`, `logo_path`,
   `terms_text`; `lib/firms/branding.ts`): the firm chooses what its client
-  sees. `GET/PATCH/POST /api/firms/:id/branding` (members; POST = multipart
-  `logo`, PNG/JPG ≤ 1 MB into `plan-uploads` at `firms/<id>/…`), the
+  sees. `GET/PATCH/POST /api/firms/:id/branding` (members; POST = `{ path }` of a
+  direct `logo` upload (H9), PNG/JPG into `plan-uploads` at `firms/<id>/…`), the
   "Proposal branding" panel on `/firms/:id`. `brand` = display name, else
   the registered name.
 - **The document** `lib/documents/proposal.ts` (pure pages) +
@@ -2003,11 +2002,62 @@ revision's figure and a link to the U4 diff against the revision it superseded
   Regenerate, checks progress, the stored revision, the page total, the event
   and the exact diff link, then follows it (`screenshots/h4/`).
 
+## Direct-to-storage uploads + signed downloads (H9)
+
+Vercel caps a function's request AND response body at ~4.5 MB (measured on prod
+12 Oct: 4.3 MB reached the app, 4.7 MB got `413 FUNCTION_PAYLOAD_TOO_LARGE`),
+so every limit above that was fiction. Since H9 no file passes through a
+function. `docs/H9_DIRECT_UPLOADS.md` has the audit and the verification.
+
+- **One limits table** `lib/uploads/limits.ts`: per kind (`plan`,
+  `project_asset`, `room_photo`, `quote`, `logo`) max bytes, allowed types
+  **by magic bytes** (`sniffType`), scope (project / firm / new project). The
+  browser pre-check, sign and complete all read it. **No other numeric upload
+  limit anywhere** — `lib/uploads/__tests__/limits-grep.test.ts` fails on one;
+  migration 052's bucket cap is held equal to the largest kind.
+- **Sign** `POST /api/uploads/sign {kind, project_id|firm_id, size, type,
+  filename?, asset_kind?}`: session → membership (H5 project / U1 firm) → the
+  declared size + type (structured 413 / 415 before any byte moves) → a signed
+  upload URL for `pending/<kind>/<projectId|firmId|new>/<signerId>/<uuid>.<ext>`
+  in the PRIVATE `uploads` bucket (052; no storage policies). The path names
+  the signer, so no table records intents.
+- **Upload**: the browser PUTs straight to Storage with progress
+  (`lib/uploads/client.ts`: `uploadDirect`, `completeUpload`, `uploadFile`).
+- **Complete** `POST /api/uploads/complete {path, …fields}` (or the kind's own
+  route — `/api/upload`, `/api/project-asset`, `/api/room-photo`, the firm
+  quote and branding routes — which take `{path, …}` now; **no multipart
+  branch remains**): signer = caller (else 403 `upload_not_yours`), membership
+  re-checked, REAL size (over ⇒ delete + 413) and magic bytes (mismatch ⇒
+  delete + 415), sha256, moved out of `pending/`, then the kind's unchanged
+  pipeline (`lib/uploads/register.ts`). A new upload route must go through
+  `finishUpload` / `signUpload` (the route-auth scan accepts them as the
+  membership check).
+- **One error shape**: `{ code: payload_too_large | unsupported_type |
+  upload_failed, kind, error }` (413 / 415 / 400); `error` names no number.
+- **Large responses** `lib/documents/file-response.ts`: every document PDF route
+  (render pack, drawing set, BoQ PDF, proposal, revision diff) answers through
+  `fileResponse` — inline up to `RESPONSE_INLINE_MAX_BYTES` (4 MiB), else
+  stored in `packs` at `downloads/<projectId>/<uuid>/<name>` and a 302 to a
+  signed URL for that one object (300 s), AFTER the route's gates. The
+  pack-export transport follows it.
+- **Orphans**: `GET /api/cron/uploads-sweep` (Vercel Cron, `vercel.json`,
+  daily) deletes `uploads/pending/` and `packs/downloads/` objects older than
+  24 h — dry-run (logged) until `UPLOAD_SWEEP_APPLY="true"`; authenticated by
+  `CRON_SECRET` (the one public-allowlist route added by H9).
+- **Live check**: `node scripts/upload-direct-check.mjs [port]` (dev, `pack`
+  server) — real Storage, a 6 MB plan through parse, a 16 MB photo, every
+  refusal, second-account 403s, the reference garden's 7.3 MB render pack by
+  redirect. Previews cannot be signed into (Vercel auth + prod-scoped Supabase
+  env), so dev stands in.
+- **DB step**: `npm run db:push` for **052** before deploying — without the
+  bucket every sign fails.
+
 ## Route auth — a session everywhere (H1)
 
 Every API route and every app page needs a signed-in caller, except the ONE
 allowlist in `lib/auth/access.ts`: the `/auth/callback` route, `/api/health`
-(anonymous = env presence only, no key fingerprints), the pages `/`,
+(anonymous = env presence only, no key fingerprints), `/api/cron/uploads-sweep`
+(H9; its own `CRON_SECRET` bearer), the pages `/`,
 `/rennovaite`, `/auth`, `/privacy`, `/terms`, and the sign-in / sign-out
 server actions. `docs/AUTH.md` has the full account.
 
@@ -2107,6 +2157,8 @@ view-only side surface reached from the layout and render steps).
 | `TEXTURED_WALKTHROUGH`            | server — `"true"` lets the 3D walkthrough read StyleBoard finishes onto floors and walls (F1). Off = the clay model, unchanged |
 | `PARSE_PROVIDER`                  | server — optional; which floorplan parser to use. Only `"inhouse"` (the default) is configured; any other value throws rather than silently mis-parsing |
 | `AUTH_SIGNUP_ALLOWLIST`           | server — H5: who may be GIVEN an account (comma/space separated addresses or `prefix+*@domain` patterns). Unset = nobody new; existing accounts still sign in |
+| `CRON_SECRET`                     | server — H9: the bearer Vercel Cron sends to `/api/cron/uploads-sweep`. Unset = the sweep answers 503 |
+| `UPLOAD_SWEEP_APPLY`              | server — H9: `"true"` lets the daily sweep DELETE stale pending uploads / staged downloads. Unset = dry-run (logs what it would delete) |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
 
 ### Feature flags — read at server start (flip → restart)
