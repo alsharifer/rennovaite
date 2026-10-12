@@ -92,8 +92,8 @@ describe("wiring", () => {
     for (const s of selectors) for (const part of s.split(",")) expect(part, part).toContain('[data-system="blueprint"]');
   });
 
-  it("the warm skin sits only on the owner landing and intake roots", () => {
-    expect(read("app/page.tsx")).toContain('data-skin="warm"');
+  it("the warm skin sits only on the intake root (the owner landing is unrouted — front door, 13 Oct)", () => {
+    expect(read("app/page.tsx")).not.toContain("data-skin");
     expect(read("app/project/new/page.tsx")).toContain('data-skin="warm"');
     expect(read("app/rennovaite/page.tsx")).not.toContain("data-skin");
   });

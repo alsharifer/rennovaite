@@ -40,7 +40,9 @@ const PUBLIC_ROUTES = new Set(["app/api/health/route.ts", "app/auth/callback/rou
 // H9: on the allowlist (no session) but guarded by its own CRON_SECRET bearer —
 // anonymous is 401 (or 503 where the secret is not configured), never 200.
 const SECRET_ROUTES = new Set(["app/api/cron/uploads-sweep/route.ts"]);
-const PUBLIC_PAGES = new Set(["/", "/rennovaite", "/auth", "/privacy", "/terms"]);
+const PUBLIC_PAGES = new Set(["/auth", "/privacy", "/terms"]);
+// Front door (13 Oct): public, but they only redirect — signed out → /auth (307).
+const FRONT_DOOR_PAGES = new Set(["/", "/rennovaite"]);
 
 function walk(dir, name, out = []) {
   for (const n of fs.readdirSync(dir)) {
@@ -145,6 +147,11 @@ for (const p of pages) {
     check(`${p} (public) renders`, r.status === 200, `${r.status}`);
     continue;
   }
+  if (FRONT_DOOR_PAGES.has(p)) {
+    const ok = r.status === 307 && (r.location === "/auth" || r.location === `${BASE}/auth`);
+    check(`${p} (front door) → 307 /auth`, ok, `${r.status} ${r.location}`);
+    continue;
+  }
   const want = `/auth?next=${encodeURIComponent(p)}`;
   const ok = r.status === 307 && (r.location === want || r.location === BASE + want);
   if (ok) redirected++;
@@ -168,6 +175,10 @@ const healthIn = await call("GET", `${BASE}/api/health`, me.headers);
 check("health (signed in) carries the fingerprints", healthIn.body?.signed_in === true && JSON.stringify(healthIn.body).includes("fingerprint"));
 const page = await call("GET", `${BASE}/project`, me.headers);
 check("a gated page renders for a signed-in caller", page.status === 200, `${page.status}`);
+for (const p of FRONT_DOOR_PAGES) {
+  const r = await call("GET", BASE + p, me.headers);
+  check(`${p} (signed in) → 307 the post-sign-in home`, r.status === 307 && /\/project$/.test(r.location ?? ""), `${r.status} ${r.location}`);
+}
 
 console.log(rows.join("\n"));
 console.log(failures === 0 ? `\nALL CHECKS PASSED — ${anon401} API handlers refuse anonymous callers; ${redirected} pages redirect to sign-in` : `\n${failures} CHECK(S) FAILED`);

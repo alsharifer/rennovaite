@@ -12,9 +12,9 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
   {
     heading: "Product",
     links: [
-      { label: "How it works", href: "/rennovaite#how-it-works" },
-      { label: "Pricing", href: "/rennovaite#pricing" },
-      { label: "Start a project", href: "/project/new" },
+      // Invite-only pilot: the landing's anchors are unrouted and the app is
+      // behind sign-in (front door, 13 Oct).
+      { label: "Sign in", href: "/auth" },
     ],
   },
   {

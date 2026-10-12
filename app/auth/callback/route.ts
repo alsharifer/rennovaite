@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { AUTH_NEXT_COOKIE, safeNextPath } from "@/lib/auth/access";
-import { SIGNED_IN_HOME, supabaseLinkError } from "@/lib/auth/link-error";
+import { AUTH_NEXT_COOKIE } from "@/lib/auth/access";
+import { postSignInPath, supabaseLinkError } from "@/lib/auth/link-error";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
   const wanted = request.cookies.get(AUTH_NEXT_COOKIE)?.value ?? searchParams.get("next");
-  // Only same-site paths: `//host` would leave the site.
-  const dest = safeNextPath(wanted) ? wanted : SIGNED_IN_HOME;
+  // Only same-site paths: `//host` would leave the site (postSignInPath).
+  const dest = postSignInPath(wanted);
 
   const hashLink = !!tokenHash && OTP_TYPES.includes(type as OtpType);
   if (!code && !hashLink) {

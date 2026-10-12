@@ -1,16 +1,9 @@
-import type { Metadata } from "next";
+import { frontDoorRedirect } from "@/lib/auth/front-door";
 
-import { HomeLanding } from "@/components/marketing/home-landing";
+// Was the RenovAIte marketing homepage (HomeLanding, parked — K_BACKLOG). While
+// the pilot is invite-only it redirects exactly like `/` (lib/auth/front-door.ts).
+export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "RenovAIte — AI renovation for Dubai villas",
-  description:
-    "RenovAIte turns your villa's floorplan into a tender-ready package: design renders, an itemised bill of quantities in AED, drawings and a permit check.",
-};
-
-// The RenovAIte marketing homepage's permanent route. `/` also renders this
-// when PROPERTY_OS_LANDING is off; when it's on, `/` shows the Property OS
-// intro and both its CTAs link here.
-export default function RennovaitePage() {
-  return <HomeLanding />;
+export default async function RennovaitePage() {
+  return frontDoorRedirect();
 }

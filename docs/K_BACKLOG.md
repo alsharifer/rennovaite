@@ -4,6 +4,29 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## Front door (13 Oct, Abdallah)
+
+No public landing during the invite-only pilot: `/` and `/rennovaite` 307 to
+`/auth` (signed in: `postSignInPath()`), via `lib/auth/front-door.ts`.
+
+- **`PROPERTY_OS_LANDING` is dead** — nothing reads it any more. Remove it from
+  `.env.local.example`, the CLAUDE.md env table / flag section, the Vercel
+  envs, and `FEATURE_FLAGS` + the `flagLike` pattern in
+  `lib/boq/__tests__/flag-invariance.test.ts`.
+- **Parked, delete or rebuild after pilot**: `app/_components/property-os-landing.tsx`
+  (`PropertyOsLanding`), `components/marketing/home-landing.tsx`
+  (`HomeLanding`) and `app/_components/watch-demo.tsx` — unrouted, not
+  deleted. `PropertyOsLanding` still links to `/rennovaite` and HomeLanding's
+  CTAs into `/project/new`; fix those if either comes back.
+- **Lift the noindex** on `/auth`, `/privacy` and `/terms` (`robots` in
+  `app/auth/page.tsx`, `LEGAL_ROBOTS` in `components/legal/LegalPage.tsx`)
+  when a public landing returns; restore the TopNav / Footer product links
+  then too.
+- **Supabase Site URL** still points at the root: a fallen-back magic link
+  lands on `/`, which the proxy forwards (`?code=` → callback, `?error_code=`
+  → /auth) before the page's redirect runs. Setting the Site URL to `/auth`
+  would save a hop; not required.
+
 ## Found in K4 (2026-10-12)
 
 - **"Link causes to lines" has no record behind it** (07 Revisions, 21:450).
