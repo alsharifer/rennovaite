@@ -3,7 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/blueprint/Button";
+import { Icon } from "@/components/blueprint/Icon";
 import { cn } from "@/lib/utils";
+
+import { FIELD, NUM_FIELD_BASE } from "./editor-chrome";
 
 // G5: the garden's standing questions, in one place under the plan.
 //
@@ -15,6 +19,8 @@ import { cn } from "@/lib/utils";
 //  - Whether the pack can export (no counter left untyped, nothing undecided).
 //  - A friction log, because the list of what got in the designer's way is pilot
 //    data and is only accurate when written down at the moment.
+//
+// Blueprint since K8 (it sits under the plan canvas on the 02 Scope page).
 
 export type SiteItemTable = "zone" | "element" | "fixture" | "context" | "opening";
 
@@ -133,50 +139,64 @@ export function GardenSitePanel({
   ];
   const ready = untypedCounters.length === 0 && undecided.length === 0;
 
+
+  // Blueprint (K8): no status hues — a draft is a flagged notice row, an open
+  // readiness item is the inverse block, the chosen disposition is ink + a brass
+  // underline, and "approx." / "required" are said in words.
+  const frictionOff =
+    busy === "friction"
+      ? { reason: "Logging…", reasonId: "friction-reason" }
+      : friction.trim().length < 3
+        ? { reason: "Write at least three characters.", reasonId: "friction-reason" }
+        : false;
+
   return (
-    <section className="mt-lg space-y-md" aria-label="Garden site" data-plan-id={planId}>
+    <section className="space-y-6" aria-label="Garden site" data-plan-id={planId}>
       {draft.draft && (
-        <div className="rounded-md border border-[#FDE68A] bg-[#FFFBEB] px-md py-sm">
+        <div className="border-y border-bp-line-hairline py-4" data-garden-draft>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-body-sm font-semibold text-[#92400E]">
+            <p className="t-label-caps flex items-center gap-3 text-bp-ink-primary">
+              <Icon name="flag" size={18} className="text-bp-ink-secondary" />
               Draft for review — {draft.derived.length} boundary-critical dimension{draft.derived.length === 1 ? "" : "s"} derived
             </p>
-            <button type="button" onClick={() => setShowDerived((s) => !s)} className="text-[12px] text-[#92400E] underline decoration-dotted underline-offset-2">
+            <Button kind="quiet" onClick={() => setShowDerived((s) => !s)}>
               {showDerived ? "Hide" : "Show"} what
-            </button>
+            </Button>
           </div>
-          {draft.note && <p className="mt-1 text-[12px] text-[#92400E]">{draft.note}</p>}
-          {showDerived && <p className="mt-1 font-mono text-[11px] leading-5 text-[#92400E]">{draft.derived.join(" · ")}</p>}
-          <p className="mt-1 text-[12px] text-ink-700">Every document built from this plan carries the draft statement until these are measured.</p>
+          {draft.note && <p className="t-body-sm mt-1 text-bp-ink-secondary">{draft.note}</p>}
+          {showDerived && <p className="t-label-md mt-1 text-bp-ink-secondary">{draft.derived.join(" · ")}</p>}
+          <p className="t-body-sm mt-1 text-bp-ink-tertiary">Every document built from this plan carries the draft statement until these are measured.</p>
         </div>
       )}
 
       {items.length > 0 && (
-        <div className="rounded-xl border border-ink-100 bg-paper p-md">
-          <div className="mb-sm flex items-baseline justify-between">
-            <p className="label-caps text-ink-500">Existing on site</p>
-            <p className={cn("font-mono text-[12px] tabular-nums", undecided.length ? "text-[#9A3412]" : "text-ink-500")}>
+        <section aria-labelledby="existing-on-site-h" className="border border-bp-line-hairline bg-bp-surface-raised p-4">
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <h2 id="existing-on-site-h" className="t-label-caps text-bp-ink-tertiary">
+              EXISTING ON SITE
+            </h2>
+            <p className={cn("t-num-sm", undecided.length ? "text-bp-ink-primary" : "text-bp-ink-tertiary")}>
               {undecided.length ? `${undecided.length} undecided` : "all decided"}
             </p>
           </div>
-          <p className="mb-sm text-[12px] text-ink-500">
+          <p className="t-body-sm mb-3 text-bp-ink-secondary">
             Placed approximately from the client photos. Keep leaves an item out of demolition and new work; remove counts its demolition; replace counts both.
           </p>
           {groups.map((g) => {
             const rows = items.filter((i) => i.table === g.table);
             if (rows.length === 0) return null;
             return (
-              <div key={g.table} className="mb-sm">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">{g.label}</p>
-                <ul className="divide-y divide-ink-100">
+              <div key={g.table} className="mb-3">
+                <p className="t-label-caps mb-1 text-bp-ink-tertiary">{g.label}</p>
+                <ul className="border-t border-bp-line-hairline">
                   {rows.map((item) => (
-                    <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                      <span className="min-w-0 text-[13px] text-ink-900">
+                    <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-bp-line-hairline py-2">
+                      <span className="t-body-sm min-w-0 text-bp-ink-primary">
                         {item.name}
-                        <span className="ml-1.5 text-[11px] text-ink-500">{item.kindLabel}</span>
-                        {item.dims_derived && <span className="ml-1.5 rounded-full bg-[#FEF3C7] px-1.5 py-px text-[10px] font-medium text-[#92400E]">approx.</span>}
+                        <span className="t-label-md ml-1.5 text-bp-ink-tertiary">{item.kindLabel}</span>
+                        {item.dims_derived && <span className="t-label-caps ml-1.5 border border-bp-line-strong px-1 text-bp-ink-secondary">approx.</span>}
                       </span>
-                      <span className="inline-flex gap-0.5 rounded-lg border border-ink-100 bg-canvas p-0.5">
+                      <span className="inline-flex border border-bp-line-control" role="group" aria-label={`${item.name}: keep, remove or replace`}>
                         {DISPOSITIONS.map((d) => {
                           const active = item.disposition === d.value;
                           return (
@@ -188,8 +208,8 @@ export function GardenSitePanel({
                               aria-pressed={active}
                               onClick={() => setDisposition(item, active ? null : d.value)}
                               className={cn(
-                                "focus-ring rounded-md px-2 py-0.5 text-[12px] transition-colors disabled:opacity-50",
-                                active ? (d.value === "remove" ? "bg-[#9A3412] text-white" : "bg-primary text-on-primary") : "text-ink-700 hover:bg-surface-container",
+                                "t-label-md rounded-none border-b-2 px-2.5 py-1 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring disabled:cursor-wait disabled:text-bp-ink-tertiary",
+                                active ? "border-bp-brass bg-bp-surface-sunken text-bp-ink-primary" : "border-transparent text-bp-ink-secondary hover:bg-bp-surface-sunken hover:text-bp-ink-primary",
                               )}
                             >
                               {d.label}
@@ -203,93 +223,121 @@ export function GardenSitePanel({
               </div>
             );
           })}
-        </div>
+        </section>
       )}
 
       {zones.length > 0 && (
-        <div className="rounded-xl border border-ink-100 bg-paper p-md">
-          <p className="label-caps mb-sm text-ink-500">Levels &amp; heights</p>
-          <p className="mb-sm text-[12px] text-ink-500">Finished level against ±000 (blank = not stated — never read as ±000). A structure needs its height for its elevation and its renders.</p>
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide text-ink-500">
-                <th className="py-1 font-medium">Zone</th>
-                <th className="py-1 text-right font-medium">Level mm</th>
-                <th className="py-1 text-right font-medium">Height mm</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100">
-              {zones.map((z) => (
-                <tr key={z.id}>
-                  <td className="py-1 text-ink-900">{z.name}</td>
-                  <td className="py-1 text-right">
-                    <input
-                      key={`${z.id}:l:${z.level_mm}`}
-                      defaultValue={z.level_mm ?? ""}
-                      inputMode="numeric"
-                      placeholder="—"
-                      disabled={busy === z.id + "level_mm"}
-                      onBlur={(e) => e.target.value !== String(z.level_mm ?? "") && setZone(z.id, "level_mm", e.target.value)}
-                      className="focus-ring w-[80px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums"
-                    />
-                  </td>
-                  <td className="py-1 text-right">
-                    {z.type === "structure" ? (
-                      <input
-                        key={`${z.id}:h:${z.height_mm}`}
-                        defaultValue={z.height_mm ?? ""}
-                        inputMode="numeric"
-                        placeholder="required"
-                        disabled={busy === z.id + "height_mm"}
-                        onBlur={(e) => e.target.value !== String(z.height_mm ?? "") && setZone(z.id, "height_mm", e.target.value)}
-                        className={cn("focus-ring w-[80px] rounded border bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums", z.height_mm == null ? "border-[#FDBA74]" : "border-ink-100")}
-                      />
-                    ) : (
-                      <span className="text-ink-500">—</span>
-                    )}
-                  </td>
+        <section aria-labelledby="levels-heights-h" className="border border-bp-line-hairline bg-bp-surface-raised p-4">
+          <h2 id="levels-heights-h" className="t-label-caps mb-2 text-bp-ink-tertiary">
+            LEVELS &amp; HEIGHTS
+          </h2>
+          <p className="t-body-sm mb-3 text-bp-ink-secondary">Finished level against ±000 (blank = not stated — never read as ±000). A structure needs its height for its elevation and its renders.</p>
+          <div className="relative overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left">
+                  <th scope="col" className="t-label-caps py-1 font-normal text-bp-ink-tertiary">Zone</th>
+                  <th scope="col" className="t-label-caps py-1 text-right font-normal text-bp-ink-tertiary">Level mm</th>
+                  <th scope="col" className="t-label-caps py-1 text-right font-normal text-bp-ink-tertiary">Height mm</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {zones.map((z) => (
+                  <tr key={z.id} className="border-t border-bp-line-hairline">
+                    <td className="t-body-sm py-1.5 text-bp-ink-primary">{z.name}</td>
+                    <td className="py-1.5 text-right">
+                      <input
+                        key={`${z.id}:l:${z.level_mm}`}
+                        defaultValue={z.level_mm ?? ""}
+                        inputMode="numeric"
+                        placeholder="—"
+                        aria-label={`${z.name} level, mm`}
+                        disabled={busy === z.id + "level_mm"}
+                        onBlur={(e) => e.target.value !== String(z.level_mm ?? "") && setZone(z.id, "level_mm", e.target.value)}
+                        className={`${NUM_FIELD_BASE} w-[80px]`}
+                      />
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {z.type === "structure" ? (
+                        <input
+                          key={`${z.id}:h:${z.height_mm}`}
+                          defaultValue={z.height_mm ?? ""}
+                          inputMode="numeric"
+                          placeholder="required"
+                          aria-label={`${z.name} height, mm`}
+                          aria-invalid={z.height_mm == null ? true : undefined}
+                          disabled={busy === z.id + "height_mm"}
+                          onBlur={(e) => e.target.value !== String(z.height_mm ?? "") && setZone(z.id, "height_mm", e.target.value)}
+                          className={cn(NUM_FIELD_BASE, "w-[80px]", z.height_mm == null && "border-dashed")}
+                        />
+                      ) : (
+                        <span className="t-num-sm text-bp-ink-tertiary">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
-      <div className={cn("rounded-xl border p-md", ready ? "border-ink-100 bg-paper" : "border-[#FDBA74] bg-[#FFF7ED]")}>
-        <p className="label-caps mb-1 text-ink-500">Pack readiness</p>
-        {ready ? (
-          <p className="text-[13px] text-ink-700">Every counter has a type and every existing item has a decision — the pack can export.</p>
-        ) : (
-          <ul className="list-disc pl-5 text-[13px] text-[#9A3412]">
+      {ready ? (
+        <section aria-labelledby="pack-readiness-h" className="border border-bp-line-hairline bg-bp-surface-raised p-4" data-pack-ready="true">
+          <h2 id="pack-readiness-h" className="t-label-caps mb-1 text-bp-ink-tertiary">
+            PACK READINESS
+          </h2>
+          <p className="t-body-sm text-bp-ink-secondary">Every counter has a type and every existing item has a decision — the pack can export.</p>
+        </section>
+      ) : (
+        <section aria-labelledby="pack-readiness-h" className="surface-inverse bg-bp-alert-surface p-4 text-bp-alert-ink" data-pack-ready="false">
+          <h2 id="pack-readiness-h" className="t-label-caps mb-1 flex items-center gap-2">
+            <Icon name="lock" className="text-[16px]" />
+            PACK READINESS — NOT YET
+          </h2>
+          <ul className="t-body-sm list-disc pl-5">
             {untypedCounters.length > 0 && <li>{untypedCounters.length} counter run{untypedCounters.length === 1 ? "" : "s"} without a type (Elements layer): {untypedCounters.join(", ")}</li>}
             {undecided.length > 0 && <li>{undecided.length} existing item{undecided.length === 1 ? "" : "s"} without keep / remove / replace</li>}
           </ul>
-        )}
-      </div>
+        </section>
+      )}
 
-      <div className="rounded-xl border border-ink-100 bg-paper p-md">
-        <p className="label-caps mb-1 text-ink-500">Friction log</p>
-        <p className="mb-sm text-[12px] text-ink-500">Anything that slowed the design down or needed a workaround. Timestamped; it is pilot data.</p>
-        <div className="flex flex-wrap gap-2">
-          <select aria-label="Where the friction was" value={frictionArea} onChange={(e) => setFrictionArea(e.target.value)} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-1 text-[13px]">
+      <section aria-labelledby="friction-log-h" className="border border-bp-line-hairline bg-bp-surface-raised p-4">
+        <h2 id="friction-log-h" className="t-label-caps mb-1 text-bp-ink-tertiary">
+          FRICTION LOG
+        </h2>
+        <p className="t-body-sm mb-3 text-bp-ink-secondary">Anything that slowed the design down or needed a workaround. Timestamped; it is pilot data.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <select aria-label="Where the friction was" value={frictionArea} onChange={(e) => setFrictionArea(e.target.value)} className={FIELD}>
             {["plan", "elements", "landscape", "lighting", "drainage", "renders", "boq", "pack", "other"].map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
           <input
             value={friction}
+            aria-label="What got in the way"
             onChange={(e) => setFriction(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && logFriction()}
             placeholder="e.g. could not reshape a run after drawing it"
-            className="focus-ring min-w-[240px] flex-1 rounded border border-ink-100 bg-paper px-2 py-1 text-[13px]"
+            className={cn(FIELD, "min-w-[240px] flex-1")}
           />
-          <button type="button" onClick={logFriction} disabled={busy === "friction" || friction.trim().length < 3} className="focus-ring rounded-lg bg-brass-600 px-3 py-1 text-[13px] font-semibold text-on-primary disabled:opacity-50">
+          <Button kind="secondary" onClick={logFriction} disabled={frictionOff}>
             {frictionSaved ? "Logged" : "Log"}
-          </button>
+          </Button>
         </div>
-      </div>
+        {frictionOff ? (
+          <p id="friction-reason" className="t-label-md mt-1.5 text-bp-ink-tertiary">
+            {frictionOff.reason}
+          </p>
+        ) : null}
+      </section>
 
-      {error && <p className="text-[12px] text-error">{error}</p>}
+      {error && (
+        <div role="alert" className="surface-inverse bg-bp-alert-surface px-4 py-3 text-bp-alert-ink">
+          <p className="t-body-sm">{error}</p>
+        </div>
+      )}
     </section>
   );
 }
+

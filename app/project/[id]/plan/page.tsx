@@ -7,7 +7,6 @@ import { Icon } from "@/components/blueprint/Icon";
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
 import { PlanRoomFocus } from "@/components/blueprint/plan/PlanRoomFocus";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
-import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
 import { FIRM_STEPS, OWNER_STEPS } from "@/lib/journey";
 import { stepEyebrow } from "@/lib/journey-eyebrow";
 import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
@@ -278,9 +277,7 @@ export default async function PlanPage({
             </div>
             {gardenSite ? (
               <div className="mt-6">
-                <AtelierCanvas>
-                  <GardenSitePanel projectId={projectId} planId={plan.id} draft={gardenSite.draft} items={gardenSite.items} zones={gardenSite.zones} untypedCounters={gardenSite.untypedCounters} />
-                </AtelierCanvas>
+                <GardenSitePanel projectId={projectId} planId={plan.id} draft={gardenSite.draft} items={gardenSite.items} zones={gardenSite.zones} untypedCounters={gardenSite.untypedCounters} />
               </div>
             ) : null}
           </section>
@@ -341,9 +338,7 @@ export default async function PlanPage({
         </div>
       ) : (
         <div className="mt-6">
-          <AtelierCanvas>
-            <PlanNotAnalysed planId={plan.id} hasDrawing={Boolean(plan.pdf_url)} parseRan={plan.parsed_json !== null} canDraw={gardenPilot} />
-          </AtelierCanvas>
+          <PlanNotAnalysed planId={plan.id} hasDrawing={Boolean(plan.pdf_url)} parseRan={plan.parsed_json !== null} canDraw={gardenPilot} />
         </div>
       )}
 

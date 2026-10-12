@@ -19,8 +19,21 @@ import polygonClipping from "polygon-clipping";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { polygonArea } from "@/lib/plan/polygon";
 import { separateOverlappingRooms } from "@/lib/plan/separate";
-import { cn } from "@/lib/utils";
+import { Icon } from "@/components/blueprint/Icon";
 
+import {
+  CANVAS_FRAME,
+  CAPTION,
+  CHIP_BTN,
+  chipState,
+  FIELD,
+  INSPECTOR_BAR,
+  NUM_FIELD,
+  SMALL_BTN,
+  SVG,
+  TAG,
+  TOOL_BTN,
+} from "./editor-chrome";
 import {
   editingEnabled,
   roomInteraction,
@@ -32,19 +45,17 @@ const VIEW_W = 1000;
 const VIEW_H = 600;
 const PADDING = 24;
 const HISTORY_LIMIT = 20;
-// Atelier viewer palette — bone room fills at 50% on a paper canvas with
-// ink-900 walls.
-const TOOL_BTN = "inline-flex h-9 items-center gap-1.5 rounded-none border border-bp-line-control px-3 t-label-md text-bp-ink-primary hover:bg-bp-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring disabled:cursor-not-allowed disabled:text-bp-ink-tertiary";
-const BONE_FILL = "#EDE6D8";
-const PRIMARY_FIXED = "#FFDDB3";
-const INK_900 = "#0F1B2D";
-// K5: Blueprint ink (falls back to the Atelier ink outside a Blueprint root).
-const INK = "var(--color-ink-primary, #0F1B2D)";
-const INK_ON = "var(--color-surface-base, #FFFFFF)";
-const INK_700 = "#4F4539";
-// G1: open zones read as ground, not as floor — a muted sage against the bone.
-const OPEN_ZONE_FILL = "#DCE3D2";
-const BRASS_600 = "#A4793A";
+// Blueprint viewer palette (K5 canvas, K8 chrome) — semantic tokens, so the
+// canvas follows the theme: room fills at 50% on the raised canvas, ink walls,
+// ink handles, brass only as a line (selection, existing items).
+const ROOM_FILL = SVG.roomFill;
+const HOVER_FILL = SVG.hoverFill;
+const INK = SVG.ink;
+const INK_ON = SVG.surface;
+const INK_SECONDARY = SVG.inkSecondary;
+// G1: open zones read as ground, not as floor — lighter than a floor, dashed edge.
+const OPEN_ZONE_FILL = SVG.openFill;
+const BRASS = SVG.brass;
 
 type Point = [number, number];
 
@@ -1048,7 +1059,7 @@ export function EditablePlanViewer({
           </button>
           {overlappingIds.size === 0 && <span id="fix-overlaps-none" className="sr-only">No overlaps on this plan</span>}
           {lowConfidenceIds.size > 0 && (
-            <span className="ml-1 rounded-full bg-[#FEF3C7] px-2 py-0.5 text-xs font-medium text-[#92400E]">
+            <span className={`ml-1 ${TAG}`}>
               {lowConfidenceIds.size} to review
             </span>
           )}
@@ -1056,7 +1067,7 @@ export function EditablePlanViewer({
               bucket, overlay seeding — keys off this one field, and until now a
               drawn room could not set it at all. */}
           {selectedRoom && (
-            <span className="ml-2 flex items-center gap-1.5 text-xs text-bp-ink-secondary">
+            <span className="ml-2 flex items-center gap-1.5">
               <label htmlFor="room-type-picker" className="sr-only">
                 Room or zone type
               </label>
@@ -1064,7 +1075,7 @@ export function EditablePlanViewer({
                 id="room-type-picker"
                 value={selectedRoom.room_type ?? "other"}
                 onChange={(e) => setRoomType(selectedRoom.id, e.target.value)}
-                className="focus-ring rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-xs text-ink-900"
+                className={FIELD}
               >
                 {typeGroups.map((g) => (
                   <optgroup key={g.label} label={g.label}>
@@ -1086,41 +1097,34 @@ export function EditablePlanViewer({
                     ? "Open to the sky: no ceiling, and its edges emit no wall"
                     : "Enclosed: walls at shared edges, ceiling finish priced"
                 }
-                className={cn(
-                  "focus-ring inline-flex items-center gap-1 rounded border px-1.5 py-0.5",
-                  selectedRoom.unroofed
-                    ? "border-brass-600 bg-primary-fixed/40 text-ink-900"
-                    : "border-ink-100 bg-paper text-ink-700 hover:bg-surface-container",
-                )}
+                className={`${CHIP_BTN} ${chipState(selectedRoom.unroofed)}`}
               >
-                <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
-                  {selectedRoom.unroofed ? "wb_sunny" : "roofing"}
-                </span>
+                <Icon name={selectedRoom.unroofed ? "wb_sunny" : "roofing"} className="text-[16px]" />
                 {selectedRoom.unroofed ? "Unroofed" : "Roofed"}
               </button>
             </span>
           )}
           {selectedId && (
-            <span className="ml-2 flex items-center gap-1 text-xs text-bp-ink-secondary">
-              Flag:
+            <span className="ml-2 flex items-center gap-1.5 t-label-md text-bp-ink-tertiary" role="group" aria-label="Flag this room">
+              Flag
               <button
                 type="button"
                 onClick={() => flagIssue(selectedId, "split")}
-                className="rounded border border-ink-100 px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+                className={SMALL_BTN}
               >
                 split
               </button>
               <button
                 type="button"
                 onClick={() => flagIssue(selectedId, "merge")}
-                className="rounded border border-ink-100 px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+                className={SMALL_BTN}
               >
                 merge
               </button>
               <button
                 type="button"
                 onClick={() => flagIssue(selectedId, "other")}
-                className="rounded border border-ink-100 px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+                className={SMALL_BTN}
               >
                 other
               </button>
@@ -1176,51 +1180,52 @@ export function EditablePlanViewer({
           the walls are — so what is left is a question, asked here with both
           numbers in it rather than a flag nobody can act on. */}
       {editing && openDisputes.size > 0 && (
-        <div className="mb-3 rounded-md border border-[#FDE68A] bg-[#FFFBEB] p-3">
-          <p className="mb-2 text-xs font-medium text-[#92400E]">
+        <div className="mb-3 border-y border-bp-line-hairline py-3" data-area-disputes={openDisputes.size}>
+          <p className="mb-2 flex items-center gap-2 t-label-caps text-bp-ink-primary">
+            <Icon name="flag" className="text-[16px] text-bp-ink-secondary" />
             {openDisputes.size === 1
               ? "1 room where the drawing and the outline disagree"
               : `${openDisputes.size} rooms where the drawing and the outline disagree`}
           </p>
-          <ul className="space-y-2">
+          <ul>
             {[...openDisputes.values()].map((d) => {
               const room = visibleRooms.find((r) => r.id === d.room_id);
               if (!room) return null;
               return (
                 <li
                   key={d.room_id}
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-700"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-bp-line-hairline py-2 t-body-sm text-bp-ink-secondary"
                 >
                   <button
                     type="button"
                     onClick={() => setSelectedId(d.room_id)}
-                    className="font-medium text-ink-900 underline decoration-dotted underline-offset-2"
+                    className="t-nav-item-active text-bp-ink-primary underline decoration-dotted underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring"
                   >
                     {room.name_en}
                   </button>
                   <span>
                     drawing says{" "}
-                    <span className="font-mono tabular-nums">
+                    <span className="t-num-sm text-bp-ink-primary">
                       {d.stated_area_m2.toFixed(2)}
                     </span>{" "}
                     m², outline measures{" "}
-                    <span className="font-mono tabular-nums">
+                    <span className="t-num-sm text-bp-ink-primary">
                       {d.geometric_area_m2.toFixed(2)}
                     </span>{" "}
                     m².
                   </span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => resolveDispute(d.room_id, "label")}
-                      className="rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+                      className={SMALL_BTN}
                     >
                       Keep the drawing
                     </button>
                     <button
                       type="button"
                       onClick={() => resolveDispute(d.room_id, "outline")}
-                      className="rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-ink-700 hover:bg-surface-container"
+                      className={SMALL_BTN}
                     >
                       Use the outline
                     </button>
@@ -1232,7 +1237,7 @@ export function EditablePlanViewer({
         </div>
       )}
 
-      <div className="overflow-hidden border border-bp-line-hairline bg-bp-surface-raised">
+      <div className={CANVAS_FRAME}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
@@ -1249,7 +1254,7 @@ export function EditablePlanViewer({
           <style>{`
             .room-group .room-poly { transition: fill 200ms ease-out, fill-opacity 200ms ease-out; }
             .room-group .room-label { transition: transform 200ms ease-out; }
-            .room-group:hover .room-poly { fill: ${PRIMARY_FIXED}; fill-opacity: 0.7; }
+            .room-group:hover .room-poly { fill: ${HOVER_FILL}; fill-opacity: 0.6; }
             .room-group:hover .room-label { transform: translateY(-2px); }
           `}</style>
           {/* G5: existing footprints under the zones — the house is where the
@@ -1263,13 +1268,13 @@ export function EditablePlanViewer({
                 <g key={`ctx-${c.id}`} pointerEvents="none">
                   <polygon
                     points={pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
-                    fill={building ? "#D9D6CF" : "#8A8F98"}
-                    fillOpacity={building ? 0.7 : 0.9}
-                    stroke="#6B7280"
+                    fill={building ? SVG.contextBuilding : SVG.contextWall}
+                    fillOpacity={building ? 0.5 : 0.6}
+                    stroke={SVG.inkTertiary}
                     strokeWidth={1}
                   />
                   {building && (
-                    <text x={(bb.xL + bb.xR) / 2} y={(bb.yT + bb.yB) / 2} textAnchor="middle" dominantBaseline="middle" fontSize="12" fill="#4B5563" style={{ fontFamily: "var(--font-inter), sans-serif", letterSpacing: "0.05em" }}>
+                    <text x={(bb.xL + bb.xR) / 2} y={(bb.yT + bb.yB) / 2} textAnchor="middle" dominantBaseline="middle" fontSize="12" fill={INK_SECONDARY} style={{ fontFamily: SVG.mono, letterSpacing: "0.05em" }}>
                       {c.name.toUpperCase()}
                     </text>
                   )}
@@ -1282,8 +1287,9 @@ export function EditablePlanViewer({
               y={VIEW_H / 2}
               textAnchor="middle"
               dominantBaseline="middle"
-              fill="var(--color-ink-500)"
+              fill={SVG.inkTertiary}
               fontSize="16"
+              style={{ fontFamily: SVG.sans }}
             >
               {plot
                 ? "Nothing drawn yet — click “Add room” to place your first zone."
@@ -1336,9 +1342,9 @@ export function EditablePlanViewer({
                     points={room.polygon
                       .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                       .join(" ")}
-                    fill={overlapReport.has_overlaps ? INK : room.unroofed ? OPEN_ZONE_FILL : BONE_FILL}
+                    fill={overlapReport.has_overlaps ? INK : room.unroofed ? OPEN_ZONE_FILL : ROOM_FILL}
                     fillOpacity={overlapReport.has_overlaps ? 0.05 : removed ? 0.12 : room.unroofed ? 0.45 : 0.5}
-                    stroke={room.site_reference ? BRASS_600 : room.unroofed ? INK_700 : INK_900}
+                    stroke={room.site_reference ? BRASS : room.unroofed ? INK_SECONDARY : INK}
                     strokeOpacity={room.unroofed ? 0.7 : 1}
                     strokeDasharray={room.site_reference ? "3 3" : room.unroofed ? "6 4" : undefined}
                     strokeWidth={editing && selected ? 2.5 : room.site_reference ? 2 : 1.5}
@@ -1360,9 +1366,9 @@ export function EditablePlanViewer({
                       x={bb.xL + 6}
                       y={bb.yT + 14}
                       fontSize="10"
-                      fill={BRASS_600}
+                      fill={INK_SECONDARY}
                       pointerEvents="none"
-                      style={{ fontFamily: "var(--font-inter), sans-serif", letterSpacing: "0.06em", fontWeight: 600 }}
+                      style={{ fontFamily: SVG.mono, letterSpacing: "0.06em", fontWeight: 500 }}
                     >
                       {room.disposition === "remove" ? "EXISTING · TO REMOVE" : room.disposition === "replace" ? "EXISTING · REPLACE" : room.disposition === "keep" ? "EXISTING · KEEP" : "EXISTING · UNDECIDED"}
                     </text>
@@ -1376,23 +1382,27 @@ export function EditablePlanViewer({
                         .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                         .join(" ")}
                       fill="none"
-                      stroke={BRASS_600}
+                      stroke={BRASS}
                       strokeWidth={3}
                       pointerEvents="none"
                       data-focus-room={room.id}
                     />
                   )}
 
-                  {/* Low-confidence / user-flagged room → amber "check me" outline. */}
+                  {/* Low-confidence / user-flagged room → a dotted "check me"
+                      outline inset in ink (Blueprint: no status hue — the dot
+                      pattern says it, and the toolbar counts them in words). */}
                   {flagged && !overlapping && (
                     <polygon
                       points={room.polygon
                         .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                         .join(" ")}
                       fill="none"
-                      stroke="#D97706"
-                      strokeWidth={1.5}
-                      strokeDasharray="5 3"
+                      stroke={INK}
+                      strokeWidth={2}
+                      strokeDasharray="1 4"
+                      strokeLinecap="round"
+                      data-flagged-room={room.id}
                       pointerEvents="none"
                     />
                   )}
@@ -1418,7 +1428,7 @@ export function EditablePlanViewer({
                           }
                         }}
                         onBlur={commitRename}
-                        className="h-7 w-full rounded-md border border-brass-600 bg-paper px-2 text-center text-sm font-medium text-ink-900 outline-none ring-2 ring-brass-600/20"
+                        className="h-7 w-full rounded-none border border-bp-brass bg-bp-surface-base px-2 text-center t-nav-item text-bp-ink-primary outline-none"
                         aria-label="Rename room"
                       />
                     </foreignObject>
@@ -1452,11 +1462,11 @@ export function EditablePlanViewer({
                                 dominantBaseline="middle"
                                 fontSize="13"
                                 fontWeight={500}
-                                fill={INK_900}
+                                fill={INK}
                                 pointerEvents={editing ? undefined : "none"}
                                 style={{
                                   cursor: editing ? "text" : "pointer",
-                                  fontFamily: "var(--font-inter), sans-serif",
+                                  fontFamily: SVG.sans,
                                 }}
                                 onPointerDown={
                                   editing
@@ -1483,7 +1493,7 @@ export function EditablePlanViewer({
                                 dominantBaseline="middle"
                                 fontSize="13"
                                 fontWeight={500}
-                                fill={INK_900}
+                                fill={INK}
                                 pointerEvents="none"
                                 style={{
                                   fontFamily: "var(--font-rubik), serif",
@@ -1500,11 +1510,11 @@ export function EditablePlanViewer({
                               dominantBaseline="middle"
                               fontSize="11"
                               fontWeight={500}
-                              fill={INK_700}
+                              fill={INK_SECONDARY}
                               pointerEvents="none"
                               style={{
                                 fontFamily:
-                                  "var(--font-jetbrains-mono), monospace",
+                                  SVG.mono,
                               }}
                             >
                               {wide && !hasAr ? inlineLine : areaLabel}
@@ -1597,11 +1607,11 @@ export function EditablePlanViewer({
             <g pointerEvents="none" data-overlap-legend aria-hidden="true">
               <rect x={8} y={8} width={410} height={36} fill={INK_ON} stroke={INK} strokeOpacity={0.25} />
               <rect x={20} y={18} width={16} height={16} fill={INK} fillOpacity={0.05} stroke={INK} strokeWidth={1} />
-              <text x={44} y={31} fontSize={15} fill={INK} style={{ fontFamily: "var(--font-mono), monospace" }}>
+              <text x={44} y={31} fontSize={15} fill={INK} style={{ fontFamily: SVG.mono }}>
                 room as parsed
               </text>
               <rect x={206} y={18} width={16} height={16} fill={INK} fillOpacity={0.3} stroke={INK} strokeWidth={1} strokeDasharray="3 2" />
-              <text x={230} y={31} fontSize={15} fill={INK} style={{ fontFamily: "var(--font-mono), monospace" }}>
+              <text x={230} y={31} fontSize={15} fill={INK} style={{ fontFamily: SVG.mono }}>
                 floor counted twice
               </text>
             </g>
@@ -1609,7 +1619,7 @@ export function EditablePlanViewer({
         </svg>
       </div>
 
-      <p className="text-xs text-bp-ink-secondary">
+      <p className={CAPTION}>
         {editing ? (
           <>
             Click a room to select. Drag the body to move, drag a vertex to
@@ -1618,13 +1628,13 @@ export function EditablePlanViewer({
             {openZoneCount > 0
               ? `${openZoneCount} zone${openZoneCount === 1 ? " is" : "s are"} open to the sky (dashed) — those edges carry no wall. `
               : ""}
-            Amber = low confidence; use Flag if a room should be split or
-            merged. Live total:{" "}
+            A dotted outline = low confidence; use Flag if a room should be
+            split or merged. Live total:{" "}
           </>
         ) : (
           <>Click a room to see what it is and what it costs. Total:{" "}</>
         )}
-        <span className="text-bp-ink-secondary">
+        <span className="t-num-sm text-bp-ink-primary">
           {liveTotalM2.toFixed(1)} m²
         </span>
         .
@@ -1665,8 +1675,8 @@ function ZoneGeometryBar({
   const [v, setV] = useState(init);
   const apply = () => onRect(v.x, v.y, v.w, v.d);
   const field = (k: keyof typeof v, label: string) => (
-    <label className="flex items-center gap-1">
-      <span className="text-bp-ink-secondary">{label}</span>
+    <label className="flex items-center gap-1.5">
+      <span className="t-label-md text-bp-ink-tertiary">{label}</span>
       <input
         type="number"
         step={0.05}
@@ -1675,32 +1685,32 @@ function ZoneGeometryBar({
         onKeyDown={(e) => {
           if (e.key === "Enter") apply();
         }}
-        className="focus-ring w-[72px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono text-xs tabular-nums text-ink-900"
+        className={NUM_FIELD}
       />
     </label>
   );
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-ink-100 bg-canvas px-3 py-2 text-xs text-ink-700">
-      <span className="font-semibold text-ink-900">{room.name_en}</span>
+    <div className={INSPECTOR_BAR}>
+      <span className="t-nav-item-active text-bp-ink-primary">{room.name_en}</span>
       {isRect ? (
         <>
           {field("x", "X")}
           {field("y", "Y")}
           {field("w", "W")}
           {field("d", "D")}
-          <span className="text-bp-ink-secondary">m</span>
-          <button type="button" onClick={apply} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
+          <span className="t-label-md text-bp-ink-tertiary">m</span>
+          <button type="button" onClick={apply} className={SMALL_BTN}>
             Apply
           </button>
         </>
       ) : (
-        <span className="font-mono tabular-nums">{m.length} vertices · {init.w} × {init.d} m extents</span>
+        <span className="t-num-sm text-bp-ink-primary">{m.length} vertices · {init.w} × {init.d} m extents</span>
       )}
-      <button type="button" onClick={onAddVertex} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
+      <button type="button" onClick={onAddVertex} className={SMALL_BTN}>
         + Vertex
       </button>
-      <span className="text-bp-ink-secondary">Shift-click a vertex to remove it. X/Y from the plot&apos;s top-left corner.</span>
-      {room.dims_derived && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Derived outline</span>}
+      <span className="t-body-sm text-bp-ink-secondary">Shift-click a vertex to remove it. X/Y from the plot&apos;s top-left corner.</span>
+      {room.dims_derived && <span className={TAG}>Derived outline</span>}
     </div>
   );
 }

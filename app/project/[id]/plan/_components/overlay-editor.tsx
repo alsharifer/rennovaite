@@ -27,10 +27,20 @@ import {
   type RawRoomInput,
 } from "@/lib/overlays/viewbox";
 
-const BONE = "#EDE6D8";
-const INK_900 = "#0F1B2D";
-const INK_500 = "#64748b";
-const BRASS = "#A4793A";
+import {
+  CANVAS_FRAME,
+  CAPTION,
+  CHIP_BTN,
+  chipState,
+  FIELD,
+  INSPECTOR_BAR,
+  LABEL,
+  NUM_FIELD,
+  SMALL_BTN,
+  SVG,
+  TAG,
+  TOOL_BTN,
+} from "./editor-chrome";
 
 interface Fixture {
   id: string;
@@ -233,7 +243,7 @@ export function OverlayEditor({
       {/* Palette + delete toolbar (edit only) */}
       {!readOnly && (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="label-caps mr-1 text-bp-ink-secondary">Add:</span>
+        <span className={`${LABEL} mr-1`}>Add</span>
         {types.map((t) => {
           const active = paletteType === t;
           return (
@@ -241,22 +251,18 @@ export function OverlayEditor({
               key={t}
               type="button"
               onClick={() => setPaletteType((cur) => (cur === t ? null : t))}
-              className={
-                "focus-ring inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[12px] transition-colors " +
-                (active
-                  ? "border-brass-600 bg-primary-fixed/40 text-ink-900"
-                  : "border-ink-100 bg-paper text-ink-700 hover:bg-surface-container")
-              }
+              aria-pressed={active}
+              className={`${CHIP_BTN} ${chipState(active)}`}
               title={FIXTURE_META[t].label}
             >
-              <span className="font-mono font-semibold">{FIXTURE_META[t].code}</span>
+              <span className="t-num-sm text-bp-ink-primary">{FIXTURE_META[t].code}</span>
               {FIXTURE_META[t].label}
             </button>
           );
         })}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
           {paletteType && (
-            <span className="text-[12px] text-brass-600">
+            <span className="t-label-md text-bp-ink-primary" aria-live="polite">
               Click the plan to place a {FIXTURE_META[paletteType].label.toLowerCase()}
             </span>
           )}
@@ -264,10 +270,16 @@ export function OverlayEditor({
             type="button"
             onClick={deleteSelected}
             disabled={!selectedId}
-            className="focus-ring rounded-lg border border-ink-100 bg-paper px-3 py-1 text-[12px] text-ink-900 transition-colors hover:bg-surface-container disabled:opacity-40"
+            aria-describedby={selectedId ? undefined : `delete-why-${layer}`}
+            className={TOOL_BTN}
           >
             Delete selected
           </button>
+          {!selectedId && (
+            <span id={`delete-why-${layer}`} className="sr-only">
+              Nothing selected — click a fixture first
+            </span>
+          )}
         </div>
       </div>
       )}
@@ -281,7 +293,7 @@ export function OverlayEditor({
         />
       )}
 
-      <div className="overflow-hidden rounded-xl border border-ink-100 bg-paper">
+      <div className={CANVAS_FRAME}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
@@ -297,9 +309,9 @@ export function OverlayEditor({
               key={`ctx-${c.id}`}
               pointerEvents="none"
               points={c.polygon.map((p) => fit.toViewBox([p[0]!, p[1]!])).map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
-              fill={c.kind === "existing_building" ? "#D9D6CF" : "#8A8F98"}
-              fillOpacity={c.kind === "existing_building" ? 0.7 : 0.9}
-              stroke="#6B7280"
+              fill={c.kind === "existing_building" ? SVG.contextBuilding : SVG.contextWall}
+              fillOpacity={c.kind === "existing_building" ? 0.5 : 0.6}
+              stroke={SVG.inkTertiary}
               strokeWidth={1}
             />
           ))}
@@ -311,13 +323,13 @@ export function OverlayEditor({
               <g key={r.id} pointerEvents="none">
                 <polygon
                   points={r.pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
-                  fill={BONE}
+                  fill={SVG.roomFill}
                   fillOpacity={0.35}
-                  stroke={INK_900}
+                  stroke={SVG.ink}
                   strokeOpacity={0.5}
                   strokeWidth={1}
                 />
-                <text x={cx} y={cy} textAnchor="middle" fontSize="12" fill={INK_500} style={{ fontFamily: "var(--font-inter), sans-serif" }}>
+                <text x={cx} y={cy} textAnchor="middle" fontSize="12" fill={SVG.inkTertiary} style={{ fontFamily: SVG.sans }}>
                   {r.name_en}
                 </text>
               </g>
@@ -338,9 +350,9 @@ export function OverlayEditor({
                   cx={vx}
                   cy={vy}
                   r={13}
-                  fill="#FFFFFF"
+                  fill={SVG.surface}
                   fillOpacity={f.site_reference && f.disposition === "remove" ? 0.4 : 1}
-                  stroke={selected || f.site_reference ? BRASS : INK_900}
+                  stroke={selected || f.site_reference ? SVG.brass : SVG.ink}
                   strokeDasharray={f.site_reference ? "3 2" : undefined}
                   strokeWidth={selected ? 2.5 : 1.5}
                 />
@@ -350,9 +362,9 @@ export function OverlayEditor({
                   textAnchor="middle"
                   fontSize="11"
                   fontWeight={600}
-                  fill={INK_900}
+                  fill={SVG.ink}
                   pointerEvents="none"
-                  style={{ fontFamily: "var(--font-inter), sans-serif" }}
+                  style={{ fontFamily: SVG.mono }}
                 >
                   {FIXTURE_META[f.type].code}
                 </text>
@@ -362,15 +374,19 @@ export function OverlayEditor({
         </svg>
       </div>
 
-      <p className="text-xs text-bp-ink-secondary">
-        {loading
-          ? "Loading fixtures…"
-          : error
-            ? `Error: ${error}`
+      {error ? (
+        <div role="alert" className="surface-inverse bg-bp-alert-surface px-4 py-3 text-bp-alert-ink">
+          <p className="t-body-sm">Error: {error}</p>
+        </div>
+      ) : (
+        <p className={CAPTION}>
+          {loading
+            ? "Loading fixtures…"
             : readOnly
               ? `${layerFixtures.length} ${layer} fixtures (view-only). Edit them on the plan step.`
               : `${layerFixtures.length} ${layer} fixtures. Drag to move, pick a type above and click to add, select and Delete to remove. Rule-seeded defaults are editable.`}
-      </p>
+        </p>
+      )}
     </div>
   );
 }
@@ -384,32 +400,32 @@ function FixtureInspector({ f, readOnly, onSpec }: { f: Fixture; readOnly: boole
   const [draft, setDraft] = useState<Record<string, number>>(() => Object.fromEntries(sizeKeys.map(([k]) => [k, Number(spec[k] ?? 0)])));
   const isLight = f.type === "garden_light";
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-ink-100 bg-canvas px-md py-sm text-[12px] text-ink-700">
-      <span className="font-semibold text-ink-900">{name}</span>
+    <div className={INSPECTOR_BAR}>
+      <span className="t-nav-item-active text-bp-ink-primary">{name}</span>
       {sizeKeys.map(([k, label]) => (
-        <label key={k} className="flex items-center gap-1">
-          <span className="text-bp-ink-secondary">{label}</span>
-          <input type="number" step={50} disabled={readOnly} value={draft[k] ?? 0} onChange={(e) => setDraft({ ...draft, [k]: Number(e.target.value) })} className="focus-ring w-[72px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums" />
+        <label key={k} className="flex items-center gap-1.5">
+          <span className="t-label-md text-bp-ink-tertiary">{label}</span>
+          <input type="number" step={50} disabled={readOnly} value={draft[k] ?? 0} onChange={(e) => setDraft({ ...draft, [k]: Number(e.target.value) })} className={NUM_FIELD} />
         </label>
       ))}
       {sizeKeys.length > 0 && !readOnly && (
-        <button type="button" onClick={() => onSpec({ ...spec, ...draft, assumed: false })} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
+        <button type="button" onClick={() => onSpec({ ...spec, ...draft, assumed: false })} className={SMALL_BTN}>
           Set size (mm)
         </button>
       )}
       {isLight && (
-        <label className="flex items-center gap-1">
-          <span className="text-bp-ink-secondary">Fitting</span>
-          <select disabled={readOnly} value={String(spec.fitting ?? "spike")} onChange={(e) => onSpec({ ...spec, fitting: e.target.value, source: "as_designed" })} className="focus-ring rounded border border-ink-100 bg-paper px-1.5 py-0.5">
+        <label className="flex items-center gap-1.5">
+          <span className="t-label-md text-bp-ink-tertiary">Fitting</span>
+          <select disabled={readOnly} value={String(spec.fitting ?? "spike")} onChange={(e) => onSpec({ ...spec, fitting: e.target.value, source: "as_designed" })} className={FIELD}>
             {LIGHT_FITTINGS.map((x) => (
               <option key={x} value={x}>{x}</option>
             ))}
           </select>
         </label>
       )}
-      {spec.assumed === true && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Size assumed</span>}
-      {f.dims_derived && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Position approximate</span>}
-      {f.site_reference && <span className="rounded-full border border-brass-600 px-2 py-0.5 font-medium text-brass-600">Existing · {f.disposition ?? "undecided"}</span>}
+      {spec.assumed === true && <span className={TAG}>Size assumed</span>}
+      {f.dims_derived && <span className={TAG}>Position approximate</span>}
+      {f.site_reference && <span className={TAG}>Existing · {f.disposition ?? "undecided"}</span>}
     </div>
   );
 }

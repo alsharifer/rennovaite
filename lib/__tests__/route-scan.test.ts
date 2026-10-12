@@ -104,13 +104,11 @@ function atelierUse(entry: string): string[] {
 
 /**
  * Pages whose module graph still draws Atelier, with the K8 task that rebuilds
- * them. Must equal the scan — remove a route here when its screen lands.
+ * them. Must equal the scan — remove a route here when its screen lands. K8
+ * emptied it (the plan editor internals were the last): a route the scan finds
+ * now is a regression.
  */
-const ATELIER_PENDING: Record<string, string> = {
-
-  "/project/[id]/plan": "plan editor canvas internals + garden panel (24:814 — K5 restyled only the chrome)",
-  "/project/[id]/drawings": "the plan editor's read mode on 06 Documents (same canvas internals as /plan)",
-};
+const ATELIER_PENDING: Record<string, string> = {};
 
 describe("K8 route scan — one shell everywhere", () => {
   it("finds the pages from the filesystem", () => {
@@ -119,7 +117,7 @@ describe("K8 route scan — one shell everywhere", () => {
   });
 
   it("the Atelier shell is gone", () => {
-    for (const f of ["components/app/AppShell.tsx", "components/app/Sidebar.tsx", "components/app/TopBar.tsx", "components/app/JourneyChrome.tsx"]) {
+    for (const f of ["components/app/AppShell.tsx", "components/app/Sidebar.tsx", "components/app/TopBar.tsx", "components/app/JourneyChrome.tsx", "components/blueprint/shell/AtelierCanvas.tsx"]) {
       expect(existsSync(path.join(ROOT, f)), f).toBe(false);
     }
     for (const p of pages) {
