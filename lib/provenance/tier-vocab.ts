@@ -58,6 +58,18 @@ export function tierLabel(tier: ProvTier, persona: Persona = "firm", role: Figur
   return { validated: "QS validated", market: "Market reference", derived: "Derived", unpriced: "To be priced" }[tier];
 }
 
+/**
+ * The owner Overview's "What this number is based on" rows (K8, spec §6.2,
+ * Figma 54:145) — the same marks in the owner's words.
+ */
+export const OWNER_BASIS_LABEL: Record<ProvTier, string> = {
+  measured: "Measured from your plan",
+  validated: "Checked by a quantity surveyor",
+  market: "Market price — recent Dubai jobs",
+  derived: "Estimated — confirm before tender",
+  unpriced: "Not priced yet — excluded",
+};
+
 /** "Derived — site assessment" for a firm; the plain label otherwise. */
 export function tierLabelWithWhy(tier: ProvTier, why: string | null, persona: Persona = "firm", role: FigureRole = "amount"): string {
   const label = tierLabel(tier, persona, role);

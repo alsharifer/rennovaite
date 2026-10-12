@@ -50,8 +50,12 @@ async function count(db: SupabaseClient, table: string, projectId: string): Prom
 /** The D4 lines still to be priced on a stored BoQ (isUnpricedLine — the headline's own rule). */
 async function unpricedLineCount(db: SupabaseClient, boqId: string): Promise<number> {
   return safe(0, async () => {
-    const { data } = await db.from("boqs").select("sections").eq("id", boqId).maybeSingle<{ sections: { lines?: Parameters<typeof isUnpricedLine>[0][] }[] | null }>();
-    return (data?.sections ?? []).reduce((n, s) => n + (s.lines ?? []).filter(isUnpricedLine).length, 0);
+    type Section = { lines?: Parameters<typeof isUnpricedLine>[0][] };
+    // The `sections` column holds the whole stored BoQ document; its sections are inside it.
+    const { data } = await db.from("boqs").select("sections").eq("id", boqId).maybeSingle<{ sections: { sections?: Section[] } | Section[] | null }>();
+    const doc = data?.sections;
+    const sections = Array.isArray(doc) ? doc : (doc?.sections ?? []);
+    return sections.reduce((n, s) => n + (s.lines ?? []).filter(isUnpricedLine).length, 0);
   });
 }
 
