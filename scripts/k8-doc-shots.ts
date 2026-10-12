@@ -17,6 +17,7 @@ import { Resvg } from "@resvg/resvg-js";
 import type { BoqPdfInput } from "@/lib/documents/boq-pdf";
 import { buildBoqPdfPages } from "@/lib/documents/boq-pdf";
 import { buildProposalPages } from "@/lib/documents/proposal";
+import { renderSheet } from "@/lib/drawings/sheet";
 
 const out = process.argv[2] ?? "screenshots/k8/docs";
 fs.mkdirSync(out, { recursive: true });
@@ -49,4 +50,17 @@ png(buildProposalPages({ brand: "Scratch Landscapes & Co.", logoDataUri: null, t
 
 const boqPages = buildBoqPdfPages({ projectName: "Garden — Draft for Review", community: "Dubai", dateISO: "2026-10-12", boq, revision: 46 });
 boqPages.forEach((p, i) => png(p, `boq-${i + 1}.png`));
+// A sheet frame (68:1542): two rooms stand in for the drawing — the title block, status strip, north and scale are the point.
+const room = (x: number, y: number, w: number, h: number, name: string) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#1A1D1F" stroke-width="0.7"/><text x="${x + 3}" y="${y + 6}" font-size="3" fill="#1A1D1F" style="font-family:Consolas">${name}</text>`;
+const sheet = (draft: string | null) =>
+  renderSheet({
+    meta: { projectNameEn: "Garden — Draft for Review", community: "Dubai", level: "ground", scale: "1:50", dateISO: "2026-10-12", preparedBy: "Scratch Landscapes & Co.", draft },
+    sheetNumber: "L-100",
+    title: "Site plan",
+    body: room(40, 30, 110, 80, "REAR LAWN 47.8 m²") + room(150, 30, 70, 80, "PERGOLA 12.3 m²"),
+  });
+fs.writeFileSync(path.join(out, "sheet.svg"), sheet(null));
+const r2 = (svg: string, file: string) => fs.writeFileSync(path.join(out, file), new Resvg(svg, { fitTo: { mode: "width", value: 1754 }, font: { loadSystemFonts: true } }).render().asPng());
+r2(sheet(null), "sheet-L-100.png");
+r2(sheet("DRAFT FOR REVIEW — quantities derived from reference layout; firm after site verification."), "sheet-L-100-draft.png");
 console.log(`${proposal.length} proposal pages, ${boqPages.length} BoQ pages → ${out}`);

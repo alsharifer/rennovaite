@@ -145,12 +145,26 @@ async function loadLockedStyleKey(projectId: string): Promise<string | null> {
 interface ProjectMetaRow {
   name: string | null;
   city: string | null;
+  /** K8: the project's own firm, as its clients read it (display name, else name). */
+  firm: string | null;
 }
 
 async function loadProjectMeta(projectId: string): Promise<ProjectMetaRow> {
   // G5: a document prints the project's display name when it has one (038).
-  const p = await loadDocumentProject(getSupabaseAdmin() as unknown as SupabaseClient, projectId, "Untitled villa");
-  return { name: p.name, city: p.city };
+  const db = getSupabaseAdmin() as unknown as SupabaseClient;
+  const p = await loadDocumentProject(db, projectId, "Untitled villa");
+  // A firm's name may appear only on its OWN project (I4) — this is that project.
+  let firm: string | null = null;
+  try {
+    const { data: row } = await db.from("projects").select("firm_id").eq("id", projectId).maybeSingle<{ firm_id: string | null }>();
+    if (row?.firm_id) {
+      const { data: f } = await db.from("firms").select("name, display_name").eq("id", row.firm_id).maybeSingle<{ name: string; display_name: string | null }>();
+      firm = f ? f.display_name?.trim() || f.name : null;
+    }
+  } catch {
+    firm = null; // pre-041 or no firm: the title block says "—"
+  }
+  return { name: p.name, city: p.city, firm };
 }
 
 function sheetMeta(
@@ -166,6 +180,7 @@ function sheetMeta(
     level: graph.meta.level.replace(/_/g, " "),
     scale: graph.meta.scale,
     dateISO: new Date().toISOString().slice(0, 10),
+    preparedBy: project.firm,
   };
 }
 
