@@ -97,9 +97,10 @@ except `design-refs/r7-handoff/`.
   Blueprint: `<Icon name>` (`components/blueprint/Icon.tsx`, `.bp-icon`:
   weight 300, grade 0, opsz 20, 20px, layered so size utilities work).
 - **Theme**: `rv_theme` cookie = `light` (default) | `dark` | `system`
-  (`lib/theme.ts`). The root layout renders `<html data-theme>` for an explicit
-  choice; an inline no-flash script settles System (and force-static pages)
-  before paint and follows the OS. `<ThemeSwitch>` sets it. Dark is the
+  (`lib/theme.ts`). ONLY the pre-paint inline script reads it and sets
+  `<html data-theme>` (System follows the OS); the root layout never reads a
+  cookie (K1 review — it made every page dynamic; spec §1.8's server-side read
+  is superseded), and `<html>` carries `suppressHydrationWarning`. `<ThemeSwitch>` sets it. Dark is the
   designed palette from the tokens — never a filter. `data-skin="warm"` sits
   only on the owner landing (`/`) and intake (`/project/new`) roots; it does
   nothing until those roots are Blueprint (K6).
@@ -127,9 +128,11 @@ except `design-refs/r7-handoff/`.
   owner, `describeFigure`) and receive marks as data — never `tier.ts`.
 - `components/blueprint/`: `<ProvenanceMark tier>` (the 12 px glyph, Figma
   3:29: solid / ¾ / ½ / ring / dashed, `aria-hidden`), `<Figure value tier
-  …>` (ink number + mark + ONE screen-reader description, e.g. "7,329.70,
-  derived — quantity derived, rate market reference"; unpriced shows "to be
-  priced" / "—"), `<TierLabel>`, `<Icon>`, `<ThemeSwitch>`. Sandbox:
+  …>` (ink number + mark + ONE screen-reader description WITH the currency,
+  e.g. "AED 7,329.70, derived — quantity derived, rate market reference"; a
+  rate is "AED 105.60 per m²"; unpriced shows "to be priced" / "—"),
+  `<TierLabel>`, `<Icon name size?>` (size by prop or `text-[…]` — never the
+  Atelier 24px trap), `<ThemeSwitch>`. Sandbox:
   `/dev/blueprint` (signed in, absent in production).
 
 ## Brand — Atelier Precise (pages not yet redesigned)

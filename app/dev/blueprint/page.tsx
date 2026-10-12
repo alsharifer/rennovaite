@@ -107,6 +107,18 @@ export default function BlueprintSandboxPage() {
                 <Icon name="description" />
                 <span className="t-label-md">Icon · Sharp 300 / opsz 20</span>
               </div>
+              {/* K1 review: <Icon size> must change the size (the Atelier 24px trap stays out). */}
+              <div className="mt-3 flex items-end gap-4 text-bp-ink-secondary" data-icon-sizes="">
+                <Icon name="lock" size={16} />
+                <Icon name="lock" />
+                <Icon name="lock" size={24} />
+                <Icon name="lock" size={32} />
+                <Icon name="lock" className="text-[40px]" />
+                <span className="material-symbols-outlined text-[32px]" aria-hidden="true" data-atelier-icon="">
+                  lock
+                </span>
+                <span className="t-label-md">16 · 20 · 24 · 32 · text-[40px] · Atelier text-[32px]</span>
+              </div>
               <p className="t-num-xl mt-6">≈ AED {formatAED(116679.56)}*</p>
               <p className="t-label-md text-bp-ink-tertiary">
                 {formatQty(1)} · {formatQty(69.41)} · {formatDelta(-0.04)} · {formatDelta(1234.5)} · {formatDelta(4.2, "pct")} · {formatRatio(17.86)}

@@ -3,7 +3,7 @@
 // (R7 §1.3 / §1.4 / §4.2 #1, K1).
 //
 // The number is always ink (R4) in mono tabular figures; the mark sits beside
-// it. Screen readers hear ONE description — "7,329.70, derived — quantity
+// it. Screen readers hear ONE description — "AED 7,329.70, derived — quantity
 // derived, rate market reference" — not a number followed by a mystery glyph.
 // An unpriced figure never shows a number: a rate reads "—", an amount reads
 // "to be priced" (label/md, ink-tertiary) with the dashed mark.
@@ -49,8 +49,14 @@ function display(value: number | null, format: FigureFormat): string {
 export function Figure({ value, tier, format = "aed", role = "amount", inputs, description, persona = "firm", size = "md", unit, className }: FigureProps) {
   const unpriced = tier === "unpriced";
   // An unpriced rate is "—"; an unpriced amount is "to be priced". A quantity is still a quantity.
-  const text = unpriced && role !== "qty" ? (role === "rate" ? "—" : "to be priced") : `${display(value, format)}${unit ? ` ${unit}` : ""}`;
-  const spoken = description ?? describeFigure(text, tier, { persona, role, inputs });
+  const priced = !(unpriced && role !== "qty");
+  const num = display(value, format);
+  const text = !priced ? (role === "rate" ? "—" : "to be priced") : `${num}${unit ? ` ${unit}` : ""}`;
+  // Screen readers hear the currency (K1 review): a Figure is used outside
+  // tables too — the hub headline, the popover — where no column header says
+  // "AED". A rate is "per" its unit.
+  const said = !priced ? text : format === "qty" ? text : `AED ${num}${unit ? `${role === "rate" ? " per" : ""} ${unit}` : ""}`;
+  const spoken = description ?? describeFigure(said, tier, { persona, role, inputs });
   return (
     <span data-bp-figure="" data-tier={tier} data-role={role} className={`inline-flex items-baseline gap-1 whitespace-nowrap${className ? ` ${className}` : ""}`}>
       <span aria-hidden="true" className={unpriced && role !== "qty" ? "t-label-md text-bp-ink-tertiary" : `${SIZE_CLASS[size]} text-bp-ink-primary`}>

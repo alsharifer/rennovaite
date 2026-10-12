@@ -4,7 +4,7 @@ import vm from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_THEME_PREF, THEME_COOKIE, THEME_NO_FLASH_SCRIPT, parseThemePref, serverTheme } from "../theme";
+import { DEFAULT_THEME_PREF, THEME_COOKIE, THEME_NO_FLASH_SCRIPT, parseThemePref } from "../theme";
 
 // =============================================================================
 // K1 — Light / Dark / System (R7 §1.8): a cookie the server reads, plus an
@@ -30,12 +30,6 @@ describe("theme preference", () => {
     expect(parseThemePref("sepia")).toBe("light");
     expect(parseThemePref("dark")).toBe("dark");
   });
-
-  it("the server renders explicit choices; System is the browser's", () => {
-    expect(serverTheme("light")).toBe("light");
-    expect(serverTheme("dark")).toBe("dark");
-    expect(serverTheme("system")).toBeUndefined();
-  });
 });
 
 describe("the no-flash script", () => {
@@ -59,10 +53,17 @@ describe("the no-flash script", () => {
 describe("wiring", () => {
   const read = (f: string) => readFileSync(path.join(process.cwd(), f), "utf8");
 
-  it("the root layout reads the cookie, inlines the script and loads Plex Sans as --font-plex-sans", () => {
+  it("the root layout never reads a cookie (static pages stay static): the inline script alone sets the theme", () => {
     const layout = read("app/layout.tsx");
-    expect(layout).toMatch(/data-theme=\{theme\}/);
-    expect(layout).toContain("THEME_NO_FLASH_SCRIPT");
+    expect(layout).not.toMatch(/next\/headers|cookies\(|headers\(/);
+    expect(layout).not.toMatch(/data-theme=\{/);
+    expect(layout).not.toMatch(/async function RootLayout/);
+    expect(layout).toContain("dangerouslySetInnerHTML={{ __html: THEME_NO_FLASH_SCRIPT }}");
+    expect(layout).toContain("suppressHydrationWarning");
+  });
+
+  it("the root layout loads Plex Sans as --font-plex-sans beside the existing faces", () => {
+    const layout = read("app/layout.tsx");
     expect(layout).toContain('variable: "--font-plex-sans"');
     expect(layout).toContain('variable: "--font-jetbrains-mono"');
     expect(layout).toContain('variable: "--font-eb-garamond"');
