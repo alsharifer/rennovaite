@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const LINKS = [
-  { label: "Floorplans", href: "/project" },
-  { label: "AI Renders", href: "/project" },
-];
-
+// Invite-only pilot (front door, 13 Oct): every link here leads to the sign-in
+// page. The section links into the app (Floorplans, AI Renders → /project) are
+// gone — signed out they only bounced through /auth. A public landing can bring
+// them back.
 export function TopNav() {
   const [scrolled, setScrolled] = useState(false);
 
@@ -28,31 +27,18 @@ export function TopNav() {
       ].join(" ")}
     >
       <Link
-        href="/"
+        href="/auth"
         className="font-display text-headline-md text-primary tracking-tight"
       >
         RenovAIte
       </Link>
 
-      <div className="flex items-center gap-xl">
-        <div className="hidden items-center gap-lg md:flex">
-          {LINKS.map((l, i) => (
-            <Link
-              key={`${l.label}-${i}`}
-              href={l.href}
-              className="font-label-caps text-label-caps uppercase text-on-surface-variant transition-colors hover:text-primary"
-            >
-              {l.label}
-            </Link>
-          ))}
-        </div>
-        <Link
-          href="/project"
-          className="flex h-[48px] items-center rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm text-white transition-all hover:brightness-110 active:scale-[0.98]"
-        >
-          Start a project
-        </Link>
-      </div>
+      <Link
+        href="/auth"
+        className="flex h-[48px] items-center rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm text-white transition-all hover:brightness-110 active:scale-[0.98]"
+      >
+        Sign in
+      </Link>
     </nav>
   );
 }

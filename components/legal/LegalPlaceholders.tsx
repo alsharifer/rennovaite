@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Footer } from "@/components/marketing/Footer";
 import { TopNav } from "@/components/marketing/TopNav";
 
+import { LEGAL_ROBOTS } from "./LegalPage";
+
 // What /privacy and /terms show until counsel's text is approved (H6): the
 // pre-H6 "being finalised" pages, unchanged. The page switches to the rendered
 // document only when content/legal/<key>.md says `status: published` — so the
@@ -15,12 +17,14 @@ import { TopNav } from "@/components/marketing/TopNav";
 
 export const PRIVACY_PLACEHOLDER_METADATA: Metadata = {
   title: "Privacy — RenovAIte",
+  robots: LEGAL_ROBOTS,
   description:
     "RenovAIte's privacy policy is being finalised. Contact hello@rennovaite.fit with any question about your data in the meantime.",
 };
 
 export const TERMS_PLACEHOLDER_METADATA: Metadata = {
   title: "Terms — RenovAIte",
+  robots: LEGAL_ROBOTS,
   description:
     "RenovAIte's terms of service are being finalised. Contact hello@rennovaite.fit in the meantime.",
 };
@@ -56,10 +60,10 @@ export function PrivacyPlaceholder() {
           with contractors unless you choose to invite them to bid.
         </p>
         <Link
-          href="/rennovaite"
+          href="/auth"
           className="focus-ring mt-xl inline-flex font-body text-body-sm text-brass-600 hover:underline"
         >
-          &larr; Back to RenovAIte
+          &larr; Sign in to RenovAIte
         </Link>
       </main>
       <Footer />
@@ -112,10 +116,10 @@ export function TermsPlaceholder() {
           </li>
         </ul>
         <Link
-          href="/rennovaite"
+          href="/auth"
           className="focus-ring mt-xl inline-flex font-body text-body-sm text-brass-600 hover:underline"
         >
-          &larr; Back to RenovAIte
+          &larr; Sign in to RenovAIte
         </Link>
       </main>
       <Footer />

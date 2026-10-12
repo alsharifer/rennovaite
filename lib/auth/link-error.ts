@@ -15,6 +15,8 @@
 // Pure and client-safe (the sign-in page and the proxy both read it).
 // =============================================================================
 
+import { safeNextPath } from "./access";
+
 export const AUTH_ERROR_CODES = ["link_expired", "link_invalid", "missing_code", "exchange_failed", "callback_error"] as const;
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
@@ -53,6 +55,15 @@ export function codeLandingRedirect(url: URL): string | null {
 
 /** Where a signed-in visitor to `/` or `/auth` goes — the auth callback's default too. */
 export const SIGNED_IN_HOME = "/project";
+
+/**
+ * THE post-sign-in destination — the one rule the auth callback, /auth, `/`
+ * and `/rennovaite` all use: the visit's own `next` when it is a safe
+ * same-site path, else SIGNED_IN_HOME.
+ */
+export function postSignInPath(next?: string | null): string {
+  return safeNextPath(next) ? next : SIGNED_IN_HOME;
+}
 
 const MESSAGES: Record<AuthErrorCode, string> = {
   link_expired: "That sign-in link has expired or was already used. Send yourself a new one below — only the newest link works.",

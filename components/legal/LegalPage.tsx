@@ -9,14 +9,19 @@ import { formatLegalDate, type Block, type Inline, type LegalDocument } from "@/
 // /privacy and /terms (H6): the text is content/legal/<key>.md, rendered as
 // React elements from lib/legal/markdown's block tree (never as HTML). While a
 // document's status is `draft` it says so above the text and is kept out of
-// search indexes; publishing counsel's text is a file swap + `status: published`.
+// search indexes (all legal pages are, while the pilot is invite-only);
+// publishing counsel's text is a file swap + `status: published`.
+
+/** Robots for /privacy and /terms: noindex while invite-only. Lift with the public landing. */
+export const LEGAL_ROBOTS: NonNullable<Metadata["robots"]> = { index: false, follow: false };
 
 export function legalMetadata(doc: LegalDocument, description: string): Metadata {
   return {
     // Counsel's drafts still spell the name RennovAIte; the tab title carries the brand either way.
     title: `${doc.title.replace(/\s+—\s+Renn?ovAIte$/, "")} — RenovAIte`,
     description,
-    ...(doc.meta.status === "draft" ? { robots: { index: false, follow: false } } : {}),
+    // Not indexed while the pilot is invite-only (front door, 13 Oct) — draft or published.
+    robots: LEGAL_ROBOTS,
   };
 }
 
@@ -47,10 +52,10 @@ export function LegalPage({ doc }: { doc: LegalDocument }) {
         )}
         <div className="mt-xl">{doc.blocks.map((b, i) => renderBlock(b, i))}</div>
         <Link
-          href="/rennovaite"
+          href="/auth"
           className="focus-ring mt-xl inline-flex font-body text-body-sm text-brass-600 hover:underline"
         >
-          &larr; Back to RenovAIte
+          &larr; Sign in to RenovAIte
         </Link>
       </main>
       <Footer />

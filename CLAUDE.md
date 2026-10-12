@@ -102,8 +102,8 @@ except `design-refs/r7-handoff/`.
   cookie (K1 review — it made every page dynamic; spec §1.8's server-side read
   is superseded), and `<html>` carries `suppressHydrationWarning`. `<ThemeSwitch>` sets it. Dark is the
   designed palette from the tokens — never a filter. `data-skin="warm"` sits
-  only on the owner landing (`/`) and intake (`/project/new`) roots; it does
-  nothing until those roots are Blueprint (K6).
+  only on the intake (`/project/new`) root (the owner landing is unrouted —
+  see "Front door" below); it does nothing until that root is Blueprint.
 
 ### Numbers + provenance primitives (K1)
 
@@ -2231,6 +2231,17 @@ allowlist in `lib/auth/access.ts`: the `/auth/callback` route, `/api/health`
 `/rennovaite`, `/auth`, `/privacy`, `/terms`, and the sign-in / sign-out
 server actions. `docs/AUTH.md` has the full account.
 
+**Front door (13 Oct): the sign-in page is the front door** while the pilot is
+invite-only. `/` and `/rennovaite` render nothing — `frontDoorRedirect()`
+(`lib/auth/front-door.ts`) answers 307 to `/auth` signed out and to
+`postSignInPath()` signed in. `postSignInPath(next?)` (`lib/auth/link-error.ts`)
+is THE post-sign-in rule — the callback, `/auth`, `/` and `/rennovaite` all
+call it; never write a second one. Temporary redirects only (a cached 308 would
+outlive the pilot). `PropertyOsLanding`, `HomeLanding` and `watch-demo` are
+parked, unrouted; the TopNav / Footer / legal back links point at `/auth`;
+`/auth`, `/privacy` and `/terms` are `noindex`. `PROPERTY_OS_LANDING` is dead
+(K_BACKLOG). Live check: `node --env-file=.env.local scripts/front-door-check.mjs <base> [--anonymous]`.
+
 - **`proxy.ts`** (Next 16's middleware) gates first: `getClaims` on the Bearer
   JWT or the cookie session (local ES256 check, ~5–15 ms); off the allowlist an
   API route answers `401 { error, code: "unauthenticated" }`, a page redirects
@@ -2321,7 +2332,7 @@ view-only side surface reached from the layout and render steps).
 | `BOQ_ENGINE`                      | server — optional; unset = deterministic `lib/boq` engine, `"llm"` = legacy Claude-priced path |
 | `PERMIT_CHECK_ENABLED`            | server — `"true"` turns on the P6 Dubai permit-trigger checklist |
 | `STAGING_ENABLED`                | server — `"true"` turns on P7 furniture staging (render prompt + optional BoQ section) |
-| `PROPERTY_OS_LANDING`             | server — `"true"` makes `/` the Property OS intro page (visitors) and moves the RennovAIte homepage to `/rennovaite`; unset/false = `/` is the homepage (as before) |
+| `PROPERTY_OS_LANDING`             | DEAD (front door, 13 Oct) — read by nothing; `/` redirects to `/auth`. Remove (K_BACKLOG) |
 | `TASTE_SEED_ENABLED`              | server — `"true"` lets a project's moodboard condition its renders (B3). Off = renders behave exactly as before |
 | `PACK_EXPORT_ENABLED`             | server — `"true"` **with `DRAWINGS_ENABLED="true"`** shows the in-app "Export pack" action and lets the document routes answer a running pack job (T5). Off = the action is absent and every document route 404s |
 | `TEXTURED_WALKTHROUGH`            | server — `"true"` lets the 3D walkthrough read StyleBoard finishes onto floors and walls (F1). Off = the clay model, unchanged |
@@ -2336,18 +2347,13 @@ view-only side surface reached from the layout and render steps).
 **All server feature flags in this app are read from `process.env` at server
 start** (`process.env.X === "true"`), so changing one in `.env.local` requires a
 **dev-server restart** to take effect — there is no runtime toggle. This covers
-the Pilot-Seven flags below and `PROPERTY_OS_LANDING`. Every flag defaults off,
-and off = pre-flag behaviour.
+the Pilot-Seven flags below. Every flag defaults off, and off = pre-flag
+behaviour.
 
-**`PROPERTY_OS_LANDING` (G1 / landing)** — off: `/` renders the RennovAIte
-marketing homepage exactly as before. On: `/` renders the four-pillar Property
-OS intro (`app/_components/property-os-landing.tsx`) for visitors; a signed-in
-visitor is redirected to their portal (`/project`, the auth-callback default);
-both the nav "Open RennovAIte" and the card "Enter RennovAIte" CTAs link to
-`/rennovaite`, which always hosts the homepage (`components/marketing/home-landing.tsx`).
-The three non-RennovAIte pillars are inert roadmap tiles (badges + copy, no
-links). The root becomes dynamic (`force-dynamic` behaviour) because of the
-auth-aware redirect.
+**`PROPERTY_OS_LANDING` — DEAD since the front door (13 Oct).** Nothing reads
+it: `/` and `/rennovaite` redirect to `/auth` (see "Route auth"). It used to
+switch `/` between HomeLanding and the Property OS intro; both are parked.
+Removal is in `docs/K_BACKLOG.md`.
 
 ### Pilot Seven feature flags (reserved)
 

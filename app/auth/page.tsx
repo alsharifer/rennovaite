@@ -6,11 +6,15 @@ import { DesignViewVideo } from "@/components/blueprint/auth/DesignViewVideo";
 import { SignInForm } from "@/components/blueprint/auth/SignInForm";
 import { safeNextPath } from "@/lib/auth/access";
 import { getPageCaller } from "@/lib/auth/caller";
-import { SIGNED_IN_HOME, authErrorMessage } from "@/lib/auth/link-error";
+import { authErrorMessage, postSignInPath } from "@/lib/auth/link-error";
 import { loadLegalDocument } from "@/lib/legal/load";
 
+// The front door while the pilot is invite-only (13 Oct): `/` and /rennovaite
+// redirect here. Kept out of search indexes until there is a public landing.
 export const metadata: Metadata = {
   title: "Sign in · RenovAIte",
+  description: "Sign in to RenovAIte — AI-assisted villa renovation for Dubai. Access is by invitation during the pilot.",
+  robots: { index: false, follow: false },
 };
 
 // K6 — Sign in (R7 §3.9a, Figma 35:1152): Dark, shared by firm and owner — the
@@ -26,7 +30,7 @@ export const metadata: Metadata = {
 export default async function AuthPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const { next, error } = await searchParams;
   // Already signed in: never ask again — go where the visit was headed.
-  if (await getPageCaller()) redirect(safeNextPath(next) ? next : SIGNED_IN_HOME);
+  if (await getPageCaller()) redirect(postSignInPath(next));
   // H6: the legal pages say "being finalised" until counsel's text is published.
   const draft = (key: "privacy" | "terms") => {
     try {

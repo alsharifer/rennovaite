@@ -3,7 +3,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { AUTH_ERROR_CODES, SIGNED_IN_HOME, authErrorMessage, codeLandingRedirect, linkErrorRedirect, supabaseLinkError } from "../link-error";
+import { signInPath } from "../access";
+import { AUTH_ERROR_CODES, SIGNED_IN_HOME, authErrorMessage, codeLandingRedirect, linkErrorRedirect, postSignInPath, supabaseLinkError } from "../link-error";
 
 // =============================================================================
 // A magic link Supabase could not verify — the landing it redirects to, and the
@@ -65,20 +66,18 @@ describe("codeLandingRedirect — a good link that fell back to the Site URL", (
   });
 });
 
+/** Source without its comments: a comment may name what the code must not use. */
+const code = (src: string) =>
+  src
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*(\/\/|\/\*|\*)/.test(l))
+    .join("\n");
+
 describe("a signed-in visitor is never asked to sign in again", () => {
   const read = (p: string) => readFileSync(path.join(process.cwd(), p), "utf8");
 
-  it("`/` sends a signed-in caller to the portal, whatever the landing flag", () => {
-    const src = read("app/page.tsx");
-    const redirectAt = src.indexOf("if (await getPageCaller()) redirect(SIGNED_IN_HOME)");
-    expect(redirectAt).toBeGreaterThan(0);
-    // Before either landing renders.
-    expect(redirectAt).toBeLessThan(src.indexOf("<HomeLanding />"));
-    expect(redirectAt).toBeLessThan(src.indexOf("<PropertyOsLanding />"));
-  });
-
   it("/auth sends a signed-in caller on, to `next` or the portal", () => {
-    expect(read("app/auth/page.tsx")).toMatch(/if \(await getPageCaller\(\)\) redirect\(safeNextPath\(next\) \? next : SIGNED_IN_HOME\)/);
+    expect(read("app/auth/page.tsx")).toMatch(/if \(await getPageCaller\(\)\) redirect\(postSignInPath\(next\)\)/);
   });
 
   it("the proxy forwards both kinds of fallen-back link before anything else", () => {
@@ -87,9 +86,71 @@ describe("a signed-in visitor is never asked to sign in again", () => {
     expect(src.indexOf("codeLandingRedirect(request.nextUrl)")).toBeLessThan(src.indexOf("createServerClient(url, anonKey"));
   });
 
-  it("one portal destination for the callback, `/` and /auth", () => {
+  it("one post-sign-in rule for the callback, /auth, `/` and /rennovaite", () => {
     expect(SIGNED_IN_HOME).toBe("/project");
-    expect(read("app/auth/callback/route.ts")).toMatch(/: SIGNED_IN_HOME;/);
+    expect(postSignInPath()).toBe(SIGNED_IN_HOME);
+    expect(postSignInPath(null)).toBe(SIGNED_IN_HOME);
+    expect(postSignInPath("/project/abc/boq?x=1")).toBe("/project/abc/boq?x=1");
+    for (const bad of ["//evil.example", "https://evil.example", "project"]) expect(postSignInPath(bad), bad).toBe(SIGNED_IN_HOME);
+    expect(read("app/auth/callback/route.ts")).toMatch(/const dest = postSignInPath\(wanted\);/);
+    expect(read("lib/auth/front-door.ts")).toMatch(/postSignInPath\(\)/);
+    // No second rule: nothing else compares against SIGNED_IN_HOME.
+    for (const f of ["app/auth/callback/route.ts", "app/auth/page.tsx", "app/page.tsx", "app/rennovaite/page.tsx", "lib/auth/front-door.ts"]) {
+      expect(code(read(f)), f).not.toMatch(/SIGNED_IN_HOME/);
+    }
+  });
+});
+
+// Front door (13 Oct): no public landing while the pilot is invite-only.
+describe("the sign-in page is the front door", () => {
+  const read = (p: string) => readFileSync(path.join(process.cwd(), p), "utf8");
+
+  it("`/` and /rennovaite only redirect — no landing is routed", () => {
+    for (const f of ["app/page.tsx", "app/rennovaite/page.tsx"]) {
+      const src = code(read(f));
+      expect(src, f).toMatch(/return frontDoorRedirect\(\);/);
+      expect(src, f).toMatch(/export const dynamic = "force-dynamic"/);
+      expect(src, f).not.toMatch(/HomeLanding|PropertyOsLanding|PROPERTY_OS_LANDING|WatchDemo/);
+    }
+    // Parked, not deleted.
+    for (const f of ["app/_components/property-os-landing.tsx", "components/marketing/home-landing.tsx", "app/_components/watch-demo.tsx"]) {
+      expect(read(f).length, f).toBeGreaterThan(0);
+    }
+  });
+
+  it("signed out → /auth, signed in → postSignInPath(), and never a permanent redirect", () => {
+    const src = code(read("lib/auth/front-door.ts"));
+    expect(src).toMatch(/redirect\(\(await getPageCaller\(\)\) \? postSignInPath\(\) : FRONT_DOOR\)/);
+    expect(src).toMatch(/export const FRONT_DOOR = "\/auth";/);
+    expect(src).not.toMatch(/permanentRedirect|RedirectType|308|301/);
+  });
+
+  it("cannot loop: /auth renders signed out, and signed in it never sends anyone back to `/`", () => {
+    expect(postSignInPath()).not.toBe("/");
+    expect(postSignInPath()).not.toBe("/rennovaite");
+    expect(postSignInPath()).not.toBe("/auth");
+    const auth = read("app/auth/page.tsx");
+    expect(auth).not.toMatch(/redirect\("\/"\)|redirect\("\/rennovaite"\)/);
+    // The proxy turns a signed-out page visit to /auth, never to `/`.
+    expect(signInPath("/project")).toMatch(/^\/auth/);
+    expect(signInPath("/")).toBe("/auth");
+  });
+
+  it("nothing public links into a redirect: the legal chrome points at /auth", () => {
+    for (const f of ["components/marketing/TopNav.tsx", "components/marketing/Footer.tsx", "components/legal/LegalPage.tsx", "components/legal/LegalPlaceholders.tsx"]) {
+      const src = read(f);
+      expect(src, f).not.toMatch(/href[=:]\s*["']\/(rennovaite[^"']*)?["']/);
+      expect(src, f).not.toMatch(/href[=:]\s*["']\/project/);
+    }
+  });
+
+  it("/auth and the legal pages are noindex and say RenovAIte", () => {
+    const auth = read("app/auth/page.tsx");
+    expect(auth).toMatch(/title: "Sign in · RenovAIte"/);
+    expect(auth).toMatch(/robots: \{ index: false, follow: false \}/);
+    expect(auth).not.toMatch(/Property OS/);
+    expect(read("components/legal/LegalPage.tsx")).toMatch(/robots: LEGAL_ROBOTS,/);
+    expect(read("components/legal/LegalPlaceholders.tsx").match(/robots: LEGAL_ROBOTS,/g)?.length).toBe(2);
   });
 });
 
