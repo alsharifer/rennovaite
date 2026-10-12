@@ -21,12 +21,7 @@ export default function NewProjectPage() {
   return (
     <AccountShell skin="warm">
       <div className="mx-auto max-w-[1100px] px-6 py-10 lg:px-12" data-skin-page="intake">
-        <p className="t-label-caps text-bp-brass-text">{`${step.number} · ${step.label.toUpperCase()}`}</p>
-        <h1 className="t-display-serif mt-3 text-bp-ink-primary">How would you like to start?</h1>
-        <p className="t-body-md mt-3 text-bp-ink-secondary">Any of these gets you to a priced plan. You can switch later.</p>
-        <div className="mt-8">
-          <VillaIntake gardenPilot={process.env.GARDEN_PILOT_ENABLED === "true"} />
-        </div>
+        <VillaIntake gardenPilot={process.env.GARDEN_PILOT_ENABLED === "true"} eyebrow={`${step.number} · ${step.label.toUpperCase()}`} />
       </div>
     </AccountShell>
   );

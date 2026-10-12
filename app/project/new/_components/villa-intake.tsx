@@ -23,7 +23,9 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
 
 import { Icon } from "@/components/blueprint/Icon";
-import { EMPTY_PLOT, parsePlot, PlotSizeFields, type PlotDraft } from "@/components/plan/plot-size-fields";
+import { ReadingPlan } from "@/components/blueprint/intake/ReadingPlan";
+import { PlotSizeFields } from "@/components/blueprint/plan/PlotSizeFields";
+import { EMPTY_PLOT, parsePlot, type PlotDraft } from "@/lib/plan/plot";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import { DRAWING_DISCIPLINES, KIND_LABEL, type AssetKind } from "@/lib/assets/types";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
@@ -76,7 +78,7 @@ const WAYS: { key: Way; icon: string; title: string; body: string; garden: boole
   { key: "photos", icon: "photo_camera", title: "Start from photos", body: "For gardens: photos of each side. We draw the zones with you.", garden: true },
 ];
 
-export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) {
+export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: boolean; eyebrow: string }) {
   const router = useRouter();
   const ids = useId();
   const [way, setWay] = useState<Way>("upload");
@@ -164,20 +166,11 @@ export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) 
   const photoDz = useDropzone({ onDrop: (f) => addAssets(f, "photo", setPhotos, patchPhoto), accept: PHOTO_ACCEPT, maxSize: ASSET_MAX_BYTES, multiple: true });
   const drawingDz = useDropzone({ onDrop: (f) => addAssets(f, discipline, setDrawings, patchDrawing), accept: DRAWING_ACCEPT, maxSize: ASSET_MAX_BYTES, multiple: true });
 
-  async function analyze() {
+  // K8 #12: Continue on an uploaded plan hands over to "Reading your plan", which runs the parse.
+  function analyze() {
     if (plan.kind !== "ready" || busy) return;
-    setBusy("parse");
     setError(null);
-    try {
-      const r = await fetch("/api/parse-plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan_id: plan.res.plan_id }) });
-      const b = (await r.json().catch(() => null)) as { success?: boolean; error?: string } | null;
-      if (!r.ok || !b?.success) throw new Error(b?.error ?? `Reading the plan failed (${r.status}).`);
-      track(AnalyticsEvent.PlanParsed, { project_id: plan.res.project_id });
-      router.push(`/project/${plan.res.project_id}/plan`);
-    } catch (err) {
-      setBusy(null);
-      setError(err instanceof Error ? err.message : "Reading the plan failed.");
-    }
+    setBusy("parse");
   }
 
   /** G1: a project with nothing to parse — the plot is its scale. Queued photos and drawings upload before we leave. */
@@ -219,8 +212,16 @@ export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) 
               : null;
   const onContinue = () => (blockReason ? undefined : way === "upload" ? void analyze() : void startDrawnPlan());
 
+  if (busy === "parse" && plan.kind === "ready") {
+    return <ReadingPlan projectId={plan.res.project_id} planId={plan.res.plan_id} eyebrow={eyebrow} subtitle={[projectName.trim() || "New project", plan.name, mb(plan.size)].join(" · ")} />;
+  }
+
   return (
-    <div className="flex flex-col gap-10" data-intake>
+    <div data-intake>
+      <p className="t-label-caps text-bp-brass-text">{eyebrow}</p>
+      <h1 className="t-display-serif mt-3 text-bp-ink-primary">How would you like to start?</h1>
+      <p className="t-body-md mt-3 text-bp-ink-secondary">Any of these gets you to a priced plan. You can switch later.</p>
+    <div className="mt-8 flex flex-col gap-10">
       <div role="radiogroup" aria-label="How would you like to start?" className={`grid grid-cols-1 gap-4 ${ways.length === 3 ? "md:grid-cols-3" : ways.length === 2 ? "md:grid-cols-2" : ""}`}>
         {ways.map((w) => {
           const on = way === w.key;
@@ -401,6 +402,7 @@ export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) 
           </span>
         ) : null}
       </div>
+    </div>
     </div>
   );
 }

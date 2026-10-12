@@ -58,7 +58,7 @@ try {
   await b.goto(`${base}/project/new`, "[data-intake]");
   await sleep(2000);
   check("warm skin on the Blueprint root", await b.evaluate(`!!document.querySelector('[data-system="blueprint"][data-skin="warm"]')`));
-  check("01 Intake is the active rail step", await b.evaluate(`document.querySelector('[data-step="intake"]')?.getAttribute('aria-current') === 'step'`));
+  check("01 Plan is the active rail step", await b.evaluate(`document.querySelector('[data-step="plan"]')?.getAttribute('aria-current') === 'step'`));
   check("Continue disabled with its reason before a plan exists", await b.evaluate(`(() => { const c = document.querySelector('[data-testid="intake-continue"]'); return c.getAttribute('aria-disabled') === 'true' && !!document.getElementById(c.getAttribute('aria-describedby') || ''); })()`));
   await b.evaluate(`(() => { const input = document.querySelector('input[aria-label="Floor plan file"]'); const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array(26 * 1024 * 1024)], "Villa_full_drawing_set.pdf", { type: "application/pdf" })); input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true })); })()`);
   check("too large: the inverse block with what to do instead", await b.until(`(document.querySelector('[data-plan-too-large]')?.textContent ?? '').includes('Export just the floor-plan sheet')`, 10000));
