@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
+import { AtelierCanvas } from "@/components/blueprint/shell/ShellFrame";
 import { getCaller } from "@/lib/auth/caller";
 import { RevisionNotFound, buildProjectRevisionDiff, listRevisions } from "@/lib/boq/revisions";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -20,7 +21,15 @@ export const dynamic = "force-dynamic";
 // the JSON route and the PDF do (lib/boq/revisions.ts). Figures carry their
 // provenance popovers from the two stored revisions. Signed-in accounts only.
 
-export default async function RevisionsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ from?: string; to?: string }> }) {
+type RevisionsProps = { params: Promise<{ id: string }>; searchParams: Promise<{ from?: string; to?: string }> };
+
+// K3: the BoQ segment's body is Blueprint now; this page is K4's (§3.5) and
+// keeps its Atelier body on its own canvas until then.
+export default async function RevisionsPage(props: RevisionsProps) {
+  return <AtelierCanvas>{await RevisionsBody(props)}</AtelierCanvas>;
+}
+
+async function RevisionsBody({ params, searchParams }: RevisionsProps) {
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
   const caller = await getCaller();

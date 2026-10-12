@@ -270,3 +270,178 @@
 .bp-drawer::backdrop {
   background: color-mix(in srgb, var(--color-ink-primary) 40%, transparent);
 }
+
+/* ------------------------------------------------------------------ */
+/*  BoQ & Review (K3, R7 §3.2 / §2 BoQ row 12:314).                    */
+/*  Desktop: pinned total (sticky) · notice rows · index 184 | table  */
+/*  | inspector 360. Columns REF 72 · Title fill · Qty 104 · Unit 64  */
+/*  · Rate 112 · Amount 136 · open 32. Tablet (768–1023): chips,      */
+/*  Unit + Rate hidden, inspector = bottom sheet. Phone (<768): rows  */
+/*  go two-line, full-height sheet. Layout is by CSS px, so 400% zoom */
+/*  on 1280 reflows to the phone layout (§4.2 #11).                    */
+/* ------------------------------------------------------------------ */
+.bp-boq {
+  --bp-boq-pinned-h: 120px;
+  --bp-boq-colhead-h: 40px;
+  --bp-boq-sticky: calc(var(--bp-topbar-h) + var(--bp-boq-pinned-h));
+}
+.bp-boq-pinned {
+  position: sticky;
+  top: var(--bp-topbar-h);
+  z-index: 20;
+}
+.bp-boq-work {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.bp-boq-work[data-inspector="open"] {
+  grid-template-columns: 184px minmax(0, 1fr) 360px;
+}
+.bp-boq-index,
+.bp-boq-inspector {
+  position: sticky;
+  top: calc(var(--bp-boq-sticky) + 16px);
+  max-height: calc(100vh - var(--bp-boq-sticky) - 32px);
+  overflow-y: auto;
+}
+.bp-boq-colhead {
+  position: sticky;
+  top: var(--bp-boq-sticky);
+  z-index: 11;
+}
+.bp-boq-sechead {
+  position: sticky;
+  top: calc(var(--bp-boq-sticky) + var(--bp-boq-colhead-h));
+  z-index: 10;
+}
+.bp-boq-cols {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 104px 64px 112px 136px 32px;
+  align-items: center;
+}
+.bp-boq-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.bp-boq-chips,
+.bp-boq-sub,
+.bp-boq-touch-only {
+  display: none;
+}
+.bp-boq-popover {
+  animation: bp-pop-in 120ms ease-out;
+}
+@keyframes bp-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-boq-popover {
+    animation: none;
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .bp-boq-work,
+  .bp-boq-work[data-inspector="open"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bp-boq-index,
+  .bp-boq-desk-only {
+    display: none;
+  }
+  .bp-boq-chips {
+    display: flex;
+    position: sticky;
+    top: var(--bp-boq-sticky);
+    z-index: 12;
+  }
+  .bp-boq-colhead {
+    top: calc(var(--bp-boq-sticky) + 52px);
+  }
+  .bp-boq-sechead {
+    top: calc(var(--bp-boq-sticky) + 52px + var(--bp-boq-colhead-h));
+  }
+  .bp-boq-cols {
+    grid-template-columns: 72px minmax(0, 1fr) 104px 136px 32px;
+  }
+  .bp-boq-col-unit,
+  .bp-boq-col-rate {
+    display: none;
+  }
+  .bp-boq-touch-only {
+    display: block;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .bp-boq-colhead {
+    display: none;
+  }
+  .bp-boq-sechead {
+    top: calc(var(--bp-boq-sticky) + 52px);
+  }
+  .bp-boq-cols.bp-boq-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title amount"
+      "sub sub";
+    row-gap: 2px;
+  }
+  .bp-boq-line > .bp-boq-col-ref,
+  .bp-boq-line > .bp-boq-col-qty,
+  .bp-boq-line > .bp-boq-col-open {
+    display: none;
+  }
+  .bp-boq-line > .bp-boq-col-title {
+    grid-area: title;
+  }
+  .bp-boq-line > .bp-boq-col-amount {
+    grid-area: amount;
+  }
+  .bp-boq-line > .bp-boq-sub {
+    display: block;
+    grid-area: sub;
+  }
+  .bp-boq-pinned-meta {
+    display: none;
+  }
+}
+
+/* The inspector as a bottom sheet (tablet: half / full detents; phone: full). */
+.bp-boq-sheet {
+  height: 50vh;
+  transition: height 200ms ease-out;
+}
+.bp-boq-sheet[data-detent="full"] {
+  height: 92vh;
+}
+@media (max-width: 767.98px) {
+  .bp-boq-sheet,
+  .bp-boq-sheet[data-detent="full"] {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-boq-sheet {
+    transition: none;
+  }
+}
+.bp-boq-col-sectotal {
+  grid-column: -3 / -2;
+}
+@media (max-width: 767.98px) {
+  .bp-boq-sechead .bp-boq-cols {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .bp-boq-col-sectotal {
+    grid-column: auto;
+  }
+}

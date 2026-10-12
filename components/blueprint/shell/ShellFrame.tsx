@@ -39,6 +39,11 @@ export function railSteps(ctx: RailContext, flags: JourneyFlags): RailStep[] {
   return journeySteps(flags).map((s) => ({ key: s.key, number: String(s.number).padStart(2, "0"), label: s.label, href: s.href(id), status: status(s.key) }));
 }
 
+/** An Atelier page body inside the Blueprint chrome (its own light canvas, Inter). */
+export function AtelierCanvas({ children }: { children: ReactNode }) {
+  return <div className="min-h-[calc(100vh-var(--bp-topbar-h))] bg-canvas p-4 font-sans text-on-background md:p-12">{children}</div>;
+}
+
 export function ShellFrame({ ctx, flags, content = "atelier", children }: { ctx: RailContext; flags: JourneyFlags; content?: "atelier" | "blueprint"; children: ReactNode }) {
   const pathname = usePathname();
   const steps = railSteps(ctx, flags);
@@ -51,7 +56,7 @@ export function ShellFrame({ ctx, flags, content = "atelier", children }: { ctx:
       <JourneyRail ctx={ctx} steps={steps} activeKey={activeKey} />
       <TopBar ctx={ctx} steps={steps} activeKey={activeKey} pageTitle={pageTitle} />
       <main id="main" className="bp-main">
-        {content === "atelier" ? <div className="min-h-[calc(100vh-var(--bp-topbar-h))] bg-canvas p-4 font-sans text-on-background md:p-12">{children}</div> : children}
+        {content === "atelier" ? <AtelierCanvas>{children}</AtelierCanvas> : children}
       </main>
       <Suspense fallback={null}>
         <HelpDrawer projectId={ctx.project?.id ?? null} area={activeKey ?? pageTitle ?? "app"} />
