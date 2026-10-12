@@ -15,7 +15,7 @@
 import { usePathname } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
-import { FIRM_STEPS, activeStepKey, journeySteps, type JourneyFlags } from "@/lib/journey";
+import { FIRM_STEPS, OWNER_STEPS, activeStepKey, ownerStepHref, type JourneyFlags } from "@/lib/journey";
 import type { RailContext } from "@/lib/journey-state";
 
 import { HelpDrawer } from "./HelpDrawer";
@@ -33,21 +33,15 @@ const PAGE_TITLES: [RegExp, string][] = [
 
 export function railSteps(ctx: RailContext, flags: JourneyFlags, pathname = ""): RailStep[] {
   const id = ctx.project?.id;
-  // K6: on the intake (no project yet) the owner journey is drawn with 01 active;
+  // K6: on the intake (no project yet) the owner journey is drawn with 01 Plan active;
   // the later steps wait for the project the intake creates (they lead back here).
   if (!id && pathname === "/project/new") {
-    return journeySteps(flags).map((s) => ({
-      key: s.key,
-      number: String(s.number).padStart(2, "0"),
-      label: s.label,
-      href: "/project/new",
-      status: { state: "available" as const },
-    }));
+    return OWNER_STEPS.map((s) => ({ key: s.key, number: s.number, label: s.label, href: "/project/new", status: { state: "available" as const } }));
   }
   if (!id) return [];
   const status = (k: string) => ctx.statuses[k] ?? { state: "available" as const };
   if (ctx.persona === "firm") return FIRM_STEPS.map((s) => ({ key: s.key, number: s.number, label: s.label, href: s.href(id), status: status(s.key) }));
-  return journeySteps(flags).map((s) => ({ key: s.key, number: String(s.number).padStart(2, "0"), label: s.label, href: s.href(id), status: status(s.key) }));
+  return OWNER_STEPS.map((s) => ({ key: s.key, number: s.number, label: s.label, href: ownerStepHref(s.key, id, flags), status: status(s.key) }));
 }
 
 /** An Atelier page body inside the Blueprint chrome (its own light canvas, Inter). */
@@ -62,7 +56,7 @@ export function AtelierCanvas({ children }: { children: ReactNode }) {
 export function ShellFrame({ ctx, flags, content = "atelier", skin, children }: { ctx: RailContext; flags: JourneyFlags; content?: "atelier" | "blueprint"; skin?: "warm"; children: ReactNode }) {
   const pathname = usePathname();
   const steps = railSteps(ctx, flags, pathname);
-  const activeKey = activeStepKey(ctx.persona, pathname, ctx.project?.id ?? null, flags);
+  const activeKey = activeStepKey(ctx.persona, pathname, ctx.project?.id ?? null);
   // K4: Revisions & Approval (21:450) takes the compact rail too — a seven-column diff beside a 360 column.
   const compactWide = activeKey === "boq_review" || activeKey === "revisions" || (ctx.persona === "owner" && /\/boq(\/revisions)?$/.test(pathname));
   const pageTitle = PAGE_TITLES.find(([re]) => re.test(pathname))?.[1] ?? null;

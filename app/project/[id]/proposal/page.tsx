@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { ProposalScreen } from "@/components/blueprint/proposal/ProposalScreen";
 import { loadProposalView } from "@/lib/documents/proposal-view";
-import { journeyFlagsFromEnv } from "@/lib/journey";
 import { stepEyebrow } from "@/lib/journey-eyebrow";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -21,6 +20,6 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
   const view = await loadProposalView(getSupabaseAdmin() as unknown as SupabaseClient, id);
-  const eyebrow = stepEyebrow(view.firm ? "firm" : "owner", "proposal", null, journeyFlagsFromEnv(), "Proposal");
+  const eyebrow = stepEyebrow(view.firm ? "firm" : "owner", "proposal", null, "Proposal");
   return <ProposalScreen view={view} eyebrow={eyebrow} />;
 }

@@ -89,7 +89,7 @@ export function StyleGrid({
       <div className="fixed inset-x-0 bottom-0 z-10 h-[88px] border-t border-ink-100 bg-paper">
         <div className="ml-60 flex h-full items-center justify-between px-margin">
           <Link
-            href={`/project/${projectId}/ideation`}
+            href={`/project/${projectId}/design`}
             className="focus-ring flex h-12 items-center rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
           >
             Back to the questionnaire
@@ -101,7 +101,7 @@ export function StyleGrid({
           </p>
           {selected ? (
             <Link
-              href={`/project/${projectId}/moodboard`}
+              href={`/project/${projectId}/design?view=references`}
               className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-xl font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
             >
               Build your moodboard

@@ -25,7 +25,7 @@ import { boqDerivedInfo, isUnpricedLine } from "@/lib/documents/boq-derived";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { loadProposalSetup } from "@/lib/documents/proposal-setup";
 import { curateBoq } from "@/lib/identity/curation";
-import { FIRM_STEPS, journeyFlagsFromEnv, journeySteps, type JourneyFlags } from "@/lib/journey";
+import { FIRM_STEPS, OWNER_STEPS, journeyFlagsFromEnv, ownerStepHref, type JourneyFlags } from "@/lib/journey";
 import type { RailContext } from "@/lib/journey-state";
 import { loadProvenanceContext } from "@/lib/provenance/load";
 import type { ProvLine } from "@/lib/provenance/boq";
@@ -99,9 +99,7 @@ export function nextFromRail(projectId: string, rail: Pick<RailContext, "persona
   const steps =
     rail.persona === "firm"
       ? FIRM_STEPS.filter((s) => s.key !== "hub").map((s) => ({ key: s.key as string, number: s.number, label: s.label, href: s.href(projectId) }))
-      : journeySteps(flags)
-          .filter((s) => s.key !== "intake" && s.key !== "marketplace")
-          .map((s) => ({ key: s.key as string, number: String(s.number).padStart(2, "0"), label: s.label, href: s.href(projectId) }));
+      : OWNER_STEPS.filter((s) => s.key !== "overview").map((s) => ({ key: s.key as string, number: s.number, label: s.label, href: ownerStepHref(s.key, projectId, flags) }));
   const out: HubNext[] = [];
   for (const s of steps) {
     const st = statuses[s.key];
@@ -118,8 +116,10 @@ export function nextFromRail(projectId: string, rail: Pick<RailContext, "persona
       secondary = { label: "Open revision", href: `/project/${projectId}/boq/revisions` };
     } else if (s.key === "boq_review") title = "BoQ out of date";
     else if (s.key === "proposal") title = "Proposal locked";
-    else if (s.key === "scope" || s.key === "layout") title = "Plan can't be priced yet";
-    else if (s.key === "costing") title = "Costing is blocked";
+    else if (s.key === "scope" || s.key === "plan") title = "Plan can't be priced yet";
+    else if (s.key === "cost") title = st.state === "blocked" ? "Cost is blocked" : "Some items are not priced";
+    else if (s.key === "design") title = "Add references";
+    else if (s.key === "tender") title = "Tender is blocked";
     out.push({ step: eyebrow, title, sentence: reason, primary: st.fix ?? { label: `Open ${s.label}`, href: s.href }, secondary });
     if (out.length === 3) break;
   }

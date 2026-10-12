@@ -256,7 +256,7 @@ export default async function VendorsPage({
       <div className="mx-auto max-w-[1440px] pb-2xl">
         {/* Header */}
         <header className="mb-xl">
-          <JourneyProgress stepKey="marketplace" projectId={id} />
+          <JourneyProgress stepKey="tender" projectId={id} />
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Pick your vendors.
           </h1>

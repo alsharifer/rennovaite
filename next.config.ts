@@ -11,6 +11,17 @@ const nextConfig: NextConfig = {
   // (H9 removed experimental.proxyClientMaxBodySize: no request body carries a
   // file any more — uploads go straight to Storage on a signed URL — so there is
   // no upload body for the proxy to buffer or truncate.)
+
+  // K8 (spec §6.0): 02 Design is one route. The old step routes are gone for
+  // good, so these are permanent (308; query strings pass through). They run
+  // before proxy.ts, which then checks membership on /design itself.
+  async redirects() {
+    return [
+      { source: "/project/:id/ideation", destination: "/project/:id/design", permanent: true },
+      { source: "/project/:id/style", destination: "/project/:id/design", permanent: true },
+      { source: "/project/:id/moodboard", destination: "/project/:id/design?view=references", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

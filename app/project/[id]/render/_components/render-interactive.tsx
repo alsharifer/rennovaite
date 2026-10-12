@@ -860,7 +860,7 @@ function StylePicker({
   if (!style) {
     return (
       <Link
-        href={`/project/${projectId}/style`}
+        href={`/project/${projectId}/design`}
         className="focus-ring flex h-14 items-center justify-between rounded border border-dashed border-ink-100 px-md font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-low"
       >
         Pick a style direction
@@ -893,7 +893,7 @@ function StylePicker({
           {style.name_en}
         </p>
         <Link
-          href={`/project/${projectId}/style`}
+          href={`/project/${projectId}/design`}
           className="text-[12px] font-semibold text-brass-600 hover:underline"
         >
           Change

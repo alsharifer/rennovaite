@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { AppShell } from "@/components/app/AppShell";
 import { JourneyChrome } from "@/components/app/JourneyChrome";
-import { journeyFlagsFromEnv, nextStep } from "@/lib/journey";
+import { journeyFlagsFromEnv, nextOwnerStep, ownerStepHref } from "@/lib/journey";
 import { loadTimeline } from "@/lib/timeline/load";
 
 import { PhasePlan } from "./_components/phase-plan";
@@ -23,13 +23,13 @@ export default async function TimelinePage({
   const data = await loadTimeline(id);
 
   const flags = journeyFlagsFromEnv();
-  const next = nextStep("scope_timeline", flags);
+  const next = nextOwnerStep("timeline");
 
   return (
     <AppShell pageName="Scope & Timeline">
       <div className="mx-auto max-w-[1100px] pb-2xl">
         <JourneyChrome
-          stepKey="scope_timeline"
+          stepKey="timeline"
           projectId={id}
           title="How long will it take?"
           intro="A phase plan scaled from one real Dubai villa refit. Durations are ranges, because a single calibrated project earns an honest estimate — not a promise."
@@ -39,7 +39,7 @@ export default async function TimelinePage({
           <PhasePlan
             estimate={data.estimate}
             boqHref={`/project/${id}/boq`}
-            nextHref={next ? next.href(id) : null}
+            nextHref={next ? ownerStepHref(next.key, id, flags) : null}
             nextLabel={next ? `Continue to ${next.label.toLowerCase()}` : ""}
           />
         ) : (

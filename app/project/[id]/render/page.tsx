@@ -328,7 +328,7 @@ export default async function RenderPage({
         initialFurnitureOptIns={initialFurnitureOptIns}
         batchJobs={batchJobs}
         initialEvenings={initialEvenings}
-        journeySlot={<JourneyProgress stepKey="render" projectId={project.id} />}
+        journeySlot={<JourneyProgress stepKey="renders" projectId={project.id} />}
       />
     </AppShell>
   );

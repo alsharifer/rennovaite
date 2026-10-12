@@ -18,7 +18,7 @@
 // =============================================================================
 
 import type { UpstreamChanges } from "@/lib/boq/changes-since";
-import type { FirmStepKey, JourneyPersona, JourneyStepKey } from "@/lib/journey";
+import type { FirmStepKey, JourneyPersona, OwnerStepKey } from "@/lib/journey";
 
 export type StepState = "done" | "available" | "attention" | "blocked";
 
@@ -43,8 +43,11 @@ export interface JourneyFacts {
   boq: { rev: number; createdAt: string } | null;
   /** Accessory / specification selections recorded on the project. */
   specSelections: number;
-  /** Owner-journey evidence. */
-  owner: { brief: boolean; moodboardItems: number; renders: number };
+  /**
+   * Owner-journey evidence. `unpricedLines` = the latest BoQ's lines still to be
+   * priced (isUnpricedLine, lib/documents/boq-derived.ts — the D4 rule).
+   */
+  owner: { brief: boolean; moodboardItems: number; renders: number; unpricedLines: number };
   /** Firm-journey evidence — null for an owner project. */
   firm: {
     bookStatus: "draft" | "reviewed" | null;
@@ -132,18 +135,45 @@ export function firmStepStatuses(f: JourneyFacts): Record<FirmStepKey, StepStatu
   };
 }
 
-export function ownerStepStatuses(f: JourneyFacts): Partial<Record<JourneyStepKey, StepStatus>> {
+/** A design board needs this many pinned references before renders follow it (spec §6.0). */
+export const DESIGN_MIN_REFERENCES = 3;
+
+/**
+ * The owner journey (spec §6.0). Only existing facts: the plan refusal, the
+ * pinned references, the renders, and the latest BoQ's D4 unpriced lines.
+ *   02 Design  attention "Add references" while fewer than 3 are pinned
+ *   04 Cost    attention "N items not priced" while unpriced lines exist
+ *   06 Tender  blocked "Price N items first" while unpriced lines exist, or
+ *              blocked by the plan check (its own words and fix)
+ */
+export function ownerStepStatuses(f: JourneyFacts): Record<OwnerStepKey, StepStatus> {
+  const id = f.projectId;
   const plan = f.planBlock;
+  const planFails = plan && plan.code !== "no_plan" ? plan : null;
+  const n = f.owner.unpricedLines;
+  const items = `${n} item${n === 1 ? "" : "s"}`;
   return {
-    intake: { state: "done" },
-    layout: !plan ? { state: "done" } : plan.code === "no_plan" ? { state: "available" } : { state: "attention", reason: plan.reason, ...(plan.fix ? { fix: plan.fix } : {}) },
-    ideation: f.owner.brief ? { state: "done" } : { state: "available" },
-    moodboard: f.owner.moodboardItems > 0 ? { state: "done" } : { state: "available" },
-    render: f.owner.renders > 0 ? { state: "done" } : { state: "available" },
-    costing: plan && plan.code !== "no_plan" ? blockedByPlan(plan) : f.boq ? { state: "done" } : { state: "available" },
-    scope_timeline: { state: "available" },
-    downloads: { state: "available" },
-    marketplace: { state: "available" },
+    overview: { state: "available" },
+    plan: !plan ? { state: "done" } : plan.code === "no_plan" ? { state: "available" } : { state: "attention", reason: plan.reason, ...(plan.fix ? { fix: plan.fix } : {}) },
+    design:
+      f.owner.moodboardItems < DESIGN_MIN_REFERENCES
+        ? { state: "attention", reason: "Add references", fix: { label: "Pin references", href: `/project/${id}/design?view=references` } }
+        : { state: "done" },
+    renders: f.owner.renders > 0 ? { state: "done" } : { state: "available" },
+    cost: planFails
+      ? blockedByPlan(planFails)
+      : n > 0
+        ? { state: "attention", reason: `${items} not priced`, fix: { label: "See what is not priced", href: `/project/${id}/boq` } }
+        : f.boq
+          ? { state: "done" }
+          : { state: "available" },
+    timeline: { state: "available" },
+    tender:
+      n > 0
+        ? { state: "blocked", reason: `Price ${items} first`, fix: { label: "Open cost", href: `/project/${id}/boq` } }
+        : planFails
+          ? blockedByPlan(planFails)
+          : { state: "available" },
   };
 }
 

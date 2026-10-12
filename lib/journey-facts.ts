@@ -22,6 +22,7 @@ import type { Caller } from "@/lib/auth/caller";
 import { approvalStatus, listApprovals } from "@/lib/boq/approvals";
 import { regenerateReadiness } from "@/lib/boq/regenerate";
 import { changesSinceRevision, summarizeChanges } from "@/lib/boq/changes-since";
+import { isUnpricedLine } from "@/lib/documents/boq-derived";
 import { latestPackJobs } from "@/lib/documents/pack-export/job";
 import { loadProposalGate } from "@/lib/documents/proposal-gate";
 import { listFirms } from "@/lib/firms/store";
@@ -43,6 +44,14 @@ async function count(db: SupabaseClient, table: string, projectId: string): Prom
   return safe(0, async () => {
     const { count: n, error } = await db.from(table).select("project_id", { count: "exact", head: true }).eq("project_id", projectId);
     return error ? 0 : (n ?? 0);
+  });
+}
+
+/** The D4 lines still to be priced on a stored BoQ (isUnpricedLine — the headline's own rule). */
+async function unpricedLineCount(db: SupabaseClient, boqId: string): Promise<number> {
+  return safe(0, async () => {
+    const { data } = await db.from("boqs").select("sections").eq("id", boqId).maybeSingle<{ sections: { lines?: Parameters<typeof isUnpricedLine>[0][] }[] | null }>();
+    return (data?.sections ?? []).reduce((n, s) => n + (s.lines ?? []).filter(isUnpricedLine).length, 0);
   });
 }
 
@@ -105,7 +114,7 @@ export async function loadRailContext(db: SupabaseClient, projectId: string, cal
     planBlock: block,
     boq,
     specSelections,
-    owner: { brief: false, moodboardItems: 0, renders: 0 },
+    owner: { brief: false, moodboardItems: 0, renders: 0, unpricedLines: 0 },
     firm: null,
   };
 
@@ -131,8 +140,13 @@ export async function loadRailContext(db: SupabaseClient, projectId: string, cal
       },
     };
   } else {
-    const [brief, moodboardItems, renders] = await Promise.all([count(db, "project_briefs", projectId), count(db, "moodboard_items", projectId), count(db, "renders", projectId)]);
-    facts.owner = { brief: brief > 0, moodboardItems, renders };
+    const [brief, moodboardItems, renders, unpricedLines] = await Promise.all([
+      count(db, "project_briefs", projectId),
+      count(db, "moodboard_items", projectId),
+      count(db, "renders", projectId),
+      latest ? unpricedLineCount(db, latest.id) : Promise.resolve(0),
+    ]);
+    facts.owner = { brief: brief > 0, moodboardItems, renders, unpricedLines };
   }
 
   const statuses = (persona === "firm" ? firmStepStatuses(facts) : ownerStepStatuses(facts)) as Record<string, StepStatus>;

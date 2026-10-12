@@ -7,7 +7,7 @@ import { Icon } from "@/components/blueprint/Icon";
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
 import { AtelierCanvas } from "@/components/blueprint/shell/ShellFrame";
-import { FIRM_STEPS, journeyFlagsFromEnv, journeySteps } from "@/lib/journey";
+import { FIRM_STEPS, OWNER_STEPS } from "@/lib/journey";
 import { stepEyebrow } from "@/lib/journey-eyebrow";
 import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
 import { planCheck, planCheckSentence } from "@/lib/plan/plan-check";
@@ -228,15 +228,11 @@ export default async function PlanPage({
   const check = planCheck(roomList.filter((r) => !removedIds.has(r.id)).map((r) => ({ id: r.id, name: r.name_en ?? "Room", polygon: r.polygon })));
   const rail = await loadProjectRail(projectId);
   const persona = rail?.persona ?? "owner";
-  const flags = journeyFlagsFromEnv();
-  const stepDefs =
-    persona === "firm"
-      ? FIRM_STEPS.map((s) => ({ key: s.key as string, name: `${s.number} ${s.label}` }))
-      : journeySteps(flags).map((s) => ({ key: s.key as string, name: `${String(s.number).padStart(2, "0")} ${s.label}` }));
+  const stepDefs = (persona === "firm" ? FIRM_STEPS : OWNER_STEPS).map((s) => ({ key: s.key as string, name: `${s.number} ${s.label}` }));
   const blocked = check.pairs.length
     ? stepDefs.filter((s) => rail?.statuses[s.key]?.state === "blocked" && /overlap/i.test(rail?.statuses[s.key]?.reason ?? "")).map((s) => ({ step: s.name, reason: rail!.statuses[s.key]!.reason! }))
     : [];
-  const eyebrow = stepEyebrow(persona, "scope", "layout", flags, "Plan");
+  const eyebrow = stepEyebrow(persona, "scope", "plan", "Plan");
   const totalArea = plan.total_area_m2 ?? null;
   const unit = authored ? "zones" : "rooms";
   const meta = [
@@ -248,7 +244,7 @@ export default async function PlanPage({
   const next =
     persona === "firm"
       ? { label: "Continue to 03 Specification", href: `/project/${projectId}/accessories` }
-      : { label: "Continue to style", href: `/project/${projectId}/style` };
+      : { label: "Continue to design", href: `/project/${projectId}/design` };
 
   return (
     <div className="mx-auto max-w-[1600px] px-6 py-8 pb-16 lg:px-10" data-plan-page>
