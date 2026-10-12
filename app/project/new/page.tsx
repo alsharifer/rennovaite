@@ -19,7 +19,7 @@ export default function NewProjectPage() {
   // K8: the intake is part of 01 Plan (spec §6.0).
   const step = ownerStep("plan");
   return (
-    <AccountShell content="blueprint" skin="warm">
+    <AccountShell skin="warm">
       <div className="mx-auto max-w-[1100px] px-6 py-10 lg:px-12" data-skin-page="intake">
         <p className="t-label-caps text-bp-brass-text">{`${step.number} · ${step.label.toUpperCase()}`}</p>
         <h1 className="t-display-serif mt-3 text-bp-ink-primary">How would you like to start?</h1>

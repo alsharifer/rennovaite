@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/blueprint/Button";
 import { SubTabs } from "@/components/blueprint/SubTabs";
-import { AtelierCanvas } from "@/components/blueprint/shell/ShellFrame";
+import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
 import { TopBarActions } from "@/components/blueprint/shell/TopBar";
 import { loadProjectAssetsOfKind } from "@/lib/assets/load";
 import { journeyFlagsFromEnv, nextOwnerStep, ownerStep, ownerStepHref } from "@/lib/journey";

@@ -7,9 +7,8 @@
 // for the pathname: which step is active (lib/journey activeStepKey) and
 // whether this page takes the compact-wide rail (the BoQ page, spec §1.5).
 //
-// `content="atelier"` is the transition: a page whose body is still Atelier
-// (redesigned in K3–K5) sits on its own canvas, Inter and light, inside the
-// Blueprint chrome — the chrome follows the theme, the body does not yet.
+// K8: every page body is Blueprint, or wears the Atelier canvas itself while it
+// waits for its rebuild (the route scan lists those pages).
 // =============================================================================
 
 import { usePathname } from "next/navigation";
@@ -44,16 +43,7 @@ export function railSteps(ctx: RailContext, flags: JourneyFlags, pathname = ""):
   return OWNER_STEPS.map((s) => ({ key: s.key, number: s.number, label: s.label, href: ownerStepHref(s.key, id, flags), status: status(s.key) }));
 }
 
-/** An Atelier page body inside the Blueprint chrome (its own light canvas, Inter). */
-export function AtelierCanvas({ children }: { children: ReactNode }) {
-  return (
-    <div data-atelier className="min-h-[calc(100vh-var(--bp-topbar-h))] bg-canvas p-4 font-sans text-on-background md:p-12">
-      {children}
-    </div>
-  );
-}
-
-export function ShellFrame({ ctx, flags, content = "atelier", skin, children }: { ctx: RailContext; flags: JourneyFlags; content?: "atelier" | "blueprint"; skin?: "warm"; children: ReactNode }) {
+export function ShellFrame({ ctx, flags, skin, children }: { ctx: RailContext; flags: JourneyFlags; skin?: "warm"; children: ReactNode }) {
   const pathname = usePathname();
   const steps = railSteps(ctx, flags, pathname);
   const activeKey = activeStepKey(ctx.persona, pathname, ctx.project?.id ?? null);
@@ -66,7 +56,7 @@ export function ShellFrame({ ctx, flags, content = "atelier", skin, children }: 
       <JourneyRail ctx={ctx} steps={steps} activeKey={activeKey} />
       <TopBar ctx={ctx} steps={steps} activeKey={activeKey} pageTitle={pageTitle} />
       <main id="main" className="bp-main">
-        {content === "atelier" ? <AtelierCanvas>{children}</AtelierCanvas> : children}
+        {children}
       </main>
       <Suspense fallback={null}>
         <HelpDrawer projectId={ctx.project?.id ?? null} area={activeKey ?? pageTitle ?? "app"} />

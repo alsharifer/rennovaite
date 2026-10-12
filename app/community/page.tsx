@@ -1,11 +1,10 @@
-import { AppShell } from "@/components/app/AppShell";
+import { redirect } from "next/navigation";
 
-export default function CommunityPage() {
-  return (
-    <AppShell pageName="Community">
-      <h1 className="font-display text-headline-lg text-ink-900">
-        Community — coming soon
-      </h1>
-    </AppShell>
-  );
+import { SIGNED_IN_HOME } from "@/lib/auth/link-error";
+
+// K8: cut from navigation since K2 (spec §3.10) and given no frame in J6 — every
+// authenticated page renders the Blueprint shell, and a "coming soon" page has
+// nothing to put in it. Temporary, so the route can come back.
+export default function Page() {
+  redirect(SIGNED_IN_HOME);
 }

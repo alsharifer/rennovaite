@@ -2,13 +2,16 @@ import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
-import { AppShell } from "@/components/app/AppShell";
-import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   ALL_RELEVANT_CATEGORIES,
   categoriesForLine,
 } from "@/lib/vendor-options-helpers";
+
+import { PageHeader } from "@/components/blueprint/PageHeader";
+import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
+import { StepTabs } from "@/components/blueprint/shell/StepTabs";
+import { ownerEyebrow } from "@/lib/journey-eyebrow";
 
 import {
   VendorPicker,
@@ -138,13 +141,16 @@ export default async function VendorsPage({
   const latestBoq = boqRes.data?.[0];
   if (!latestBoq || !isBoqPayload(latestBoq.sections)) {
     return (
-      <AppShell pageName={PAGE_NAME}>
+      <>
+      <PageHeader className="mx-auto max-w-[1280px] px-6 pt-10 lg:px-12" eyebrow={ownerEyebrow("tender")} title="Contractors & suppliers" intro="For each major item we found up to three suppliers in Dubai. Swap, compare and choose — your cost updates as you go." tabs={<StepTabs step="tender" projectId={id} active="suppliers" persona="owner" />} />
+      <AtelierCanvas>
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
           <p className="text-on-surface-variant">
             No BoQ yet. Generate the bill of quantities first.
           </p>
         </main>
-      </AppShell>
+      </AtelierCanvas>
+    </>
     );
   }
 
@@ -252,19 +258,10 @@ export default async function VendorsPage({
     .slice(0, TOP_LANES);
 
   return (
-    <AppShell pageName={PAGE_NAME}>
+    <>
+      <PageHeader className="mx-auto max-w-[1280px] px-6 pt-10 lg:px-12" eyebrow={ownerEyebrow("tender")} title="Contractors & suppliers" intro="For each major item we found up to three suppliers in Dubai. Swap, compare and choose — your cost updates as you go." tabs={<StepTabs step="tender" projectId={id} active="suppliers" persona="owner" />} />
+      <AtelierCanvas>
       <div className="mx-auto max-w-[1440px] pb-2xl">
-        {/* Header */}
-        <header className="mb-xl">
-          <JourneyProgress stepKey="tender" projectId={id} />
-          <h1 className="mb-md font-display text-headline-lg text-ink-900">
-            Pick your vendors.
-          </h1>
-          <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
-            For each major line item we sourced three options across Dubai.
-            Swap, compare, and lock — your BoQ updates as you go.
-          </p>
-        </header>
 
         {topLanes.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-ink-100 bg-paper px-margin py-3xl text-center">
@@ -281,6 +278,7 @@ export default async function VendorsPage({
           />
         )}
       </div>
-    </AppShell>
+    </AtelierCanvas>
+    </>
   );
 }

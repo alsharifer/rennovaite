@@ -6,7 +6,7 @@ import { Button } from "@/components/blueprint/Button";
 import { Icon } from "@/components/blueprint/Icon";
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
-import { AtelierCanvas } from "@/components/blueprint/shell/ShellFrame";
+import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
 import { FIRM_STEPS, OWNER_STEPS } from "@/lib/journey";
 import { stepEyebrow } from "@/lib/journey-eyebrow";
 import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
@@ -344,7 +344,7 @@ export default async function PlanPage({
 
       {parsedComplete ? (
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-bp-line-hairline pt-5">
-          <Button kind="secondary" href={authored ? "/my-projects" : "/project/new"}>
+          <Button kind="secondary" href={authored ? "/projects" : "/project/new"}>
             {authored ? "Back to projects" : "Back to upload"}
           </Button>
           <Button kind="primary" href={next.href}>

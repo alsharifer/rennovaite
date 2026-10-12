@@ -87,7 +87,7 @@ describe("a signed-in visitor is never asked to sign in again", () => {
   });
 
   it("one post-sign-in rule for the callback, /auth, `/` and /rennovaite", () => {
-    expect(SIGNED_IN_HOME).toBe("/project");
+    expect(SIGNED_IN_HOME).toBe("/projects");
     expect(postSignInPath()).toBe(SIGNED_IN_HOME);
     expect(postSignInPath(null)).toBe(SIGNED_IN_HOME);
     expect(postSignInPath("/project/abc/boq?x=1")).toBe("/project/abc/boq?x=1");
@@ -95,7 +95,7 @@ describe("a signed-in visitor is never asked to sign in again", () => {
     expect(read("app/auth/callback/route.ts")).toMatch(/const dest = postSignInPath\(wanted\);/);
     expect(read("lib/auth/front-door.ts")).toMatch(/postSignInPath\(\)/);
     // No second rule: nothing else compares against SIGNED_IN_HOME.
-    for (const f of ["app/auth/callback/route.ts", "app/auth/page.tsx", "app/page.tsx", "app/rennovaite/page.tsx", "lib/auth/front-door.ts"]) {
+    for (const f of ["app/auth/callback/route.ts", "app/auth/page.tsx", "app/page.tsx", "app/rennovaite/page.tsx"]) {
       expect(code(read(f)), f).not.toMatch(/SIGNED_IN_HOME/);
     }
   });

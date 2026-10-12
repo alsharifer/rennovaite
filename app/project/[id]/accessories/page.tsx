@@ -1,10 +1,12 @@
-import { AppShell } from "@/components/app/AppShell";
-import { JourneyChrome } from "@/components/app/JourneyChrome";
 import { NO_CATALOGUE_REASON } from "@/lib/accessories/seed-data";
 import { EMPTY_PICKER_DATA, loadPickerData } from "@/lib/accessories/picker-data";
 import { journeyFlagsFromEnv, nextOwnerStep, ownerStepHref } from "@/lib/journey";
 
 import { AccessoryPicker } from "./_components/accessory-picker";
+import { PageHeader } from "@/components/blueprint/PageHeader";
+import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
+import { StepTabs } from "@/components/blueprint/shell/StepTabs";
+import { ownerEyebrow } from "@/lib/journey-eyebrow";
 
 export const dynamic = "force-dynamic";
 
@@ -30,14 +32,10 @@ export default async function AccessoriesPage({
   const next = nextOwnerStep("cost");
 
   return (
-    <AppShell pageName="Accessories & Specs">
+    <>
+      <PageHeader className="mx-auto max-w-[1280px] px-6 pt-10 lg:px-12" eyebrow={ownerEyebrow("cost")} title="Specification" intro="Every line is priced by rule until you pick the actual product. Quantities stay the plan's — only the rate moves." tabs={<StepTabs step="cost" projectId={id} active="specification" persona="owner" />} />
+      <AtelierCanvas>
       <div className="mx-auto max-w-[1200px] pb-2xl">
-        <JourneyChrome
-          stepKey="cost"
-          projectId={id}
-          title="Choose the specification."
-          intro="Every line below is priced by rule today. Pick the actual product where it matters — quantities stay the take-off's, so only the rate moves."
-        />
         <AccessoryPicker
           projectId={id}
           catalog={data.catalog ?? []}
@@ -52,6 +50,7 @@ export default async function AccessoriesPage({
           degraded={data.degraded ?? true}
         />
       </div>
-    </AppShell>
+    </AtelierCanvas>
+    </>
   );
 }

@@ -2,7 +2,6 @@ import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { AppShell } from "@/components/app/AppShell";
 import { Villa3DLoader } from "@/components/viewer/Villa3DLoader";
 import type { InspectData, RoomRenders } from "@/components/viewer/Villa3D";
 import { derivePlanGraph } from "@/lib/plan/derive";
@@ -10,6 +9,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildScene } from "@/lib/viewer/scene";
 import { styleFinishes, styleFloorColor } from "@/lib/viewer/finishes";
 import { buildFinishPlan } from "@/lib/viewer/materials";
+import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
 import type { InspectBoq, RoomMeta, WallMeta } from "@/lib/viewer/inspect";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,8 @@ export default async function ViewerPage({
   // Empty/failure state — never a blank canvas or a crash.
   if (graph.walls.length === 0) {
     return (
-      <AppShell pageName={PAGE_NAME}>
+      <>
+      <AtelierCanvas flush>
         <main className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center gap-lg px-6 text-center">
           <p className="max-w-[560px] font-display text-headline-md italic text-ink-700">
             We need a confirmed plan before we can build your villa in 3D.
@@ -52,7 +53,8 @@ export default async function ViewerPage({
             Back to the plan
           </Link>
         </main>
-      </AppShell>
+      </AtelierCanvas>
+    </>
     );
   }
 
@@ -162,10 +164,12 @@ export default async function ViewerPage({
   const inspect: InspectData = { projectId, boq, rooms: inspectRooms, walls: inspectWalls };
 
   return (
-    <AppShell pageName={PAGE_NAME} noPadding>
+    <>
+      <AtelierCanvas flush>
       <div className="p-6">
         <Villa3DLoader scene={scene} renders={renders} inspect={inspect} finishes={finishes} />
       </div>
-    </AppShell>
+    </AtelierCanvas>
+    </>
   );
 }

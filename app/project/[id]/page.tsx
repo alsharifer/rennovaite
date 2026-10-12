@@ -26,7 +26,7 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
   if (!rail) notFound();
   const [view, assets] = await Promise.all([loadHubView(sb, projectId, rail), loadProjectAssets(projectId).then((a) => a.map(toAssetLite))]);
   return (
-    <ProjectShell projectId={projectId} content="blueprint">
+    <ProjectShell projectId={projectId}>
       <HubScreen view={view} />
       <HubFiles assets={assets} />
     </ProjectShell>

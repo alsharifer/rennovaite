@@ -1,9 +1,8 @@
-import { redirect } from "next/navigation";
+import { redirectToProjectsHome } from "@/lib/auth/front-door";
 
-// The canonical project-intake screen is the Atelier-rebuilt /project/new.
-// /project (and the sidebar "AI Designer" link) forwards there so there's a
-// single, on-brand entry point. The old Dark-Silk upload component
-// (_components/floorplan-upload.tsx) is now unused.
-export default function ProjectIndexRedirect() {
-  redirect("/project/new");
+// K8 (spec §6.1): the Projects home (/projects) replaces this route.
+export const dynamic = "force-dynamic";
+
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  return redirectToProjectsHome(searchParams);
 }

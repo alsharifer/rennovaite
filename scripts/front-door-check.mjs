@@ -11,7 +11,7 @@
 //   link nowhere that redirects; the callback and a fallen-back magic link
 //   still land on /auth; health answers.
 // Signed in (dev only — mints the dev pipeline account's session, by Bearer
-// AND by the browser's cookie): / , /rennovaite and /auth → 307 /project.
+// AND by the browser's cookie): / , /rennovaite and /auth → 307 /projects.
 // =============================================================================
 
 const args = process.argv.slice(2);
@@ -76,13 +76,13 @@ if (!anonymousOnly) {
   for (const [how, headers] of [["bearer", me.headers], ["cookie", { cookie }]]) {
     for (const p of ["/", "/rennovaite", "/auth"]) {
       const r = await get(p, { headers });
-      check(`${p} (${how}) → 307 /project`, r.status === 307 && r.location === "/project", `${r.status} ${r.location}`);
+      check(`${p} (${how}) → 307 /projects`, r.status === 307 && r.location === "/projects", `${r.status} ${r.location}`);
     }
   }
   const nextKept = await get(`/auth?next=${encodeURIComponent("/firms")}`, { headers: me.headers });
   check("/auth?next=/firms (signed in) → /firms (the same rule)", nextKept.status === 307 && nextKept.location === "/firms", `${nextKept.status} ${nextKept.location}`);
   const evil = await get(`/auth?next=${encodeURIComponent("//evil.example")}`, { headers: me.headers });
-  check("/auth?next=//evil.example (signed in) → /project", evil.status === 307 && evil.location === "/project", `${evil.status} ${evil.location}`);
+  check("/auth?next=//evil.example (signed in) → /projects", evil.status === 307 && evil.location === "/projects", `${evil.status} ${evil.location}`);
 }
 
 console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nFRONT DOOR PASSED");

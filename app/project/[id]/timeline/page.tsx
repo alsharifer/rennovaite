@@ -1,11 +1,12 @@
 import Link from "next/link";
 
-import { AppShell } from "@/components/app/AppShell";
-import { JourneyChrome } from "@/components/app/JourneyChrome";
 import { journeyFlagsFromEnv, nextOwnerStep, ownerStepHref } from "@/lib/journey";
 import { loadTimeline } from "@/lib/timeline/load";
 
 import { PhasePlan } from "./_components/phase-plan";
+import { PageHeader } from "@/components/blueprint/PageHeader";
+import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
+import { ownerEyebrow } from "@/lib/journey-eyebrow";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +27,10 @@ export default async function TimelinePage({
   const next = nextOwnerStep("timeline");
 
   return (
-    <AppShell pageName="Scope & Timeline">
+    <>
+      <PageHeader className="mx-auto max-w-[1280px] px-6 pt-10 lg:px-12" eyebrow={ownerEyebrow("timeline")} title="How long will it take?" intro="A phase plan scaled from one real Dubai villa refit. Durations are ranges, because a single calibrated project earns an honest estimate — not a promise." />
+      <AtelierCanvas>
       <div className="mx-auto max-w-[1100px] pb-2xl">
-        <JourneyChrome
-          stepKey="timeline"
-          projectId={id}
-          title="How long will it take?"
-          intro="A phase plan scaled from one real Dubai villa refit. Durations are ranges, because a single calibrated project earns an honest estimate — not a promise."
-        />
 
         {data.estimate ? (
           <PhasePlan
@@ -65,6 +62,7 @@ export default async function TimelinePage({
           </section>
         )}
       </div>
-    </AppShell>
+    </AtelierCanvas>
+    </>
   );
 }

@@ -81,7 +81,7 @@ export function RouteError({ error, reset }: RouteErrorProps) {
           Try again
         </button>
         <Link
-          href="/my-projects"
+          href="/projects"
           className="focus-ring flex h-11 items-center rounded-lg border border-ink-100 bg-paper px-lg font-body text-body-sm text-ink-900 transition-colors hover:bg-canvas"
         >
           Back to your projects
@@ -99,7 +99,7 @@ export function RouteError({ error, reset }: RouteErrorProps) {
 export function RouteNotFound({
   title = "We couldn't find that page.",
   body = "The link may be out of date, or the project may have been removed.",
-  backHref = "/my-projects",
+  backHref = "/projects",
   backLabel = "Back to your projects",
 }: {
   title?: string;

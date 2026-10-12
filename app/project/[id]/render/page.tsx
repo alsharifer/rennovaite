@@ -1,8 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
-import { AppShell } from "@/components/app/AppShell";
-import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { loadProjectPhotoAssets } from "@/lib/assets/load";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
@@ -15,6 +13,7 @@ import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { RenderInteractive } from "./_components/render-interactive";
+import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
 
 export const dynamic = "force-dynamic";
 
@@ -140,13 +139,15 @@ export default async function RenderPage({
   if (!project) notFound();
   if (!plan) {
     return (
-      <AppShell pageName="AI Designer">
+      <>
+      <AtelierCanvas flush>
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
           <p className="text-on-surface-variant">
             No plan attached to this project yet.
           </p>
         </main>
-      </AppShell>
+      </AtelierCanvas>
+    </>
     );
   }
 
@@ -255,13 +256,15 @@ export default async function RenderPage({
 
   if (roomList.length === 0) {
     return (
-      <AppShell pageName="AI Designer">
+      <>
+      <AtelierCanvas flush>
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
           <p className="text-on-surface-variant">
             No rooms found on this plan. Go back and confirm the plan first.
           </p>
         </main>
-      </AppShell>
+      </AtelierCanvas>
+    </>
     );
   }
 
@@ -314,7 +317,8 @@ export default async function RenderPage({
   }
 
   return (
-    <AppShell pageName="AI Designer" noPadding>
+    <>
+      <AtelierCanvas flush>
       <RenderInteractive
         projectId={project.id}
         rooms={roomList}
@@ -328,8 +332,8 @@ export default async function RenderPage({
         initialFurnitureOptIns={initialFurnitureOptIns}
         batchJobs={batchJobs}
         initialEvenings={initialEvenings}
-        journeySlot={<JourneyProgress stepKey="renders" projectId={project.id} />}
       />
-    </AppShell>
+    </AtelierCanvas>
+    </>
   );
 }

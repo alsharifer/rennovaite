@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { redirect } from "next/navigation";
 
+import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
 import { AccountShell } from "@/components/blueprint/shell/ProjectShell";
 import { getCaller } from "@/lib/auth/caller";
 import { listFirms, type Firm } from "@/lib/firms/store";
@@ -27,6 +28,7 @@ export default async function FirmsPage() {
   if (firms.length === 1) redirect(`/firms/${firms[0]!.id}`);
   return (
     <AccountShell>
+      <AtelierCanvas>
       <div className="mx-auto max-w-4xl">
         <header className="mb-lg">
           <p className="label-caps text-ink-500">Firms</p>
@@ -39,6 +41,7 @@ export default async function FirmsPage() {
         </header>
         {caller ? <FirmList initialFirms={firms} callerEmail={caller.email} /> : <SignInCard what="your firms" />}
       </div>
+      </AtelierCanvas>
     </AccountShell>
   );
 }

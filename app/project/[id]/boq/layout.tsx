@@ -7,7 +7,7 @@ import { ProjectShell } from "@/components/blueprint/shell/ProjectShell";
 export default async function Layout({ children, params }: { children: ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   return (
-    <ProjectShell projectId={id} content="blueprint">
+    <ProjectShell projectId={id}>
       {children}
     </ProjectShell>
   );

@@ -15,3 +15,8 @@ export function stepEyebrow(persona: "firm" | "owner", firmKey: string, ownerKey
   const s = ownerKey ? ownerStep(ownerKey) : null;
   return s ? `${s.number} · ${s.label.toUpperCase()}` : fallback.toUpperCase();
 }
+
+/** An owner page's eyebrow — "04 · COST". */
+export function ownerEyebrow(key: OwnerStepKey): string {
+  return stepEyebrow("owner", "", key, key);
+}

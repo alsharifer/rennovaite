@@ -244,7 +244,7 @@ describe("chrome wiring + route triage (spec §3.10)", () => {
   };
 
   it("every redesigned segment frames itself in a layout and has its own loading / error / not-found inside the shell", () => {
-    for (const seg of ["boq", "plan", "drawings", "rates", "proposal"]) {
+    for (const seg of ["boq", "plan", "drawings", "rates", "proposal", "design", "render", "accessories", "timeline", "vendors", "viewer"]) {
       const dir = `app/project/[id]/${seg}`;
       expect(read(`${dir}/layout.tsx`), seg).toContain("<ProjectShell");
       expect(read(`${dir}/loading.tsx`), seg).toContain("SegmentLoading");
@@ -253,24 +253,18 @@ describe("chrome wiring + route triage (spec §3.10)", () => {
     }
     expect(read("app/firms/[firmId]/layout.tsx")).toContain("<AccountShell");
     expect(read("app/settings/layout.tsx")).toContain("<AccountShell");
+    expect(read("app/projects/layout.tsx")).toContain("<AccountShell");
     // The hub sits at the [id] level and frames itself; its loading draws the chrome.
-    expect(read("app/project/[id]/page.tsx")).toContain(`<ProjectShell projectId={projectId} content="blueprint">`);
+    expect(read("app/project/[id]/page.tsx")).toContain(`<ProjectShell projectId={projectId}>`);
     // K6: the intake is Blueprint too (warm skin), framed without a project.
-    expect(read("app/project/new/page.tsx")).toContain(`<AccountShell content="blueprint" skin="warm">`);
+    expect(read("app/project/new/page.tsx")).toContain(`<AccountShell skin="warm">`);
     expect(read("app/project/[id]/loading.tsx")).toContain("ShellSkeleton");
   });
 
-  it("the firm surfaces no longer carry the old chrome (Atelier pages keep theirs)", () => {
-    for (const f of ["app/project/[id]/boq/page.tsx", "app/project/[id]/boq/revisions/page.tsx", "app/project/[id]/drawings/page.tsx", "app/project/[id]/plan/page.tsx", "app/project/[id]/page.tsx", "app/firms/[firmId]/page.tsx", "app/firms/page.tsx"]) {
-      expect(read(f), f).not.toMatch(/AppShell|JourneyProgress|JourneyChrome/);
-    }
-    for (const f of ["app/project/[id]/render/page.tsx", "app/project/[id]/accessories/page.tsx"]) expect(read(f), f).toContain("AppShell");
-  });
-
-  it("Marketplace and Community are cut from navigation; the routes remain", () => {
-    expect(read("components/app/Sidebar.tsx")).not.toMatch(/href: "\/(marketplace|community)"/);
+  it("Marketplace and Community are cut from navigation and (K8, no frame) redirect to the Projects home", () => {
+    expect(read("components/blueprint/shell/JourneyRail.tsx")).not.toMatch(/\/(marketplace|community)/);
     expect(read("components/marketing/TopNav.tsx")).not.toContain('"/marketplace"');
-    expect(exists("app/marketplace/page.tsx") && exists("app/community/page.tsx")).toBe(true);
+    for (const f of ["app/marketplace/page.tsx", "app/community/page.tsx"]) expect(read(f), f).toContain("redirect(SIGNED_IN_HOME)");
   });
 
   it("/support opens the help drawer; /firms goes straight to a single firm's book", () => {
