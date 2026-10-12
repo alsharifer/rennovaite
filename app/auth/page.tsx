@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { safeNextPath } from "@/lib/auth/access";
+import { getPageCaller } from "@/lib/auth/caller";
+import { SIGNED_IN_HOME, authErrorMessage } from "@/lib/auth/link-error";
 
 import { AuthForm } from "./_components/auth-form";
 
@@ -16,13 +19,16 @@ const DETAIL_IMG =
 
 // H1: the proxy sends a signed-out visit here as /auth?next=<path>; the form
 // carries it so the magic link returns the visitor to where they were going.
-export default async function AuthPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next } = await searchParams;
+// `error` is a failed sign-in link (lib/auth/link-error.ts) — said in words.
+export default async function AuthPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
+  const { next, error } = await searchParams;
+  // Already signed in: never ask again — go where the visit was headed.
+  if (await getPageCaller()) redirect(safeNextPath(next) ? next : SIGNED_IN_HOME);
   return (
     <main className="flex min-h-screen bg-background">
       {/* Left — form */}
       <section className="flex w-full flex-col items-center justify-center border-r border-ink-100 bg-canvas px-margin md:w-1/2">
-        <AuthForm next={safeNextPath(next) ? next : undefined} />
+        <AuthForm next={safeNextPath(next) ? next : undefined} linkError={authErrorMessage(error)} />
       </section>
 
       {/* Right — editorial imagery */}

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { AUTH_NEXT_COOKIE, safeNextPath } from "@/lib/auth/access";
+import { SIGNED_IN_HOME, supabaseLinkError } from "@/lib/auth/link-error";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -15,10 +16,11 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const wanted = request.cookies.get(AUTH_NEXT_COOKIE)?.value ?? searchParams.get("next");
   // Only same-site paths: `//host` would leave the site.
-  const dest = safeNextPath(wanted) ? wanted : "/project";
+  const dest = safeNextPath(wanted) ? wanted : SIGNED_IN_HOME;
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/auth?error=missing_code`);
+    // The proxy normally turns a failed link around first; this is the backstop.
+    return NextResponse.redirect(`${origin}/auth?error=${supabaseLinkError(searchParams) ?? "missing_code"}`);
   }
 
   try {

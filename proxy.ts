@@ -30,9 +30,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { routeKind, signInPath, unauthenticatedBody, type RouteKind } from "@/lib/auth/access";
+import { codeLandingRedirect, linkErrorRedirect } from "@/lib/auth/link-error";
 
 export async function proxy(request: NextRequest) {
   const kind = routeKind(request.nextUrl.pathname);
+  // A magic link that fell back to the Site URL (its target was not on the
+  // Supabase Redirect URLs list): a failed one goes to the sign-in page, which
+  // says so; a good one goes to the callback, which signs the visitor in.
+  const landing = linkErrorRedirect(request.nextUrl) ?? codeLandingRedirect(request.nextUrl);
+  if (landing) return NextResponse.redirect(new URL(landing, request.url), 307);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   // Misconfigured auth fails closed off the allowlist.
