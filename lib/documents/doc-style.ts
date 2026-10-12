@@ -97,3 +97,32 @@ export const PAGE_COUNT_TOKEN = "@@PAGES@@";
 /** A page of the given size in millimetres, on white. */
 export const docPage = (w: number, h: number, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="${DOC.PAPER}"/>${body}</svg>`;
+
+// --- provenance marks on paper (the internal BoQ PDF only; never a client document) ---
+
+/** Light-mode mark colours (tokens.css --color-prov-*-mark). Colour draws MARKS only. */
+export const MARK_FILL = {
+  measured: "#1F4E5F",
+  validated: "#3C7A57",
+  market: "#A8741F",
+  derived: "#C75D3A",
+  unpriced: "#62676B",
+} as const;
+export type PaperTier = keyof typeof MARK_FILL;
+
+/**
+ * The 12 px glyph of components/blueprint/ProvenanceMark (Figma 3:29) at `d`
+ * millimetres across: solid · ¾ · ½ (right half) · ring · dashed ring.
+ */
+export function markGlyph(cx: number, cy: number, tier: PaperTier, d = 2.6): string {
+  const s = d / 12; // the glyph's 12-unit box
+  const c = MARK_FILL[tier];
+  const tr = `transform="translate(${n1(cx - d / 2)} ${n1(cy - d / 2)}) scale(${Math.round(s * 1000) / 1000})"`;
+  if (tier === "measured") return `<g ${tr} data-mark="${tier}"><circle cx="6" cy="6" r="5" fill="${c}"/></g>`;
+  const R = 4.375;
+  const dash = (2 * Math.PI * R) / 16;
+  let g = `<g ${tr} data-mark="${tier}"><circle cx="6" cy="6" r="${R}" fill="none" stroke="${c}" stroke-width="1.25"${tier === "unpriced" ? ` stroke-dasharray="${dash.toFixed(3)} ${dash.toFixed(3)}" stroke-dashoffset="${(dash / 2).toFixed(3)}"` : ""}/>`;
+  if (tier === "validated") g += `<path d="M6 6 L6 1 A5 5 0 1 1 1 6 Z" fill="${c}"/>`;
+  if (tier === "market") g += `<path d="M6 1 A5 5 0 0 1 6 11 Z" fill="${c}"/>`;
+  return `${g}</g>`;
+}

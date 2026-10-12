@@ -7,6 +7,7 @@ import { z } from "zod";
 import { guardDocumentRoute, packJobActor } from "@/lib/documents/pack-export/guard";
 
 import { renderBoqPdf, type BoqPdfInput } from "@/lib/documents/boq-pdf";
+import { loadProvenanceContext } from "@/lib/provenance/load";
 import { loadPackReadiness, readinessMessage } from "@/lib/documents/pack-readiness";
 import { loadParity } from "@/lib/documents/parity-load";
 import { loadDocumentProject } from "@/lib/documents/project-name";
@@ -62,12 +63,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const fails = [...parity.lines.filter((l) => l.status === "fail").map((l) => `${l.rule_id}: ${l.reason}`), ...parity.elements.filter((e) => e.status === "fail").map((e) => `${e.name}: ${e.reason}`)];
       return NextResponse.json({ error: `Parity failed: ${fails.slice(0, 6).join("; ")}`, code: "parity_failed", parity }, { status: 409 });
     }
+    // K8 #16: the marks come from the same tierOf() the BoQ screen uses (QS validation from the
+    // rate book), and the revision is numbered as 07 Revisions numbers it (oldest = rev 1).
+    const [prov, revs] = await Promise.all([
+      loadProvenanceContext(sb, projectId),
+      sb.from("boqs").select("id").eq("project_id", projectId).order("created_at", { ascending: true }).then((r) => (r.data ?? []) as { id: string }[]),
+    ]);
     const { pdf, pages } = await renderBoqPdf({
       projectName: project.name,
       community: project.city,
       dateISO: new Date().toISOString().slice(0, 10),
       // I4: curated — a stored BoQ may predate the source scrub.
       boq: curateBoq(boq.data.sections, await loadWithheldNames(sb, projectId)),
+      revision: revs.findIndex((r) => r.id === boq.data!.id) + 1 || null,
+      qsValidated: prov.qsValidated,
     });
     if (json) return NextResponse.json({ readiness, pages: pages.length, bytes: pdf.byteLength, boq_id: boq.data.id });
     // T5: exactly the pages this PDF printed, for the pack's printed-content checks.

@@ -24,7 +24,7 @@ const fx = JSON.parse(fs.readFileSync("lib/boq/__fixtures__/arabella-g5d-revisio
 const boq = fx.boqs[fx.stages[7]!.boq_id]!;
 
 const png = (svg: string, file: string) => {
-  const r = new Resvg(svg, { fitTo: { mode: "width", value: 1240 }, font: { loadSystemFonts: true } });
+  const r = new Resvg(svg, { fitTo: { mode: "width", value: svg.includes('width="297mm"') ? 1754 : 1240 }, font: { loadSystemFonts: true } });
   fs.writeFileSync(path.join(out, file), r.render().asPng());
 };
 
@@ -47,6 +47,6 @@ const proposal = buildProposalPages({
 proposal.forEach((p, i) => png(p, `proposal-${i + 1}.png`));
 png(buildProposalPages({ brand: "Scratch Landscapes & Co.", logoDataUri: null, termsText: null, projectName: "Garden — Draft for Review", community: "Dubai", dateISO: "2026-10-12", rooms: [], boq, preview: true, showLineRates: false })[0]!, "proposal-preview-1.png");
 
-const boqPages = buildBoqPdfPages({ projectName: "Garden — Draft for Review", community: "Dubai", dateISO: "2026-10-12", boq });
+const boqPages = buildBoqPdfPages({ projectName: "Garden — Draft for Review", community: "Dubai", dateISO: "2026-10-12", boq, revision: 46 });
 boqPages.forEach((p, i) => png(p, `boq-${i + 1}.png`));
 console.log(`${proposal.length} proposal pages, ${boqPages.length} BoQ pages → ${out}`);
