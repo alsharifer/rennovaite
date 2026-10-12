@@ -249,7 +249,7 @@ export function ProposalScreen({ view, eyebrow }: { view: ProposalView; eyebrow:
             Generate proposal
           </Button>
           {!locked ? <span className="t-label-md text-bp-ink-tertiary">Generated with the export pack on 06 Documents — every check runs first.</span> : null}
-          <Button kind="quiet" onClick={() => setPreview(true)} testId="preview-as-client" disabled={gate.noBoq ? { reason: "Nothing to preview until the BoQ is generated", reasonId: `${genReason}-p` } : false}>
+          <Button kind="quiet" onClick={() => setPreview(true)} testId="preview-as-client" disabled={gate.noBoq ? { reason: "Nothing to preview until the BoQ is generated", reasonId: `${genReason}-p`, showReason: true } : false}>
             Preview as client
           </Button>
         </div>

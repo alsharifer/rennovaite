@@ -201,7 +201,7 @@ export function QuoteReview({ firmId, initialQuote, initialLines }: { firmId: st
         {[quote.supplier_role, quote.quote_date ? `dated ${quote.quote_date}` : null, quote.valid_until ? `valid to ${quote.valid_until}` : null, ...terms, quote.source_filename, quote.source_sha256 ? `sha256 ${quote.source_sha256.slice(0, 8)}…` : null].filter(Boolean).join(" · ")}
       </p>
 
-      <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-3 border-y border-bp-line-strong py-4" aria-label="Summary">
+      <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-3 border-y border-bp-line-strong py-4" aria-label="Summary" aria-live="polite">
         {[
           ["description", counts.read, "lines read"],
           ["check", counts.ready, "ready"],

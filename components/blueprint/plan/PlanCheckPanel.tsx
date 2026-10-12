@@ -76,7 +76,7 @@ export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, s
               Fix overlaps · {pairs.length}
             </Button>
             {canReparse ? (
-              <Button kind="quiet" tone="inverse" onClick={() => void reparse()} disabled={busy ? { reason: "Parsing…", reasonId: "reparse-why" } : false} testId="rerun-parse">
+              <Button kind="quiet" tone="inverse" onClick={() => void reparse()} disabled={busy ? { reason: "Parsing…", reasonId: "reparse-why", showReason: true } : false} testId="rerun-parse">
                 {busy ? "Parsing…" : "Re-run parse"}
               </Button>
             ) : null}

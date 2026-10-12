@@ -327,9 +327,9 @@ function ApprovalTrail({ view, canApprove, approveBlock, onDone }: { view: Revis
       <p className="t-body-sm mt-3 text-bp-ink-secondary">
         A firm approval is recorded by a member of the project&rsquo;s firm. A client&rsquo;s approval is captured by you — the date, how it was given and a reference; the client needs no account. Every entry stays: the trail is append-only.
       </p>
-      {!canApprove ? (
+      {blocked ? (
         <p id={reasonId} className="t-label-md mt-3 text-bp-ink-tertiary">
-          {approveBlock ?? "Only a member of this project's firm can record an approval."}
+          {blocked.reason}
         </p>
       ) : null}
 
@@ -369,7 +369,7 @@ function ApprovalTrail({ view, canApprove, approveBlock, onDone }: { view: Revis
             <input id={`${formId}-r`} value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. email of 19 Sep, PO 2231" className={INPUT} autoComplete="off" />
           </Field>
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            <Button kind="primary" type="submit" disabled={!clientValid ? { reason: "Enter the client's name and the date they gave", reasonId: `${formId}-why`, showReason: false } : busy ? { reason: "Recording…", reasonId: `${formId}-why` } : false} testId="record-client-submit">
+            <Button kind="primary" type="submit" disabled={!clientValid ? { reason: "Enter the client's name and the date they gave", reasonId: `${formId}-why`, showReason: false } : busy ? { reason: "Recording…", reasonId: `${formId}-why`, showReason: true } : false} testId="record-client-submit">
               Record client approval
             </Button>
             <Button kind="quiet" onClick={() => setMode(null)}>

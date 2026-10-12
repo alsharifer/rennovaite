@@ -133,7 +133,7 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, initialPro
   const blocking = core.filter((c) => !c.ok).length + (proposal ? proposalItems.filter((c) => !c.ok).length : 0);
   const running = job?.status === "running" || job?.status === "queued";
   const progress = job && "step" in job.progress ? job.progress : null;
-  const runDisabled = running ? { reason: "An export is running", reasonId: runReasonId } : blocking > 0 ? { reason: `Resolve ${blocking} blocking check${blocking === 1 ? "" : "s"} first`, reasonId: runReasonId, showReason: true } : false;
+  const runDisabled = running ? { reason: "An export is running", reasonId: runReasonId, showReason: true } : blocking > 0 ? { reason: `Resolve ${blocking} blocking check${blocking === 1 ? "" : "s"} first`, reasonId: runReasonId, showReason: true } : false;
 
   return (
     <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_400px]" data-pack-export ref={(el) => el?.setAttribute("data-hydrated", "")}>
