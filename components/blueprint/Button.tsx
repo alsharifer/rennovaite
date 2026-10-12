@@ -56,9 +56,11 @@ export interface ButtonProps {
   disabled?: { reason: string; reasonId: string; showReason?: boolean } | false;
   className?: string;
   "aria-label"?: string;
+  /** data-testid for page checks. */
+  testId?: string;
 }
 
-export function Button({ kind = "secondary", tone = "default", children, href, onClick, type = "button", disabled = false, className, ...rest }: ButtonProps) {
+export function Button({ kind = "secondary", tone = "default", children, href, onClick, type = "button", disabled = false, className, testId, ...rest }: ButtonProps) {
   const off = !!disabled;
   const set = tone === "inverse" ? INVERSE : KIND;
   const cls = `${BASE} ${off ? set[kind].off : set[kind].on}${className ? ` ${className}` : ""}`;
@@ -71,11 +73,11 @@ export function Button({ kind = "secondary", tone = "default", children, href, o
 
   const el =
     href && !off ? (
-      <Link href={href} className={cls} aria-label={rest["aria-label"]}>
+      <Link href={href} className={cls} aria-label={rest["aria-label"]} data-testid={testId}>
         {children}
       </Link>
     ) : (
-      <button type={type} className={cls} onClick={off ? undefined : onClick} aria-label={rest["aria-label"]} {...a11y}>
+      <button type={type} className={cls} onClick={off ? undefined : onClick} aria-label={rest["aria-label"]} data-testid={testId} {...a11y}>
         {children}
       </button>
     );

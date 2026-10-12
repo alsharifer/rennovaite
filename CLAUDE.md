@@ -197,6 +197,59 @@ except `design-refs/r7-handoff/`.
   navigation (routes remain); `/firms` goes straight to the book when the
   caller has one firm; `/settings` is Account · Appearance · Firm.
 
+### BoQ & Review (K3)
+
+`/project/[id]/boq` is Blueprint end to end (spec §3.2; frames 13:48 / 14:675
+/ 14:890 / 17:1602 / 26:924, inspector 16:1580 / 16:1654).
+
+- **One view model, built on the server** — `lib/boq/review-model.ts`
+  (`buildReviewModel`, pure; types in `lib/boq/review-types.ts`): the STORED
+  revision, identity-curated, in canonical section order (H7), with REF codes,
+  every mark from `tierOf()`, weakest-link roll-ups (R1), the basis of the
+  subtotal by tier, the summary chain WITH its bases, the excluded lines named
+  with reasons (the description's "(… — QS to price)" aside becomes the
+  reason, `splitAside`), and the I4 provenance chains. The page never
+  re-prices; `lib/boq/__tests__/review-model.test.ts` pins the J3 figures.
+- **The screen** `components/blueprint/boq/`: `BoqReview` (client root) ·
+  `PinnedTotal` (sticky; "≈ AED N*" + weakest mark; named exclusions;
+  basis of subtotal; `data-display-total`) · `Notices` (DRAFT FOR REVIEW,
+  PRICED FROM MARKET REFERENCE with the L4 accept control, priced-twice,
+  existing-on-site, permits) · `SectionIndex` / `SectionChips` · `BoqGrid`
+  (ARIA grid, roving tabindex, §4.3) · `ProvenancePopover` (hover 250 ms AND
+  keyboard focus, Escape; curated chains only) · `Inspector` (Line · What-if
+  · Corrections; `InspectorSheet` on < 1024 px) · `SummaryChain` · `Extras`
+  (programme, cost by room, optional furniture — all outside the total) ·
+  `Regenerate` (H4 path) · `GenerateFirst` (empty state). Layout CSS is
+  the `.bp-boq-*` block in `app/globals.css` (unlayered, CSS-px breakpoints).
+- **No sources in rows**: `vendor_or_source` reaches the screen only through
+  the curated provenance (popover, inspector).
+- **What-if is a scenario, never the BoQ**: the pinned total is always the
+  stored revision. The tab wraps the P5 grade engine (real scenario chain)
+  when the BoQ has take-off provenance and `WHATIF_ENABLED`; otherwise the
+  four sensitivity modifiers, whose engine is an illustrative ±% of the
+  PROJECT TOTAL — so (K0.4) the copy says that and there are no chain rows.
+  Optional furniture joins a scenario, never the headline.
+- **Corrections** are recorded, never applied. "Promote to our rate book after
+  review" attributes a RATE correction to the project's firm (`firm_id`) —
+  the candidate list a member promotes from. `/api/boq-corrections` is no
+  longer behind `GARDEN_PILOT_ENABLED`.
+- **"Add to my book"** links to `/project/[id]/rates?add=<item_key>&rate=<n>#new-entry`;
+  the book's add form prefills and saves nothing until the member does.
+- **Regenerate**: blocked = `regenerateReadiness`; ready / unchanged =
+  `changesSinceRevision` (the rail's one function); running keeps rev N on
+  screen ("Showing rev N while rev N+1 is generated"); done names the new rev,
+  total and Δ and links the U4 diff. Test ids `regenerate`,
+  `regenerate-button`, `regenerate-result`, `regenerate-diff-link` are kept
+  for the walkthrough.
+- **The revisions page** (K4) keeps its Atelier body on `AtelierCanvas`
+  (`components/blueprint/shell/ShellFrame.tsx`) — the boq segment layout is
+  `content="blueprint"`.
+- **Checks**: `node scripts/boq-review-check.mjs [port] [--shots=dir] [ids…]`
+  (stored = displayed, rate × qty = amount, page height ≤ 4,500, §4.3 keyboard,
+  axe light + dark, tablet / phone) over `scripts/lib/cdp.mjs` (a signed-in
+  headless Chrome); the onboarding walkthrough covers Add to my book,
+  Unchanged → Ready → Running → Done and the firm-rate popovers.
+
 ## Brand — Atelier Precise (pages not yet redesigned)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

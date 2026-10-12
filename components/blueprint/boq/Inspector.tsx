@@ -90,7 +90,8 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
   const r = line.prov?.rate;
   const takeoff = steps(q, ["rule"]).find((s) => s.label === "Take-off");
   const geometry = steps(q, ["geometry"]);
-  const qFlags = steps(q, ["flag"]);
+  // One line per distinct note (seven elements of one reference layout share it).
+  const qFlags = steps(q, ["flag"]).filter((f, i, all) => all.findIndex((x) => x.detail === f.detail) === i);
   const source = steps(r, ["source"])[0];
   const basis = steps(r, ["rule"]).find((s) => s.label === "Rate basis");
   const tierStep = steps(r, ["tier"])[0];
@@ -159,13 +160,13 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
                 <TierLabel tier={line.tiers.qty} why={line.tiers.qtyWhy} persona={model.persona} role="qty" />
               </p>
               {takeoff ? <p className="t-num-sm mt-2">{formula(takeoff.detail)}</p> : <p className="t-num-sm mt-2">{formatQty(line.quantity)} {unit}</p>}
-              {geometry.map((g) => (
-                <p key={g.label} className="t-body-sm mt-2 text-bp-ink-secondary">
+              {geometry.map((g, i) => (
+                <p key={`g${i}`} className="t-body-sm mt-2 text-bp-ink-secondary">
                   {g.label} · {g.detail}
                 </p>
               ))}
-              {qFlags.map((f) => (
-                <p key={f.label + f.detail} className="t-body-sm mt-1 text-bp-ink-secondary">
+              {qFlags.map((f, i) => (
+                <p key={`f${i}`} className="t-body-sm mt-1 text-bp-ink-secondary">
                   {f.detail}
                 </p>
               ))}

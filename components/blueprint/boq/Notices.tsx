@@ -27,7 +27,7 @@ function Row({ k, children, action, data }: { k: string; children: ReactNode; ac
         <Icon name="flag" size={18} className="text-bp-ink-secondary" />
         {k}
       </p>
-      <div className="t-body-sm min-w-0 flex-1 text-bp-ink-secondary">{children}</div>
+      <div className="bp-boq-notice t-body-sm min-w-0 flex-1 text-bp-ink-secondary">{children}</div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
@@ -41,7 +41,7 @@ export function Notices({ model, permits }: { model: ReviewModel; permits: { tit
       {n.draft ? (
         <Row k={n.draft.key} data={{ "data-boq-draft": "true" }} action={<Button kind="quiet" href={`/project/${id}/plan`}>Site measurements</Button>}>
           {n.draft.sentence} {n.draft.derivedLines > 0 ? `${n.draft.derivedLines} lines carry derived quantities.` : ""}
-          {n.draft.note ? <span className="block text-bp-ink-tertiary">Source: {n.draft.note}</span> : null}
+          {n.draft.note ? <span className="bp-boq-desk-only block text-bp-ink-tertiary">Source: {n.draft.note}</span> : null}
         </Row>
       ) : null}
       {n.reference ? <ReferenceRow model={model} /> : null}

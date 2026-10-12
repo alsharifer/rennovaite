@@ -11,6 +11,7 @@ import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
 import { elementPricer } from "@/lib/boq/rates";
 import { resolveRef } from "@/lib/boq/refs";
 import { regenerateReadiness } from "@/lib/boq/regenerate";
+import { changesSinceRevision } from "@/lib/boq/changes-since";
 import { buildReviewModel, type ReviewBoq } from "@/lib/boq/review-model";
 import { sortSections } from "@/lib/boq/section-order";
 import { runPermitCheck } from "@/lib/compliance/check";
@@ -28,7 +29,6 @@ import { hasTakeoffProvenance, type ScenarioBoq } from "@/lib/whatif/engine";
 import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
 import type { WhatIfEngine } from "@/components/blueprint/boq/WhatIfTab";
 
-import { RegenerateBoq } from "./_components/regenerate-boq";
 
 export const dynamic = "force-dynamic";
 
@@ -85,37 +85,94 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
     );
   }
 
-  const caller = await getCaller();
-  const ctx = await loadProvenanceContext(sb, id);
+  // Everything below reads independently — fetched together (the page used to
+  // await a dozen round-trips one after another).
+  const rev = countRes.count ?? 1;
+  const [caller, ctx, gate] = await Promise.all([
+    getCaller(),
+    loadProvenanceContext(sb, id),
+    // L4: where the rates came from and whether a client proposal may export on them.
+    loadProposalGate(sb, id).catch((): ProposalGate | null => null),
+  ]);
   const curated = curateBoq(latest.sections, ctx.withheldNames) as ReviewBoq;
   const boq: ReviewBoq = { ...curated, sections: sortSections(curated.sections) };
   const provenance = buildBoqProvenance(boq as Parameters<typeof buildBoqProvenance>[0], ctx);
 
-  // Persona: a member of the firm this project is attached to works the firm journey.
-  let firm: Parameters<typeof buildReviewModel>[0]["firm"] = null;
-  let persona: "firm" | "owner" = "owner";
-  let gate: ProposalGate | null = null;
-  try {
-    gate = await loadProposalGate(sb, id);
-  } catch {
-    /* the BoQ page never fails on the gate */
-  }
-  if (project.firm_id && caller) {
-    const { data: member } = await sb.from("firm_members").select("firm_id").eq("firm_id", project.firm_id).eq("user_id", caller.id).maybeSingle();
-    if (member) {
-      persona = "firm";
+  // P5 what-if: the grade engine when the BoQ has take-off provenance (legacy
+  // LLM-path BoQs are refused) — wrapped, unchanged, in the inspector's What-if tab.
+  const scenarioBoq: ScenarioBoq = {
+    sections: boq.sections.map((s) => ({ work_section: s.work_section, lines: s.lines.map((l) => ({ rule_id: l.rule_id, quantity: l.quantity, rate_aed: l.rate_aed, total_aed: l.total_aed, description: l.description })) })),
+    grand_total_aed: boq.grand_total_aed,
+    subtotal_aed: boq.subtotal_aed,
+    contingency_pct: boq.contingency_pct,
+    vat_pct: boq.vat_pct,
+    ohp_pct: boq.ohp_pct,
+  };
+
+  const [firm, regenerateBlock, changed, rooms, permits, furniture, engine] = await Promise.all([
+    // Persona: a member of the firm this project is attached to works the firm journey.
+    (async (): Promise<Parameters<typeof buildReviewModel>[0]["firm"]> => {
+      if (!project.firm_id || !caller) return null;
+      const { data: member } = await sb.from("firm_members").select("firm_id").eq("firm_id", project.firm_id).eq("user_id", caller.id).maybeSingle();
+      if (!member) return null;
       const book = await loadFirmBook(sb, project.firm_id).catch(() => null);
-      firm = {
+      return {
         id: project.firm_id,
         brand: gate?.firm?.brand ?? "your firm",
         bookItemKeys: new Set((book?.entries ?? []).map((e) => e.item_key)),
-        vocabulary: (k) => {
+        vocabulary: (k: string) => {
           const v = itemVocabulary(k);
           return v ? { unit: v.unit } : null;
         },
       };
-    }
-  }
+    })(),
+    // H4: may this viewer regenerate, and if not, why — the route's own answer.
+    regenerateReadiness(sb, id, caller)
+      .then((r) => r.block)
+      .catch(() => null /* the route still enforces */),
+    // K2/K3: "changed since rev N" is ONE function — the rail's attention reason
+    // and this control's Ready / Unchanged never disagree.
+    changesSinceRevision(sb, id, { id: latest.id, created_at: latest.created_at }, rev)
+      .then((c) => c.summary)
+      .catch(() => null),
+    // P4: cost by room (best-effort; empty when the take-off was not stored).
+    (async (): Promise<RoomRollup[]> => {
+      try {
+        const { data: tRows } = await sb.from("takeoff_items").select("work_item_key, room_id, element_id, qty, unit, wet_area").eq("project_id", id);
+        const items: TakeoffItem[] = ((tRows ?? []) as { work_item_key: string; room_id: string | null; element_id: string | null; qty: number; unit: string; wet_area: boolean }[]).map((r) => ({
+          work_item_key: r.work_item_key as WorkItemKey,
+          room_id: r.room_id,
+          element_id: r.element_id ?? "",
+          qty: Number(r.qty),
+          unit: r.unit,
+          wet_area: !!r.wet_area,
+        }));
+        if (items.length === 0) return [];
+        const overlay = await loadProjectFirmOverlay(sb, id);
+        const tier = (curated as { engine?: { tier?: "value" | "mid" | "premium" } }).engine?.tier ?? "mid";
+        const rollups = roomRollup(items, elementPricer(overlay, tier));
+        const { data: roomRows } = await sb.from("rooms").select("id, name_en").in("id", rollups.map((r) => r.room_id));
+        const names = new Map(((roomRows ?? []) as { id: string; name_en: string | null }[]).map((r) => [r.id, r.name_en ?? "Room"]));
+        return rollups.map((r) => ({ roomId: r.room_id, roomName: names.get(r.room_id) ?? "Room", total_aed: r.total_aed, items: r.items.map((w) => ({ description: w.description, qty: w.qty, unit: w.unit, total_aed: w.total_aed })) }));
+      } catch {
+        return []; // no take-off table → no room view
+      }
+    })(),
+    // P6: permit triggers over the plan diff (flagged).
+    process.env.PERMIT_CHECK_ENABLED === "true"
+      ? runPermitCheck(id)
+          .then((r) => r.fired.map((f) => ({ title: f.title_en, consequence: CONSEQUENCE[f.consequence] ?? f.consequence })))
+          .catch(() => null)
+      : Promise.resolve(null),
+    // P7: optional furniture — never in boqs.sections, never in the project total.
+    collectFurnitureSection(id, sb)
+      .then((f): FurnitureView | null => (f ? { total: f.section_total_aed, lines: f.lines.map((l) => ({ description: l.description, quantity: l.quantity, rate_aed: l.rate_aed, total_aed: l.total_aed })) } : null))
+      .catch(() => null),
+    process.env.WHATIF_ENABLED === "true" && hasTakeoffProvenance(scenarioBoq)
+      ? Promise.all([loadRateBook(sb), loadLatestScenario(sb, id)]).then(([rateBook, scenario]): WhatIfEngine => ({ rateBook, boq: scenarioBoq, initialSelections: scenario?.selections ?? {} }))
+      : Promise.resolve(null),
+  ]);
+  const persona: "firm" | "owner" = firm ? "firm" : "owner";
 
   const duplicates = findComponentDuplicates(
     boq.sections.flatMap((s) => s.lines.map((l) => ({ work_section: s.work_section, description: l.description, rule_id: l.rule_id ?? null, item_key: null, quantity: l.quantity, total_aed: l.total_aed }))),
@@ -127,7 +184,7 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
   const model = buildReviewModel({
     projectId: id,
     boqId: latest.id,
-    rev: countRes.count ?? 1,
+    rev,
     revDate: revDate(latest.created_at),
     persona,
     boq,
@@ -141,73 +198,6 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
 
   // L5: a signed-in view of the BoQ is the checking signal (deduped per actor per 10 min).
   if (caller) await recordBoqView(sb, id, latest.id, caller.id);
-
-  // H4: may this viewer regenerate, and if not, why — the route's own answer.
-  let regenerateBlock: { code: string; reason: string; fix?: { label: string; href: string } } | null = null;
-  try {
-    regenerateBlock = (await regenerateReadiness(sb, id, caller)).block;
-  } catch {
-    /* the route still enforces */
-  }
-
-  // P4: cost by room (best-effort; empty when the take-off was not stored).
-  let rooms: RoomRollup[] = [];
-  try {
-    const { data: tRows } = await sb.from("takeoff_items").select("work_item_key, room_id, element_id, qty, unit, wet_area").eq("project_id", id);
-    const items: TakeoffItem[] = ((tRows ?? []) as { work_item_key: string; room_id: string | null; element_id: string | null; qty: number; unit: string; wet_area: boolean }[]).map((r) => ({
-      work_item_key: r.work_item_key as WorkItemKey,
-      room_id: r.room_id,
-      element_id: r.element_id ?? "",
-      qty: Number(r.qty),
-      unit: r.unit,
-      wet_area: !!r.wet_area,
-    }));
-    if (items.length > 0) {
-      const overlay = await loadProjectFirmOverlay(sb, id);
-      const tier = (curated as { engine?: { tier?: "value" | "mid" | "premium" } }).engine?.tier ?? "mid";
-      const rollups = roomRollup(items, elementPricer(overlay, tier));
-      const { data: roomRows } = await sb.from("rooms").select("id, name_en").in("id", rollups.map((r) => r.room_id));
-      const names = new Map(((roomRows ?? []) as { id: string; name_en: string | null }[]).map((r) => [r.id, r.name_en ?? "Room"]));
-      rooms = rollups.map((r) => ({ roomId: r.room_id, roomName: names.get(r.room_id) ?? "Room", total_aed: r.total_aed, items: r.items.map((w) => ({ description: w.description, qty: w.qty, unit: w.unit, total_aed: w.total_aed })) }));
-    }
-  } catch {
-    /* no take-off table → no room view */
-  }
-
-  // P6: permit triggers over the plan diff (flagged).
-  let permits: { title: string; consequence: string }[] | null = null;
-  if (process.env.PERMIT_CHECK_ENABLED === "true") {
-    try {
-      permits = (await runPermitCheck(id)).fired.map((f) => ({ title: f.title_en, consequence: CONSEQUENCE[f.consequence] ?? f.consequence }));
-    } catch {
-      /* best-effort */
-    }
-  }
-
-  // P7: optional furniture — never in boqs.sections, never in the project total.
-  let furniture: FurnitureView | null = null;
-  try {
-    const f = await collectFurnitureSection(id, sb);
-    if (f) furniture = { total: f.section_total_aed, lines: f.lines.map((l) => ({ description: l.description, quantity: l.quantity, rate_aed: l.rate_aed, total_aed: l.total_aed })) };
-  } catch {
-    /* best-effort */
-  }
-
-  // P5 what-if: the grade engine when the BoQ has take-off provenance (legacy
-  // LLM-path BoQs are refused) — wrapped, unchanged, in the inspector's What-if tab.
-  const scenarioBoq: ScenarioBoq = {
-    sections: boq.sections.map((s) => ({ work_section: s.work_section, lines: s.lines.map((l) => ({ rule_id: l.rule_id, quantity: l.quantity, rate_aed: l.rate_aed, total_aed: l.total_aed, description: l.description })) })),
-    grand_total_aed: boq.grand_total_aed,
-    subtotal_aed: boq.subtotal_aed,
-    contingency_pct: boq.contingency_pct,
-    vat_pct: boq.vat_pct,
-    ohp_pct: boq.ohp_pct,
-  };
-  let engine: WhatIfEngine | null = null;
-  if (process.env.WHATIF_ENABLED === "true" && hasTakeoffProvenance(scenarioBoq)) {
-    const [rateBook, scenario] = await Promise.all([loadRateBook(sb), loadLatestScenario(sb, id)]);
-    engine = { rateBook, boq: scenarioBoq, initialSelections: scenario?.selections ?? {} };
-  }
 
   const highlightRef = sp.highlight ? resolveRef(boq.sections, sp.highlight) : null;
 
@@ -223,7 +213,7 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
         highlightRef={highlightRef}
         view={sp.view === "byroom" ? "byroom" : "sections"}
         highlightRoom={sp.room ?? null}
-        regenerate={<RegenerateBoq projectId={id} block={regenerateBlock} />}
+        regen={{ rev, block: regenerateBlock, changed }}
         engine={engine}
       />
     </>

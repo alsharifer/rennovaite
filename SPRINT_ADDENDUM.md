@@ -1,3 +1,34 @@
+# K3 — BoQ & Review rebuild (2026-10-12)
+
+- Built per spec §3.2 in three commits (rows + sections · inspector +
+  what-if + corrections · regenerate + responsive). One server view model
+  (`lib/boq/review-model.ts`); every figure is the stored revision's.
+- **Verified on dev** (`scripts/boq-review-check.mjs`, headless Chrome):
+  Arabella and the demo villa — every row = the stored revision and rate ×
+  qty = amount on all 18 / 59 lines; page height 2,327 / 4,264 px with every
+  section expanded (≤ 4,500; was 21,623); the §4.3 keyboard walkthrough; axe
+  zero violations light + dark; tablet chips / hidden Unit + Rate / half sheet
+  with the row visible; phone two-line rows / full sheet. Onboarding walkthrough
+  green with the new K3 checks (Add to my book prefill; Unchanged → Ready →
+  Running banner → Done → diff; Own-basis vs fallback popovers).
+- **Both dev BoQs were regenerated** so the stored revisions are H7-corrected
+  (the brief's "identical to the stored BoQ (H7-corrected)"): Arabella
+  116,679.07 → **116,679.56** (the J3 figure); demo villa 498,824 →
+  515,628.94 — H7's rounding plus H3's two overlay sections (Electrical
+  Installations 8,380, Plumbing & Sanitary 6,440) that a flag-off assembly had
+  dropped. Revisions are append-only; nothing was deleted.
+- **Differs from the frames, on purpose**: section order is H7's canonical
+  order, so Plumbing (an interior trade) sits before Hardscape on Arabella
+  (13:48 draws it after Irrigation); phone notice rows are clamped to two lines
+  rather than omitted (26:924 has none).
+- Removed: the 25 hard-coded hex values of the old view, its indigo generate
+  button, the source column, the hard-coded per-line "upgrade" claims and the
+  vendor mini-cards (the vendors step has them). The "against your budget —
+  headroom" line: hidden on firm projects (H7, confirmed); an owner project
+  with an entered budget shows it as a meta line.
+- `/api/boq-corrections` no longer requires `GARDEN_PILOT_ENABLED`.
+- Button: Quiet sits flush (`px-4` only on Primary / Secondary).
+
 # H9 — direct-to-storage uploads, one limits table, signed downloads (2026-10-12)
 
 - **The finding** (12 Oct, prod): Vercel answers a function request over ~4.5 MB

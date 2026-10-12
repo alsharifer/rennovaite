@@ -8,16 +8,19 @@
 // figure it shows is the stored BoQ's.
 // =============================================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ReviewLine, ReviewModel } from "@/lib/boq/review-types";
 import type { FigureRole } from "@/lib/provenance/tier-vocab";
 
 import { Button } from "../Button";
+import { RegenerateControl } from "../RegenerateControl";
 import { TopBarActions } from "../shell/TopBar";
 import { BoqGrid, rowDomId, sectionDomId } from "./BoqGrid";
 import { correctionsFor, type Correction } from "./CorrectionsTab";
 import { Inspector, type InspectorTab } from "./Inspector";
+import { InspectorSheet, useSheetLayout } from "./InspectorSheet";
+import { useRegenerate, type RegenerateStart } from "./Regenerate";
 import type { WhatIfEngine } from "./WhatIfTab";
 import { ByRoom, Furniture, Programme, type FurnitureView, type RoomRollup } from "./Extras";
 import { Notices } from "./Notices";
@@ -37,8 +40,8 @@ export interface BoqReviewProps {
   highlightRef: string | null;
   view: "sections" | "byroom";
   highlightRoom: string | null;
-  /** Rendered in the work area until the regenerate control is wired (K3 commit 3). */
-  regenerate?: ReactNode;
+  /** The regenerate control's starting state — the server's readiness + changesSinceRevision answers. */
+  regen: RegenerateStart;
   /** P5: the grade engine, when the BoQ has take-off provenance and WHATIF is on. */
   engine: WhatIfEngine | null;
 }
@@ -46,7 +49,7 @@ export interface BoqReviewProps {
 const HOVER_DELAY = 250;
 const CLOSE_GRACE = 120;
 
-export function BoqReview({ model, rooms, furniture, permits, packExport, highlightRef, view, highlightRoom, regenerate, engine }: BoqReviewProps) {
+export function BoqReview({ model, rooms, furniture, permits, packExport, highlightRef, view, highlightRoom, regen, engine }: BoqReviewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef<HTMLDivElement>(null);
   const lineByRef = useMemo(() => new Map(model.sections.flatMap((s) => s.lines.map((l) => [l.ref, l] as const))), [model.sections]);
@@ -62,6 +65,8 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
   const headingRef = useRef<HTMLHeadingElement>(null);
   const opener = useRef<string | null>(null);
   const selected = useMemo(() => (selectedKey ? (model.sections.flatMap((s) => s.lines).find((l) => l.key === selectedKey) ?? null) : null), [model.sections, selectedKey]);
+  const regenerate = useRegenerate(model.projectId, regen);
+  const layout = useSheetLayout();
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -201,6 +206,12 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
     }
     opener.current = key;
     setSelectedKey(key);
+    if (layout.sheet && !layout.phone) {
+      requestAnimationFrame(() => {
+        const row = document.querySelector<HTMLElement>(`[data-line-key="${CSS.escape(key)}"]`);
+        if (row) window.scrollTo({ top: row.getBoundingClientRect().top + window.scrollY - stickyOffset() - 8, behavior: "instant" as ScrollBehavior });
+      });
+    }
   };
   /** Close returns focus to the row it was opened from (§4.2 #4). */
   const closeInspector = () => {
@@ -216,7 +227,7 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
   return (
     <div ref={rootRef} className="bp-boq" data-boq-review="" data-rev={model.rev}>
       <TopBarActions>
-        <span className="t-label-md whitespace-nowrap text-bp-ink-tertiary">
+        <span className="bp-boq-wide-only t-label-md whitespace-nowrap text-bp-ink-tertiary">
           rev {model.rev} · {model.revDate}
           {model.notices.draft ? " · draft" : ""}
         </span>
@@ -224,17 +235,28 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
           Revisions &amp; diff
         </Button>
         {packExport ? (
-          <Button kind="secondary" href={`/project/${model.projectId}/drawings?export=1`}>
-            Export BoQ PDF
-          </Button>
+          <span className="bp-boq-desk-only">
+            <Button kind="secondary" href={`/project/${model.projectId}/drawings?export=1`}>
+              Export BoQ PDF
+            </Button>
+          </span>
         ) : null}
+        <RegenerateControl value={regenerate.value} onRegenerate={regenerate.run} />
       </TopBarActions>
 
       <div ref={pinnedRef} className="bp-boq-pinned">
         <PinnedTotal model={model} />
       </div>
       <Notices model={model} permits={permits} />
-      {regenerate ? <div className="px-6 pt-4 md:px-8">{regenerate}</div> : null}
+      {regenerate.running ? (
+        <p role="status" className="t-body-sm mx-6 mt-4 flex items-center gap-2 bg-bp-surface-sunken px-4 py-3 text-bp-ink-secondary md:mx-8" data-regenerating="">
+          Showing rev {model.rev} while rev {model.rev + 1} is generated — every figure below is rev {model.rev}&rsquo;s until it lands.
+        </p>
+      ) : null}
+      {/* Phone: the top bar holds the step switcher, so Regenerate sits here. */}
+      <div className="bp-phone-only px-6 pt-4">
+        <RegenerateControl value={regenerate.value} onRegenerate={regenerate.run} />
+      </div>
 
       <SectionChips sections={model.sections} current={current} onJump={jump} persona={model.persona} />
 
@@ -270,7 +292,7 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
           {rooms.length > 0 ? <ByRoom rooms={rooms} open={view === "byroom"} highlightRoom={highlightRoom} /> : null}
           {furniture ? <Furniture furniture={furniture} /> : null}
         </div>
-        {selected ? (
+        {selected && !layout.sheet ? (
           <aside
             aria-labelledby="bp-boq-inspector-heading"
             className="bp-boq-inspector border border-bp-line-strong bg-bp-surface-base"
@@ -299,6 +321,27 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
           </aside>
         ) : null}
       </div>
+
+      {layout.sheet ? (
+        <InspectorSheet open={!!selected} phone={layout.phone} onClose={closeInspector}>
+          {selected ? (
+            <Inspector
+              line={selected}
+              model={model}
+              tab={tab}
+              setTab={setTab}
+              corrections={correctionsFor(corrections, selected)}
+              capturing={capturing}
+              setCapturing={setCapturing}
+              onCorrectionSaved={(c) => setCorrections((cur) => [...cur, c])}
+              engine={engine}
+              furniture={furniture?.total ?? null}
+              onClose={closeInspector}
+              headingRef={headingRef}
+            />
+          ) : null}
+        </InspectorSheet>
+      ) : null}
 
       {pop ? (
         <ProvenancePopover
