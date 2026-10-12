@@ -278,7 +278,7 @@ export function ElementsEditor({
     <div className="space-y-3">
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="label-caps mr-1 text-ink-500">Draw:</span>
+          <span className="label-caps mr-1 text-bp-ink-secondary">Draw:</span>
           {LINEAR_ELEMENT_KINDS.map((k) => {
             const meta = LINEAR_ELEMENT_META[k];
             const active = kind === k;
@@ -340,7 +340,7 @@ export function ElementsEditor({
           a price is the counter variant, so that is what this holds. */}
       {!readOnly && selected?.kind === "counter_run" && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-ink-100 bg-canvas px-md py-sm">
-          <span className="label-caps text-ink-500">Counter type:</span>
+          <span className="label-caps text-bp-ink-secondary">Counter type:</span>
           {COUNTER_VARIANTS.map((v) => {
             const active = selected.variant === v.value;
             return (
@@ -500,7 +500,7 @@ export function ElementsEditor({
         </svg>
       </div>
 
-      <p className="text-xs text-ink-500">
+      <p className="text-xs text-bp-ink-secondary">
         {loading
           ? "Loading elements…"
           : error
@@ -553,14 +553,14 @@ function RunInspector({
       ) : (
         <>
           <label className="flex items-center gap-1">
-            <span className="text-ink-500">H</span>
+            <span className="text-bp-ink-secondary">H</span>
             <input type="number" step={10} value={h} onChange={(e) => setH(Number(e.target.value))} className="focus-ring w-[70px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums" />
           </label>
           <label className="flex items-center gap-1">
-            <span className="text-ink-500">W</span>
+            <span className="text-bp-ink-secondary">W</span>
             <input type="number" step={10} value={w} onChange={(e) => setW(Number(e.target.value))} className="focus-ring w-[70px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums" />
           </label>
-          <span className="text-ink-500">mm</span>
+          <span className="text-bp-ink-secondary">mm</span>
           <button type="button" onClick={() => onSection(h, w)} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
             Set section
           </button>

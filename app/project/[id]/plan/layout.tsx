@@ -6,5 +6,9 @@ import { ProjectShell } from "@/components/blueprint/shell/ProjectShell";
 // error.tsx render inside the shell (the rail and top bar stay).
 export default async function Layout({ children, params }: { children: ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <ProjectShell projectId={id}>{children}</ProjectShell>;
+  return (
+    <ProjectShell projectId={id} content="blueprint">
+      {children}
+    </ProjectShell>
+  );
 }

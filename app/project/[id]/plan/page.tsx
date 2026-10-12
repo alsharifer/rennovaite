@@ -1,9 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { Button } from "@/components/blueprint/Button";
+import { Icon } from "@/components/blueprint/Icon";
+import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
+import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
+import { AtelierCanvas } from "@/components/blueprint/shell/ShellFrame";
+import { FIRM_STEPS, journeyFlagsFromEnv, journeySteps } from "@/lib/journey";
+import { stepEyebrow } from "@/lib/journey-eyebrow";
 import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
+import { planCheck, planCheckSentence } from "@/lib/plan/plan-check";
 import { loadGardenSiteData, type GardenSiteData } from "@/lib/plan/garden-site-data";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -26,16 +33,6 @@ interface PlanRow {
 
 export const dynamic = "force-dynamic";
 
-const HVAC_HABITABLE = new Set([
-  "master_bedroom",
-  "bedroom",
-  "bathroom",
-  "ensuite",
-  "living",
-  "dining",
-  "kitchen",
-  "majlis",
-]);
 const BEDROOM_TYPES = new Set(["master_bedroom", "bedroom"]);
 const BATHROOM_TYPES = new Set(["bathroom", "ensuite", "powder"]);
 
@@ -43,24 +40,19 @@ function Shell({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function CenteredMessage({
-  tone,
-  children,
-}: {
-  tone: "error" | "muted";
-  children: ReactNode;
-}) {
+function CenteredMessage({ tone, children }: { tone: "error" | "muted"; children: ReactNode }) {
+  // K5: a Blueprint state — an error is the inverse block, anything else a quiet line.
   return (
     <Shell>
-      <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-        <p
-          className={
-            tone === "error" ? "text-error" : "text-on-surface-variant"
-          }
-        >
-          {children}
-        </p>
-      </main>
+      <div className="mx-auto max-w-[720px] px-6 py-10">
+        {tone === "error" ? (
+          <div role="alert" className="surface-inverse bg-bp-alert-surface px-5 py-4 text-bp-alert-ink">
+            <p className="t-body-sm">{children}</p>
+          </div>
+        ) : (
+          <p className="t-body-sm border border-dashed border-bp-line-hairline px-5 py-6 text-bp-ink-secondary">{children}</p>
+        )}
+      </div>
     </Shell>
   );
 }
@@ -225,279 +217,145 @@ export default async function PlanPage({
     /* parse_metrics absent pre-025 — leave null */
   }
 
-  // Aggregates for the right column + sticky bar.
+  // K5: the plan check — THE overlap detector over the stored rooms (removed
+  // site-reference zones are not in the design), and what the rail says is
+  // blocked downstream because of the plan.
+  const removedIds = new Set(
+    Object.entries(gardenSite?.siteRefs ?? {})
+      .filter(([, s]) => s.site_reference && s.disposition === "remove")
+      .map(([id]) => id),
+  );
+  const check = planCheck(roomList.filter((r) => !removedIds.has(r.id)).map((r) => ({ id: r.id, name: r.name_en ?? "Room", polygon: r.polygon })));
+  const rail = await loadProjectRail(projectId);
+  const persona = rail?.persona ?? "owner";
+  const flags = journeyFlagsFromEnv();
+  const stepDefs =
+    persona === "firm"
+      ? FIRM_STEPS.map((s) => ({ key: s.key as string, name: `${s.number} ${s.label}` }))
+      : journeySteps(flags).map((s) => ({ key: s.key as string, name: `${String(s.number).padStart(2, "0")} ${s.label}` }));
+  const blocked = check.pairs.length
+    ? stepDefs.filter((s) => rail?.statuses[s.key]?.state === "blocked" && /overlap/i.test(rail?.statuses[s.key]?.reason ?? "")).map((s) => ({ step: s.name, reason: rail!.statuses[s.key]!.reason! }))
+    : [];
+  const eyebrow = stepEyebrow(persona, "scope", "layout", flags, "Plan");
   const totalArea = plan.total_area_m2 ?? null;
-  const bedroomCount = roomList.filter((r) =>
-    BEDROOM_TYPES.has(r.room_type ?? ""),
-  ).length;
-  const bathroomCount = roomList.filter((r) =>
-    BATHROOM_TYPES.has(r.room_type ?? ""),
-  ).length;
-  const renovatableTypes = HVAC_HABITABLE;
+  const unit = authored ? "zones" : "rooms";
+  const meta = [
+    `${roomList.length} ${unit} · ${formatM2(totalArea)}`,
+    authored ? (plot ? `drawn on a ${plot.width_m} × ${plot.depth_m} m plot` : "drawn by you") : "parsed from the drawing",
+    meanConfidencePct != null ? `${meanConfidencePct}% avg confidence` : null,
+    correctionsTotal != null && correctionsTotal > 0 ? `${correctionsTotal} correction${correctionsTotal === 1 ? "" : "s"}` : null,
+  ].filter(Boolean) as string[];
+  const next =
+    persona === "firm"
+      ? { label: "Continue to 03 Specification", href: `/project/${projectId}/accessories` }
+      : { label: "Continue to style", href: `/project/${projectId}/style` };
 
   return (
-    <Shell>
-      <div className="mx-auto max-w-[1440px] pb-32">
-        {/* Header ---------------------------------------------------- */}
-        <header className="mb-2xl">
-          <h1 className="mb-md font-display text-headline-lg text-ink-900">
-            {authored ? "Your plan, as you draw it." : "Your villa, understood."}
-          </h1>
-          <p className="max-w-[720px] font-body text-body-lg text-on-surface-variant">
-            {authored ? (
-              <>
-                Nothing was parsed here — every outline is yours. The canvas is
-                your {plot ? `${plot.width_m} × ${plot.depth_m} m ` : ""}plot, so
-                what you draw comes out in real metres.
-              </>
-            ) : (
-              <>
-                We parsed your plan and labeled every room. Hover any room to see
-                its area; click to rename or merge.
-              </>
-            )}
-          </p>
-        </header>
+    <div className="mx-auto max-w-[1600px] px-6 py-8 pb-16 lg:px-10" data-plan-page>
+      <p className="t-label-caps text-bp-brass-text">{eyebrow}</p>
+      <h1 className="t-heading-lg mt-2 text-bp-ink-primary">{authored ? "Your plan, as you draw it" : "The plan, as parsed"}</h1>
+      <p className="t-label-md mt-2 font-bp-mono text-bp-ink-secondary">{meta.join(" · ")}</p>
 
-        {parsedComplete ? (
-          <div className="grid grid-cols-1 gap-gutter lg:grid-cols-12">
-            {/* Left: parsed plan viewer ------------------------------ */}
-            <section className="col-span-12 lg:col-span-8">
-              <div className="rounded-xl border border-ink-100 bg-paper p-8">
-                <div className="mb-md flex items-baseline justify-between">
-                  <p className="label-caps text-ink-500">
-                    Parsed plan viewer
-                  </p>
-                  <p className="font-mono text-[12px] uppercase text-ink-500">
-                    {roomList.length} {authored ? "zones" : "rooms"} ·{" "}
-                    {formatM2(totalArea)}
-                  </p>
-                </div>
-                <PlanLayers
-                  projectId={projectId}
-                  planId={plan.id}
-                  initialRooms={roomList}
-                  initialTotalAreaM2={totalArea}
-                  areaDisputes={areaDisputes}
-                  overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
-                  gardenPilot={gardenPilot}
-                  plot={plot}
-                  context={gardenSite?.context ?? []}
-                  siteRefs={gardenSite?.siteRefs}
-                  mode="edit"
-                />
-                <div className="mt-md flex items-center justify-end gap-md text-ink-500">
-                  <span
-                    className="material-symbols-outlined text-[20px]"
-                    aria-hidden="true"
-                  >
-                    explore
-                  </span>
-                  <span className="label-caps">N</span>
-                  <span className="h-px w-16 bg-ink-100" aria-hidden="true" />
-                  <span className="font-mono text-[12px]">5 m</span>
-                </div>
+      {parsedComplete ? (
+        <div className="mt-6 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <section className="min-w-0" aria-label="Plan editor">
+            {/* The canvas sits on the sunken surface; its internals are the editor's own (K5: chrome only). */}
+            <div className="border border-bp-line-hairline bg-bp-surface-sunken p-4">
+              <PlanLayers
+                projectId={projectId}
+                planId={plan.id}
+                initialRooms={roomList}
+                initialTotalAreaM2={totalArea}
+                areaDisputes={areaDisputes}
+                overlaysEnabled={process.env.OVERLAYS_ENABLED === "true"}
+                gardenPilot={gardenPilot}
+                plot={plot}
+                context={gardenSite?.context ?? []}
+                siteRefs={gardenSite?.siteRefs}
+                mode="edit"
+              />
+            </div>
+            {gardenSite ? (
+              <div className="mt-6">
+                <AtelierCanvas>
+                  <GardenSitePanel projectId={projectId} planId={plan.id} draft={gardenSite.draft} items={gardenSite.items} zones={gardenSite.zones} untypedCounters={gardenSite.untypedCounters} />
+                </AtelierCanvas>
               </div>
-              {gardenSite && (
-                <GardenSitePanel
-                  projectId={projectId}
-                  planId={plan.id}
-                  draft={gardenSite.draft}
-                  items={gardenSite.items}
-                  zones={gardenSite.zones}
-                  untypedCounters={gardenSite.untypedCounters}
-                />
-              )}
+            ) : null}
+          </section>
+
+          <div className="min-w-0 space-y-8">
+            <PlanCheckPanel
+              planId={plan.id}
+              pairs={check.pairs}
+              sentence={check.pairs.length ? planCheckSentence(check, totalArea) : null}
+              canReparse={!authored && Boolean(plan.pdf_url)}
+              blocked={blocked}
+              summary={{ rooms: roomList.length, area: formatM2(totalArea), label: unit }}
+            />
+
+            <section aria-labelledby="rooms-h">
+              <h2 id="rooms-h" className="t-label-caps text-bp-ink-tertiary">
+                {roomList.length} {authored ? "ZONES DRAWN" : "ROOMS DETECTED"}
+              </h2>
+              <ul className="mt-2 max-h-[360px] overflow-y-auto" tabIndex={0} aria-label={authored ? "Zones" : "Rooms"}>
+                {roomList.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-3 border-b border-bp-line-hairline py-2">
+                    <span className="t-body-sm min-w-0 truncate text-bp-ink-primary">{r.name_en ?? "(unnamed)"}</span>
+                    <span className="t-num-sm text-bp-ink-secondary">{formatM2(r.area_m2)}</span>
+                  </li>
+                ))}
+              </ul>
+              <dl className="mt-3 grid grid-cols-3 gap-3">
+                <div>
+                  <dt className="t-label-caps text-bp-ink-tertiary">AREA</dt>
+                  <dd className="t-num-md text-bp-ink-primary">{formatM2(totalArea)}</dd>
+                </div>
+                <div>
+                  <dt className="t-label-caps text-bp-ink-tertiary">BEDROOMS</dt>
+                  <dd className="t-num-md text-bp-ink-primary">{roomList.filter((r) => BEDROOM_TYPES.has(r.room_type ?? "")).length}</dd>
+                </div>
+                <div>
+                  <dt className="t-label-caps text-bp-ink-tertiary">BATHROOMS</dt>
+                  <dd className="t-num-md text-bp-ink-primary">{roomList.filter((r) => BATHROOM_TYPES.has(r.room_type ?? "")).length}</dd>
+                </div>
+              </dl>
             </section>
 
-            {/* Right: 3 stacked cards -------------------------------- */}
-            <aside className="col-span-12 flex flex-col gap-gutter lg:col-span-4">
-              {/* Project summary */}
-              <article className="rounded-xl border border-ink-100 bg-paper p-lg">
-                <p className="label-caps mb-xs text-ink-500">Villa</p>
-                <h2 className="mb-lg font-display text-headline-md text-ink-900">
-                  {project.name?.trim() || "Untitled villa"}
-                </h2>
-                <dl className="flex flex-col gap-md">
-                  <SummaryRow
-                    label="Total area"
-                    value={formatM2(totalArea)}
-                  />
-                  <SummaryRow
-                    label="Bedrooms"
-                    value={String(bedroomCount)}
-                  />
-                  <SummaryRow
-                    label="Bathrooms"
-                    value={String(bathroomCount)}
-                  />
-                </dl>
-              </article>
-
-              {/* Detected rooms */}
-              <article className="rounded-xl border border-ink-100 bg-paper p-lg">
-                <p className="label-caps mb-md text-ink-500">
-                  {roomList.length} {authored ? "Zones drawn" : "Rooms detected"}
-                </p>
-                <ul className="flex max-h-[360px] flex-col gap-xs overflow-y-auto">
-                  {roomList.map((r) => {
-                    const included = renovatableTypes.has(r.room_type ?? "");
-                    return (
-                      <li
-                        key={r.id}
-                        className="flex items-center justify-between gap-md py-xs"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-body-sm text-body-sm text-ink-900">
-                            {r.name_en ?? "(unnamed)"}
-                          </p>
-                          <p className="font-mono text-[11px] text-ink-500">
-                            {formatM2(r.area_m2)}
-                          </p>
-                        </div>
-                        <span
-                          className={
-                            "flex items-center gap-xs rounded-full px-sm py-[2px] text-[11px] font-semibold " +
-                            (included
-                              ? "bg-primary-fixed text-ink-900"
-                              : "bg-bone text-ink-700")
-                          }
-                        >
-                          <span aria-hidden="true">
-                            {included ? "✓" : "—"}
-                          </span>
-                          Renovate
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </article>
-
-              {/* Verification — placeholder copy about a parsed interior; an
-                  authored garden has nothing parsed to second-guess (G5). */}
-              {!authored && (
-              <article className="rounded-xl border border-ink-100 bg-paper p-lg">
-                <p className="label-caps mb-md text-ink-500">
-                  Worth a second look
-                </p>
-                <div
-                  className="rounded-md border p-md"
-                  style={{
-                    borderColor: "rgba(184,80,66,0.4)",
-                    background: "rgba(184,80,66,0.08)",
-                  }}
-                >
-                  <p className="mb-md font-body-sm text-body-sm text-ink-900">
-                    Maid&apos;s room area unclear — we estimated 8.2 m².
-                  </p>
-                  <button
-                    type="button"
-                    className="focus-ring rounded border border-ink-100 bg-paper px-md py-xs font-body-sm text-body-sm text-ink-900 transition-colors hover:bg-surface-container"
-                  >
-                    Confirm or correct
-                  </button>
-                </div>
-              </article>
-              )}
-
-              {/* Drawings entry — gated by DRAWINGS_ENABLED so this page is
-                  pixel-identical to today when the flag is off (P1). */}
-              {process.env.DRAWINGS_ENABLED === "true" && (
-                <Link
-                  href={`/project/${projectId}/drawings`}
-                  className="focus-ring group flex items-center justify-between gap-md rounded-xl border border-ink-100 bg-paper p-lg transition-colors hover:bg-surface-container"
-                >
-                  <span>
-                    <span className="label-caps mb-xs block text-ink-500">
-                      Drawings
-                    </span>
-                    <span className="block font-body text-body-sm text-ink-900">
-                      Dimensioned as-built, demolition &amp; finish schedule
-                    </span>
-                  </span>
-                  <span
-                    className="material-symbols-outlined text-brass-600"
-                    aria-hidden="true"
-                  >
-                    draft
-                  </span>
-                </Link>
-              )}
-
-              {/* Walk your villa in 3D — gated; the aside only renders when the
-                  plan is parsed/confirmed (P3, view-only). */}
-              {process.env.VIEWER_3D_ENABLED === "true" && (
-                <Link
-                  href={`/project/${projectId}/viewer`}
-                  className="focus-ring inline-flex items-center justify-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg py-3 font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-brass-600" aria-hidden="true">
-                    view_in_ar
-                  </span>
-                  Walk your villa in 3D
-                </Link>
-              )}
-            </aside>
-          </div>
-        ) : (
-          <PlanNotAnalysed
-            planId={plan.id}
-            hasDrawing={Boolean(plan.pdf_url)}
-            parseRan={plan.parsed_json !== null}
-            canDraw={gardenPilot}
-          />
-        )}
-      </div>
-
-      {/* Sticky bottom action bar ---------------------------------- */}
-      {parsedComplete && (
-        <div className="fixed inset-x-0 bottom-0 z-20 h-[88px] border-t border-ink-100 bg-paper">
-          <div className="ml-60 flex h-full items-center justify-between px-margin">
-            <Link
-              href={authored ? "/my-projects" : "/project/new"}
-              className="focus-ring flex h-12 items-center rounded-lg border border-ink-100 px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
-            >
-              {authored ? "Back to projects" : "Back to upload"}
-            </Link>
-            <p className="font-body text-body-sm italic text-on-surface-variant">
-              {authored ? "Drawn by you" : "Parsed by RenovAIte"} ·{" "}
-              {roomList.length} {authored ? "zones" : "rooms"} ·{" "}
-              {formatM2(totalArea)}
-              {authored && plot
-                ? ` of a ${(plot.width_m * plot.depth_m).toFixed(0)} m² plot`
-                : ""}
-              {meanConfidencePct != null ? ` · ${meanConfidencePct}% avg confidence` : ""}
-              {correctionsTotal != null && correctionsTotal > 0
-                ? ` · ${correctionsTotal} correction${correctionsTotal === 1 ? "" : "s"}`
-                : ""}
-            </p>
-            <Link
-              href={`/project/${projectId}/style`}
-              className="focus-ring flex h-12 items-center gap-sm rounded-lg bg-brass-600 px-xl font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
-            >
-              Continue to style
-              <span
-                className="material-symbols-outlined text-[18px]"
-                aria-hidden="true"
-              >
-                arrow_forward
-              </span>
-            </Link>
+            {process.env.DRAWINGS_ENABLED === "true" || process.env.VIEWER_3D_ENABLED === "true" ? (
+              <section aria-label="From this plan" className="flex flex-col items-start gap-3 border-t border-bp-line-hairline pt-4">
+                {process.env.DRAWINGS_ENABLED === "true" ? (
+                  <Button kind="quiet" href={`/project/${projectId}/drawings`}>
+                    <Icon name="draft" size={18} /> Open the drawings
+                  </Button>
+                ) : null}
+                {process.env.VIEWER_3D_ENABLED === "true" ? (
+                  <Button kind="quiet" href={`/project/${projectId}/viewer`}>
+                    <Icon name="view_in_ar" size={18} /> Walk your villa in 3D
+                  </Button>
+                ) : null}
+              </section>
+            ) : null}
           </div>
         </div>
+      ) : (
+        <div className="mt-6">
+          <AtelierCanvas>
+            <PlanNotAnalysed planId={plan.id} hasDrawing={Boolean(plan.pdf_url)} parseRan={plan.parsed_json !== null} canDraw={gardenPilot} />
+          </AtelierCanvas>
+        </div>
       )}
-    </Shell>
-  );
-}
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-end justify-between border-b border-bone pb-sm">
-      <dt className="label-caps text-ink-500">{label}</dt>
-      <dd className="font-mono text-body-sm tabular-nums text-ink-900">
-        {value}
-      </dd>
+      {parsedComplete ? (
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-bp-line-hairline pt-5">
+          <Button kind="secondary" href={authored ? "/my-projects" : "/project/new"}>
+            {authored ? "Back to projects" : "Back to upload"}
+          </Button>
+          <Button kind="primary" href={next.href}>
+            {next.label}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
