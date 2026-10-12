@@ -1,29 +1,29 @@
 import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { Villa3DLoader } from "@/components/viewer/Villa3DLoader";
-import type { InspectData, RoomRenders } from "@/components/viewer/Villa3D";
+import { Button } from "@/components/blueprint/Button";
+import { PageHeader } from "@/components/blueprint/PageHeader";
+import { StateBlock } from "@/components/blueprint/StateBlock";
+import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
+import type { BackTargets, ViewerData } from "@/components/blueprint/viewer/Viewer3D";
+import { ViewerLoader } from "@/components/blueprint/viewer/ViewerLoader";
+import { FIRM_STEPS, OWNER_STEPS, journeyFlagsFromEnv, ownerStepHref } from "@/lib/journey";
+import { roomFacts } from "@/lib/viewer/room-facts";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildScene } from "@/lib/viewer/scene";
 import { styleFinishes, styleFloorColor } from "@/lib/viewer/finishes";
 import { buildFinishPlan } from "@/lib/viewer/materials";
-import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
 import type { InspectBoq, RoomMeta, WallMeta } from "@/lib/viewer/inspect";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 
-type RenderRow = {
-  id: string;
-  room_id: string | null;
-  image_url: string | null;
-  kind: string | null;
-  created_at: string | null;
-};
-
+// K8 #9 — the 3D view (spec §6.8, Figma 62:1017): a side surface, off the
+// numbered journey (the rail keeps the step you came from). The scene, the
+// finishes and the inspect data are built here exactly as before; the screen
+// is components/blueprint/viewer.
 export default async function ViewerPage({
   params,
 }: {
@@ -36,24 +36,24 @@ export default async function ViewerPage({
 
   const graph = await derivePlanGraph(projectId);
 
-  // Empty/failure state — never a blank canvas or a crash.
+  // Empty state — never a blank canvas or a crash.
   if (graph.walls.length === 0) {
     return (
-      <>
-      <AtelierCanvas flush>
-        <main className="flex min-h-[calc(100vh-8rem)] flex-col items-center justify-center gap-lg px-6 text-center">
-          <p className="max-w-[560px] font-display text-headline-md italic text-ink-700">
-            We need a confirmed plan before we can build your villa in 3D.
-          </p>
-          <Link
-            href={`/project/${projectId}/plan`}
-            className="focus-ring inline-flex h-11 items-center rounded-lg bg-brass-600 px-lg font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary"
-          >
-            Back to the plan
-          </Link>
-        </main>
-      </AtelierCanvas>
-    </>
+      <div className="mx-auto max-w-[1344px] px-6 pb-16 pt-8 lg:px-12" data-viewer-empty>
+        <PageHeader eyebrow="3D VIEW" title="Your plan in 3D" />
+        <div className="mt-8 max-w-[720px]">
+          {graph.rooms.length > 0 ? (
+            // An open garden: zones, no walls — its 3D design views are on Renders.
+            <StateBlock kind="empty" icon="view_in_ar" title="Nothing to stand up in 3D yet" actions={<Button kind="primary" href={`/project/${projectId}/render`}>Open renders</Button>}>
+              The 3D view builds the walls of your rooms. Your plan has open zones and no walls, so its 3D design views are on Renders.
+            </StateBlock>
+          ) : (
+            <StateBlock kind="empty" icon="view_in_ar" title="We need a confirmed plan" actions={<Button kind="primary" href={`/project/${projectId}/plan`}>Open plan</Button>}>
+              The 3D view is built from your plan&apos;s rooms and walls. Confirm the plan and it appears here.
+            </StateBlock>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -86,33 +86,6 @@ export default async function ViewerPage({
         )
       : undefined;
 
-  // Latest render per room (+ small gallery) for the brass anchors.
-  const { data: renderRows } = await supabase
-    .from("renders")
-    .select("id, room_id, image_url, kind, created_at")
-    .eq("project_id", projectId)
-    .eq("status", "succeeded")
-    .not("image_url", "is", null)
-    .order("created_at", { ascending: false });
-
-  const roomNameById = new Map(graph.rooms.map((r) => [r.id, r.name_en]));
-  const byRoom = new Map<string, RenderRow[]>();
-  for (const r of (renderRows ?? []) as RenderRow[]) {
-    if (!r.room_id || !r.image_url) continue;
-    (byRoom.get(r.room_id) ?? byRoom.set(r.room_id, []).get(r.room_id)!).push(r);
-  }
-  const renders: RoomRenders[] = [];
-  for (const [roomId, list] of byRoom) {
-    const latest = list[0]!;
-    renders.push({
-      roomId,
-      roomName: roomNameById.get(roomId) ?? "Room",
-      latestUrl: latest.image_url!,
-      latestKind: latest.kind ?? "still",
-      gallery: list.slice(0, 6).map((r) => ({ id: r.id, url: r.image_url! })),
-    });
-  }
-
   // P4 tap-to-inspect data: latest BoQ (with element_refs) + element metadata.
   const { data: boqRows } = await supabase
     .from("boqs")
@@ -126,6 +99,7 @@ export default async function ViewerPage({
       ? curateBoq(rawSections as unknown as InspectBoq, await loadWithheldNames(supabase, projectId))
       : { sections: [] };
 
+  const roomNameById = new Map(graph.rooms.map((r) => [r.id, r.name_en]));
   const fin = styleFinishes(styleKey);
   const wallIdsByRoom = new Map<string, string[]>();
   for (const w of graph.walls) {
@@ -160,15 +134,16 @@ export default async function ViewerPage({
       wallFinish: fin.wall,
     };
   });
-  const inspect: InspectData = { projectId, boq, rooms: inspectRooms, walls: inspectWalls };
+  const data: ViewerData = { projectId, boq, rooms: inspectRooms, walls: inspectWalls, facts: roomFacts(graph) };
 
-  return (
-    <>
-      <AtelierCanvas flush>
-      <div className="p-6">
-        <Villa3DLoader scene={scene} renders={renders} inspect={inspect} finishes={finishes} />
-      </div>
-    </AtelierCanvas>
-    </>
-  );
+  // "Back to …" the step you came from (remembered in the browser), else the
+  // step the 3D view is most often opened from.
+  const rail = await loadProjectRail(projectId);
+  const flags = journeyFlagsFromEnv();
+  const back: BackTargets =
+    rail?.persona === "firm"
+      ? { steps: Object.fromEntries(FIRM_STEPS.map((x) => [x.key, { label: x.label, href: x.href(projectId) }])), fallback: "scope" }
+      : { steps: Object.fromEntries(OWNER_STEPS.map((x) => [x.key, { label: x.label, href: ownerStepHref(x.key, projectId, flags) }])), fallback: "renders" };
+
+  return <ViewerLoader scene={scene} data={data} finishes={finishes} back={back} />;
 }

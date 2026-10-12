@@ -12,19 +12,21 @@
 // =============================================================================
 
 import { usePathname } from "next/navigation";
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useEffect, useSyncExternalStore, type ReactNode } from "react";
 
 import { FIRM_STEPS, OWNER_STEPS, activeStepKey, ownerStepHref, type JourneyFlags } from "@/lib/journey";
 import type { RailContext } from "@/lib/journey-state";
 
 import { HelpDrawer } from "./HelpDrawer";
 import { JourneyRail } from "./JourneyRail";
+import { noSubscribe, readStep, writeStep } from "./step-memory";
 import type { RailStep } from "./StepList";
 import { TopBar } from "./TopBar";
 
 /** Page titles for shell pages that are not journey steps. */
 const PAGE_TITLES: [RegExp, string][] = [
   [/^\/projects$/, "Projects"],
+  [/^\/project\/[^/]+\/viewer$/, "3D view"],
   [/^\/settings/, "Settings"],
   [/^\/firms\/[^/]+\/quotes\//, "Quotation"],
   [/^\/firms\/[^/]+/, "Rate book"],
@@ -44,10 +46,21 @@ export function railSteps(ctx: RailContext, flags: JourneyFlags, pathname = ""):
   return OWNER_STEPS.map((s) => ({ key: s.key, number: s.number, label: s.label, href: ownerStepHref(s.key, id, flags), status: status(s.key) }));
 }
 
+// A side surface (the 3D view, spec §6.8) is off the numbered journey: the
+// rail keeps the step you came from (./step-memory).
+const SIDE_SURFACE = /\/viewer$/;
+
 export function ShellFrame({ ctx, flags, skin, children }: { ctx: RailContext; flags: JourneyFlags; skin?: "warm"; children: ReactNode }) {
   const pathname = usePathname();
   const steps = railSteps(ctx, flags, pathname);
-  const activeKey = activeStepKey(ctx.persona, pathname, ctx.project?.id ?? null);
+  const projectId = ctx.project?.id ?? null;
+  const stepKey = activeStepKey(ctx.persona, pathname, projectId);
+  const side = SIDE_SURFACE.test(pathname);
+  const remembered = useSyncExternalStore(noSubscribe, () => (side ? readStep(projectId) : null), () => null);
+  useEffect(() => {
+    if (projectId && stepKey) writeStep(projectId, stepKey);
+  }, [projectId, stepKey]);
+  const activeKey = stepKey ?? (side && remembered && steps.some((x) => x.key === remembered) ? remembered : null);
   // K4: Revisions & Approval (21:450) takes the compact rail too — a seven-column diff beside a 360 column.
   const compactWide = activeKey === "boq_review" || activeKey === "revisions" || (ctx.persona === "owner" && /\/boq(\/revisions)?$/.test(pathname));
   const pageTitle = PAGE_TITLES.find(([re]) => re.test(pathname))?.[1] ?? null;

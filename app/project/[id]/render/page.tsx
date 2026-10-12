@@ -112,10 +112,13 @@ function buildInitialChains(
 
 export default async function RenderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ room?: string }>;
 }) {
   const { id: projectId } = await params;
+  const { room: initialRoomId } = await searchParams;
   const supabase = getSupabaseAdmin();
 
   const { data: project } = await supabase
@@ -322,6 +325,7 @@ export default async function RenderPage({
   const flags = journeyFlagsFromEnv();
   return (
     <RendersStudio
+      initialRoomId={initialRoomId ?? null}
       projectId={project.id}
       rooms={roomList.map((r) => ({ id: r.id, name_en: r.name_en, room_type: r.room_type }))}
       style={style}

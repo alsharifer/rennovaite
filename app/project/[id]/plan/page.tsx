@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/blueprint/Button";
 import { Icon } from "@/components/blueprint/Icon";
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
+import { PlanRoomFocus } from "@/components/blueprint/plan/PlanRoomFocus";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
 import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
 import { FIRM_STEPS, OWNER_STEPS } from "@/lib/journey";
@@ -64,10 +65,13 @@ function formatM2(n: number | null | undefined): string {
 
 export default async function PlanPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ room?: string }>;
 }) {
   const { id: projectId } = await params;
+  const { room: focusRoomId } = await searchParams;
   const supabase = getSupabaseAdmin();
 
   const { data: project, error: projectErr } = await supabase
@@ -248,6 +252,7 @@ export default async function PlanPage({
 
   return (
     <div className="mx-auto max-w-[1600px] px-6 py-8 pb-16 lg:px-10" data-plan-page>
+      {focusRoomId ? <PlanRoomFocus roomId={focusRoomId} /> : null}
       <p className="t-label-caps text-bp-brass-text">{eyebrow}</p>
       <h1 className="t-heading-lg mt-2 text-bp-ink-primary">{authored ? "Your plan, as you draw it" : "The plan, as parsed"}</h1>
       <p className="t-label-md mt-2 font-bp-mono text-bp-ink-secondary">{meta.join(" · ")}</p>

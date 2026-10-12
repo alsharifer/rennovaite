@@ -92,6 +92,8 @@ export function RendersStudio(props: {
   style: Style | null;
   initialChains: Record<string, StudioRender[]>;
   initialLockedRoomIds: string[];
+  /** ?room= (the 3D view's "Render this room"): open on that room's first row. */
+  initialRoomId?: string | null;
   initialPhotosByRoom: Record<string, string>;
   initialPhotoAssets: AssetLite[];
   roomCost: Record<string, number>;
@@ -129,7 +131,7 @@ export function RendersStudio(props: {
     rowsRef.current = rows;
   }, [rows]);
 
-  const firstRow = rows.find((r) => r.state !== "na" && rooms.find((x) => x.id === r.roomId)?.room_type === "master_bedroom") ?? rows.find((r) => r.state !== "na") ?? rows[0] ?? null;
+  const firstRow = (props.initialRoomId ? rows.find((r) => r.roomId === props.initialRoomId) : undefined) ?? rows.find((r) => r.state !== "na" && rooms.find((x) => x.id === r.roomId)?.room_type === "master_bedroom") ?? rows.find((r) => r.state !== "na") ?? rows[0] ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(firstRow?.id ?? null);
   const row = selectedId ? (rows.find((r) => r.id === selectedId) ?? null) : null;
   const selected = row ? { roomId: row.roomId, view: row.view } : null;
