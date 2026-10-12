@@ -181,13 +181,13 @@ export function Suppliers({
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-3.5 lg:grid-cols-[minmax(0,1fr)_180px_160px_88px]">
                   <div className="col-span-2 lg:col-span-1">
                     <p className="t-label-caps text-bp-ink-tertiary">{l.work_section}</p>
-                    <p className="t-body-sm mt-1 font-semibold text-bp-ink-primary">{l.description}</p>
+                    <p className="t-nav-item-active mt-1 text-bp-ink-primary">{l.description}</p>
                     <p className="t-num-sm mt-0.5 text-bp-ink-tertiary">
                       {formatQty(l.quantity)} {displayUnit(l.unit)}
                     </p>
                   </div>
                   <div>
-                    <p className="t-body-sm flex items-center gap-1.5 font-semibold text-bp-ink-primary">
+                    <p className="t-nav-item-active flex items-center gap-1.5 text-bp-ink-primary">
                       <Icon name="check" className="text-[18px]" />
                       <span className="sr-only">Chosen: </span>
                       {supplierName(o)}
@@ -286,7 +286,7 @@ export function Suppliers({
             return (
               <li key={g.name} className="flex items-start gap-3 border-b border-bp-line-hairline py-3">
                 <span className="min-w-0 flex-1">
-                  <span className="t-body-sm block font-semibold text-bp-ink-primary">{g.name}</span>
+                  <span className="t-nav-item-active block text-bp-ink-primary">{g.name}</span>
                   <span className="t-body-sm block text-bp-ink-secondary">
                     {g.sections.join(", ")}
                     {g.lines.length > 1 ? ` · ${g.lines.length} items` : ""}
@@ -329,7 +329,7 @@ export function Suppliers({
         </div>
         {sent ? (
           <div ref={sentRef} tabIndex={-1} role="status" className="mt-4 bg-bp-surface-sunken p-3" data-send-scope>
-            <p className="t-body-sm font-semibold text-bp-ink-primary">Your scope is ready to share</p>
+            <p className="t-nav-item-active text-bp-ink-primary">Your scope is ready to share</p>
             <p className="t-body-sm mt-1 text-bp-ink-secondary">
               Download the tender pack and send it to the contractors you choose — it is built to be bid against as it stands. Inviting contractors from RenovAIte is not built yet.
             </p>

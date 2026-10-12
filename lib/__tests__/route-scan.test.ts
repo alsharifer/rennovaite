@@ -108,7 +108,6 @@ function atelierUse(entry: string): string[] {
  */
 const ATELIER_PENDING: Record<string, string> = {
 
-  "/firms": "#10 Rate books list (63:1094)",
   "/project/new": "#12 intake → Reading your plan (63:4510) — the plot-size fields",
   "/project/[id]/plan": "plan editor canvas internals + garden panel (24:814 — K5 restyled only the chrome)",
   "/project/[id]/drawings": "the plan editor's read mode on 06 Documents (same canvas internals as /plan)",

@@ -220,7 +220,7 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, initialPro
           </div>
           {job?.status === "failed" ? (
             <div className="surface-inverse mt-4 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink" data-pack-failed role="alert">
-              <p className="t-body-sm font-semibold">
+              <p className="t-nav-item-active">
                 {job.failed_checks.length > 0
                   ? `The export ran, but ${job.failed_checks.length} check${job.failed_checks.length === 1 ? "" : "s"} on the printed documents failed — nothing was released.`
                   : "The export did not complete — nothing was released."}
