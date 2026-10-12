@@ -54,13 +54,15 @@ export default async function DrawingsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ export?: string }>;
+  searchParams: Promise<{ export?: string; proposal?: string }>;
 }) {
   // Whole surface is gated by DRAWINGS_ENABLED — invisible (404) when off.
   if (process.env.DRAWINGS_ENABLED !== "true") notFound();
 
   const { id: projectId } = await params;
-  await searchParams; // ?export=1 (the document-route redirect) lands here; the export panel is always open now.
+  // ?export=1 (the document-route redirect) lands here — the export panel is always open now;
+  // ?proposal=1 (08 Proposal → Generate) starts with the client proposal included.
+  const wantsProposal = (await searchParams).proposal === "1";
   // T5: documents leave the app only through Export pack (every gate on).
   const canExport = packExportEnabled();
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
@@ -197,7 +199,7 @@ export default async function DrawingsPage({
         <>
           {canExport && preflight ? (
             <div className="mt-8">
-              <DocumentsExport projectId={projectId} rev={rev} checkedAt={checkedAt} initial={preflight} latestJobId={jobs[0]?.id ?? null} sheetCount={set.sheets.length} bookOpen={bookOpen} />
+              <DocumentsExport projectId={projectId} rev={rev} checkedAt={checkedAt} initial={preflight} initialProposal={wantsProposal} latestJobId={jobs[0]?.id ?? null} sheetCount={set.sheets.length} bookOpen={bookOpen} />
             </div>
           ) : null}
 

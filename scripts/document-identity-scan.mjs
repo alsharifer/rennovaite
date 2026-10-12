@@ -70,6 +70,27 @@ for (const id of args) {
     if (res.ok) surfaces.push([label, await res.text()]);
     else console.log(`  ${label}: HTTP ${res.status}`);
   }
+  // K4: the firm surfaces — Rates & Basis (project context and the firm's own
+  // book), Revisions & Approval, Documents, Proposal (page, setup, the
+  // watermarked preview pages) — HTML + RSC payload, as the browser receives them.
+  const k4 = [
+    ["rates page (HTML + payload)", `/project/${id}/rates`],
+    ["revisions page (HTML + payload)", `/project/${id}/boq/revisions`],
+    ["documents page (HTML + payload)", `/project/${id}/drawings`],
+    ["proposal page (HTML + payload)", `/project/${id}/proposal`],
+    ["GET /api/projects/:id/proposal-setup", `/api/projects/${id}/proposal-setup`],
+    ["GET /api/projects/:id/proposal-preview", `/api/projects/${id}/proposal-preview`],
+    ["GET /api/projects/:id/pack-export (gate)", `/api/projects/${id}/pack-export?proposal=1`],
+  ];
+  if (p?.firm_id) {
+    k4.push(["firm book page (HTML + payload)", `/firms/${p.firm_id}`]);
+    for (const q of (await sb.from("firm_quotes").select("id").eq("firm_id", p.firm_id).limit(5)).data ?? []) k4.push([`quote review ${q.id.slice(0, 8)} (HTML + payload)`, `/firms/${p.firm_id}/quotes/${q.id}`]);
+  }
+  for (const [label, path] of k4) {
+    const res = await api(`${base}${path}`);
+    if (res.ok) surfaces.push([label, await res.text()]);
+    else console.log(`  ${label}: HTTP ${res.status}${res.status === 409 || res.status === 403 || res.status === 404 ? " (no payload to scan)" : ""}`);
+  }
 
   console.log(`  surfaces scanned: ${surfaces.length}`);
   for (const n of names) {

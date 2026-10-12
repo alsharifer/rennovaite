@@ -39,7 +39,7 @@ export function RevisionsScreen({ view, eyebrow, canApprove, approveBlock }: { v
   const c = view.counts;
 
   return (
-    <div className="mx-auto max-w-[1344px] px-6 py-8 lg:px-10" data-diff-from={view.from.boqId} data-diff-to={view.to.boqId}>
+    <div className="mx-auto max-w-[1344px] px-6 py-8 lg:px-10" data-diff-from={view.from.boqId} data-diff-to={view.to.boqId} ref={(el) => el?.setAttribute("data-hydrated", "")}>
       <TopBarActions>
         <a href={view.pdfHref} className={`bp-desk-only ${SECONDARY_A}`} data-testid="diff-pdf">
           Export diff PDF

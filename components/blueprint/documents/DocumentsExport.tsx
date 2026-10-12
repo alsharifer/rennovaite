@@ -15,6 +15,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
+import { isWorkingName } from "@/lib/documents/pack-export/checklist";
 import type { ChecklistItem, PackProgress } from "@/lib/documents/pack-export/types";
 
 import { Button } from "../Button";
@@ -61,17 +62,19 @@ export interface DocumentsExportProps {
   rev: number | null;
   checkedAt: string;
   initial: Preflight;
+  /** 08 Proposal → Generate: start with the client proposal included. */
+  initialProposal?: boolean;
   latestJobId: string | null;
   sheetCount: number;
   /** On a firm project: what keeps the client proposal locked, in the book's words. */
   bookOpen: { conflicts: number; outliers: number } | null;
 }
 
-export function DocumentsExport({ projectId, rev, checkedAt, initial, latestJobId, sheetCount, bookOpen }: DocumentsExportProps) {
+export function DocumentsExport({ projectId, rev, checkedAt, initial, initialProposal = false, latestJobId, sheetCount, bookOpen }: DocumentsExportProps) {
   const [preflight, setPreflight] = useState<Preflight>(initial);
   const [name, setName] = useState(initial.documentName ?? "");
   const [renders, setRenders] = useState<"full" | "cached">("full");
-  const [proposal, setProposal] = useState(false);
+  const [proposal, setProposal] = useState(initialProposal && !!initial.firm);
   const [job, setJob] = useState<JobView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -120,7 +123,11 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, latestJobI
   }
 
   const gate = job?.status === "blocked" && job.checklist ? job.checklist : preflight.checklist;
-  const core = gate.filter((c) => !PROPOSAL_KEYS.has(c.key));
+  // The run saves an edited name BEFORE it applies the gate, so a client-facing
+  // name typed here already answers the name check (the same rule, isWorkingName).
+  const core = gate
+    .filter((c) => !PROPOSAL_KEYS.has(c.key))
+    .map((c) => (c.key === "name" && nameChanged && name.trim() ? { ...c, ok: !isWorkingName(name.trim()), detail: isWorkingName(name.trim()) ? `"${name.trim()}" is still a working name.` : `Covers will print "${name.trim()}" — saved when the export starts.` } : c));
   const proposalItems = gate.filter((c) => PROPOSAL_KEYS.has(c.key));
   const basis = proposalItems.find((c) => c.key === "reference_basis") ?? null;
   const blocking = core.filter((c) => !c.ok).length + (proposal ? proposalItems.filter((c) => !c.ok).length : 0);
@@ -129,7 +136,7 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, latestJobI
   const runDisabled = running ? { reason: "An export is running", reasonId: runReasonId } : blocking > 0 ? { reason: `Resolve ${blocking} blocking check${blocking === 1 ? "" : "s"} first`, reasonId: runReasonId, showReason: true } : false;
 
   return (
-    <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_400px]" data-pack-export>
+    <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_400px]" data-pack-export ref={(el) => el?.setAttribute("data-hydrated", "")}>
       <section aria-labelledby="checks-h" className="min-w-0">
         <h2 id="checks-h" className="t-label-caps border-b border-bp-line-strong bg-bp-surface-sunken px-3 py-2.5 text-bp-ink-tertiary">
           EXPORT CHECKS{rev ? ` · REV ${rev}` : ""} · CHECKED {checkedAt}

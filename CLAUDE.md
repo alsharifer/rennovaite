@@ -241,14 +241,74 @@ except `design-refs/r7-handoff/`.
   total and Δ and links the U4 diff. Test ids `regenerate`,
   `regenerate-button`, `regenerate-result`, `regenerate-diff-link` are kept
   for the walkthrough.
-- **The revisions page** (K4) keeps its Atelier body on `AtelierCanvas`
-  (`components/blueprint/shell/ShellFrame.tsx`) — the boq segment layout is
-  `content="blueprint"`.
 - **Checks**: `node scripts/boq-review-check.mjs [port] [--shots=dir] [ids…]`
   (stored = displayed, rate × qty = amount, page height ≤ 4,500, §4.3 keyboard,
   axe light + dark, tablet / phone) over `scripts/lib/cdp.mjs` (a signed-in
   headless Chrome); the onboarding walkthrough covers Add to my book,
   Unchanged → Ready → Running → Done and the firm-rate popovers.
+
+### Firm surfaces (K4)
+
+Steps 04 · 06 · 07 · 08 and quote review are Blueprint (spec §3.3–§3.7;
+frames 19:48, 20:263, 21:450, 22:548, 23:689). A page's step eyebrow comes
+from the journey (`lib/journey-eyebrow.ts`), never a literal.
+
+- **04 Rates & Basis** (`/firms/[firmId]`, `/project/[id]/rates`) —
+  `lib/firms/book-view.ts` (`loadBookView`, member-checked first): NEEDS
+  ATTENTION (H8 unit check with the conversion offer and its project
+  consequence · outlier · conflict) above IN USE, the status strip (book
+  status · this project's lines · reference basis with the L4 accept control,
+  anchored `#reference-basis`), Entries / Quote imports / Corrections /
+  History. **Mark book reviewed is refused while attention is open** — on the
+  screen and at the route (`updateFirm` → 409 `attention_open`); an outlier
+  confirmed with no figure change writes `outlier_confirmed` with its
+  `entry_id`, which is what clears it.
+- **Quote review** — one status per line (READY · CONFIRM MATCH · HELD:
+  outlier / unit check / currency / not a number · NO MATCH · REJECTED · IN
+  BOOK); a foreign-currency hold takes an AED rate (`enter_rate_aed`,
+  recorded as `rate_entered` with a conversion note).
+- **07 Revisions & Approval** — `lib/boq/revisions-view.ts` shapes U4's ONE
+  diff object: rev N labels (oldest = rev 1, Dubai time), chain A · B · Δ,
+  lines with marks and RECORDED causes linked to their record ("none
+  recorded" otherwise), a reconciliation sentence that names any gap, the
+  window events no line names, and the later revision's approval trail.
+  Client approval = name + date + how it was given + reference (kept in the
+  approval's note — no migration). **"Link causes to lines" is shown disabled
+  with its reason: there is no record behind it** (backlog). Compact rail
+  like the BoQ page.
+- **06 Documents** — `components/blueprint/documents/DocumentsExport.tsx`:
+  EXPORT CHECKS (the run's gate, server-computed; PASS / BLOCKS EXPORT), the
+  reference basis on a firm project (BLOCKS CLIENT PROPOSAL — the gate locks
+  the proposal, not the pack), and the printed-page checks from the latest
+  IN-APP run. Run export is disabled with the number of blocking checks. The
+  **internal review pack is NOT built** — shown disabled with its reason (it
+  needs a watermark and a release rule; a decision, not a build).
+- **08 Proposal** (`/project/[id]/proposal`) — the gate first (same verdict
+  as the export), then SETUP (migration **053**: firm defaults
+  `proposal_validity_days` / `proposal_payment_terms` /
+  `proposal_show_line_rates`, and `project_proposals` per project — client,
+  validity, payment terms, cover note, line rates), saved on leaving each
+  field via `PUT /api/projects/:id/proposal-setup`; validity, payment terms
+  and the line-rate choice also become the firm's defaults. **Line rates
+  default OFF**: the client reads quantities and section totals. The document
+  gains client, validity, cover note, payment terms, EXCLUSIONS & TO BE
+  PRICED and ASSUMPTIONS (`lib/documents/proposal.ts`; an L4 caller that
+  passes no setup gets the L4 document). **Preview as client** =
+  `GET /api/projects/:id/proposal-preview` → SVG pages with `PREVIEW · NOT
+  ISSUED` on every page, firm members only, identity-scanned — never a PDF,
+  never a release. **Generate proposal** opens 06 Documents with the proposal
+  included (`?export=1&proposal=1`): the proposal still leaves only through
+  the gated export. One loader for both: `lib/documents/proposal-load.ts`.
+- **Checks**: `node scripts/k-page-check.mjs [port] --shots=dir --projects=<ids>
+  name=/path …` (axe + shots, light/dark, desktop/tablet/phone); the onboarding
+  walkthrough runs the K4 loop (quote → pergola held → convert → reviewed →
+  04 clears → 08 locked/unlocked → regenerate → diff with cause → approvals →
+  setup → preview → Documents with the proposal) and scans every K4 payload
+  for withheld identities with the member's session;
+  `scripts/document-identity-scan.mjs` scans them too.
+- **Gotcha (K4)**: an `sr-only` span inside an `overflow-x-auto` region
+  escapes it (absolute, no positioned ancestor) and widens the phone page —
+  give every scroll region `relative`.
 
 ## Brand — Atelier Precise (pages not yet redesigned)
 

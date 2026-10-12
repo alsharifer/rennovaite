@@ -63,7 +63,9 @@ describe("every document route is gated", () => {
 });
 
 describe("the UI has no direct link to a document route", () => {
-  const DIRECT = /\/api\/projects\/\$\{[^}]+\}\/(drawings|render-pack|boq-pdf|proposal)\b/;
+  // The route itself — not a sibling that shares its prefix (K4: /proposal-setup
+  // saves the setup, /proposal-preview draws watermarked SVG pages; neither releases).
+  const DIRECT = /\/api\/projects\/\$\{[^}]+\}\/(drawings|render-pack|boq-pdf|proposal)(?![\w-])/;
   const files = [...walk(path.join(ROOT, "app")), ...walk(path.join(ROOT, "components"))].filter((f) => !/[\\/]api[\\/]/.test(f));
 
   it("scans the app's pages and components", () => {
@@ -82,6 +84,8 @@ describe("the UI has no direct link to a document route", () => {
       "app/project/[id]/drawings/page.tsx",
       "components/blueprint/boq/BoqReview.tsx",
       "components/blueprint/documents/DocumentsExport.tsx",
+      // K4: 08 Proposal → Generate opens the Export pack panel with the proposal included.
+      "components/blueprint/proposal/ProposalScreen.tsx",
     ]);
   });
 });
