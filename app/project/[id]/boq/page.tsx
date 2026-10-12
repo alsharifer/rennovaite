@@ -24,6 +24,9 @@ import { loadProvenanceContext } from "@/lib/provenance/load";
 import { loadFirmBook, loadProjectFirmOverlay } from "@/lib/rates/firm";
 import { collectFurnitureSection } from "@/lib/staging/collect";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { hasTakeoffProvenance, type ScenarioBoq } from "@/lib/whatif/engine";
+import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
+import type { WhatIfEngine } from "@/components/blueprint/boq/WhatIfTab";
 
 import { RegenerateBoq } from "./_components/regenerate-boq";
 
@@ -190,6 +193,22 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
     /* best-effort */
   }
 
+  // P5 what-if: the grade engine when the BoQ has take-off provenance (legacy
+  // LLM-path BoQs are refused) — wrapped, unchanged, in the inspector's What-if tab.
+  const scenarioBoq: ScenarioBoq = {
+    sections: boq.sections.map((s) => ({ work_section: s.work_section, lines: s.lines.map((l) => ({ rule_id: l.rule_id, quantity: l.quantity, rate_aed: l.rate_aed, total_aed: l.total_aed, description: l.description })) })),
+    grand_total_aed: boq.grand_total_aed,
+    subtotal_aed: boq.subtotal_aed,
+    contingency_pct: boq.contingency_pct,
+    vat_pct: boq.vat_pct,
+    ohp_pct: boq.ohp_pct,
+  };
+  let engine: WhatIfEngine | null = null;
+  if (process.env.WHATIF_ENABLED === "true" && hasTakeoffProvenance(scenarioBoq)) {
+    const [rateBook, scenario] = await Promise.all([loadRateBook(sb), loadLatestScenario(sb, id)]);
+    engine = { rateBook, boq: scenarioBoq, initialSelections: scenario?.selections ?? {} };
+  }
+
   const highlightRef = sp.highlight ? resolveRef(boq.sections, sp.highlight) : null;
 
   return (
@@ -205,6 +224,7 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
         view={sp.view === "byroom" ? "byroom" : "sections"}
         highlightRoom={sp.room ?? null}
         regenerate={<RegenerateBoq projectId={id} block={regenerateBlock} />}
+        engine={engine}
       />
     </>
   );

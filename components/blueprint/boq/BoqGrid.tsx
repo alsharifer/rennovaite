@@ -178,10 +178,10 @@ export function BoqGrid(p: Props) {
                     {s.code}
                   </span>
                   <span className="bp-boq-col-title flex min-w-0 items-baseline gap-2 px-4">
-                    <span id={`${sectionDomId(s.code)}-name`} className="t-heading-sm truncate text-bp-ink-primary">
+                    <span id={`${sectionDomId(s.code)}-name`} className="t-heading-sm whitespace-nowrap text-bp-ink-primary">
                       {s.name}
                     </span>
-                    <span className="t-label-md shrink-0 text-bp-ink-tertiary">
+                    <span className="t-label-md min-w-0 truncate text-bp-ink-tertiary">
                       {linesWord(s.lines.length)}
                       {s.tbp > 0 ? ` · ${s.tbp} to be priced` : ""}
                     </span>
@@ -283,7 +283,7 @@ function LineRow({
         <span className="bp-boq-title t-body-sm text-bp-ink-primary">{line.description}</span>
       </div>
       {fig("qty", 2, "bp-boq-col-qty", <Figure value={line.quantity} tier={line.tiers.qty} format="qty" role="qty" persona={persona} />)}
-      <div role="gridcell" data-cell={`${row}:3`} tabIndex={tab(row, 3)} onFocus={onFocusCell(row, 3)} className="bp-boq-col-unit px-2 t-label-md text-bp-ink-secondary">
+      <div role="gridcell" data-cell={`${row}:3`} tabIndex={tab(row, 3)} onFocus={onFocusCell(row, 3)} className="bp-boq-col-unit whitespace-nowrap pl-2 t-label-md text-bp-ink-secondary">
         {displayUnit(line.unit)}
       </div>
       {fig(

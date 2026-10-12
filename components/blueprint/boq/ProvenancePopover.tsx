@@ -20,10 +20,11 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import { formatAED, formatQty } from "@/lib/format/aed";
 import type { ReviewLine } from "@/lib/boq/review-types";
-import { tierLabelWithWhy, type FigureRole } from "@/lib/provenance/tier-vocab";
+import { tierLabelWithWhy, type FigureRole, type Persona } from "@/lib/provenance/tier-vocab";
 import type { FigureProvenance } from "@/lib/provenance/types";
 
 import { ProvenanceMark } from "../ProvenanceMark";
+import { displayUnit } from "./format";
 
 export const POPOVER_ID = "bp-boq-provenance";
 
@@ -53,16 +54,16 @@ function rateSummary(p: FigureProvenance | undefined): string | null {
   return src?.detail ?? tier?.detail ?? null;
 }
 
-export function weakerSentence(line: ReviewLine): string {
+export function weakerSentence(line: ReviewLine, persona: Persona = "firm"): string {
   const { qty, rate, amount } = line.tiers;
   if (line.unpriced) return "To be priced — not in any total.";
-  if (qty === rate) return `Quantity and rate are both ${tierLabelWithWhy(qty, null, "firm", "qty").toLowerCase()}.`;
+  if (qty === rate) return `Quantity and rate are both ${tierLabelWithWhy(qty, null, persona, "qty").toLowerCase()}.`;
   const weak = amount === qty ? "quantity" : "rate";
   const why = weak === "quantity" ? line.tiers.qtyWhy : line.tiers.rateWhy;
-  return `Amount takes the weaker input: ${weak} is ${tierLabelWithWhy(amount, null, "firm").toLowerCase()}${why && !why.startsWith(weak) ? ` (${why})` : ""}.`;
+  return `Amount takes the weaker input: ${weak} is ${tierLabelWithWhy(amount, null, persona).toLowerCase()}${why && !why.startsWith(weak) && persona === "firm" ? ` (${why})` : ""}.`;
 }
 
-export function ProvenancePopover({ target, onPointerEnter, onPointerLeave }: { target: PopoverTarget; onPointerEnter: () => void; onPointerLeave: () => void }) {
+export function ProvenancePopover({ target, persona, onPointerEnter, onPointerLeave }: { target: PopoverTarget; persona: Persona; onPointerEnter: () => void; onPointerLeave: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const { line, role, rect, avoid } = target;
@@ -101,7 +102,7 @@ export function ProvenancePopover({ target, onPointerEnter, onPointerLeave }: { 
       <div className="mb-3 flex items-center justify-between gap-3 border-b border-bp-line-hairline pb-2">
         <span className="inline-flex items-center gap-1.5">
           <ProvenanceMark tier={tier} />
-          <span className="t-label-caps">{tierLabelWithWhy(tier, why, "firm", role)}</span>
+          <span className="t-label-caps">{tierLabelWithWhy(tier, persona === "firm" ? why : null, persona, role)}</span>
         </span>
         <span className="t-label-md text-bp-ink-tertiary">
           {line.ref} · {role === "qty" ? "QUANTITY" : role === "rate" ? "RATE" : "AMOUNT"}
@@ -114,7 +115,7 @@ export function ProvenancePopover({ target, onPointerEnter, onPointerLeave }: { 
         <>
           <p className="t-num-sm flex flex-wrap items-center gap-1.5">
             <span>
-              {formatQty(line.quantity)} {line.unit}
+              {formatQty(line.quantity)} {displayUnit(line.unit)}
             </span>
             <ProvenanceMark tier={line.tiers.qty} />
             <span className="text-bp-ink-tertiary">×</span>
@@ -123,10 +124,10 @@ export function ProvenancePopover({ target, onPointerEnter, onPointerLeave }: { 
             <span className="text-bp-ink-tertiary">=</span>
             <span>{formatAED(line.amount)}</span>
           </p>
-          <p className="t-body-sm mt-2 text-bp-ink-secondary">{weakerSentence(line)}</p>
+          <p className="t-body-sm mt-2 text-bp-ink-secondary">{weakerSentence(line, persona)}</p>
         </>
       ) : (
-        <p className="t-num-sm">{role === "qty" ? `${formatQty(line.quantity)} ${line.unit}` : `${formatAED(line.rate)} / ${line.unit}`}</p>
+        <p className="t-num-sm">{role === "qty" ? `${formatQty(line.quantity)} ${displayUnit(line.unit)}` : `${formatAED(line.rate)} / ${displayUnit(line.unit)}`}</p>
       )}
 
       <dl className="t-label-md mt-3 grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-2">

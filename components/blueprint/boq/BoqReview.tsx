@@ -16,6 +16,9 @@ import type { FigureRole } from "@/lib/provenance/tier-vocab";
 import { Button } from "../Button";
 import { TopBarActions } from "../shell/TopBar";
 import { BoqGrid, rowDomId, sectionDomId } from "./BoqGrid";
+import { correctionsFor, type Correction } from "./CorrectionsTab";
+import { Inspector, type InspectorTab } from "./Inspector";
+import type { WhatIfEngine } from "./WhatIfTab";
 import { ByRoom, Furniture, Programme, type FurnitureView, type RoomRollup } from "./Extras";
 import { Notices } from "./Notices";
 import { PinnedTotal } from "./PinnedTotal";
@@ -36,12 +39,14 @@ export interface BoqReviewProps {
   highlightRoom: string | null;
   /** Rendered in the work area until the regenerate control is wired (K3 commit 3). */
   regenerate?: ReactNode;
+  /** P5: the grade engine, when the BoQ has take-off provenance and WHATIF is on. */
+  engine: WhatIfEngine | null;
 }
 
 const HOVER_DELAY = 250;
 const CLOSE_GRACE = 120;
 
-export function BoqReview({ model, rooms, furniture, permits, packExport, highlightRef, view, highlightRoom, regenerate }: BoqReviewProps) {
+export function BoqReview({ model, rooms, furniture, permits, packExport, highlightRef, view, highlightRoom, regenerate, engine }: BoqReviewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef<HTMLDivElement>(null);
   const lineByRef = useMemo(() => new Map(model.sections.flatMap((s) => s.lines.map((l) => [l.ref, l] as const))), [model.sections]);
@@ -51,6 +56,12 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
   const [selectedKey, setSelectedKey] = useState<string | null>(initialSelected);
   const [current, setCurrent] = useState<string | null>(model.sections[0]?.name ?? null);
   const [pop, setPop] = useState<PopoverTarget | null>(null);
+  const [tab, setTab] = useState<InspectorTab>("line");
+  const [capturing, setCapturing] = useState(false);
+  const [corrections, setCorrections] = useState<Correction[]>([]);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const opener = useRef<string | null>(null);
+  const selected = useMemo(() => (selectedKey ? (model.sections.flatMap((s) => s.lines).find((l) => l.key === selectedKey) ?? null) : null), [model.sections, selectedKey]);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -97,6 +108,18 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
   useEffect(() => {
     if (view === "byroom") document.getElementById(highlightRoom ? `boq-room-${highlightRoom}` : "boq-by-room")?.scrollIntoView({ block: "start" });
   }, [view, highlightRoom]);
+
+  // --- corrections: this project's, once (a correction is recorded, never applied) ---
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/boq-corrections?project_id=${model.projectId}`)
+      .then((r) => (r.ok ? r.json() : { corrections: [] }))
+      .then((b: { corrections?: Correction[] }) => !cancelled && setCorrections(b.corrections ?? []))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [model.projectId]);
 
   // --- popover ---------------------------------------------------------------------
   const target = useCallback(
@@ -172,7 +195,22 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
 
   const openLine = (key: string) => {
     setPop(null);
+    if (key !== selectedKey) {
+      setTab("line");
+      setCapturing(false);
+    }
+    opener.current = key;
     setSelectedKey(key);
+  };
+  /** Close returns focus to the row it was opened from (§4.2 #4). */
+  const closeInspector = () => {
+    const key = opener.current ?? selectedKey;
+    setSelectedKey(null);
+    setCapturing(false);
+    requestAnimationFrame(() => {
+      const row = key ? document.querySelector<HTMLElement>(`[data-line-key="${CSS.escape(key)}"] [role="gridcell"]:not([hidden])`) : null;
+      row?.focus();
+    });
   };
 
   return (
@@ -200,7 +238,7 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
 
       <SectionChips sections={model.sections} current={current} onJump={jump} persona={model.persona} />
 
-      <div className="bp-boq-work px-6 pb-16 pt-6 md:px-8" data-inspector="closed">
+      <div className="bp-boq-work px-6 pb-16 pt-6 md:px-8" data-inspector={selected ? "open" : "closed"}>
         <SectionIndex
           sections={model.sections}
           current={current}
@@ -232,11 +270,40 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
           {rooms.length > 0 ? <ByRoom rooms={rooms} open={view === "byroom"} highlightRoom={highlightRoom} /> : null}
           {furniture ? <Furniture furniture={furniture} /> : null}
         </div>
+        {selected ? (
+          <aside
+            aria-labelledby="bp-boq-inspector-heading"
+            className="bp-boq-inspector border border-bp-line-strong bg-bp-surface-base"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                closeInspector();
+              }
+            }}
+            data-inspector-for={selected.ref}
+          >
+            <Inspector
+              line={selected}
+              model={model}
+              tab={tab}
+              setTab={setTab}
+              corrections={correctionsFor(corrections, selected)}
+              capturing={capturing}
+              setCapturing={setCapturing}
+              onCorrectionSaved={(c) => setCorrections((cur) => [...cur, c])}
+              engine={engine}
+              furniture={furniture?.total ?? null}
+              onClose={closeInspector}
+              headingRef={headingRef}
+            />
+          </aside>
+        ) : null}
       </div>
 
       {pop ? (
         <ProvenancePopover
           target={pop}
+          persona={model.persona}
           onPointerEnter={clearTimers}
           onPointerLeave={() => {
             closeTimer.current = setTimeout(() => setPop(null), CLOSE_GRACE);

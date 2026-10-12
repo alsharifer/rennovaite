@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { Figure } from "@/components/figures/Figure";
 import { checkMagnitude } from "@/lib/firms/magnitude";
@@ -191,6 +191,21 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
     }));
     setDraftErrors([]);
   }
+  // K3: "Add to my book" from the BoQ inspector — ?add=<item_key>&rate=<n>
+  // prefills this form (nothing is saved until the member presses Add).
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !vocab) return;
+    const q = new URLSearchParams(window.location.search);
+    const key = q.get("add");
+    if (!key || !byKey.has(key)) return;
+    prefilled.current = true;
+    pickItem(key);
+    const rate = q.get("rate");
+    if (rate && Number.isFinite(Number(rate))) setDraft((d) => ({ ...d, rate_aed: rate }));
+    document.getElementById("new-entry")?.scrollIntoView({ block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vocab, byKey]);
   // H8: an outlier the server refused; the member may save it anyway (recorded).
   const [addOutlier, setAddOutlier] = useState(false);
   const draftMagnitude = useMemo(() => {
@@ -596,7 +611,7 @@ export function FirmBookEditor({ initialFirm, initialEntries }: { initialFirm: F
       </section>
 
       {/* Add entry */}
-      <section className="rounded-xl border border-ink-100 bg-paper p-md" aria-label="Add a rate entry">
+      <section id="new-entry" className="rounded-xl border border-ink-100 bg-paper p-md" aria-label="Add a rate entry">
         <p className="label-caps text-ink-500">Add an entry</p>
         {vocabError && (
           <p role="alert" className="mt-xs text-body-sm text-error">
