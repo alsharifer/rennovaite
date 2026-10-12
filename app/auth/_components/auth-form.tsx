@@ -9,7 +9,7 @@ import { signInWithEmail } from "@/app/_actions/sign-in-with-email";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FADE = { duration: 0.24, ease: "easeOut" as const };
 
-export function AuthForm({ next }: { next?: string }) {
+export function AuthForm({ next, linkError }: { next?: string; linkError?: string | null }) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submittedTo, setSubmittedTo] = useState<string | null>(null);
@@ -105,6 +105,18 @@ export function AuthForm({ next }: { next?: string }) {
             transition={FADE}
             className="w-full"
           >
+            {linkError && (
+              <div
+                role="status"
+                data-testid="link-error"
+                className="mb-xl flex w-full items-start gap-sm rounded border border-ink-100 bg-paper px-md py-sm"
+              >
+                <span className="material-symbols-outlined text-[20px] text-ink-500" aria-hidden="true">
+                  link_off
+                </span>
+                <p className="font-body-sm text-body-sm text-ink-700">{linkError}</p>
+              </div>
+            )}
             <h1 className="mb-md font-display text-headline-lg text-on-surface">
               Pick up where you left off.
             </h1>
