@@ -3,8 +3,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { AppShell } from "@/components/app/AppShell";
-import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
 import { loadGardenSiteData, type GardenSiteData } from "@/lib/plan/garden-site-data";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
@@ -28,7 +26,6 @@ interface PlanRow {
 
 export const dynamic = "force-dynamic";
 
-const PAGE_NAME = "Plan Analysis";
 const HVAC_HABITABLE = new Set([
   "master_bedroom",
   "bedroom",
@@ -43,7 +40,7 @@ const BEDROOM_TYPES = new Set(["master_bedroom", "bedroom"]);
 const BATHROOM_TYPES = new Set(["bathroom", "ensuite", "powder"]);
 
 function Shell({ children }: { children: ReactNode }) {
-  return <AppShell pageName={PAGE_NAME}>{children}</AppShell>;
+  return <>{children}</>;
 }
 
 function CenteredMessage({
@@ -243,7 +240,6 @@ export default async function PlanPage({
       <div className="mx-auto max-w-[1440px] pb-32">
         {/* Header ---------------------------------------------------- */}
         <header className="mb-2xl">
-          <JourneyProgress stepKey="layout" projectId={projectId} />
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             {authored ? "Your plan, as you draw it." : "Your villa, understood."}
           </h1>

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-import { AppShell } from "@/components/app/AppShell";
+import { ProjectShell } from "@/components/blueprint/shell/ProjectShell";
 import { ProjectFilesPanel } from "@/components/assets/ProjectFilesPanel";
 import { ApprovalsCard } from "@/components/boq/ApprovalsCard";
 import { listRevisions, type RevisionSummary } from "@/lib/boq/revisions";
@@ -296,7 +296,9 @@ export default async function ProjectHubPage({
   const projectAssets = (await loadProjectAssets(projectId)).map(toAssetLite);
 
   return (
-    <AppShell pageName="Project Hub">
+    // K2: the hub sits at the [id] level, so it frames itself (the redesigned
+    // child segments take the same shell from their layouts).
+    <ProjectShell projectId={projectId}>
       <div className="mx-auto max-w-[1440px] pb-2xl">
         {/* HEADER ----------------------------------------------------- */}
         <header className="mb-xl flex flex-wrap items-end justify-between gap-md">
@@ -454,7 +456,7 @@ export default async function ProjectHubPage({
           arrow_forward
         </span>
       </Link>
-    </AppShell>
+    </ProjectShell>
   );
 }
 

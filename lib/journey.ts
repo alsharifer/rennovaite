@@ -190,3 +190,82 @@ export function prevStep(
   const i = steps.findIndex((s) => s.key === key);
   return i > 0 ? steps[i - 1]! : null;
 }
+
+// =============================================================================
+// The FIRM journey (K2) — Blueprint v0.4 §7, R7 rail frame 9:361.
+//
+// A separate definition beside the owner list above (which is untouched): the
+// persona decides which one a page's rail renders — a member of the firm a
+// project is attached to sees this one, everyone else the owner journey
+// (lib/journey-state.ts). Numbering is FIXED, 00–08: a firm step never drops
+// out; when it cannot be used yet it is Blocked and says why.
+//
+// Every step maps to a route that exists. 01 Project & Plan is the intake
+// (v0.4 §7) — for an existing project there is no per-project intake page, so
+// it opens the plan, whose source and parse state it covers; 02 Scope owns
+// that route's active state (spec §3.8). 08 Proposal opens a gate page until
+// K4 builds the proposal screen there.
+// =============================================================================
+
+export type JourneyPersona = "firm" | "owner";
+
+export type FirmStepKey =
+  | "hub"
+  | "project_plan"
+  | "scope"
+  | "specification"
+  | "rates_basis"
+  | "boq_review"
+  | "documents"
+  | "revisions"
+  | "proposal";
+
+export interface FirmStepDef {
+  key: FirmStepKey;
+  /** Fixed two-digit number, "00"–"08". */
+  number: string;
+  label: string;
+  href: (projectId: string) => string;
+  /** The project-relative paths on which this step is the active one ("" = the hub). */
+  activeOn: readonly string[];
+}
+
+export const FIRM_STEPS: readonly FirmStepDef[] = [
+  { key: "hub", number: "00", label: "Project hub", href: (id) => `/project/${id}`, activeOn: [""] },
+  { key: "project_plan", number: "01", label: "Project & Plan", href: (id) => `/project/${id}/plan`, activeOn: [] },
+  { key: "scope", number: "02", label: "Scope", href: (id) => `/project/${id}/plan`, activeOn: ["/plan"] },
+  { key: "specification", number: "03", label: "Specification", href: (id) => `/project/${id}/accessories`, activeOn: ["/accessories"] },
+  { key: "rates_basis", number: "04", label: "Rates & Basis", href: (id) => `/project/${id}/rates`, activeOn: ["/rates"] },
+  { key: "boq_review", number: "05", label: "BoQ & Review", href: (id) => `/project/${id}/boq`, activeOn: ["/boq"] },
+  { key: "documents", number: "06", label: "Documents", href: (id) => `/project/${id}/drawings`, activeOn: ["/drawings"] },
+  { key: "revisions", number: "07", label: "Revisions & Approval", href: (id) => `/project/${id}/boq/revisions`, activeOn: ["/boq/revisions"] },
+  { key: "proposal", number: "08", label: "Proposal", href: (id) => `/project/${id}/proposal`, activeOn: ["/proposal"] },
+];
+
+/** Owner steps' extra surfaces that light the same step (style folds into ideation). */
+const OWNER_ACTIVE_ALIASES: Partial<Record<JourneyStepKey, readonly string[]>> = {
+  ideation: ["/ideation", "/style"],
+  costing: ["/boq", "/boq/revisions", "/accessories"],
+};
+
+/**
+ * Which step a pathname lights, for either persona. Exact project-relative
+ * match first (so /boq/revisions is 07, not 05); null when the page is not a
+ * step (the 3D viewer, settings).
+ */
+export function activeStepKey(persona: JourneyPersona, pathname: string, projectId: string | null, flags: JourneyFlags): string | null {
+  const prefix = projectId ? `/project/${projectId}` : null;
+  if (persona === "firm") {
+    if (!prefix || !(pathname === prefix || pathname.startsWith(`${prefix}/`))) return null;
+    const rel = pathname.slice(prefix.length).replace(/\/$/, "");
+    return FIRM_STEPS.find((s) => s.activeOn.includes(rel))?.key ?? null;
+  }
+  if (pathname === "/project/new") return "intake";
+  if (!prefix || !pathname.startsWith(prefix)) return null;
+  const rel = pathname.slice(prefix.length).replace(/\/$/, "");
+  for (const s of journeySteps(flags)) {
+    const own = s.key === "intake" ? null : s.href(projectId!).slice(prefix.length);
+    if ((OWNER_ACTIVE_ALIASES[s.key] ?? (own ? [own] : [])).includes(rel)) return s.key;
+  }
+  return null;
+}

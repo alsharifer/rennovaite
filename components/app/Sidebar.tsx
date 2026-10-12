@@ -17,13 +17,8 @@ const PRIMARY: NavItem[] = [
   { label: "AI Designer", href: "/project", icon: "magic_button", match: ["/project"] },
   // U2: a firm's private rate books (members only).
   { label: "Rate books", href: "/firms", icon: "menu_book", match: ["/firms"] },
-  {
-    label: "Marketplace",
-    href: "/marketplace",
-    icon: "storefront",
-    match: ["/marketplace"],
-  },
-  { label: "Community", href: "/community", icon: "groups", match: ["/community"] },
+  // K2 (spec §3.10): Marketplace and Community are cut from navigation; the
+  // routes remain.
 ];
 
 const SECONDARY: NavItem[] = [

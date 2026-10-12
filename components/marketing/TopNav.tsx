@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 const LINKS = [
   { label: "Floorplans", href: "/project" },
   { label: "AI Renders", href: "/project" },
-  { label: "Marketplace", href: "/marketplace" },
 ];
 
 export function TopNav() {

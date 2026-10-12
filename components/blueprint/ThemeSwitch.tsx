@@ -22,8 +22,15 @@ function subscribe(onChange: () => void) {
 }
 const readPref = () => parseThemePref(document.documentElement.getAttribute("data-theme-pref"));
 
+/** The current preference, live (the rail footer's "Theme · Light"). */
+export function useThemePref(): ThemePref {
+  return useSyncExternalStore(subscribe, readPref, () => DEFAULT_THEME_PREF);
+}
+
+export const THEME_LABEL = LABEL;
+
 export function ThemeSwitch({ className }: { className?: string }) {
-  const pref = useSyncExternalStore(subscribe, readPref, () => DEFAULT_THEME_PREF);
+  const pref = useThemePref();
   return (
     <fieldset className={`flex items-center gap-3 border-0 p-0${className ? ` ${className}` : ""}`}>
       <legend className="t-label-caps float-left mr-2 text-bp-ink-tertiary">Theme</legend>

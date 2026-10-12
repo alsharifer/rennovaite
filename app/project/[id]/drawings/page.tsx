@@ -2,10 +2,8 @@ import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { AppShell } from "@/components/app/AppShell";
 import { PackExport } from "@/components/documents/PackExport";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
-import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { PlanLayers, type PlanInspectData } from "@/app/project/[id]/plan/_components/plan-layers";
 import { generateDrawingSet } from "@/lib/drawings/export";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
@@ -17,7 +15,6 @@ import type { InspectBoq, RoomMeta } from "@/lib/viewer/inspect";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const PAGE_NAME = "Drawings";
 
 /** Make a fixed-size (mm) sheet SVG scale responsively inside its frame. */
 function toDisplaySvg(svg: string): string {
@@ -132,10 +129,9 @@ export default async function DrawingsPage({
   const isGardenSet = !!set?.sheets.some((s) => s.kind === "site_plan");
 
   return (
-    <AppShell pageName={PAGE_NAME}>
+    <>
       <div className="mx-auto max-w-[1440px] pb-24">
         <header className="mb-xl">
-          <JourneyProgress stepKey="downloads" projectId={projectId} />
           <p className="label-caps mb-md text-brass-600">
             {isGardenSet ? "Drawing set · A3 · scaled to fit" : "Drawing set · A3 · 1:100"}
           </p>
@@ -229,6 +225,6 @@ export default async function DrawingsPage({
           </>
         )}
       </div>
-    </AppShell>
+    </>
   );
 }

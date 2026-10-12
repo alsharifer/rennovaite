@@ -4,6 +4,32 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## Found in K2 (2026-10-12)
+
+- **01 Project & Plan has no route of its own.** Blueprint v0.4 §7 makes it the
+  intake (parse / draw / photos, client and site details); for an existing
+  project there is no per-project intake page, so the step opens the plan
+  (`FIRM_STEPS`, `lib/journey.ts`) and 02 Scope owns that route's active
+  state. Decide in K5/K6 whether 01 gets a project-details page.
+- **The hub's body is still Atelier.** Spec §3.1 (estimate block, basis table,
+  Next column, revisions, documents) is not assigned to a K prompt; K2 framed
+  the existing hub in the new chrome. Its local `PhaseTracker` now duplicates
+  the rail.
+- **"Upstream change since rev" had no gate.** The rail reads it from
+  `loadRecordedCauses` (plan edits / design edits, firm book entries created or
+  retired, session decisions after the latest revision). The Regenerate
+  control's Ready state (K3) should read the same, so the two never disagree.
+- **Revision number = count of BoQ rows.** The rail's "rev N" counts the
+  project's `boqs` rows (as the K0 ruling allowed until 052 stores
+  `revision_no`); `listRevisions` drops rows whose sections are not a valid BoQ,
+  so the two can differ on a project with a malformed row. Migration 052
+  settles it.
+- **Owner rail: "Intake" links to `/project/new`** (the owner list is
+  untouched) — on an existing project that starts a new one. K6.
+- **The phone step drawer and the rail each render a "Firm journey" nav**; the
+  drawer's is inside a closed `<dialog>` (out of the accessibility tree until
+  opened). Revisit in K7's audit.
+
 ## Found in K1 (2026-10-12)
 
 - **Atelier icon sizes ignore `text-*` utilities.** Google's icon stylesheet

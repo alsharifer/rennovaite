@@ -1,3 +1,34 @@
+# K2 — firm + owner journey rail, top bar, in-shell states (2026-10-12)
+
+- **One rail, two journeys**: `FIRM_STEPS` (00–08, fixed numbers) beside the
+  untouched owner list; persona = member of the project's firm → firm journey.
+  States computed from the gates' own outputs (`lib/journey-facts.ts` →
+  `lib/journey-state.ts`, pure, matrix-tested). Verified live on a scratch firm
+  project (walkthrough account, torn down): 04 "47 of 47 lines on market
+  reference", 07 "rev 1 awaiting firm approval", 08 blocked "Review rates or
+  accept market basis" — each straight from the reference-basis gate and the
+  approval trail.
+- **Shell in layouts** for the redesigned segments, so skeletons / errors /
+  not-found render inside it; the hub frames itself. New routes:
+  `/project/[id]/rates` (04: the project's firm's book) and
+  `/project/[id]/proposal` (08: the gate until K4).
+- **Dev-server route trees went missing, twice**: every child of
+  `/project/[id]` (Atelier pages included) and later every
+  `/api/projects/[id]/*` route answered an HTML 404 in `next dev`. Moving a
+  segment aside and back cleared it each time, and a FRESH dev server served
+  everything — so it was dev-server state, not the code (the first time
+  `/rates` imported `app/firms/[firmId]/page.tsx`; the book is now a shared
+  component anyway). The isolation sweep then passed in full on a fresh
+  `pack` server: 74/74 handlers, 13/13 mixed references, 15/15 pages incl.
+  `/rates` and `/proposal`.
+- **Phone**: an Atelier page body wider than the screen widened the whole page,
+  so the full-width step drawer overflowed; `.bp-main` clips horizontal
+  overflow (`overflow-x: clip`, which keeps sticky working).
+- **Route triage** (spec §3.10): Marketplace + Community out of navigation
+  (app sidebar and the marketing top nav), `/firms` → the single firm's book,
+  `/support` → help drawer, minimal `/settings`.
+- Stacked on K1 (PR #93): the K2 PR targets `feat/k1-blueprint-foundations`.
+
 # K1 — Blueprint foundations: tokens, type, icons, theme, number + provenance primitives (2026-10-12)
 
 - **K0 rulings (design owner, 12 Oct) that govern K**: `/` flag-off branch →

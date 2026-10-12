@@ -1,8 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
-import { AppShell } from "@/components/app/AppShell";
-import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { roomRollup } from "@/lib/boq/elements";
 import { elementPricer } from "@/lib/boq/rates";
 import { loadProjectFirmOverlay } from "@/lib/rates/firm";
@@ -50,7 +48,6 @@ import { recordBoqView } from "@/lib/pilot/views";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_NAME = "Bill of Quantities";
 
 type SkuRow = {
   id: string;
@@ -307,11 +304,10 @@ export default async function BoqPage({
   }
 
   return (
-    <AppShell pageName={PAGE_NAME}>
+    <>
       <div className="mx-auto max-w-[1440px]">
         {/* Header */}
         <header className="mb-xl">
-          <JourneyProgress stepKey="costing" projectId={id} />
           <h1 className="mb-md font-display text-headline-lg text-ink-900">
             Your bill of quantities.
           </h1>
@@ -437,7 +433,7 @@ export default async function BoqPage({
           <EmptyState projectId={id} />
         )}
       </div>
-    </AppShell>
+    </>
   );
 }
 

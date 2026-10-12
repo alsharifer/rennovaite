@@ -132,6 +132,56 @@ except `design-refs/r7-handoff/`.
   priced" / "—"), `<TierLabel>`, `<Icon>`, `<ThemeSwitch>`. Sandbox:
   `/dev/blueprint` (signed in, absent in production).
 
+### Shell + journey rail (K2)
+
+- **Two journeys, one rail.** `lib/journey.ts` keeps the owner list (untouched)
+  and adds `FIRM_STEPS` — 00 Project hub · 01 Project & Plan · 02 Scope · 03
+  Specification · 04 Rates & Basis · 05 BoQ & Review · 06 Documents · 07
+  Revisions & Approval · 08 Proposal, fixed numbers, each on a route that
+  exists (01 opens the plan until a per-project intake exists; 04 is
+  `/project/[id]/rates`, the project's firm's book; 08 is
+  `/project/[id]/proposal`, the gate until K4). Persona: a member of the firm a
+  project is attached to → firm journey; everyone else → owner.
+  `activeStepKey(persona, pathname, …)` lights the step a page is on.
+- **States are computed, never stored** (`lib/journey-state.ts`, pure):
+  done / available / attention (book not reviewed, upstream change since the
+  revision, approval outstanding) / blocked (plan check, the proposal gate),
+  each with its reason and fix link. The facts come from the gates the app
+  already runs (`lib/journey-facts.ts`: `regenerateReadiness`,
+  `loadProposalGate`, `approvalStatus`, `loadRecordedCauses` since the latest
+  revision, `latestPackJobs`) — **a new gate rule belongs in the gate, never in
+  the rail**. `lib/__tests__/journey-state.test.ts` is the state matrix.
+- **The shell** (`components/blueprint/shell/`): `ShellFrame` (rail + top bar +
+  main under one `data-system="blueprint"` root), `JourneyRail`, `TopBar`
+  (breadcrumb + `<TopBarActions>` portal slot + the phone step switcher /
+  bottom-sheet drawer), `HelpDrawer` (Support on every page, `?help=1`;
+  `/support` redirects to it), `ProjectShell` / `AccountShell` (server: load
+  the rail, frame the page). Widths are CSS in `app/globals.css`: rail 232 /
+  compact 56 on tablet and on the BoQ page below 1680 (hover / focus expands it
+  as an overlay) / hidden on phone; those rules are UNLAYERED on purpose.
+- **Where the shell comes from**: the redesigned segments (`boq` incl.
+  revisions, `plan`, `drawings`, `rates`, `proposal`, `firms/[firmId]`,
+  `settings`) frame themselves in a `layout.tsx`, so their `loading.tsx` /
+  `error.tsx` / `not-found.tsx` render INSIDE the shell (`SegmentLoading`,
+  `SegmentError`, `SegmentNotFound`). The hub sits at the `[id]` level and
+  frames itself in its page; `[id]/loading.tsx` draws `ShellSkeleton`. Atelier
+  pages keep `AppShell`. Share a page body as a component (the firm book is
+  `app/firms/[firmId]/_components/firm-book.tsx`, rendered by both book
+  routes), not by importing another route's `page.tsx`. **If every child of a
+  route segment suddenly 404s in dev, restart `next dev` before debugging** —
+  K2 saw a dev server answer HTML 404s for whole route trees
+  (`/project/[id]/*`, `/api/projects/[id]/*`) that a fresh server served fine.
+- **Transition**: until K3–K5 restyle them, page bodies are still Atelier and
+  render on their own light canvas (`ShellFrame content="atelier"`) inside the
+  Blueprint chrome — the chrome follows the theme, the body does not yet.
+- **Primitives added**: `<Button>` (Primary / Secondary / Quiet, `tone="inverse"`
+  inside an error or gate block; disabled = `aria-disabled` + a visible reason),
+  `<StateBlock kind>` (empty / loading / error / gate / pending) +
+  `SkeletonRows`, and the `<RegenerateControl>` shell (wired in K3).
+- **Route triage (spec §3.10)**: Marketplace and Community are out of every
+  navigation (routes remain); `/firms` goes straight to the book when the
+  caller has one firm; `/settings` is Account · Appearance · Firm.
+
 ## Brand — Atelier Precise (pages not yet redesigned)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic
@@ -1980,6 +2030,9 @@ heading, `JourneyChrome` for the full header) — **never hard-code a step
 number**. A step that is flag-disabled or not yet built **drops out of the
 numbering**, so the denominator always matches what is actually navigable and
 there are no dead ends.
+
+(This is the OWNER journey. The firm journey, 00–08, is `FIRM_STEPS` in the
+same file — see "Shell + journey rail (K2)".)
 
 1 Intake · 2 Layout · 3 **Ideation** · 4 **Moodboard** · 5 Renders ·
 6 Costing & BoQ · 7 Scope & timeline *(T4 — unbuilt, currently absent)* ·
