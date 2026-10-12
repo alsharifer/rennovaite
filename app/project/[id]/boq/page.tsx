@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { BoqReview } from "@/components/blueprint/boq/BoqReview";
 import type { FurnitureView, RoomRollup } from "@/components/blueprint/boq/Extras";
 import { GenerateFirst } from "@/components/blueprint/boq/GenerateFirst";
-import { getCaller } from "@/lib/auth/caller";
+import { getPageCaller } from "@/lib/auth/caller";
 import { findComponentDuplicates } from "@/lib/boq/component-dedupe";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
@@ -89,7 +89,8 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
   // await a dozen round-trips one after another).
   const rev = countRes.count ?? 1;
   const [caller, ctx, gate] = await Promise.all([
-    getCaller(),
+    // A page request carries a cookie session or (scripts) a Bearer token.
+    getPageCaller(),
     loadProvenanceContext(sb, id),
     // L4: where the rates came from and whether a client proposal may export on them.
     loadProposalGate(sb, id).catch((): ProposalGate | null => null),
@@ -191,6 +192,7 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
     provenance,
     tierCtx: { qsValidated: ctx.qsValidated },
     firm,
+    projectHasFirm: !!project.firm_id,
     basis: gate?.boq ? { basis: gate.boq.basis, verdict: gate.verdict, acceptance: gate.acceptance, bookReviewed: gate.firm?.book_status === "reviewed" } : null,
     duplicates,
     budget: project.firm_id ? null : (project.budget_aed ?? null),

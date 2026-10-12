@@ -54,6 +54,8 @@ export interface ReviewInputs {
   tierCtx: TierContext;
   /** The project's firm — present when the project is firm-attached. */
   firm: { id: string; brand: string; bookItemKeys: ReadonlySet<string>; vocabulary: (itemKey: string) => { unit: string | null } | null } | null;
+  /** The project is firm-attached (whoever is looking) — the notice's status follows the PROJECT. */
+  projectHasFirm?: boolean;
   /** L4: the reference-basis gate's facts for this revision (best-effort; null = unknown). */
   basis: { basis: ReferenceBasis; verdict: ProposalGateVerdict; acceptance: ReferenceBasisAcceptance | null; bookReviewed: boolean } | null;
   /** findComponentDuplicates() findings, already worded. */
@@ -162,7 +164,7 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
           referenceLines: ref.basis.reference_lines,
           totalLines: ref.basis.total_lines,
           firmLines: ref.basis.firm_lines,
-          status: !i.firm ? ("no_firm" as const) : ref.bookReviewed ? ("book_reviewed" as const) : ref.acceptance ? ("accepted" as const) : ("open" as const),
+          status: !(i.projectHasFirm ?? !!i.firm) ? ("no_firm" as const) : ref.bookReviewed ? ("book_reviewed" as const) : ref.acceptance ? ("accepted" as const) : ("open" as const),
           acceptedOn: ref.acceptance?.created_at.slice(0, 10) ?? null,
           acceptedNote: ref.acceptance?.note ?? null,
         }
