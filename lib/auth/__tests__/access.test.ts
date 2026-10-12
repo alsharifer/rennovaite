@@ -9,6 +9,7 @@ import {
   PUBLIC_ROUTE_FILES,
   routeKind,
   safeNextPath,
+  sessionCheckApplies,
   signInPath,
   unauthenticated,
   unauthenticatedBody,
@@ -103,5 +104,29 @@ describe("proxy.ts", () => {
     }
     // API paths are the other matcher's — including one whose segment has a dot.
     expect(re.test("/api/projects/a.b/boq-pdf")).toBe(false);
+  });
+});
+
+// 12 Oct (prod): with a STALE session in the browser, the proxy's session check
+// made Supabase clear the session AND the PKCE code verifier on the very request
+// /auth/callback then read — every such sign-in failed "code verifier not found".
+describe("the magic-link callback is outside the proxy's session check", () => {
+  it("skips /auth/callback and only it", () => {
+    expect(sessionCheckApplies("/auth/callback")).toBe(false);
+    expect(sessionCheckApplies("/auth/callback/")).toBe(false);
+    for (const p of ["/", "/auth", "/project", "/api/health", "/api/projects/x/boq-pdf"]) expect(sessionCheckApplies(p), p).toBe(true);
+  });
+
+  it("the proxy returns before it builds a Supabase client on such a path", () => {
+    const src = readFileSync(path.join(process.cwd(), "proxy.ts"), "utf8");
+    const skip = src.indexOf("if (!sessionCheckApplies(request.nextUrl.pathname)) return NextResponse.next();");
+    expect(skip).toBeGreaterThan(-1);
+    expect(skip).toBeLessThan(src.indexOf("createServerClient(url, anonKey"));
+  });
+
+  it("the callback takes a token-hash link as well as a PKCE code", () => {
+    const src = readFileSync(path.join(process.cwd(), "app/auth/callback/route.ts"), "utf8");
+    expect(src).toMatch(/verifyOtp\(\{ token_hash/);
+    expect(src).toMatch(/exchangeCodeForSession\(code/);
   });
 });

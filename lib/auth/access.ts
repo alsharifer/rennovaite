@@ -80,6 +80,21 @@ export function routeKind(pathname: string): RouteKind {
 }
 
 /**
+ * Paths the proxy must NOT run its session check on. The magic link's callback
+ * exchanges a PKCE code using the code-verifier cookie the sign-in request set;
+ * when the browser also holds a STALE session, the check's failed refresh makes
+ * Supabase clear the session AND the verifier (auth-js `_removeSession`) — on
+ * the request the callback then reads — so the exchange fails with "PKCE code
+ * verifier not found" (12 Oct, prod). The callback is public and signs the
+ * visitor in itself; it needs nothing from the proxy.
+ */
+export const SESSION_CHECK_SKIP_PATHS = ["/auth/callback"];
+
+export function sessionCheckApplies(pathname: string): boolean {
+  return !SESSION_CHECK_SKIP_PATHS.includes(normalise(pathname));
+}
+
+/**
  * Where a signed-out page visit goes: /auth, carrying the path it wanted when
  * that path is a safe same-site one.
  */

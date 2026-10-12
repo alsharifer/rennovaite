@@ -29,7 +29,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { routeKind, signInPath, unauthenticatedBody, type RouteKind } from "@/lib/auth/access";
+import { routeKind, sessionCheckApplies, signInPath, unauthenticatedBody, type RouteKind } from "@/lib/auth/access";
 import { codeLandingRedirect, linkErrorRedirect } from "@/lib/auth/link-error";
 
 export async function proxy(request: NextRequest) {
@@ -39,6 +39,10 @@ export async function proxy(request: NextRequest) {
   // says so; a good one goes to the callback, which signs the visitor in.
   const landing = linkErrorRedirect(request.nextUrl) ?? codeLandingRedirect(request.nextUrl);
   if (landing) return NextResponse.redirect(new URL(landing, request.url), 307);
+  // The magic-link callback signs the visitor in itself. A session check here
+  // would, for a browser with a stale session, delete the PKCE code verifier the
+  // callback is about to use (lib/auth/access.ts SESSION_CHECK_SKIP_PATHS).
+  if (!sessionCheckApplies(request.nextUrl.pathname)) return NextResponse.next();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   // Misconfigured auth fails closed off the allowlist.
