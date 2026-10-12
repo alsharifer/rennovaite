@@ -8,20 +8,23 @@ import {
   categoriesForLine,
 } from "@/lib/vendor-options-helpers";
 
+import { Button } from "@/components/blueprint/Button";
 import { PageHeader } from "@/components/blueprint/PageHeader";
-import { AtelierCanvas } from "@/components/blueprint/shell/AtelierCanvas";
+import { StateBlock } from "@/components/blueprint/StateBlock";
+import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
 import { StepTabs } from "@/components/blueprint/shell/StepTabs";
-import { ownerEyebrow } from "@/lib/journey-eyebrow";
-
-import {
-  VendorPicker,
-  type LineCard,
-  type VendorOption,
-  type BoqMeta,
-} from "./_components/vendor-picker";
+import { TopBarActions } from "@/components/blueprint/shell/TopBar";
+import { revLine } from "@/components/blueprint/shell/rev-line";
+import { Suppliers, type SupplierLine, type SupplierOption, type SuppliersBoq } from "@/components/blueprint/tender/Suppliers";
+import type { RevisionBoq } from "@/lib/boq/revision-diff";
+import { estimateOf } from "@/lib/hub/estimate";
+import { journeyFlagsFromEnv, ownerStep } from "@/lib/journey";
+import { stepEyebrow } from "@/lib/journey-eyebrow";
+import { loadProvenanceContext } from "@/lib/provenance/load";
 
 export const dynamic = "force-dynamic";
 
+/** The major items: the largest share of cost first (spec §6.7). */
 const TOP_LANES = 8;
 
 type SkuRow = {
@@ -29,9 +32,7 @@ type SkuRow = {
   sku: string | null;
   brand: string | null;
   category: string | null;
-  description_en: string | null;
   price_aed: number | null;
-  photo_url: string | null;
   lead_time_days: number | null;
   in_stock: boolean | null;
 };
@@ -69,13 +70,10 @@ function isBoqPayload(v: unknown): v is BoqPayload {
   return Array.isArray(o.sections) && typeof o.grand_total_aed === "number";
 }
 
-function toOption(sku: SkuRow): VendorOption {
+function toOption(sku: SkuRow): SupplierOption {
   return {
     id: sku.id,
-    sku: sku.sku,
     brand: sku.brand,
-    description: sku.description_en,
-    photo_url: sku.photo_url,
     price_aed: sku.price_aed ?? 0,
     lead_time_days: sku.lead_time_days,
     in_stock: sku.in_stock,
@@ -96,6 +94,10 @@ function extractSkuCode(
   return null;
 }
 
+// K8 #8 — 06 Tender · Contractors & suppliers (spec §6.7, Figma 60:913). The
+// lines and their catalogue candidates are resolved here exactly as before
+// (persisted choice > cited SKU > closest candidate, within ±25% of the BoQ
+// rate); the screen is components/blueprint/tender/Suppliers.
 export default async function VendorsPage({
   params,
 }: {
@@ -108,7 +110,7 @@ export default async function VendorsPage({
   const [projectRes, boqRes, skuRes, selectionRes] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, name, city, budget_aed")
+      .select("id")
       .eq("id", id)
       .single(),
     supabase
@@ -120,7 +122,7 @@ export default async function VendorsPage({
     sb
       .from("pricing_skus")
       .select(
-        "id, sku, brand, category, description_en, price_aed, photo_url, lead_time_days, in_stock",
+        "id, sku, brand, category, price_aed, lead_time_days, in_stock",
       )
       .in("category", ALL_RELEVANT_CATEGORIES)
       .not("price_aed", "is", null)
@@ -137,29 +139,34 @@ export default async function VendorsPage({
     notFound();
   }
 
+  const rail = await loadProjectRail(id);
+  const persona = rail?.persona ?? "owner";
+  const flags = journeyFlagsFromEnv();
   const latestBoq = boqRes.data?.[0];
+  const header = (meta?: string) => (
+    <PageHeader
+      eyebrow={stepEyebrow(persona, "", "tender", "Tender")}
+      title="Contractors & suppliers"
+      intro="For each major item we found up to three suppliers in Dubai. Swap, compare and choose — your cost updates as you go. Then send the scope to contractors to bid."
+      tabs={<StepTabs step="tender" projectId={id} active="suppliers" persona={persona} meta={{ documents: "drawings · cost · tender pack", suppliers: meta }} />}
+    />
+  );
   if (!latestBoq || !isBoqPayload(latestBoq.sections)) {
     return (
-      <>
-      <PageHeader className="mx-auto max-w-[1280px] px-6 pt-10 lg:px-12" eyebrow={ownerEyebrow("tender")} title="Contractors & suppliers" intro="For each major item we found up to three suppliers in Dubai. Swap, compare and choose — your cost updates as you go." tabs={<StepTabs step="tender" projectId={id} active="suppliers" persona="owner" />} />
-      <AtelierCanvas>
-        <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-          <p className="text-on-surface-variant">
-            No BoQ yet. Generate the bill of quantities first.
-          </p>
-        </main>
-      </AtelierCanvas>
-    </>
+      <div className="mx-auto max-w-[1344px] px-6 pb-16 pt-8 lg:px-12" data-suppliers>
+        {header()}
+        <div className="mt-8 max-w-[720px]">
+          <StateBlock kind="empty" icon="storefront" title="No bill of quantities yet" actions={<Button kind="primary" href={`/project/${id}/boq`}>Open cost</Button>}>
+            Suppliers are matched to the items in your bill of quantities. Generate it first.
+          </StateBlock>
+        </div>
+      </div>
     );
   }
 
-  const project = projectRes.data;
   // I4: curated on its way to the browser — a stored BoQ may predate the source scrub.
   const boqPayload = curateBoq(latestBoq.sections, await loadWithheldNames(sb, id));
   const boqId = latestBoq.id;
-  // H7: the client's own entered budget, owner projects only — never a default.
-  const { data: firmRow } = await sb.from("projects").select("firm_id").eq("id", id).maybeSingle();
-  const budgetAed = (firmRow as { firm_id?: string | null } | null)?.firm_id ? null : (project.budget_aed ?? null);
 
   const allSkus: SkuRow[] = skuRes.data ?? [];
   const skuById = new Map(allSkus.map((s) => [s.id, s]));
@@ -178,8 +185,8 @@ export default async function VendorsPage({
     }
   }
 
-  // Build line cards: material-bearing lines with at least one usable SKU.
-  const lineCards: LineCard[] = [];
+  // The material-bearing lines with at least one usable catalogue SKU.
+  const lineCards: SupplierLine[] = [];
 
   for (const section of boqPayload.sections) {
     for (let idx = 0; idx < section.lines.length; idx++) {
@@ -230,10 +237,8 @@ export default async function VendorsPage({
         line_key: lineKey,
         work_section: section.work_section,
         description: line.description,
-        notes: line.notes,
         quantity: line.quantity,
         unit: line.unit,
-        base_rate_aed: line.rate_aed,
         base_total_aed: line.total_aed,
         current: toOption(currentSku),
         alternatives,
@@ -241,43 +246,52 @@ export default async function VendorsPage({
     }
   }
 
-  const boqMeta: BoqMeta = {
+  const topLanes = [...lineCards].sort((a, b) => b.base_total_aed - a.base_total_aed).slice(0, TOP_LANES);
+
+  // The stored headline (≈ … * + weakest mark), the same figure the BoQ pins.
+  const e = estimateOf(latestBoq.sections as unknown as RevisionBoq, await loadProvenanceContext(sb, id));
+  const boq: SuppliersBoq = {
     boq_id: boqId,
+    rev: rail?.project?.rev ?? null,
     contingency_pct: boqPayload.contingency_pct,
     vat_pct: boqPayload.vat_pct,
     ohp_pct: boqPayload.ohp_pct,
     base_subtotal_aed: boqPayload.subtotal_aed,
-    base_grand_total_aed: boqPayload.grand_total_aed,
-    budget_aed: budgetAed,
+    stored_grand_aed: e.grand,
+    estimate: e.estimate,
+    excluded: e.excluded.length,
+    tier: e.tier,
   };
 
-  // Top N lines by base_total_aed — the spec is "top 8 BoQ line items".
-  const topLanes = [...lineCards]
-    .sort((a, b) => b.base_total_aed - a.base_total_aed)
-    .slice(0, TOP_LANES);
+  // Send waits for the rail's Tender block, in the button's words.
+  const n = e.excluded.length;
+  const tender = rail?.statuses.tender;
+  const sendBlocked =
+    n > 0
+      ? `Locked until every item has a price — ${n} item${n === 1 ? "" : "s"} in ${persona === "owner" ? `${ownerStep("cost").number} Cost` : "the BoQ"} ${n === 1 ? "isn’t" : "aren’t"} priced yet.`
+      : tender?.state === "blocked"
+        ? `Locked until the plan check passes — ${tender.reason ?? "the plan has a problem"}.`
+        : null;
 
   return (
-    <>
-      <PageHeader className="mx-auto max-w-[1280px] px-6 pt-10 lg:px-12" eyebrow={ownerEyebrow("tender")} title="Contractors & suppliers" intro="For each major item we found up to three suppliers in Dubai. Swap, compare and choose — your cost updates as you go." tabs={<StepTabs step="tender" projectId={id} active="suppliers" persona="owner" />} />
-      <AtelierCanvas>
-      <div className="mx-auto max-w-[1440px] pb-2xl">
-
+    <div className="mx-auto max-w-[1344px] px-6 pb-16 pt-8 lg:px-12" data-suppliers>
+      {rail?.project ? (
+        <TopBarActions>
+          <span className="t-label-md hidden font-bp-mono text-bp-ink-tertiary lg:inline">{revLine(rail.project)}</span>
+        </TopBarActions>
+      ) : null}
+      {header(topLanes.length ? `${topLanes.length} item${topLanes.length === 1 ? "" : "s"}` : undefined)}
+      <div className="mt-8">
         {topLanes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-ink-100 bg-paper px-margin py-3xl text-center">
-            <p className="text-on-surface-variant">
-              No material-bearing lines with alternatives were found for this
-              BoQ.
-            </p>
+          <div className="max-w-[720px]">
+            <StateBlock kind="empty" icon="storefront" title="No supplier options for this BoQ">
+              None of its items has a catalogue product within a quarter of its rate yet. The documents still go to contractors as they stand.
+            </StateBlock>
           </div>
         ) : (
-          <VendorPicker
-            projectId={id}
-            boqMeta={boqMeta}
-            lines={topLanes}
-          />
+          <Suppliers projectId={id} boq={boq} lines={topLanes} sendBlocked={sendBlocked} documentsHref={flags.drawingsEnabled ? `/project/${id}/drawings` : null} />
         )}
       </div>
-    </AtelierCanvas>
-    </>
+    </div>
   );
 }
