@@ -137,7 +137,7 @@ describe("the sign-in page is the front door", () => {
   });
 
   it("nothing public links into a redirect: the legal chrome points at /auth", () => {
-    for (const f of ["components/marketing/TopNav.tsx", "components/marketing/Footer.tsx", "components/legal/LegalPage.tsx", "components/legal/LegalPlaceholders.tsx"]) {
+    for (const f of ["components/marketing/TopNav.tsx", "components/marketing/Footer.tsx", "components/blueprint/legal/LegalTemplate.tsx", "components/blueprint/legal/LegalPlaceholders.tsx"]) {
       const src = read(f);
       expect(src, f).not.toMatch(/href[=:]\s*["']\/(rennovaite[^"']*)?["']/);
       expect(src, f).not.toMatch(/href[=:]\s*["']\/project/);
@@ -149,8 +149,8 @@ describe("the sign-in page is the front door", () => {
     expect(auth).toMatch(/title: "Sign in · RenovAIte"/);
     expect(auth).toMatch(/robots: \{ index: false, follow: false \}/);
     expect(auth).not.toMatch(/Property OS/);
-    expect(read("components/legal/LegalPage.tsx")).toMatch(/robots: LEGAL_ROBOTS,/);
-    expect(read("components/legal/LegalPlaceholders.tsx").match(/robots: LEGAL_ROBOTS,/g)?.length).toBe(2);
+    expect(read("components/blueprint/legal/LegalTemplate.tsx")).toMatch(/robots: LEGAL_ROBOTS,/);
+    expect(read("components/blueprint/legal/LegalPlaceholders.tsx").match(/robots: LEGAL_ROBOTS,/g)?.length).toBe(2);
   });
 });
 

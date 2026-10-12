@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { LegalPage, legalMetadata } from "@/components/legal/LegalPage";
-import { TermsPlaceholder, TERMS_PLACEHOLDER_METADATA } from "@/components/legal/LegalPlaceholders";
+import { LegalDocumentPage, legalMetadata } from "@/components/blueprint/legal/LegalTemplate";
+import { TermsPlaceholder, TERMS_PLACEHOLDER_METADATA } from "@/components/blueprint/legal/LegalPlaceholders";
 import { loadLegalDocument } from "@/lib/legal/load";
 
 // H6: the text is content/legal/terms.md. It renders only once that file says
@@ -17,5 +17,5 @@ export const metadata: Metadata = published
   : TERMS_PLACEHOLDER_METADATA;
 
 export default function TermsPage() {
-  return published ? <LegalPage doc={doc} /> : <TermsPlaceholder />;
+  return published ? <LegalDocumentPage doc={doc} /> : <TermsPlaceholder />;
 }
