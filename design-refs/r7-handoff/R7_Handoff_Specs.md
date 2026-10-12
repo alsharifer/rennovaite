@@ -4,7 +4,7 @@
 
 Node IDs below are Figma node IDs: open `https://www.figma.com/design/vgibM0F9SdEQErBaTxjUqH?node-id=<id with : → ->`. Every mock figure in the frames reconciles; where a frame uses real pilot data the caption says so. **Identity rule applies to the build exactly as to the mocks:** no contractor/supplier name ever renders from `rate_book.source` or any free-text note — only curated labels.
 
-**Not in this cycle (ship in the current UI, unchanged):** 03 Specification (accessories/spec comparison), owner Ideation · Moodboard · Style · Render · Scope & timeline · Downloads · Vendors · Viewer, `/rennovaite`. They must keep working on the Atelier tokens — see K1 "coexistence".
+**SUPERSEDED 13 Oct (K8): every page moves to Blueprint this cycle — the list below is history.** ~~Not in this cycle (ship in the current UI, unchanged):~~ 03 Specification (accessories/spec comparison), owner Ideation · Moodboard · Style · Render · Scope & timeline · Vendors · Viewer, `/rennovaite`, and `/` (owner landing parked 12 Oct). **13 Oct:** no public landing during the invite-only pilot — `/` and `/rennovaite` redirect to `/auth` (signed out) or the post-sign-in home (signed in); the sign-in page is the front door. The owner Downloads step links to `/project/[id]/drawings`, which §3.6 restyles — owners land on the Blueprint page there. They must keep working on the Atelier tokens — see K1 "coexistence".
 
 ---
 
@@ -23,7 +23,7 @@ Node IDs below are Figma node IDs: open `https://www.figma.com/design/vgibM0F9Sd
 | Shape | `--radius-none: 0` · `--stroke-hairline: 1px` · `--stroke-rule: 2px` | Zero radius everywhere. 2 px only for section rules, selection, focus, active tab. |
 | Layout | `--layout-rail-width: 232px` · `--layout-rail-collapsed: 56px` · grid 8/96 | |
 
-Modes: Light (default) · Dark `[data-theme="dark"]` (designed, not inverted — provenance hues lifted) · Warm `[data-skin="warm"]` (owner landing + intake only; light only this cycle).
+Modes: Light (default) · Dark `[data-theme="dark"]` (designed, not inverted — provenance hues lifted) · Warm `[data-skin="warm"]` (intake only this cycle — landing parked; light only).
 
 ### 1.2 Type (`.t-*` classes in `tokens.css`)
 | Style | Face | Size/LH | Use |
@@ -76,7 +76,7 @@ Material Symbols **Sharp**, weight 300, grade 0, optical 20, rendered via ligatu
 Popover open 120 ms ease-out (opacity + 4 px y) after 250 ms hover delay · sheet 200 ms ease-out · section collapse 160 ms height · skeleton pulse 1.2 s opacity 1→0.6 · rail compact↔full on hover 160 ms. All off under `prefers-reduced-motion`.
 
 ### 1.8 Theme & skin
-`<html data-theme="light|dark">` set server-side from the user preference (cookie) + a no-flash inline script; toggle in rail footer ("Theme · Light/Dark/System"). Owner landing + intake add `data-skin="warm"` on their root.
+`<html data-theme="light|dark">` set by a no-flash inline script from the preference cookie — **not** server-side (12 Oct: a server cookie read makes every route dynamic); `suppressHydrationWarning` on `<html>`; toggle in rail footer ("Theme · Light/Dark/System"). Owner landing + intake add `data-skin="warm"` on their root.
 
 ---
 
@@ -114,7 +114,7 @@ Empty: no BoQ yet → State block Empty in the estimate slot. Replaces the hub t
 **Phone (390):** top bar step switcher (`05 BoQ & Review ▾` → step drawer); pinned total compact; chips; rows two-line: title + amount + mark / REF + `qty unit × rate` + qty mark. Tap → full-height inspector sheet.
 **States:** loading = skeleton rows in shell · empty = "No BoQ yet" + Generate · error = inverse block with retry, last good rev named · regenerating = Regenerate control Running; table stays readable (old rev) with a sunken banner "Showing rev 4 while rev 5 is generated" · blocked = Regenerate Blocked with reason (e.g. plan overlaps).
 **Numbers on the frames** (Arabella rev 4 with H7): subtotal 102,892.03 · contingency 8,231.36 · VAT 5,556.17 · ≈ 116,679.56* · Market 6 lines 21,074.00 · Derived 9 lines 81,818.03 · 3 TBP.
-**Open for K0:** garden what-if semantics (design assumes modifiers are additive % of the counted subtotal, contingency + VAT recomputed) — match the engine and fix the copy, not the engine; interior grade-picker what-if keeps its current interaction inside the new What-if tab shell.
+**Resolved in K0:** there is no garden what-if — garden BoQs get the engine's "Cost sensitivity" panel (summed % applied to the stored total, nothing saved). Copy: "illustrative ±% of the project total — never the BoQ"; **no** scenario-chain rows (the % carries through the chain, so they add nothing). The frame 16:1580 chain rows apply to the interior what-if only; interior grade-picker what-if keeps its current interaction inside the new What-if tab shell.
 
 ### 3.3 Rates & Basis — book — `/firms/[firmId]` (in project context also reachable as step 04) (J4: 19:48)
 Status strip (3 columns, hairline top): **Book status** (Draft — not reviewed · *Mark book reviewed* disabled with reason "Resolve N conflicts and confirm N outliers first") · **On this project** ("N of M lines price from your book; …") · **Reference basis** (Not accepted + Quiet "Accept market basis for this project" — records an event with name). Tabs: Entries · N | Quote imports · N | Corrections to promote · N | History. Table: ITEM (label + `item_key` mono) · KIND · UNIT · YOUR RATE (+ measured mark) · MARKET REF (+ market mark, or `built-in`) · VS REF (+x.x% / −x.x% / ×n.n) · ORIGIN (Firm entry · date / Quote ref · l.N). Groups: **NEEDS ATTENTION** first, then **IN USE**.
@@ -132,14 +132,14 @@ Line key = stable line identity (U4), not REF.
 "Export pack" — one gate for all documents. Left: **Export checks · rev N · run time** (icon, title, sentence, PASS / PASS · NOTE / BLOCKS CLIENT PACK): BoQ current · drawings match plan · quantities agree across documents (parity) · renders passed the design gate (substitutions named) · no contractor/supplier names (identity scan) · draft statement on every page · reference basis accepted. Right 400: **Internal review pack · ready** (watermarked DRAFT; list of contents; Download / Single files) and **Client pack locked** (State block Gate refusal). Drawing thumbnails grid stays below (existing component, restyled: zero radius, hairline frame). Replaces today's red "No drawings available." with State block Empty.
 
 ### 3.7 Proposal — **NEW ROUTE** `/project/[id]/proposal` (J4: 23:689) — step 08
-Gate refusal block when locked. Setup (saved to the firm, reused): display name · logo (dashed drop zone empty state; display name set as type until a logo exists) · client (cover only) · validity · payment terms · cover note · checkbox "Show line rates to the client" **default off** (section totals only — the firm's book stays private). Right 440: "What the client receives · from rev N" (7 numbered sections) + Price summary preview (section totals, subtotal, contingency, VAT, total, excluded lines footnote, "regenerate after reviewing your book to apply your rates and OH&P"). Footer: Generate proposal (disabled with reason when locked) · Preview as client. Fields beyond `/api/firms/[id]/branding` (client, validity, cover note, rate toggle) are **new** — K4 adds them.
+Gate refusal block when locked. Setup (**firm defaults** — payment terms, validity days, show-line-rates — copied into a **per-project proposal row** on first open, so later firm edits never change an issued proposal; client, validity date and cover note are per project; the proposal stores its source BoQ revision id): display name · logo (dashed drop zone empty state; display name set as type until a logo exists) · client (cover only) · validity · payment terms · cover note · checkbox "Show line rates to the client" **default off** (section totals only — the firm's book stays private). Right 440: "What the client receives · from rev N" (7 numbered sections) + Price summary preview (section totals, subtotal, contingency, VAT, total, excluded lines footnote, "regenerate after reviewing your book to apply your rates and OH&P"). Footer: Generate proposal (disabled with reason when locked) · Preview as client (= the guarded proposal-only document mode with `preview:true` → watermarked "PREVIEW · NOT ISSUED", not recorded as issued, identity scan unchanged; no new allow-listed route). Fields beyond `/api/firms/[id]/branding` (client, validity, cover note, rate toggle) are **new** — K4 adds them.
 
 ### 3.8 Scope — `/project/[id]/plan` chrome + parse failure (J4: 24:814)
 Compact rail (02 active; downstream 05/06/08 Blocked with reason). Top bar: breadcrumb · undo/redo · Save changes (disabled until dirty). Layer tabs Plan / Openings / Electrical / Plumbing (brass underline) + tools Add room / Select / Measure. Canvas: `surface-sunken`; **canvas internals unchanged this cycle** except: purple/red handles → ink; overlap fill = ink at 30% with dashed ink outline ("floor counted twice"), rooms = ink 5%; legend chip top-left. Right panel 380 "Plan check": parse failure = inverse block ("Plan can't be priced yet", overlap count + share + consequence, Fix overlaps · N / Re-run parse) · overlaps list largest first (click = select both rooms) · "Blocked downstream" note. Remove the mock "Worth a second look" card.
 
-### 3.9 Owner front door — `/` landing (J4: 28:1003) and `/project/new` intake (29:1016) — `data-skin="warm"`
-Landing: nav (wordmark, How it works, For firms, Sign in, Start your project) · hero (`display/warm` headline, body, Start with your plan / See a sample bill of quantities, fee line) + 3:2 render slot with "checked against your plan" caption (licensed or own-project image only) · How it works 01/02/03 · provenance legend in owner vocabulary on `surface-raised` · For-firms band · footer (legal links marked "being finalised" until counsel). **No testimonials, logos or usage numbers until real.** Replaces the Property OS landing's own header/footer and hard-coded colours.
-Intake: owner rail (01 active) · `display/serif` question · three option tiles (Upload a drawing / Draw it yourself / Start from photos — the last only when the garden flag is on) — selected = brass left rule + raised · upload zone (dashed) · **413 / too-large** = inverse block with what to do instead · project fields · Continue disabled with reason until a way to start is valid.
+### 3.9 Owner front door — `/project/new` intake (29:1016) — `data-skin="warm"`
+**Landing `/` (28:1003) — PARKED 12 Oct, not built this cycle; kept for reference.** Landing: nav (wordmark, How it works, For firms, Sign in, Start your project) · hero (`display/warm` headline, body, Start with your plan / See a sample bill of quantities, fee line) + 3:2 render slot with "checked against your plan" caption (licensed or own-project image only) · How it works 01/02/03 · provenance legend in owner vocabulary on `surface-raised` · For-firms band · footer (legal links marked "being finalised" until counsel). **No testimonials, logos or usage numbers until real.** Replaces the Property OS landing's own header/footer and hard-coded colours.
+Intake: owner rail (01 active) · `display/serif` question · three option tiles (Upload a drawing / Draw it yourself / Start from photos — the last only when the garden flag is on) — selected = brass left rule + raised · upload zone (dashed, with progress — H9 direct-to-storage upload) · **too large / unsupported type / upload failed** (H9 error codes) = inverse block with what to do instead · project fields · Continue disabled with reason until a way to start is valid.
 
 ### 3.9a Sign in — `/auth` (added 11 Oct at Gate 3, frame 35:1152) — Dark, shared by firm and owner
 Abdallah's Gate 3 change: the sign-in page is the one "futuristic" moment; everything after it stays practical. Full-bleed **3D design view** of a fictional demo villa (hidden-line clay/axonometric look: graphite faces, hairline `ink`-light edges, faint ground grid) on the right two-thirds, legibility gradient from `surface-base` at the left. Left panel 96 px inset: wordmark · eyebrow SIGN IN · `display/serif` headline "Renovation / Re-imagined" (two lines — Abdallah's edit, 11 Oct) · one sentence ("Sign in with your email. We send a one-time link. No password to remember.") · WORK EMAIL field · Primary "Email me a sign-in link" · invite-only note with Request access · legal links at the bottom. Caption chip bottom-right: "DESIGN VIEW · RENOVAITE 3D MODEL · ILLUSTRATIVE".
@@ -203,9 +203,80 @@ VoiceOver + NVDA pass over BoQ (grid announcements, figure descriptions), 200%/4
 
 ---
 
-## 5 · Open questions to resolve in K0 (read-only, before building)
+## 5 · K0 rulings (12 Oct) — supersede the questions below
+- Tokens scoped to `[data-system="blueprint"]`; Tailwind names `bp-`-prefixed; fonts via next/font variables `--font-plex-sans`, `--font-jetbrains-mono`, `--font-eb-garamond`. One icon font: Material Symbols Sharp (Atelier wght 400, Blueprint 300/opsz 20).
+- `tierOf()` (lib/provenance/tier.ts) consumes I4's curated keys; **validated iff `rate_book.qs_validated`** — a priced product selection is **market**; `needs_qs` with a rate = derived; quantity tier keys on `qty_derived`. Arabella snapshot test = 6 market / 9 derived / 3 to be priced, 102,892.03 / ≈ 116,679.56.
+- `<Figure>` accessible name includes the currency: "AED 7,329.70, derived — quantity derived, rate market reference".
+- Firm rail: 00 Project hub · 01 Project & Plan · 02 Scope · 03 Specification · 04 Rates & Basis · 05 BoQ & Review · 06 Documents · 07 Revisions & Approval · 08 Proposal — its own journey definition; the owner list is untouched.
+- Uploads: 4.5 MB platform cap confirmed → H9 (direct-to-storage). Intake error copy names no number.
+- Dark mode / Plex / Sharp on Blueprint pages: signed off by the R7 spec + Gate 3 (11 Oct); CLAUDE.md split by system.
+
+### Original K0 questions (answered above)
 1. Garden what-if semantics (additive % on counted subtotal?) — copy follows the engine.
 2. Upload size limit (the intake error deliberately names no number).
 3. Where the I4 curated provenance labels are produced — `tierOf()` must consume the same source, not re-derive from raw fields in the UI.
 4. Tailwind version / theme mechanism in the repo (v3 config vs v4 `@theme`) — tokens map into whichever exists.
 5. Which pages still depend on Atelier tokens after K (should be exactly the "ship in current UI" list above).
+
+---
+
+## 6 · J6 — Remaining screens (13 Oct 2026) — Figma page "J6 · Remaining screens" (index 69:5117)
+
+Every authenticated page now has a Blueprint frame. Anything not listed here or in §3 is a bug: route-scan must find zero Atelier shells.
+
+### 6.0 Owner journey — rethought (Abdallah, 13 Oct)
+Owner rail (component 9:361, Persona=Owner — updated): **00 Overview · 01 Plan · 02 Design · 03 Renders · 04 Cost · 05 Timeline · 06 Tender** (was 9 steps). Firm journey unchanged (00–08).
+
+| Step | Route(s) | Frame | Notes |
+|---|---|---|---|
+| 00 Overview | `/project/[id]` (non-firm project) | 54:145 | Firm projects keep the firm hub 11:48. |
+| 01 Plan | `/project/new` → processing → `/project/[id]/plan` | 29:1016 · 63:4510 · 24:814 | Intake is part of 01. |
+| 02 Design | **new** `/project/[id]/design` (`?view=direction` default, `?view=references`) | 55:296 · 56:434 | 308 redirects: `/ideation`→`/design`, `/style`→`/design`, `/moodboard`→`/design?view=references`. |
+| 03 Renders | `/project/[id]/render` | 57:612 · phone 66:1443 | |
+| 04 Cost | `/boq` (tab 1) · `/accessories` (tab 2) | J3 · 58:738 | Rail shows 04 on both routes. |
+| 05 Timeline | `/project/[id]/timeline` | 59:837 | |
+| 06 Tender | `/drawings` (tab 1) · `/vendors` (tab 2) | 22:548 · 60:913 | Supersedes "Downloads" and "Vendors" steps. |
+
+`lib/journey.ts`: replace the owner list with these 7 entries (keep the firm list untouched). Step states from existing functions only: Design = Attention "Add references" when < 3 pinned; Cost = Attention "N items not priced" when unpriced lines exist; Tender = Blocked "Price N items first" while unpriced lines exist or the plan check fails. Sub-tabs = text tabs with the brass 2 px underline (same as the projects-home filter tabs), each a real link.
+
+### 6.1 Projects home — 53:65 (desktop) · 66:1343 (phone)
+Route: the post-sign-in home; `/dashboard`, `/my-projects`, `/project` redirect here (keep query params). Rail = **Rail · No project** (52:278): wordmark, firm switcher (firm users only), "Projects" active, footer. Header: eyebrow PROJECTS · `display/serif` "Projects" · counts line · one Primary "New project". Controls row wraps (never scrolls): text tabs with counts · search · "Show archived (N)" · sort. Table: thumbnail 64×43 (latest locked render, hairline frame; none → Render placeholder style sunken box) · name + scope line · stage (icon + label/caps, **no coloured badges**) · rev + date · estimate `<Figure>` "≈ N*" + weakest mark, or "No BoQ yet" · Next = top Attention/Blocked reason from the rail functions (flag/lock icon) · updated. Recent activity: ≤ 6 plain rows. **No KPI tiles** (a portfolio sum mixes provenance — R1). Empty = State block Empty "No projects yet" + New project. Phone: filter select + search icon, full-width Primary, two-line rows.
+
+### 6.2 Owner Overview — 54:145
+Topbar: breadcrumb · "Cost updated …" · Secondary "3D view". Left: estimate (`num/xl` + weakest mark + exclusions sentence) · budget line (2 px ink bar on a hairline track, % in mono — no brass fill) · "What this number is based on" tier table in **owner vocabulary** (Measured from your plan / Checked by a quantity surveyor / Market price / Estimated — confirm before tender / Not priced yet) with lines, AED, share, counted total · "Your design" 3 locked renders. Right (400): NEXT (≤ 3 actions from rail reasons) · 05 Timeline summary · Documents list (ready/locked). Never shows firm-only items (rate book, proposal, OH&P).
+
+### 6.3 02 Design — Direction 55:296 · References 56:434
+Direction: left 320 "Your answers" (existing IdeationFlow: six weighted questions, deterministic; unanswered → one question at a time in this column; answered → list with "Change"). Right: selected direction (raised, brass 2 px left rule, check + name, 2×2 images, match sentence, cost delta `+AED 60,000` **with the derived mark**, "Pin references" Secondary) + 5 other directions 3-up with "Choose" Quiet. Remove the hard-coded "AED 850k budget" copy. References: "Your board" 6 slots (3 filled with order number + remove; empty = dashed control box "Pin from below"); library with source segmented control (Direction library / Your renders / Upload) + room filter; pinned = check icon (not colour). Reorder by drag and Alt+↑/↓. Upload errors = inverse block with H9 codes.
+
+### 6.4 03 Renders studio — 57:612 (phone 66:1443)
+Three columns under the topbar (Secondary "3D view", Primary "Continue to cost" — replaces the floating "Cost it"). Left 288: "All views 7/10 locked" + Secondary "Render remaining N" · room/view list (status = icon + label/caps: LOCKED ✓ / READY / RENDERING / QUEUED / NOT YET / N/A; active row raised + brass left rule) · Room photo · Direction (links 02) · Lighting. Centre: eyebrow (room · view · version) + `heading/lg`, render image (object-fit cover, hairline), "This room in your cost" `<Figure>` + mark + link to 04, **Design check** sunken block (pass/substitution sentence from the existing QA verdict), Lock this view (Secondary) · Render again (Quiet) · version thumbnails (current = 2 px ink outline), "Ask for a change" input. Right 300: material palette rows (sunken 44 px swatch, name, role · supplier label, swap) · "Include furniture" checkbox (optional BoQ line) · "Material details" disclosure (the surface-spec numbers move in here). **Never show model or vendor names** (remove "NANO-BANANA") and fix the "4K RENDER · — ·" placeholder. Empty states (no plan / no rooms) = State block Empty, not bare text.
+
+### 6.5 04 Cost — Specification 58:738
+Tabs "Bill of quantities ≈ N*" | "Specification · n of N chosen". Category chips (Sanitary / Lighting / Sockets & switches / AC & heating) — selected = ink fill. Per item: `heading/md` name · lock icon + "3 no · quantity from the plan" · Compare (Quiet). Options in equal cells: WHAT THE ENGINE ASSUMED / STANDARD / PREMIUM as label/caps text (**no coloured pills**); selected = raised + strong outline + brass left rule + check; product, supplier label + ref, rate `/no` + mark (engine default = derived, priced product = market), total. Owner copy never shows internal keys (`labour_rates`) — "Priced by rule · no product chosen". Right 320 summary: effect on cost (+AED, mark), changed items, Secondary "Regenerate cost". Firm: same page as step 03 Specification, firm rail, no tabs.
+
+### 6.6 05 Timeline — 59:837
+Estimate `6–11 weeks` (`num/xl`) **with the derived mark** + basis note (sunken). Phase bars: **ink** for the likely duration + ink at 35 % for "could run to" (no brass fills) on a hairline track; day axis; range in mono at the right; hover/focus → popover with the driver. "Not in this project" box. Firm: this content lives in the BoQ programme section (J4 triage).
+
+### 6.7 06 Tender — Contractors & suppliers 60:913
+Tabs "Documents" (22:548) | "Contractors & suppliers". Table: item (section caps, title, qty) · chosen supplier (check + label, stock + distance as plain text) · rate + market mark · "N more" + swap. Right summary: live total `<Figure>` + mark, delta with sign in ink (**never red/green**), selected suppliers list, Primary "Send scope to contractors" — **disabled with reason** while Tender is Blocked. Production supplier names come from the catalogue; mocks use Supplier A–E.
+
+### 6.8 Other surfaces
+- **3D view** 62:1017 — side surface (rail keeps the step you came from). Canvas uses tokens at runtime (ink edges, raised volumes, sunken ground) in both themes; toolbar Orbit/Walk segmented (selected = ink), Measure/Inspect/Section; inspector 300 (room, measured dims, "Render this room", "Show on plan"); "Show chosen finishes" toggle; key hints in label/md.
+- **Rate books list** 63:1094 — `/firms` only when > 1 firm (else redirect to the book). Footer "Firm rate book" is the active rail item.
+- **Not found / no access / error** 63:1175 — one message for missing and not-a-member (never confirm a project exists); error variant "Something went wrong on our side" + Try again + reference code; always inside the shell.
+- **Reading your plan** 63:4510 — warm skin; 4 real parse stages (Uploaded / Finding rooms / Measuring / Checking overlaps) with icon + label/caps state, `aria-live="polite"`; > 3 min → State block Error + Re-run parse; failure → 24:814.
+- **Help drawer** 65:1247 — 440 px right drawer over a 32 % ink scrim; search, "About this page" articles, Ask form (topic, message, include page + project reference), Send; Esc closes, focus trapped and returned. `/support` opens the current page with the drawer.
+- **Legal template** 65:1480 — public, no rail: wordmark + Sign in; TOC 220 (active = brass 2 px left rule) + article 720; inverse "DRAFT — being finalised with counsel" band until signed off.
+- **Settings** — built in K2 from the §3.10 text; no frame needed.
+
+### 6.9 Client documents and emails (always light)
+- **Proposal** cover 67:1396 · price summary 67:1436 (A4): firm-branded (logo slot or display name), ref, client, date, validity, "based on BoQ rev N"; price summary = section totals, subtotal, contingency, VAT, total (reconciles to the fil), exclusions sentence. **No provenance marks, no line rates unless ticked, no supplier/contractor names.** "Prepared with RenovAIte" small in the footer (firm can turn it off). PREVIEW = diagonal "PREVIEW · NOT ISSUED" watermark.
+- **BoQ PDF** 68:1396 (A4 landscape): internal/owner document — keeps Q/R marks per line, section subtotal + weakest mark, legend and R1 note in the footer, "reconciles to rev N".
+- **Drawing sheet** 68:1542 (A3): 1.5 px border, title block bottom-right (client/project, sheet title, sheet no, scale, rev, date, prepared by, drawn with), inverse status strip "FOR REVIEW — NOT FOR CONSTRUCTION", north arrow + scale bar; no supplier/contractor names.
+- **Emails** 69:1422 magic link · 69:1438 invite: 600 px table layout, inline styles, Plex webfont → Arial fallback, explicit light colours (`color-scheme: light`), ink button 44 px zero radius, same copy for known/unknown addresses, plain-text part.
+
+### 6.10 Checks run on J6
+Text contrast (every text node vs its nearest filled ancestor, resolved per mode): Light min 4.67 · Dark min 4.99 · Warm min 4.59 — 0 failures. Identity scan of all J6 text: no real supplier, contractor, client or model names.
+
+### 6.11 Dark frames (13 Oct)
+Every app frame has a Dark twin (Color mode = Dark, designed not inverted). J6: 6,200 px below each light frame (home 70:8327, overview 70:8600, design 70:8837 / 70:9101, renders 70:9435, specification 70:9730, timeline 70:9989, tender 70:10158, 3D view 70:10422, rate books 70:10717, not found 70:10791, reading-your-plan 70:10846, help drawer 70:10958, legal 70:11278, phones 70:11320 / 70:11420). J2–J4: hub tablet 70:529; BoQ tablet 70:2679, inspectors 70:3278 / 70:3352, scale check 70:3404; book 70:4830, quote review 70:5223, diff 70:5609, documents 70:5951, proposal setup 70:6166, plan editor 70:6416, phone BoQ 70:6674, phone drawer 70:6791, intake 70:6871. Existing: hub 11:439, BoQ 14:675, sign-in 35:1152. Overlay scrims stay black at 55 % in dark (never `ink/primary`, which is light in dark). Client documents and emails are light in both themes. Full mapping: `K8_Prompt_for_Claude_Code.md` (docs root).
