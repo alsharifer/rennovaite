@@ -1,20 +1,26 @@
 // =============================================================================
-// lib/documents/proposal.ts — the firm's client-facing proposal, as pages (L4).
+// lib/documents/proposal.ts — the firm's client-facing proposal, as pages (L4;
+// K4 setup; K8 #15 Blueprint paper — Figma 67:1396 cover, 67:1436 price
+// summary, spec §6.9).
 //
-// The firm is the brand. A cover with the firm's logo and display name, a scope
-// summary, the BoQ at the firm's resolved rates with its overheads & profit as
-// its own row, a terms block (the firm's words) and the indicative programme.
-// RenovAIte is a discreet "prepared with" mark in the footer, nothing more.
+// The firm is the brand. A cover with the firm's logo slot or display name, the
+// project, who it is for, the date, validity and the BoQ revision it is based
+// on, and what is inside; then numbered sections — scope of works (the cover
+// note, the scope, the schedule), price summary (section totals → subtotal →
+// the firm's OH&P as its own row → contingency → VAT → total, to the fil),
+// exclusions & assumptions, programme, terms (the firm's words). RenovAIte is
+// a discreet "Prepared with" mark in the footer, nothing more.
 //
-// What a client-facing proposal does NOT print: rate sources, resolution tiers,
-// QS status marks, the reference label, a contractor identity. What it DOES
-// keep from the BoQ's honesty: the derived-quantity flag and note, the derived
-// total convention (≈ … *), the D4 "excludes N lines to be priced" headline, and
-// the DRAFT statement on every page while boundary-critical dimensions remain
-// derived — a client sees a draft as a draft.
+// What a client-facing proposal does NOT print: provenance marks, rate
+// sources, resolution tiers, QS status, the reference label, a contractor or
+// supplier identity — and no line rates unless the firm ticked "show line
+// rates". What it DOES keep from the BoQ's honesty: the derived-quantity flag
+// and note (≈), the derived total convention (≈ … *), the D4 lines still to be
+// priced, named, and the DRAFT statement on every page while boundary-critical
+// dimensions remain derived — a client sees a draft as a draft.
 //
-// Pure (A4 SVG pages on the BoQ PDF's primitives); the rasteriser is in
-// proposal-pdf.ts.
+// Pure (A4 SVG pages, lib/documents/doc-style); the rasteriser is in
+// proposal-pdf.ts. Always light.
 // =============================================================================
 
 import { assignRefs } from "@/lib/boq/refs";
@@ -24,10 +30,9 @@ import { formatAed } from "@/lib/format/aed";
 import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
 
 import { boqDerivedInfo, derivedLineNote, derivedTotal } from "./boq-derived";
-import { A4_PDF, BOQ_PAGE_H, BOQ_PAGE_W, a4Num as f1, a4Page as page, a4Text as t, a4Wrap as wrap, type BoqPdfInput } from "./boq-pdf";
+import { BOQ_PAGE_H as H, BOQ_PAGE_W as W, type BoqPdfInput } from "./boq-pdf";
+import { DOC, PAGE_COUNT_TOKEN, docPage, hline, inverseBand, label, longDate, n1, text, wrapWords } from "./doc-style";
 import { PREPARED_WITH_MARK } from "./reference-basis-types";
-
-const { M, INK_900, INK_700, INK_500, INK_100, BRASS, TERRACOTTA, FONT_MONO, FONT_DISPLAY, K } = A4_PDF;
 
 export interface ProposalScopeRoom {
   name: string;
@@ -46,6 +51,8 @@ export interface ProposalInput {
   dateISO: string;
   rooms: ProposalScopeRoom[];
   boq: BoqPdfInput["boq"];
+  /** K8: "Based on — Bill of quantities, revision N". Absent = not printed. */
+  revision?: number | null;
   // --- K4 setup (053). All optional: absent = the L4 document, unchanged. ---------
   /** Who the cover names as the client. Printed on the cover only. */
   clientLabel?: string | null;
@@ -68,7 +75,7 @@ export interface ProposalInput {
 /** The preview's mark: it is on every page, so a preview can never pass for the proposal. */
 export const PREVIEW_MARK = "PREVIEW · NOT ISSUED";
 
-// H7: the proposal's BoQ to the fils, like the firm's own BoQ PDF.
+// H7: the proposal's figures to the fils, like the firm's own BoQ PDF.
 const aed = (n: number) => formatAed(n, "money");
 
 /**
@@ -84,6 +91,10 @@ export function clientDescription(description: string): string {
     .trim();
 }
 
+const M = 19; // the frame's 72 px margin on a 794 px A4
+const R = W - M;
+const BOTTOM = H - 26;
+
 type Row =
   | { kind: "section"; title: string }
   | { kind: "line"; line: BoqPdfInput["boq"]["sections"][number]["lines"][number]; desc: string[]; sub: string[]; ref: string }
@@ -95,300 +106,296 @@ export function buildProposalPages(input: ProposalInput): string[] {
   const total = derivedTotal(boq.grand_total_aed, info);
   const statement = info.draft ? info.statement : null;
   const refs = assignRefs(boq.sections);
-  const pages: string[] = [];
-  let n = 0;
   const showRates = input.showLineRates !== false;
+  const setup = input.showLineRates !== undefined;
+  const sections = sortSections(boq.sections);
+  const prog = boq.programme && boq.programme.phases.length ? boq.programme : null;
+  const hasTerms = !!(input.termsText && input.termsText.trim()) || !!input.validity || !!input.paymentTerms;
+
+  // The numbered sections, as the cover lists them — only those this proposal has.
+  const exclusions = setup ? total.excluded.map((x) => `${clientDescription(x.description)} (${x.work_section})`) : [];
+  const assumptions: string[] = [];
+  if (setup && statement) assumptions.push(statement);
+  if (setup && info.derivedLines > 0) assumptions.push(`${info.derivedLines} quantit${info.derivedLines === 1 ? "y is" : "ies are"} derived from the plan (marked ≈) and firm after site verification.`);
+  const toc: { key: string; title: string }[] = [
+    { key: "scope", title: "Scope of works" },
+    { key: "price", title: "Price summary" },
+    ...(exclusions.length || assumptions.length ? [{ key: "exclusions", title: "Exclusions & assumptions" }] : []),
+    ...(prog ? [{ key: "programme", title: "Programme" }] : []),
+    ...(hasTerms ? [{ key: "terms", title: "Terms" }] : []),
+  ];
+  const num = (key: string) => toc.findIndex((s) => s.key === key) + 1;
+
+  const pages: string[] = [];
   const previewMark = input.preview
-    ? `<text x="${f1(BOQ_PAGE_W / 2)}" y="${f1(BOQ_PAGE_H / 2)}" text-anchor="middle" transform="rotate(-35 ${f1(BOQ_PAGE_W / 2)} ${f1(BOQ_PAGE_H / 2)})" font-family="${FONT_MONO}" font-size="11" letter-spacing="1.2" fill="${INK_500}" fill-opacity="0.28" data-preview="true">${esc(PREVIEW_MARK)}</text>`
+    ? `<text x="${n1(W / 2)}" y="${n1(H / 2)}" text-anchor="middle" transform="rotate(-35 ${n1(W / 2)} ${n1(H / 2)})" font-size="11" fill="${DOC.INK_3}" fill-opacity="0.28" style="font-family:${DOC.MONO};letter-spacing:0.1em" data-preview="true">${esc(PREVIEW_MARK)}</text>`
     : "";
-  const push = (body: string) => pages.push(page(body + previewMark));
+  const push = (body: string) => pages.push(docPage(W, H, body + previewMark));
+  const draftBand = (y: number, extra = "") => (statement ? inverseBand(M, y, R - M, wrapWords(statement, 92), `data-boq-draft="true"${extra}`) : null);
 
-  // --- chrome: every page but the cover -------------------------------------------
-  const header = () => {
-    n += 1;
-    let s = t(M, 14, brand, { size: 4.2, fill: INK_900, font: FONT_DISPLAY }).replace("<text ", '<text data-firm-brand="header" ');
-    s += t(BOQ_PAGE_W - M, 14, `${input.projectName} · Proposal`, { size: 2.6, fill: INK_500, anchor: "end" });
-    let y = 18;
-    if (statement) {
-      s += `<rect x="${M}" y="${y}" width="${BOQ_PAGE_W - 2 * M}" height="9" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.45" data-boq-draft="true"/>`;
-      s += t(M + 3, y + 5.8, statement, { size: 2.7, fill: TERRACOTTA, weight: 700 });
-      y += 11;
-    } else {
-      s += `<line x1="${M}" y1="${y}" x2="${BOQ_PAGE_W - M}" y2="${y}" stroke="${INK_100}" stroke-width="0.3"/>`;
-      y += 3;
-    }
-    s += footer();
-    return { svg: s, y };
-  };
+  // Every page's footer: the firm, and the discreet mark.
   const footer = () =>
-    t(BOQ_PAGE_W - M, BOQ_PAGE_H - 8, `${n}`, { size: 2.4, fill: INK_500, font: FONT_MONO, anchor: "end" }) +
-    t(M, BOQ_PAGE_H - 8, `${PREPARED_WITH_MARK} · AED · dated ${input.dateISO}`, { size: 2.2, fill: INK_500 }).replace("<text ", '<text data-prepared-with="true" ');
+    hline(M, R, H - 17, DOC.STRONG, 0.35) +
+    text(M, H - 11, `${brand}${input.community ? ` · ${input.community}` : ""}`, { size: 2.6, fill: DOC.INK_2, font: DOC.MONO }) +
+    text(R, H - 11, PREPARED_WITH_MARK, { size: 2.4, fill: DOC.INK_3, font: DOC.MONO, anchor: "end", attrs: 'data-prepared-with="true"' });
 
-  // --- cover -------------------------------------------------------------------------
-  n += 1;
+  // --- cover (67:1396) ------------------------------------------------------------------
   let svg = "";
-  let y = 30;
+  let y = 26;
   if (input.logoDataUri) {
-    svg += `<image x="${M}" y="${y - 8}" width="44" height="22" preserveAspectRatio="xMinYMin meet" href="${input.logoDataUri}" data-logo="present"/>`;
-    y += 20;
+    svg += `<image x="${M}" y="${y - 8}" width="44" height="14" preserveAspectRatio="xMinYMin meet" href="${input.logoDataUri}" data-logo="present"/>`;
+    y += 12;
   }
-  svg += t(M, y, brand, { size: 7.5, fill: INK_900, font: FONT_DISPLAY }).replace("<text ", `<text data-firm-brand="cover" data-logo="${input.logoDataUri ? "present" : "none"}" data-proposal-cover="true" `);
-  y += 8;
-  svg += `<line x1="${M}" y1="${y}" x2="${M + 40}" y2="${y}" stroke="${BRASS}" stroke-width="0.6"/>`;
-  y = 110;
-  svg += t(M, y, "Proposal", { size: 13, fill: INK_900, font: FONT_DISPLAY });
-  y += 12;
-  svg += t(M, y, input.projectName, { size: 5.2, fill: INK_700 });
-  y += 7;
-  svg += t(M, y, input.community, { size: 3.2, fill: INK_500 });
-  if (input.clientLabel) {
-    y += 7;
-    svg += t(M, y, `Prepared for ${input.clientLabel}`, { size: 3.2, fill: INK_700 }).replace("<text ", '<text data-client="true" ');
+  svg += text(M, y, brand, { size: 5.8, weight: 500, attrs: `data-firm-brand="cover" data-logo="${input.logoDataUri ? "present" : "none"}" data-proposal-cover="true"` });
+  if (input.revision) svg += text(R, 24, `BoQ rev ${input.revision}`, { size: 2.6, fill: DOC.INK_3, font: DOC.MONO, anchor: "end" });
+  y = 74;
+  svg += label(M, y, "Proposal");
+  y += 15;
+  for (const line of wrapWords(input.projectName, 30).slice(0, 3)) {
+    svg += text(M, y, line, { size: 10.6, font: DOC.SERIF });
+    y += 13;
   }
-  y += 16;
-  svg += t(M, y, "Proposed contract sum", { size: 2.4, fill: INK_500, spacing: "0.06em" });
-  y += 8;
-  svg += t(M, y, total.text, { size: 8.5, font: FONT_MONO, fill: INK_900 }).replace("<text ", `<text data-grand-total="${boq.grand_total_aed}" `);
-  y += 6;
-  svg += t(M, y, "incl. overheads & profit, contingency and VAT", { size: 2.4, fill: INK_500 });
-  if (input.validity) {
-    y += 5;
-    svg += t(M, y, input.validity, { size: 2.6, fill: INK_700 }).replace("<text ", '<text data-validity="true" ');
+  y += 4;
+  const facts: [string, string, string?][] = [
+    ...(input.clientLabel ? ([["Prepared for", input.clientLabel, 'data-client="true"']] as [string, string, string][]) : []),
+    ["Date", longDate(input.dateISO)],
+    ...(input.community ? ([["Location", input.community]] as [string, string][]) : []),
+    ...(input.validity ? ([["Validity", input.validity, 'data-validity="true"']] as [string, string, string][]) : []),
+    ...(input.revision ? ([["Based on", `Bill of quantities, revision ${input.revision}`]] as [string, string][]) : []),
+  ];
+  for (const [k, v, attrs] of facts) {
+    svg += text(M, y, k, { size: 2.9, fill: DOC.INK_2 });
+    const lines = wrapWords(v, 46);
+    lines.forEach((l, i) => (svg += text(M + 37, y + i * 4.2, l, { size: 2.9, attrs })));
+    y += 4 + (lines.length - 1) * 4.2;
+    svg += hline(M, M + 111, y);
+    y += 6.3;
   }
-  if (total.excludes) {
-    y += 5;
-    svg += t(M, y, total.excludes, { size: 2.6, fill: TERRACOTTA, weight: 700 }).replace("<text ", '<text data-headline-excludes="true" ');
-  }
-  if (total.footnote) {
-    y += 6;
-    for (const line of wrap(total.footnote, 88)) {
-      svg += t(M, y, line, { size: 2.4, fill: TERRACOTTA });
-      y += 3.2 * K;
-    }
-  }
-  if (statement) {
-    const sy = BOQ_PAGE_H - 44;
-    svg += `<rect x="${M}" y="${sy}" width="${BOQ_PAGE_W - 2 * M}" height="11" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.45" data-boq-draft="true" data-draft-cover="true"/>`;
-    svg += t(M + 3, sy + 7, statement, { size: 2.9, fill: TERRACOTTA, weight: 700 });
-  }
-  svg += t(M, BOQ_PAGE_H - 24, `Prepared by ${brand} · ${input.dateISO}`, { size: 2.8, fill: INK_700 });
+  const band = draftBand(Math.max(y + 6, 196), ' data-draft-cover="true"');
+  if (band) svg += band.svg;
+  let ty = H - 54;
+  svg += label(M, ty, "What’s inside");
+  ty += 6;
+  toc.forEach((s, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    svg += text(M + col * 56.6, ty + row * 6.3, `${i + 1}  ${s.title}`, { size: 2.9 });
+  });
   svg += footer();
   push(svg);
 
-  // --- scope summary + BoQ ---------------------------------------------------------------
-  ({ svg, y } = header());
-  const bottom = BOQ_PAGE_H - 30;
+  // --- the numbered sections ------------------------------------------------------------
+  const header = () => {
+    let s = text(M, 16, `${brand} · ${input.projectName}`, { size: 2.6, fill: DOC.INK_2, font: DOC.MONO, attrs: 'data-firm-brand="header"' });
+    s += text(R, 16, `page ${pages.length + 1} of ${PAGE_COUNT_TOKEN}`, { size: 2.6, fill: DOC.INK_2, font: DOC.MONO, anchor: "end" });
+    s += hline(M, R, 20);
+    let yy = 28;
+    const b = draftBand(24);
+    if (b) {
+      s += b.svg;
+      yy = 24 + b.h + 6;
+    }
+    return { svg: s + footer(), y: yy };
+  };
   const flush = () => {
     push(svg);
     ({ svg, y } = header());
-    y += 4;
   };
-  y += 6;
+  const sectionHead = (key: string, title: string) => {
+    if (y + 26 > BOTTOM) flush();
+    svg += text(M, y + 4, String(num(key)), { size: 4.4, fill: DOC.INK_2, weight: 300 });
+    svg += text(M, y + 12.5, title, { size: 5.8, weight: 500 });
+    y += 21;
+  };
+  const para = (s: string, o: { size?: number; fill?: string; attrs?: string; max?: number } = {}) => {
+    for (const line of wrapWords(s, o.max ?? 92)) {
+      if (y + 5 > BOTTOM) flush();
+      svg += text(M, y, line, { size: o.size ?? 3.1, fill: o.fill ?? DOC.INK_2, attrs: o.attrs });
+      y += 5.2;
+    }
+    y += 1.6;
+  };
+
+  // 1 Scope of works -----------------------------------------------------------------------
+  ({ svg, y } = header());
+  sectionHead("scope", "Scope of works");
   if (input.coverNote && input.coverNote.trim()) {
-    for (const para of input.coverNote.split(/\r?\n/)) {
-      if (!para.trim()) {
-        y += 2.5;
+    for (const p of input.coverNote.split(/\r?\n/)) {
+      if (!p.trim()) {
+        y += 2;
         continue;
       }
-      for (const line of wrap(para, 96)) {
-        if (y + 4 > bottom) flush();
-        svg += t(M, y, line, { size: 2.7, fill: INK_900 }).replace("<text ", '<text data-cover-note="true" ');
-        y += 3.4 * K;
-      }
-      y += 1.5;
+      para(p, { fill: DOC.INK, attrs: 'data-cover-note="true"' });
     }
-    y += 6;
+    y += 3;
   }
-  svg += t(M, y, "SCOPE OF WORKS", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
-  y += 6;
-  const scopeLines: string[] = [];
-  if (input.rooms.length) {
-    scopeLines.push(`${input.rooms.length} area${input.rooms.length === 1 ? "" : "s"}: ${input.rooms.map((r) => `${r.name}${r.area_m2 != null ? ` (${Math.round(r.area_m2 * 10) / 10} m²)` : ""}`).join(", ")}.`);
-  }
-  scopeLines.push(`${boq.sections.length} work sections, ${boq.sections.reduce((k, s) => k + s.lines.length, 0)} priced items: ${sortSections(boq.sections).map((s) => `${s.work_section} (${aed(s.section_total_aed)})`).join(" · ")}.`);
+  if (input.rooms.length) para(`${input.rooms.length} area${input.rooms.length === 1 ? "" : "s"}: ${input.rooms.map((r) => `${r.name}${r.area_m2 != null ? ` (${Math.round(r.area_m2 * 10) / 10} m²)` : ""}`).join(", ")}.`, { attrs: 'data-scope="true"' });
+  para(`${sections.length} work sections, ${sections.reduce((k, s) => k + s.lines.length, 0)} items: ${sections.map((s) => s.work_section).join(" · ")}.`, { attrs: 'data-scope="true"' });
   const g = boq.garden;
-  if (g?.kept?.length) scopeLines.push(`Existing on site, kept and excluded from the works: ${g.kept.map((k) => k.name).join(", ")}.`);
-  if (g?.removals?.length) scopeLines.push(`Existing on site, taken out: ${g.removals.map((r) => `${r.name} (${r.disposition})`).join(", ")}.`);
-  for (const para of scopeLines) {
-    for (const line of wrap(para, 96)) {
-      if (y + 4 > bottom) flush();
-      svg += t(M, y, line, { size: 2.5, fill: INK_700 }).replace("<text ", '<text data-scope="true" ');
-      y += 3.2 * K;
-    }
-    y += 1.5;
-  }
-  y += 4;
+  if (g?.kept?.length) para(`Existing on site, kept and excluded from the works: ${g.kept.map((k) => k.name).join(", ")}.`, { attrs: 'data-scope="true"' });
+  if (g?.removals?.length) para(`Existing on site, taken out: ${g.removals.map((r) => `${r.name} (${r.disposition})`).join(", ")}.`, { attrs: 'data-scope="true"' });
+  y += 3;
 
-  // The BoQ at the firm's rates: REF, description, qty, unit, rate, total — no
-  // source, no tier, no QS mark. Derived quantities keep their flag and note.
+  // The schedule: REF, description, qty, unit — and the rate and amount only
+  // when the firm chose to show them. Derived quantities keep their ≈ and note.
   const rows: Row[] = [];
-  for (const s of sortSections(boq.sections)) {
+  for (const s of sections) {
     rows.push({ kind: "section", title: s.work_section });
     s.lines.forEach((l, idx) => {
       const note = derivedLineNote(l);
-      rows.push({ kind: "line", line: l, desc: wrap(clientDescription(l.description), 46).slice(0, 4), sub: note ? wrap(note, 70) : [], ref: refs[`${s.work_section}-${idx}`]! });
+      rows.push({ kind: "line", line: l, desc: wrapWords(clientDescription(l.description), showRates ? 52 : 68).slice(0, 4), sub: note ? wrapWords(note, 70) : [], ref: refs[`${s.work_section}-${idx}`]! });
     });
     rows.push({ kind: "section_total", title: s.work_section, total: s.section_total_aed });
   }
-  const DESC_H = 3.4 * K;
-  const SUB_H = 3 * K;
-  const rowH = (r: Row) => (r.kind === "section" ? 9 : r.kind === "section_total" ? 8 : DESC_H * r.desc.length + SUB_H * r.sub.length + 2.6);
-  const colHead = (yy: number) =>
-    t(M + 4, yy, "REF", { size: 2.1, fill: INK_500, spacing: "0.06em" }) +
-    t(M + 18, yy, "DESCRIPTION", { size: 2.1, fill: INK_500, spacing: "0.06em" }) +
-    t(128, yy, "QTY", { size: 2.1, fill: INK_500, anchor: "end" }) +
-    t(131, yy, "UNIT", { size: 2.1, fill: INK_500 }) +
-    (showRates ? t(162, yy, "RATE", { size: 2.1, fill: INK_500, anchor: "end" }) + t(BOQ_PAGE_W - M, yy, "TOTAL", { size: 2.1, fill: INK_500, anchor: "end" }) : "") +
-    `<line x1="${M}" y1="${f1(yy + 1.6)}" x2="${BOQ_PAGE_W - M}" y2="${f1(yy + 1.6)}" stroke="${INK_100}" stroke-width="0.3"/>`;
-  if (y + 30 > bottom) flush();
-  svg += t(M, y, showRates ? "PRICED SCHEDULE OF WORKS" : "SCHEDULE OF WORKS · PRICED BY SECTION", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
-  y += 6;
-  svg += colHead(y);
-  y += 6;
-  const flushTable = () => {
-    flush();
-    svg += colHead(y + 2);
-    y += 8;
+  const QX = showRates ? 133 : R - 16; // quantity column (right edge)
+  const UX = QX + 2;
+  const rowH = (r: Row) => (r.kind === "section" ? 9 : r.kind === "section_total" ? 8 : 4.4 * r.desc.length + 3.8 * r.sub.length + 3.2);
+  const colHead = () => {
+    let s = `<rect x="${M}" y="${n1(y - 4.6)}" width="${R - M}" height="7" fill="${DOC.HAIR}" fill-opacity="0.45"/>`;
+    s += label(M + 2, y, "Ref") + label(M + 18, y, "Description") + label(QX, y, "Qty", { anchor: "end" }) + label(UX, y, "Unit");
+    if (showRates) s += label(165, y, "Rate", { anchor: "end" }) + label(R - 2, y, "Amount", { anchor: "end" });
+    svg += s;
+    y += 7;
   };
+  if (y + 30 > BOTTOM) flush();
+  svg += label(M, y, showRates ? "Schedule of works" : "Schedule of works · priced by section", { fill: DOC.INK_2 });
+  y += 7;
+  colHead();
   for (const r of rows) {
-    if (y + rowH(r) > bottom) flushTable();
+    // A section heading keeps its first line with it (no orphan at the foot of a page).
+    if (y + rowH(r) + (r.kind === "section" ? 12 : 0) > BOTTOM) {
+      flush();
+      colHead();
+    }
     if (r.kind === "section") {
-      svg += t(M, y + 4, r.title.toUpperCase(), { size: 2.6, fill: INK_900, weight: 700, spacing: "0.05em" });
-      y += 8;
+      svg += label(M + 2, y + 4.5, r.title, { fill: DOC.INK });
+      y += 9;
     } else if (r.kind === "section_total") {
-      svg += `<line x1="120" y1="${f1(y)}" x2="${BOQ_PAGE_W - M}" y2="${f1(y)}" stroke="${INK_100}" stroke-width="0.3"/>`;
-      svg += t(162, y + 4, `${r.title} total`, { size: 2.4, fill: INK_500, anchor: "end" });
-      svg += t(BOQ_PAGE_W - M, y + 4, aed(r.total), { size: 2.6, font: FONT_MONO, anchor: "end", weight: 700 });
-      y += 7;
+      svg += hline(M + 18, R, y);
+      svg += text(showRates ? 165 : QX, y + 4.6, `${r.title} total`, { size: 2.8, fill: DOC.INK_2, anchor: "end" });
+      svg += text(R - 2, y + 4.6, aed(r.total), { size: 2.9, font: DOC.MONO, anchor: "end", weight: 500 });
+      y += 8;
     } else {
       const l = r.line;
-      svg += t(M + 4, y + 2.6, r.ref, { size: 2.2, fill: INK_500, font: FONT_MONO }).replace("<text ", `<text data-ref="${esc(r.ref)}" `);
-      r.desc.forEach((d, i) => {
-        svg += t(M + 18, y + 2.6 + i * DESC_H, d, { size: 2.55 });
-      });
-      svg += t(128, y + 2.6, `${l.qty_derived ? "≈ " : ""}${l.quantity}`, { size: 2.55, font: FONT_MONO, anchor: "end", fill: l.qty_derived ? TERRACOTTA : INK_900 });
-      svg += t(131, y + 2.6, l.unit, { size: 2.4, fill: INK_700 });
-      // K4: with line rates off the client reads the work and its quantity; the money is per section.
+      svg += text(M + 2, y + 3, r.ref, { size: 2.6, fill: DOC.INK_3, font: DOC.MONO, attrs: `data-ref="${esc(r.ref)}"` });
+      r.desc.forEach((d, i) => (svg += text(M + 18, y + 3 + i * 4.4, d, { size: 2.9 })));
+      svg += text(QX, y + 3, `${l.qty_derived ? "≈ " : ""}${l.quantity}`, { size: 2.9, font: DOC.MONO, anchor: "end" });
+      svg += text(UX, y + 3, l.unit, { size: 2.7, fill: DOC.INK_2 });
       if (showRates) {
-        svg += t(162, y + 2.6, aed(l.rate_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
-        svg += t(BOQ_PAGE_W - M, y + 2.6, aed(l.total_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
+        svg += text(165, y + 3, aed(l.rate_aed), { size: 2.9, font: DOC.MONO, anchor: "end" });
+        svg += text(R - 2, y + 3, aed(l.total_aed), { size: 2.9, font: DOC.MONO, anchor: "end" });
       }
-      let sy = y + 2.6 + r.desc.length * DESC_H;
+      let sy = y + 3 + r.desc.length * 4.4;
       for (const s of r.sub) {
-        svg += t(M + 18, sy - 0.4, s, { size: 2.1, fill: TERRACOTTA });
-        sy += SUB_H;
+        svg += text(M + 18, sy - 0.4, s, { size: 2.6, fill: DOC.INK_3 });
+        sy += 3.8;
       }
       y += rowH(r);
     }
   }
+  push(svg);
 
-  // Summary: subtotal → OH&P (the firm's, as its own row) → contingency → VAT → total.
-  if (y + 46 > bottom) flush();
-  y += 4;
-  const sumRow = (label: string, value: string, attr: string, bold = false) => {
-    svg += t(162, y, label, { size: 2.7, fill: bold ? INK_900 : INK_700, anchor: "end", weight: bold ? 700 : undefined });
-    svg += t(BOQ_PAGE_W - M, y, value, { size: bold ? 3.4 : 2.7, font: FONT_MONO, anchor: "end", weight: bold ? 700 : undefined }).replace("<text ", `<text ${attr} `);
-    y += bold ? 7 : 5;
+  // 2 Price summary (67:1436) ----------------------------------------------------------------
+  ({ svg, y } = header());
+  sectionHead("price", "Price summary");
+  para(`Section totals for the scope in section ${num("scope")}. Quantities are measured from your drawings; rates are ${brand}’s.${showRates ? "" : " Line rates are not shown in this proposal."}`);
+  y += 3;
+  svg += label(M, y, "Section") + label(R, y, "AED", { anchor: "end" });
+  y += 2.4;
+  svg += hline(M, R, y, DOC.STRONG, 0.5);
+  const sumRow = (k: string, v: string, attrs: string, bold = false) => {
+    if (y + 10 > BOTTOM) flush();
+    svg += text(M, y + 6.4, k, { size: 3.1, weight: bold ? 600 : undefined, fill: DOC.INK });
+    svg += text(R, y + 6.4, v, { size: 3.1, font: DOC.MONO, anchor: "end", attrs });
+    y += 10.3;
+    svg += hline(M, R, y);
   };
-  svg += `<line x1="110" y1="${f1(y - 3)}" x2="${BOQ_PAGE_W - M}" y2="${f1(y - 3)}" stroke="${INK_900}" stroke-width="0.35"/>`;
-  sumRow("Subtotal", aed(boq.subtotal_aed), 'data-summary="subtotal"');
+  for (const s of sections) sumRow(s.work_section, aed(s.section_total_aed), `data-section-total="${esc(s.work_section)}"`);
+  sumRow("Subtotal", aed(boq.subtotal_aed), 'data-summary="subtotal"', true);
   if (boq.ohp_aed && boq.ohp_aed > 0) sumRow(`${OHP_LINE_LABEL} ${boq.ohp_pct}%`, aed(boq.ohp_aed), `data-ohp="${boq.ohp_aed}"`);
-  sumRow(`Contingency ${boq.contingency_pct}%`, aed(boq.contingency_aed), 'data-summary="contingency"');
-  sumRow(`VAT ${boq.vat_pct}%`, aed(boq.vat_aed), 'data-summary="vat"');
-  sumRow("Proposed contract sum", total.text, `data-grand-total="${boq.grand_total_aed}"`, true);
+  sumRow(`Contingency (${boq.contingency_pct}%)`, aed(boq.contingency_aed), 'data-summary="contingency"');
+  sumRow(`VAT (${boq.vat_pct}%)`, aed(boq.vat_aed), 'data-summary="vat"');
+  svg += hline(M, R, y, DOC.STRONG, 0.5);
+  if (y + 14 > BOTTOM) flush();
+  svg += text(M, y + 7.6, "Total", { size: 3.1, weight: 600 });
+  // To the fil, so the column adds up (spec §6.9); a draft keeps its ≈ and *.
+  const exact = `${total.derived ? "≈ " : ""}AED ${aed(boq.grand_total_aed)}${total.derived ? "*" : ""}`;
+  svg += text(R, y + 8.6, exact, { size: 5.8, font: DOC.MONO, anchor: "end", attrs: `data-grand-total="${boq.grand_total_aed}"` });
+  y += 13;
+  svg += hline(M, R, y, DOC.STRONG, 0.5);
+  y += 9;
   if (total.excludes) {
-    svg += t(BOQ_PAGE_W - M, y, total.excludes, { size: 2.4, fill: TERRACOTTA, anchor: "end", weight: 700 }).replace("<text ", '<text data-headline-excludes="true" ');
-    y += 5;
+    const named = total.excluded.map((x) => clientDescription(x.description)).join("; ");
+    para(`The total ${total.excludes}${named ? `: ${named}` : ""} — priced separately on request.${num("exclusions") ? ` See section ${num("exclusions")}.` : ""}`, { attrs: 'data-headline-excludes="true"' });
   }
-
-  // K4: what the sum leaves out, named (D4), and what it rests on — a client
-  // reads both before the terms. Absent when there is nothing to say.
-  const block = (title: string, paras: string[], attr: string) => {
-    if (paras.length === 0) return;
-    if (y + 16 > bottom) flush();
-    y += 6;
-    svg += t(M, y, title, { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
-    y += 6;
-    for (const para of paras) {
-      for (const line of wrap(para, 96)) {
-        if (y + 4 > bottom) flush();
-        svg += t(M, y, line, { size: 2.6, fill: INK_700 }).replace("<text ", `<text ${attr} `);
-        y += 3.2 * K;
-      }
-      y += 1.2;
-    }
-  };
-  if (input.showLineRates !== undefined) {
-    block("EXCLUSIONS & TO BE PRICED", total.excluded.map((x) => `${x.work_section} — ${clientDescription(x.description)}: not in the sum above; priced when confirmed.`), 'data-excluded="true"');
-    const assumptions: string[] = [];
-    if (statement) assumptions.push(statement);
-    if (info.derivedLines > 0) assumptions.push(`${info.derivedLines} quantit${info.derivedLines === 1 ? "y is" : "ies are"} derived from the plan (marked ≈) and firm after site verification.`);
-    block("ASSUMPTIONS", assumptions, 'data-assumption="true"');
+  if (total.footnote) para(total.footnote, { size: 2.8 });
+  y += 2;
+  for (const line of wrapWords(`All amounts in UAE dirhams.${input.validity ? ` ${input.validity}.` : ""}`, 92)) {
+    svg += text(M, y, line, { size: 2.7, fill: DOC.INK_2, font: DOC.MONO });
+    y += 4.6;
   }
   push(svg);
 
-  // --- terms (validity, payment terms, the firm's words) ---------------------------------------
-  const hasTerms = !!(input.termsText && input.termsText.trim());
-  if (hasTerms || input.validity || input.paymentTerms) {
+  // 3 Exclusions & assumptions (K4) ------------------------------------------------------------
+  if (num("exclusions")) {
     ({ svg, y } = header());
-    y += 6;
-    svg += t(M, y, "TERMS", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
-    y += 6;
-    if (input.validity) {
-      svg += t(M, y, input.validity, { size: 2.6, fill: INK_900 }).replace("<text ", '<text data-validity="true" ');
-      y += 3.4 * K + 2;
-    }
-    if (input.paymentTerms) {
-      svg += t(M, y, "Payment terms", { size: 2.6, fill: INK_900, weight: 700 });
-      y += 3.4 * K;
-      for (const line of wrap(input.paymentTerms, 96)) {
-        svg += t(M, y, line, { size: 2.6, fill: INK_700 }).replace("<text ", '<text data-payment-terms="true" ');
-        y += 3.2 * K;
-      }
+    sectionHead("exclusions", "Exclusions & assumptions");
+    if (exclusions.length) {
+      svg += label(M, y, "Excluded and to be priced");
+      y += 6;
+      for (const x of exclusions) para(`${x} — not in the total; priced when confirmed.`, { fill: DOC.INK, attrs: 'data-excluded="true"' });
       y += 3;
     }
-    for (const para of hasTerms ? input.termsText!.split(/\r?\n/) : []) {
-      if (!para.trim()) {
-        y += 2.5;
-        continue;
-      }
-      for (const line of wrap(para, 96)) {
-        if (y + 4 > bottom) {
-          push(svg);
-          ({ svg, y } = header());
-          y += 6;
-        }
-        svg += t(M, y, line, { size: 2.5, fill: INK_700 }).replace("<text ", '<text data-terms="true" ');
-        y += 3.2 * K;
-      }
-      y += 1.5;
+    if (assumptions.length) {
+      svg += label(M, y, "Assumptions");
+      y += 6;
+      for (const a of assumptions) para(a, { fill: DOC.INK, attrs: 'data-assumption="true"' });
     }
     push(svg);
   }
 
-  // --- programme (indicative) -----------------------------------------------------------------
-  const prog = boq.programme;
-  if (prog && prog.phases.length) {
+  // 4 Programme (indicative) — ink bars (brass draws lines only) ------------------------------
+  if (prog) {
     ({ svg, y } = header());
-    y += 6;
-    svg += t(M, y, "INDICATIVE PROGRAMME", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
-    y += 5;
-    svg += t(M, y, `${prog.total_days} days, indicative — the phases are sized by the value of their work; dates are agreed at contract.`, { size: 2.3, fill: INK_700 });
-    y += 7;
-    const barX = 70;
-    const barW = BOQ_PAGE_W - M - barX;
+    sectionHead("programme", "Programme");
+    para(`${prog.total_days} days, indicative — the phases are sized by the value of their work; dates are agreed at contract.`);
+    y += 3;
+    const barX = 82;
+    const barW = R - barX;
     for (const ph of prog.phases) {
-      svg += t(M, y + 3, ph.name, { size: 2.5, fill: INK_900 });
-      svg += t(barX - 3, y + 3, `${ph.days} d`, { size: 2.5, fill: INK_700, font: FONT_MONO, anchor: "end" });
+      svg += text(M, y + 3.4, ph.name, { size: 2.9 });
+      svg += text(barX - 3, y + 3.4, `${ph.days} d`, { size: 2.8, fill: DOC.INK_2, font: DOC.MONO, anchor: "end" });
+      svg += hline(barX, R, y + 2.2);
       const x0 = barX + ((ph.start_day - 1) / prog.total_days) * barW;
       const w = Math.max(0.8, (ph.days / prog.total_days) * barW);
-      svg += `<rect x="${f1(x0)}" y="${f1(y + 0.6)}" width="${f1(w)}" height="3.2" rx="0.6" fill="${BRASS}" fill-opacity="0.75" data-programme-phase="${esc(ph.name)}"/>`;
-      y += 6.5;
+      svg += `<rect x="${n1(x0)}" y="${n1(y + 0.6)}" width="${n1(w)}" height="3.2" fill="${DOC.INK}" data-programme-phase="${esc(ph.name)}"/>`;
+      y += 7.4;
     }
-    svg += t(barX, y + 1.5, "day 1", { size: 2.1, fill: INK_500, font: FONT_MONO });
-    svg += t(BOQ_PAGE_W - M, y + 1.5, `day ${prog.total_days}`, { size: 2.1, fill: INK_500, font: FONT_MONO, anchor: "end" });
+    svg += text(barX, y + 2, "day 1", { size: 2.6, fill: DOC.INK_3, font: DOC.MONO });
+    svg += text(R, y + 2, `day ${prog.total_days}`, { size: 2.6, fill: DOC.INK_3, font: DOC.MONO, anchor: "end" });
     push(svg);
   }
 
-  return pages;
+  // 5 Terms (validity, payment terms, the firm's words) ----------------------------------------
+  if (hasTerms) {
+    ({ svg, y } = header());
+    sectionHead("terms", "Terms");
+    if (input.validity) para(input.validity, { fill: DOC.INK, attrs: 'data-validity="true"' });
+    if (input.paymentTerms) {
+      svg += label(M, y, "Payment terms");
+      y += 6;
+      para(input.paymentTerms, { fill: DOC.INK, attrs: 'data-payment-terms="true"' });
+      y += 2;
+    }
+    for (const p of input.termsText && input.termsText.trim() ? input.termsText.split(/\r?\n/) : []) {
+      if (!p.trim()) {
+        y += 2;
+        continue;
+      }
+      para(p, { fill: DOC.INK, attrs: 'data-terms="true"' });
+    }
+    push(svg);
+  }
+
+  return pages.map((p) => p.replaceAll(PAGE_COUNT_TOKEN, String(pages.length)));
 }
