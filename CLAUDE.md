@@ -1,6 +1,9 @@
 @AGENTS.md
 
-# RennovAIte
+# RenovAIte
+
+(The product name is **RenovAIte** in every user-facing string since K1; the
+repo, routes, domain, packages and env keep the lowercase `rennovaite`.)
 
 AI-powered villa renovation platform for Dubai. Takes a homeowner from floorplan
 and photos to a fully-specified renovation (moodboards, room-by-room concept
@@ -20,14 +23,119 @@ than months.
 ## Stack
 
 - Next.js (App Router) + TypeScript + Tailwind CSS
-- shadcn/ui components (base color: **neutral**), lucide-react icons
+- shadcn/ui components (base color: **neutral**); icons are ONE font,
+  Material Symbols Sharp (no lucide — removed in K1; `components.json`
+  `iconLibrary: "none"`)
 - Anthropic SDK (`@anthropic-ai/sdk`) for reasoning / design generation
 - Replicate SDK (`replicate`) for image generation (render rooms, moodboards)
 - Supabase (`@supabase/supabase-js`) for storage + persistence
 - zod for schema validation at boundaries (LLM output, API inputs, env)
 - PostHog for product analytics (env var wired, client not yet added)
 
-## Brand — Atelier Precise (current direction)
+## Two design systems — which rules apply where (K-series)
+
+The app is mid-migration from **Atelier Precise** to **Blueprint** (R7). Which
+rules apply is decided by ONE thing: whether the page's root carries
+`data-system="blueprint"`.
+
+- **Blueprint pages** (`[data-system="blueprint"]`) follow the R7 spec —
+  `design-refs/r7-handoff/R7_Handoff_Specs.md` (tracked) — and the section
+  below. Dark mode, IBM Plex Sans and Material Symbols Sharp 300 are signed off
+  for them (R7 + Gate 3, 11 Oct; K0 rulings 12 Oct).
+- **Atelier pages** (everything else) follow the Atelier section further down,
+  unchanged. Out of scope this cycle and must not regress: 03 Specification
+  (`/accessories`), owner Ideation · Moodboard · Style · Render · Scope &
+  timeline · Vendors · Viewer, and `/rennovaite`. (`/project/[id]/drawings` is
+  firm step 06 Documents and goes Blueprint in K4; the owner "Downloads" step
+  lands on it.)
+
+Never mix the two on one surface, and never restyle a shared component for one
+system — fork it (a Blueprint component under `components/blueprint/`, the
+Atelier one untouched).
+
+## Brand — Blueprint (R7; K-series)
+
+Source of truth: Figma **RenovAIte — Blueprint Design System (R7)**
+`vgibM0F9SdEQErBaTxjUqH`; spec `design-refs/r7-handoff/R7_Handoff_Specs.md`;
+build order `KSeries_Build_Pack.md` (docs root). `design-refs/` is gitignored
+except `design-refs/r7-handoff/`.
+
+### Tokens
+
+- **`design-refs/r7-handoff/tokens.css`** is GENERATED from the Figma variables
+  — never hand-edit it; change Figma and re-export. It is imported once by
+  `app/globals.css`, and every rule in it is scoped to
+  `[data-system="blueprint"]` (so it cannot touch an Atelier page).
+- **Tailwind names are the `bp-*` namespace** in `tailwind.config.ts` (each →
+  a `var(--color-*)` token): `bg-bp-surface-base|raised|sunken`,
+  `text-bp-ink-primary|secondary|tertiary|on-inverse`,
+  `border-bp-line-hairline|strong|control`, `bp-brass` / `bp-brass-text`,
+  `bp-focus-ring(-inverse)`, `text-bp-prov-{measured,validated,market,derived}-{mark,text}`,
+  `text-bp-prov-unpriced-mark`, `bg-bp-alert-surface` / `text-bp-alert-ink`;
+  fonts `font-bp-sans|mono|serif`. Outside a Blueprint root they are inert.
+  Never add a Blueprint colour as a hex.
+- **Type** is the `.t-*` classes from tokens.css (`t-heading-lg`, `t-body-sm`,
+  `t-label-caps`, `t-num-md`, …). Numbers are always mono + tabular.
+- **Zero radius.** No global reset (it would break Atelier and native
+  controls): Blueprint components simply never use `rounded-*` other than
+  `rounded-none` (a test enforces it in `components/blueprint/`). `--radius`
+  is not wired in this app.
+- **Colour means one thing**: brass draws LINES only (rail marker, tab
+  underline, selection, focus); provenance colour draws MARKS only (the glyph
+  and its tier label); numbers are ink; no status hues; every error / refusal
+  is the inverse block (`.surface-inverse bg-bp-alert-surface
+  text-bp-alert-ink`).
+
+### Fonts, icons, theme
+
+- Fonts are self-hosted `next/font/local` variables on `<html>`:
+  `--font-plex-sans` (IBM Plex Sans latin 400–600, Blueprint UI),
+  `--font-jetbrains-mono`, `--font-eb-garamond`; tokens.css builds
+  `--font-sans/mono/serif` from them inside the Blueprint scope. Inter stays for
+  Atelier pages; Plex Sans Arabic / Rubik remain the Arabic fallbacks.
+- **One icon font**: Material Symbols **Sharp** (variable), a runtime `<link>`.
+  Blueprint: `<Icon name>` (`components/blueprint/Icon.tsx`, `.bp-icon`:
+  weight 300, grade 0, opsz 20, 20px, layered so size utilities work).
+- **Theme**: `rv_theme` cookie = `light` (default) | `dark` | `system`
+  (`lib/theme.ts`). ONLY the pre-paint inline script reads it and sets
+  `<html data-theme>` (System follows the OS); the root layout never reads a
+  cookie (K1 review — it made every page dynamic; spec §1.8's server-side read
+  is superseded), and `<html>` carries `suppressHydrationWarning`. `<ThemeSwitch>` sets it. Dark is the
+  designed palette from the tokens — never a filter. `data-skin="warm"` sits
+  only on the owner landing (`/`) and intake (`/project/new`) roots; it does
+  nothing until those roots are Blueprint (K6).
+
+### Numbers + provenance primitives (K1)
+
+- **Formatting** (`lib/format/aed.ts`, still the ONE formatter):
+  `formatAED(n)` → exactly 2 dp, en-US grouping, H7 `money2` rounding first
+  (`{ prefix: true }` → `AED …`); `formatQty` (integer if integral, else 2 dp);
+  `formatDelta(n, "aed" | "pct")` (true minus U+2212, `+` on positives, `—`
+  at zero); `formatRatio` (`×17.9`); `headlineSpokenText` (the screen-reader
+  headline, never "star"). Displayed rate × displayed qty = displayed amount.
+- **`tierOf(line, section, { qsValidated })`** (`lib/provenance/tier.ts`,
+  SERVER-side — it reaches the I4 provenance module and identity curation)
+  → `{ qty, rate, amount, qtyWhy, rateWhy }`. qty = the line's `qty_derived`;
+  rate = I4's `lineTierKey` → firm tiers = measured ("Own basis"), reference =
+  **validated only when `rate_book.qs_validated`**, else market; a selected
+  product = market when priced (never validated), else derived; every fallback
+  = derived; `site_assessment` / `indicative` / `needs_selection` cap it at
+  derived; a QS-to-price line at 0 = unpriced. amount = the weaker (R1). Pinned
+  by the Arabella rev-4 snapshot (6 market 21,074.00 · 9 derived 81,818.03 ·
+  3 to be priced · 102,892.03 · ≈ 116,679.56).
+- Components import the client-safe vocabulary
+  `lib/provenance/tier-vocab.ts` (tiers, `weaker`/`weakest`, `tierLabel` firm /
+  owner, `describeFigure`) and receive marks as data — never `tier.ts`.
+- `components/blueprint/`: `<ProvenanceMark tier>` (the 12 px glyph, Figma
+  3:29: solid / ¾ / ½ / ring / dashed, `aria-hidden`), `<Figure value tier
+  …>` (ink number + mark + ONE screen-reader description WITH the currency,
+  e.g. "AED 7,329.70, derived — quantity derived, rate market reference"; a
+  rate is "AED 105.60 per m²"; unpriced shows "to be priced" / "—"),
+  `<TierLabel>`, `<Icon name size?>` (size by prop or `text-[…]` — never the
+  Atelier 24px trap), `<ThemeSwitch>`. Sandbox:
+  `/dev/blueprint` (signed in, absent in production).
+
+## Brand — Atelier Precise (pages not yet redesigned)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic
 for the luxury Dubai market. Calm, exclusive, meticulous — a private
@@ -37,7 +145,8 @@ architectural atelier, never a construction tool. Replaces the old Dark Silk
 spec is `atelier_precise/DESIGN.md` and the canonical shell wiring is
 `landing_page/code.html` / `project_dashboard/code.html`.
 
-**Default to light mode. There is no dark toggle in the PoC.**
+**Atelier pages are light-only.** (Dark mode exists only on Blueprint pages —
+see above.)
 
 ### Where tokens live
 
@@ -94,9 +203,12 @@ available.
 
 ### Iconography
 
-- **Always use Material Symbols Outlined via the global font** — render
-  `<span className="material-symbols-outlined">icon_name</span>`. Loaded once
-  via a `<link>` in `app/layout.tsx`. **No inline SVG icon imports** and no
+- **Always use Material Symbols via the global font** — on Atelier pages
+  render `<span className="material-symbols-outlined">icon_name</span>`. The
+  class name is historical: since K1 it draws the ONE icon font, Material
+  Symbols **Sharp**, at weight 400 / opsz 24 / 24px (the size is unlayered, so
+  `text-*` utilities do not resize it — use an inline `fontSize`). Loaded once
+  via a `<link>` in `app/layout.tsx`. Blueprint pages use `<Icon>`. **No inline SVG icon imports** and no
   lucide-react in new code. (DESIGN.md mentions Phosphor — ignore that; Stitch
   shipped Material Symbols and we match what Stitch shipped.)
 
@@ -146,7 +258,8 @@ now no sanctioned non-Atelier palette anywhere in the app.)
 
 ### Don't
 
-- Don't introduce a dark theme or a dark toggle without product signoff.
+- Don't add dark styles to Atelier pages. Dark mode is Blueprint-only (signed
+  off with R7 / Gate 3) and comes from its tokens.
 - Don't put design tokens in `@theme` — they live in `tailwind.config.ts`.
 - Don't hard-code font families, use heavy `shadow-lg`, or import SVG icon
   components — use the tokens/utilities above.

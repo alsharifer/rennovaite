@@ -8,7 +8,7 @@
 export const REFERENCE_BASIS_BANNER = "priced from market reference — review rates before client use";
 
 /** The proposal's discreet mark — the firm is the brand. */
-export const PREPARED_WITH_MARK = "Prepared with RennovAIte";
+export const PREPARED_WITH_MARK = "Prepared with RenovAIte";
 
 export type PricingBasis = "firm" | "reference" | "mixed" | "unpriced" | "none";
 

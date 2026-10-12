@@ -52,7 +52,7 @@ export function AuthForm({ next, linkError }: { next?: string; linkError?: strin
     <div className="flex w-full max-w-[480px] flex-col items-start">
       {/* Wordmark */}
       <span className="mb-2xl font-display text-headline-md text-primary tracking-tight">
-        RennovAIte
+        RenovAIte
       </span>
 
       <AnimatePresence mode="wait" initial={false}>

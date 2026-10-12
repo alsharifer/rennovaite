@@ -3,7 +3,7 @@ import Link from "next/link";
 // =============================================================================
 // Property OS intro / landing page (gated on PROPERTY_OS_LANDING).
 //
-// Four-pillar platform vision with RennovAIte as the only live product; the
+// Four-pillar platform vision with RenovAIte as the only live product; the
 // other three pillars are honest, INERT roadmap tiles (no links, no product
 // pages). Atelier tokens are used for every standard role (canvas / paper /
 // ink-900 / brass-600 / bone / ink-100 borders); the design's bespoke band
@@ -109,7 +109,7 @@ export function PropertyOsLanding() {
               href="/rennovaite"
               className="focus-ring hidden items-center rounded-lg bg-ink-900 px-[18px] py-[9px] font-body text-[13px] font-semibold text-canvas transition-opacity hover:opacity-90 sm:inline-flex"
             >
-              Open RennovAIte
+              Open RenovAIte
             </Link>
             {/* Mobile: single ink Sign in button */}
             <Link
@@ -150,7 +150,7 @@ export function PropertyOsLanding() {
 
         {/* PILLAR GRID */}
         <ul className="grid grid-cols-1 gap-[22px] pb-2xl sm:grid-cols-2 xl:grid-cols-4">
-          {/* 1 — RennovAIte (LIVE) */}
+          {/* 1 — RenovAIte (LIVE) */}
           <li className="group flex flex-col overflow-hidden rounded-md border border-ink-100 bg-paper shadow-level-1 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-level-2">
             <div className="flex items-center justify-between bg-[#C9964B] px-[18px] py-[10px]">
               <span className="font-mono text-[10px] tracking-[0.14em] text-white">
@@ -159,7 +159,7 @@ export function PropertyOsLanding() {
               <span className="size-2 rounded-full bg-[#3FA97A]" aria-hidden="true" />
             </div>
             <div className="flex flex-1 flex-col gap-3 px-5 py-[22px]">
-              <h2 className="font-display text-[26px] font-bold text-ink-900">RennovAIte</h2>
+              <h2 className="font-display text-[26px] font-bold text-ink-900">RenovAIte</h2>
               <p className="font-body text-[13px] leading-[1.55] text-on-surface-variant">
                 Redesign and renovate your home. AI design, an itemised bill of
                 quantities in AED, drawings and a permit check &mdash;
@@ -172,7 +172,7 @@ export function PropertyOsLanding() {
                 href="/rennovaite"
                 className="focus-ring mt-auto flex items-center justify-center gap-sm rounded-[9px] bg-ink-900 py-3 font-body text-[14px] font-semibold text-canvas transition-opacity hover:opacity-90"
               >
-                Enter RennovAIte
+                Enter RenovAIte
                 {ENTER_ARROW}
               </Link>
             </div>

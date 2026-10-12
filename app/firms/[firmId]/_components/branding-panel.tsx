@@ -90,7 +90,7 @@ export function BrandingPanel({ firmId }: { firmId: string }) {
     <section className="rounded-xl border border-ink-100 bg-paper p-md" aria-label="Proposal branding" data-testid="branding-panel">
       <p className="label-caps text-ink-500">Proposal branding — what your client sees</p>
       <p className="mt-xs max-w-[672px] text-body-sm text-ink-700">
-        A client proposal is your document: it carries this name and logo on the cover and your terms at the end. RennovAIte appears only
+        A client proposal is your document: it carries this name and logo on the cover and your terms at the end. RenovAIte appears only
         as a small &ldquo;prepared with&rdquo; mark. Contractor and reference identities never appear on it.
       </p>
       <div className="mt-md grid grid-cols-1 gap-md md:grid-cols-2">

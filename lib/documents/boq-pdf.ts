@@ -145,7 +145,7 @@ export function buildBoqPdfPages(input: BoqPdfInput): string[] {
   const rowH = (r: Row) => (r.kind === "section" ? 9 : r.kind === "section_total" ? 8 : DESC_H * r.desc.length + SUB_H * r.sub.length + 2.6);
 
   const header = (n: number) => {
-    let s = t(M, 14, "RennovAIte", { size: 4.4, fill: BRASS, font: FONT_DISPLAY });
+    let s = t(M, 14, "RenovAIte", { size: 4.4, fill: BRASS, font: FONT_DISPLAY });
     s += t(BOQ_PAGE_W - M, 14, `${input.projectName} · Bill of Quantities`, { size: 2.6, fill: INK_500, anchor: "end" });
     let y = 18;
     if (statement) {
@@ -373,9 +373,9 @@ export async function rasteriseA4Pages(pages: readonly string[], title: string):
   const { PDFDocument } = await import("pdf-lib");
   const pdf = stampPdfDay(await PDFDocument.create());
   pdf.setTitle(title);
-  pdf.setAuthor("RennovAIte");
-  pdf.setCreator("RennovAIte");
-  pdf.setProducer("RennovAIte");
+  pdf.setAuthor("RenovAIte");
+  pdf.setCreator("RenovAIte");
+  pdf.setProducer("RenovAIte");
   const MM_TO_PT = 72 / 25.4;
   for (const svg of pages) {
     const png = new Resvg(svg, { fitTo: { mode: "width", value: 2480 } }).render().asPng();

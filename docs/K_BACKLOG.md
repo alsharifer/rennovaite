@@ -1,0 +1,54 @@
+# K backlog — known issues parked during the Blueprint (R7) cycle
+
+Items found while building K that are deliberately NOT fixed in the K task that
+found them (design ≠ engine; Atelier pages must not regress this cycle). Each
+says where it is and why it waits. Newest first.
+
+## Found in K1 (2026-10-12)
+
+- **Atelier icon sizes ignore `text-*` utilities.** Google's icon stylesheet
+  set `font-size: 24px` on the icon class, unlayered, which outranks
+  Tailwind v4's layered utilities — so `material-symbols-outlined text-[18px]`
+  (46 files; measured: `text-[22px]` computes 24px) has always rendered at 24px. K1 kept that exactly (the
+  Atelier class now carries the 24px itself, `app/globals.css`) so no Atelier
+  page moved. Fix when each page is redesigned; Blueprint's `<Icon>` is layered
+  and sizes correctly.
+- **Counsel's legal drafts still spell the product "RennovAIte"**
+  (`content/legal/*.md`, verbatim drafts). The tab title already reads
+  RenovAIte (`components/legal/LegalPage.tsx`); ask counsel to use RenovAIte in
+  the published text.
+- **LLM system prompts still say "RennovAIte"** (`app/api/generate-boq/route.ts`,
+  `lib/parse/providers/inhouse.ts`). Not user-facing; changing the parse prompt
+  can change parse output, so it waits for a parse-quality pass.
+- **Returning users land on new-project intake.** `/project` (the signed-in
+  home for `/`, `/auth` and the auth callback) redirects to `/project/new`.
+  A returning firm probably wants its project list — K2's route triage.
+- **The sign-in rate-limit message says "wait a minute"**; Supabase's built-in
+  mailer limits magic links per HOUR. With H9, or when custom SMTP is set up.
+- **Uploads over ~4.5 MB never reach the app** (Vercel's function body limit —
+  measured 12 Oct: 4.3 MB → app, 4.7 MB → `413 FUNCTION_PAYLOAD_TOO_LARGE`).
+  Floorplan PDFs and drawings are not compressed. **H9**: direct-to-storage
+  signed uploads for `/api/upload`, `/api/project-asset`, quote import. K1 only
+  aligned the app's own limits (plan 20 MB both sides, structured 413).
+  Written up as `docs/H9_DIRECT_UPLOADS.md`.
+
+## Ruled into the backlog at K0 (2026-10-12)
+
+- **shadcn colour bridge disagrees with itself** (`tailwind.config.ts` vs
+  `app/globals.css :root`): `bg-primary` = `#7a5518` (MD3) while `--primary` =
+  brass `#a4793a`; `bg-background` `#fdf9f2` vs `--background` `#f7f3ec`;
+  `bg-secondary` `#535f74` vs `--secondary` bone. Atelier only; leave until the
+  last Atelier page goes.
+- **`--radius-md` is undefined** (no `@theme inline` radius mapping), so the
+  shadcn Button's `xs` / `sm` / `icon-*` sizes
+  (`rounded-[min(var(--radius-md),…)]`, `components/ui/button.tsx`) render
+  square. `--radius` itself is set but wired to nothing. Atelier only.
+- **Garden "Cost sensitivity" toggles have no source**
+  (`app/project/[id]/boq/_components/boq-view.tsx` `SENSITIVITY_TOGGLES`:
+  +15 / −8 / +6 / −3 %) — the one number on the BoQ page with no provenance.
+  K3 ships them with the engine's copy ("illustrative ±% of the project total
+  — never the BoQ"); source them or hide them for firms later.
+- **Dead Atelier tokens on the plan pages** (`status-error`, `status-success`,
+  `bg-bg-elevated`, `text-label-sm`, `brand-hover`, a purple glow on the default
+  Button) render as nothing — from the abandoned `claude/priceless-jones-bb887c`
+  branch's inventory. K5 restyles that chrome.

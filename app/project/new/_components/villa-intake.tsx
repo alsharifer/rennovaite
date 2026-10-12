@@ -46,7 +46,11 @@ const DRAWING_ACCEPT = {
   "application/dxf": [".dxf"],
   "application/octet-stream": [".dwg", ".dxf"],
 };
+// Asset-library uploads (photos, drawings) — /api/project-asset accepts 25 MB.
 const MAX_SIZE_BYTES = 25 * 1024 * 1024;
+// The floorplan goes to /api/upload, which accepts 20 MB (K1: the two limits
+// used to disagree, so a 20–25 MB plan passed here and was refused there).
+const PLAN_MAX_BYTES = 20 * 1024 * 1024;
 
 const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ras Al Khaimah", "Ajman"];
 
@@ -269,10 +273,10 @@ export function VillaIntake({ gardenPilot = false }: { gardenPilot?: boolean }) 
     onDropRejected: () =>
       setPlan({
         kind: "error",
-        message: "Please upload a PDF, PNG, or JPG under 25 MB.",
+        message: "Please upload a PDF, PNG, or JPG under 20 MB.",
       }),
     accept: PLAN_ACCEPT,
-    maxSize: MAX_SIZE_BYTES,
+    maxSize: PLAN_MAX_BYTES,
     multiple: false,
     disabled: plan.kind === "uploading",
   });

@@ -27,7 +27,7 @@ describe("drawing sheets render deterministic, valid SVG", () => {
     expect(svg).toContain('height="297mm"');
     expect(svg).toContain("Master Bedroom");
     expect(svg).toContain("A-101");
-    expect(svg).toContain("RennovAIte");
+    expect(svg).toContain("RenovAIte");
     // a dimension value (envelope width in mm) should appear
     expect(/>\d{3,5}</.test(svg)).toBe(true);
   });

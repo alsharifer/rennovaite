@@ -96,6 +96,39 @@ const config: Config = {
         "accent-foreground": "var(--accent-foreground)",
         destructive: "var(--destructive)",
         "destructive-foreground": "var(--destructive-foreground)",
+        // --- R7 Blueprint (K1) — bp-* only, so it never shadows an Atelier
+        // name. Each resolves to a semantic token from
+        // design-refs/r7-handoff/tokens.css, which defines them ONLY inside
+        // [data-system="blueprint"]: outside that scope these classes are
+        // inert. Light / dark / warm values switch there, never here.
+        "bp-surface-base": "var(--color-surface-base)",
+        "bp-surface-raised": "var(--color-surface-raised)",
+        "bp-surface-sunken": "var(--color-surface-sunken)",
+        "bp-ink-primary": "var(--color-ink-primary)",
+        "bp-ink-secondary": "var(--color-ink-secondary)",
+        "bp-ink-tertiary": "var(--color-ink-tertiary)",
+        "bp-ink-on-inverse": "var(--color-ink-on-inverse)",
+        "bp-line-hairline": "var(--color-line-hairline)",
+        "bp-line-strong": "var(--color-line-strong)",
+        "bp-line-control": "var(--color-line-control)",
+        // Brass draws LINES only (rail marker, tab underline, selection, focus).
+        "bp-brass": "var(--color-active-brass)",
+        "bp-brass-text": "var(--color-active-brass-text)",
+        "bp-focus-ring": "var(--color-focus-ring)",
+        "bp-focus-ring-inverse": "var(--color-focus-ring-inverse)",
+        // Provenance draws MARKS only (the glyph + its tier label).
+        "bp-prov-measured-mark": "var(--color-prov-measured-mark)",
+        "bp-prov-measured-text": "var(--color-prov-measured-text)",
+        "bp-prov-validated-mark": "var(--color-prov-validated-mark)",
+        "bp-prov-validated-text": "var(--color-prov-validated-text)",
+        "bp-prov-market-mark": "var(--color-prov-market-mark)",
+        "bp-prov-market-text": "var(--color-prov-market-text)",
+        "bp-prov-derived-mark": "var(--color-prov-derived-mark)",
+        "bp-prov-derived-text": "var(--color-prov-derived-text)",
+        "bp-prov-unpriced-mark": "var(--color-prov-unpriced-mark)",
+        // The only error / refusal treatment: an inverse ink block.
+        "bp-alert-surface": "var(--color-alert-surface)",
+        "bp-alert-ink": "var(--color-alert-ink)",
       },
       borderRadius: {
         DEFAULT: "0.25rem",
@@ -173,6 +206,11 @@ const config: Config = {
           "sans-serif",
         ],
         "data-mono": ["var(--font-jetbrains-mono)", "monospace"],
+        // R7 Blueprint (K1): the scoped tokens.css stacks (IBM Plex Sans /
+        // JetBrains Mono / EB Garamond over the next/font variables).
+        "bp-sans": ["var(--font-sans)"],
+        "bp-mono": ["var(--font-mono)"],
+        "bp-serif": ["var(--font-serif)"],
       },
       fontSize: {
         "display-hero": [

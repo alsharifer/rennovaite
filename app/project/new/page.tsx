@@ -6,7 +6,7 @@ import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { VillaIntake } from "./_components/villa-intake";
 
 export const metadata: Metadata = {
-  title: "New project · RennovAIte",
+  title: "New project · RenovAIte",
 };
 
 
@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
 export default function NewProjectPage() {
   return (
     <AppShell pageName="New Project">
-      <div className="mx-auto max-w-[1100px]">
+      {/* R7 §1.8: the owner front door wears the warm skin (inert until K6 makes this a Blueprint root). */}
+      <div className="mx-auto max-w-[1100px]" data-skin="warm">
         {/* Header */}
         <header className="mb-2xl">
           <JourneyProgress stepKey="intake" projectId={null} />

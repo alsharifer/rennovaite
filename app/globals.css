@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* R7 Blueprint tokens (K1) — generated from Figma, never hand-edited: change
+   the Figma variable and re-export. Every rule in it is scoped to
+   [data-system="blueprint"], so Atelier pages are untouched. The Tailwind
+   names for them are the bp-* namespace in tailwind.config.ts. */
+@import "../design-refs/r7-handoff/tokens.css";
+
 /* Atelier Precise design tokens live in the legacy-style JS config; the v4
    bridge loads them so `bg-canvas`, `text-ink-900`, `font-display`, the
    `text-headline-lg` scale, `shadow-level-1`, etc. all resolve. */
@@ -88,12 +94,19 @@
   outline-offset: 2px;
 }
 
-/* Material Symbols Outlined — font delivered via the <link> in
-   app/layout.tsx (matches what Stitch shipped). */
+/* Icons — ONE font, Material Symbols Sharp (variable), delivered via the <link>
+   in app/layout.tsx. Atelier pages keep their class name and weight 400 / opsz
+   24 (the glyph shapes moved from Outlined to Sharp in K1 — accepted, rather
+   than ship two icon fonts); Blueprint pages use <Icon> (.bp-icon, 300 / 20). */
 .material-symbols-outlined {
-  font-family: "Material Symbols Outlined";
+  font-family: "Material Symbols Sharp";
   font-weight: normal;
   font-style: normal;
+  /* Google's stylesheet sets these on the class named after its font
+     (.material-symbols-sharp now), so the Atelier class carries them itself.
+     Unlayered, exactly as Google's rule was: it outranks text-* utilities. */
+  font-size: 24px;
+  -webkit-font-smoothing: antialiased;
   display: inline-block;
   line-height: 1;
   text-transform: none;
@@ -107,4 +120,31 @@
     "wght" 400,
     "GRAD" 0,
     "opsz" 24;
+}
+
+@layer components {
+  /* Blueprint icon (R7 §1.6, <Icon> in components/blueprint/Icon.tsx): Sharp,
+     weight 300, grade 0, optical size 20, rendered by ligature. Layered, so a
+     size utility on <Icon> wins. */
+  .bp-icon {
+    font-family: "Material Symbols Sharp";
+    font-weight: normal;
+    font-style: normal;
+    font-size: 20px;
+    -webkit-font-smoothing: antialiased;
+    display: inline-block;
+    flex-shrink: 0;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    font-feature-settings: "liga";
+    font-variation-settings:
+      "FILL" 0,
+      "wght" 300,
+      "GRAD" 0,
+      "opsz" 20;
+  }
 }

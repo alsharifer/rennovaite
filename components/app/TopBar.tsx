@@ -26,7 +26,7 @@ export async function TopBar({ pageName }: Props) {
       <div className="flex items-center gap-md">
         <BackButton />
         <span className="font-display text-headline-md text-primary tracking-tight">
-          RennovAIte
+          RenovAIte
         </span>
         <span
           className="h-6 w-px bg-bone"

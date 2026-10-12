@@ -8,7 +8,7 @@ import { SIGNED_IN_HOME, authErrorMessage } from "@/lib/auth/link-error";
 import { AuthForm } from "./_components/auth-form";
 
 export const metadata: Metadata = {
-  title: "Sign in · RennovAIte",
+  title: "Sign in · RenovAIte",
 };
 
 // Placeholder per spec (Unsplash query: walnut brass detail interior dubai).

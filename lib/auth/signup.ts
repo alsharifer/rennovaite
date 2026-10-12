@@ -18,7 +18,7 @@ export const SIGNUP_ALLOWLIST_ENV = "AUTH_SIGNUP_ALLOWLIST";
 
 /** Shown to anyone the list does not name — worded the same whether or not the address has an account. */
 export const INVITE_ONLY_MESSAGE =
-  "Access to RennovAIte is invite-only during the pilot. If this address already has an account, a sign-in link is on its way; if you were invited, use the address the invitation went to.";
+  "Access to RenovAIte is invite-only during the pilot. If this address already has an account, a sign-in link is on its way; if you were invited, use the address the invitation went to.";
 
 export type AllowEntry = { kind: "exact"; email: string } | { kind: "pattern"; re: RegExp; source: string };
 

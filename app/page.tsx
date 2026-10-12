@@ -7,7 +7,7 @@ import { getPageCaller } from "@/lib/auth/caller";
 import { SIGNED_IN_HOME } from "@/lib/auth/link-error";
 
 // Read-at-server-start flag (documented in CLAUDE.md). OFF → `/` is the
-// RennovAIte marketing home for visitors. ON → `/` is the Property OS intro for
+// RenovAIte marketing home for visitors. ON → `/` is the Property OS intro for
 // visitors. Either way a signed-in user goes straight to their portal — with the
 // flag off they used to land back on the marketing page after signing in and be
 // asked to sign in again.
@@ -20,9 +20,9 @@ const propertyOsEnabled = () => process.env.PROPERTY_OS_LANDING === "true";
 
 export async function generateMetadata(): Promise<Metadata> {
   if (!propertyOsEnabled()) return {}; // inherit the root layout default (as today)
-  const title = "Property OS — by RennovAIte";
+  const title = "Property OS — by RenovAIte";
   const description =
-    "Design, price, and deliver work on your property — starting with RennovAIte, Dubai's calibrated AI renovation platform.";
+    "Design, price, and deliver work on your property — starting with RenovAIte, Dubai's calibrated AI renovation platform.";
   return {
     title,
     description,
@@ -36,5 +36,11 @@ export default async function RootPage() {
   // destination the auth callback defaults to (SIGNED_IN_HOME).
   if (await getPageCaller()) redirect(SIGNED_IN_HOME);
 
-  return propertyOsEnabled() ? <PropertyOsLanding /> : <HomeLanding />;
+  // R7 §1.8: the owner landing wears the warm skin. A layout-neutral wrapper,
+  // so /rennovaite (the same HomeLanding) stays exactly as it was.
+  return (
+    <div data-skin="warm" className="contents">
+      {propertyOsEnabled() ? <PropertyOsLanding /> : <HomeLanding />}
+    </div>
+  );
 }

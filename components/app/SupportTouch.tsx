@@ -13,7 +13,7 @@ const CHANNELS: { value: "in_app" | "call" | "chat" | "email" | "session" | "int
   { value: "chat", label: "Chat / WhatsApp" },
   { value: "email", label: "E-mail" },
   { value: "session", label: "At a working session" },
-  { value: "intervention", label: "RennovAIte stepped in" },
+  { value: "intervention", label: "RenovAIte stepped in" },
 ];
 
 export function SupportTouch({ projectId, area }: { projectId: string; area: string }) {

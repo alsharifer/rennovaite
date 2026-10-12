@@ -150,7 +150,7 @@ export function printedChecks(i: PrintedInput): PackCheck[] {
     const text = pp.map((s) => s.replace(/<[^>]+>/g, " ")).join(" ");
     check("the proposal has pages", pp.length >= 2, `${pp.length} pages`);
     check("the proposal cover carries the firm's brand", !!pp[0]?.includes('data-proposal-cover="true"') && pp[0].includes(`>${i.proposal.brand.replace(/&/g, "&amp;")}<`), i.proposal.brand);
-    check("RennovAIte appears only as the discreet 'prepared with' mark", pp.every((p) => p.includes('data-prepared-with="true"')) && !pp.some((p) => /font-size="(?:[4-9]|\d{2})[\d.]*"[^>]*>[^<]*RennovAIte/.test(p)), `${pp.length} pages`);
+    check("RenovAIte appears only as the discreet 'prepared with' mark", pp.every((p) => p.includes('data-prepared-with="true"')) && !pp.some((p) => /font-size="(?:[4-9]|\d{2})[\d.]*"[^>]*>[^<]*RenovAIte/.test(p)), `${pp.length} pages`);
     check("the proposal prints no rate provenance (sources, tiers, QS marks)", !PROVENANCE_WORDS.test(text));
     check("the proposal's contract sum is the BoQ's grand total", pp.some((p) => p.includes(`data-grand-total="${i.boq.grand_total_aed}"`)), String(i.boq.grand_total_aed));
     const ohp = (i.boq as { ohp_aed?: number }).ohp_aed ?? 0;

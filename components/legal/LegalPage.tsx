@@ -13,7 +13,8 @@ import { formatLegalDate, type Block, type Inline, type LegalDocument } from "@/
 
 export function legalMetadata(doc: LegalDocument, description: string): Metadata {
   return {
-    title: `${doc.title.replace(/\s+—\s+RennovAIte$/, "")} — RennovAIte`,
+    // Counsel's drafts still spell the name RennovAIte; the tab title carries the brand either way.
+    title: `${doc.title.replace(/\s+—\s+Renn?ovAIte$/, "")} — RenovAIte`,
     description,
     ...(doc.meta.status === "draft" ? { robots: { index: false, follow: false } } : {}),
   };
@@ -49,7 +50,7 @@ export function LegalPage({ doc }: { doc: LegalDocument }) {
           href="/rennovaite"
           className="focus-ring mt-xl inline-flex font-body text-body-sm text-brass-600 hover:underline"
         >
-          &larr; Back to RennovAIte
+          &larr; Back to RenovAIte
         </Link>
       </main>
       <Footer />

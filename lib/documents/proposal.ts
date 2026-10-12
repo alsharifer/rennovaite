@@ -4,7 +4,7 @@
 // The firm is the brand. A cover with the firm's logo and display name, a scope
 // summary, the BoQ at the firm's resolved rates with its overheads & profit as
 // its own row, a terms block (the firm's words) and the indicative programme.
-// RennovAIte is a discreet "prepared with" mark in the footer, nothing more.
+// RenovAIte is a discreet "prepared with" mark in the footer, nothing more.
 //
 // What a client-facing proposal does NOT print: rate sources, resolution tiers,
 // QS status marks, the reference label, a contractor identity. What it DOES
