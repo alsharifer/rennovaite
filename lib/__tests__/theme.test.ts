@@ -4,7 +4,7 @@ import vm from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_THEME_PREF, THEME_COOKIE, THEME_NO_FLASH_SCRIPT, parseThemePref } from "../theme";
+import { DEFAULT_THEME_PREF, OFFERED_THEME_PREFS, THEME_CHOICES_OPEN, THEME_COOKIE, THEME_NO_FLASH_SCRIPT, parseThemePref, themeNoFlashScript } from "../theme";
 
 // =============================================================================
 // K1 — Light / Dark / System (R7 §1.8): a cookie the server reads, plus an
@@ -12,11 +12,11 @@ import { DEFAULT_THEME_PREF, THEME_COOKIE, THEME_NO_FLASH_SCRIPT, parseThemePref
 // =============================================================================
 
 /** Run the inline script against a fake document / matchMedia. */
-function runScript(cookie: string, osDark: boolean) {
+function runScript(cookie: string, osDark: boolean, script = themeNoFlashScript(true)) {
   const attrs: Record<string, string> = {};
   const listeners: (() => void)[] = [];
   const media = { matches: osDark, addEventListener: (_: string, fn: () => void) => listeners.push(fn) };
-  vm.runInNewContext(THEME_NO_FLASH_SCRIPT, {
+  vm.runInNewContext(script, {
     document: { cookie, documentElement: { setAttribute: (k: string, v: string) => (attrs[k] = v) } },
     window: { matchMedia: () => media },
   });
@@ -32,7 +32,17 @@ describe("theme preference", () => {
   });
 });
 
-describe("the no-flash script", () => {
+describe("the K5 gate — everyone gets Light until the page bodies are converted", () => {
+  it("is closed: the inlined script ignores a stored Dark / System, and only Light is offered", () => {
+    expect(THEME_CHOICES_OPEN).toBe(false); // K5 flips this
+    expect(OFFERED_THEME_PREFS).toEqual(["light"]);
+    expect(THEME_NO_FLASH_SCRIPT).toBe(themeNoFlashScript(false));
+    expect(runScript(`${THEME_COOKIE}=dark`, false, THEME_NO_FLASH_SCRIPT).attrs).toEqual({ "data-theme": "light", "data-theme-pref": "light" });
+    expect(runScript(`${THEME_COOKIE}=system`, true, THEME_NO_FLASH_SCRIPT).attrs["data-theme"]).toBe("light");
+  });
+});
+
+describe("the no-flash script (as it behaves once K5 opens the gate)", () => {
   it("applies the cookie before paint", () => {
     expect(runScript(`a=1; ${THEME_COOKIE}=dark`, false).attrs).toEqual({ "data-theme": "dark", "data-theme-pref": "dark" });
     expect(runScript("", true).attrs["data-theme"]).toBe("light");

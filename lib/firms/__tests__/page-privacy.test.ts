@@ -72,13 +72,20 @@ describe("the firm list", () => {
 });
 
 describe("the server pages read through the store with the caller", () => {
-  it("the book page uses getCaller + getFirmSummary/listEntries and renders a 403 card, never the book", () => {
-    const src = read("app/firms/[firmId]/page.tsx");
+  it("the book (one component, K2) uses getCaller + getFirmSummary/listEntries and renders a 403 card, never the book", () => {
+    const src = read("app/firms/[firmId]/_components/firm-book.tsx");
     expect(src).toMatch(/await getCaller\(\)/);
     expect(src).toMatch(/getFirmSummary\(db, firmId, caller\)/);
     expect(src).toMatch(/listEntries\(db, firmId, caller\)/);
     expect(src).toMatch(/e\.status === 403/);
     expect(src).not.toMatch(/from\("firm_rate_entries"\)/);
+  });
+  it("both book pages — /firms/[firmId] and the project's step 04 — render that component and read nothing themselves", () => {
+    for (const f of ["app/firms/[firmId]/page.tsx", "app/project/[id]/rates/page.tsx"]) {
+      const src = read(f);
+      expect(src, f).toMatch(/<FirmBook firmId=/);
+      expect(src, f).not.toMatch(/getFirmSummary|listEntries|from\("firm_rate_entries"\)|from\("firm_rate_books"\)/);
+    }
   });
   it("the firms page lists the caller's firms only", () => {
     const src = read("app/firms/page.tsx");

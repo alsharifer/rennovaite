@@ -171,7 +171,7 @@ const MIXED = [
   ["feedback: own project + owner's render", (o, m) => ({ method: "POST", path: "/api/feedback", body: { project_id: m.P, entity_type: "render", entity_id: o.RD, action: "accepted" } })],
 ];
 
-const PAGES = ["", "/boq", "/boq/revisions", "/plan", "/render", "/drawings", "/viewer", "/vendors", "/moodboard", "/ideation", "/style", "/timeline", "/accessories"];
+const PAGES = ["", "/boq", "/boq/revisions", "/plan", "/render", "/drawings", "/viewer", "/vendors", "/moodboard", "/ideation", "/style", "/timeline", "/accessories", "/rates", "/proposal"];
 
 // --- setup --------------------------------------------------------------------------
 async function makeProject(who, name) {

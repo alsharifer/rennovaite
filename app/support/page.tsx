@@ -1,11 +1,7 @@
-import { AppShell } from "@/components/app/AppShell";
+import { redirect } from "next/navigation";
 
+// K2 (spec §3.10): support is a help drawer on every page now. The old route
+// opens it on Settings, so a bookmark still lands somewhere useful.
 export default function SupportPage() {
-  return (
-    <AppShell pageName="Support">
-      <h1 className="font-display text-headline-lg text-ink-900">
-        Support — coming soon
-      </h1>
-    </AppShell>
-  );
+  redirect("/settings?help=1");
 }

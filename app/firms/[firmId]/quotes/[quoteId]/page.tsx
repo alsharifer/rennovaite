@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
-import { AppShell } from "@/components/app/AppShell";
 import { getCaller } from "@/lib/auth/caller";
 import { StoreError } from "@/lib/firms/store";
 import { reviewQuote, type LineReview, type Quote, type QuoteLine } from "@/lib/quotes/store";
@@ -23,11 +22,11 @@ export default async function QuoteReviewPage({ params }: { params: Promise<{ fi
   const caller = await getCaller();
   if (!caller) {
     return (
-      <AppShell pageName="Quotation">
+      <>
         <div className="mx-auto max-w-4xl">
           <SignInCard what="this quotation" />
         </div>
-      </AppShell>
+      </>
     );
   }
   let quote: Quote;
@@ -39,23 +38,23 @@ export default async function QuoteReviewPage({ params }: { params: Promise<{ fi
     if (e instanceof StoreError && e.status === 404) notFound();
     if (e instanceof StoreError && e.status === 403) {
       return (
-        <AppShell pageName="Quotation">
+        <>
           <div className="mx-auto max-w-4xl">
             <section className="rounded-xl border border-ink-100 bg-paper p-lg" aria-label="Not a member">
               <p className="label-caps text-ink-500">Members only</p>
               <h2 className="mt-xs font-display text-headline-md text-ink-900">You are not a member of this firm</h2>
             </section>
           </div>
-        </AppShell>
+        </>
       );
     }
     throw e;
   }
   return (
-    <AppShell pageName="Quotation">
+    <>
       <div className="mx-auto max-w-6xl">
         <QuoteReview firmId={firmId} initialQuote={quote} initialLines={lines} />
       </div>
-    </AppShell>
+    </>
   );
 }

@@ -109,8 +109,13 @@ describe("Icon — Material Symbols Sharp by ligature", () => {
 
 // --- house rules for every new Blueprint file --------------------------------------
 
+const walk = (dir: string): string[] =>
+  readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]));
 const BLUEPRINT_FILES = [
-  ...readdirSync(path.join(ROOT, "components/blueprint")).map((f) => `components/blueprint/${f}`),
+  ...walk("components/blueprint"),
+  "lib/journey-state.ts",
+  "app/project/[id]/proposal/page.tsx",
+  "app/settings/page.tsx",
   "lib/provenance/tier-vocab.ts",
   "lib/provenance/tier.ts",
   "lib/theme.ts",

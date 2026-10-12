@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { AppShell } from "@/components/app/AppShell";
+import { redirect } from "next/navigation";
+
+import { AccountShell } from "@/components/blueprint/shell/ProjectShell";
 import { getCaller } from "@/lib/auth/caller";
 import { listFirms, type Firm } from "@/lib/firms/store";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -14,12 +16,17 @@ export const dynamic = "force-dynamic";
 // A signed-out visitor sees a sign-in card, not a redirect: there is no
 // middleware in this app (docs/AUTH.md), and a page that renders nothing
 // useful is worse than one that says why.
+//
+// K2 (spec §3.10): /firms folds into the firm switcher — a member of exactly
+// one firm goes straight to its book; the list stays for none (create one)
+// or several.
 export default async function FirmsPage() {
   const caller = await getCaller();
   let firms: Firm[] = [];
   if (caller) firms = await listFirms(getSupabaseAdmin() as unknown as SupabaseClient, caller);
+  if (firms.length === 1) redirect(`/firms/${firms[0]!.id}`);
   return (
-    <AppShell pageName="Rate books">
+    <AccountShell>
       <div className="mx-auto max-w-4xl">
         <header className="mb-lg">
           <p className="label-caps text-ink-500">Firms</p>
@@ -32,6 +39,6 @@ export default async function FirmsPage() {
         </header>
         {caller ? <FirmList initialFirms={firms} callerEmail={caller.email} /> : <SignInCard what="your firms" />}
       </div>
-    </AppShell>
+    </AccountShell>
   );
 }

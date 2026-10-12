@@ -9,7 +9,7 @@
 
 import { useSyncExternalStore } from "react";
 
-import { DEFAULT_THEME_PREF, THEME_PREFS, parseThemePref, setThemePreference, type ThemePref } from "@/lib/theme";
+import { DEFAULT_THEME_PREF, OFFERED_THEME_PREFS, parseThemePref, setThemePreference, type ThemePref } from "@/lib/theme";
 
 const LABEL: Record<ThemePref, string> = { light: "Light", dark: "Dark", system: "System" };
 
@@ -22,12 +22,20 @@ function subscribe(onChange: () => void) {
 }
 const readPref = () => parseThemePref(document.documentElement.getAttribute("data-theme-pref"));
 
+/** The current preference, live (the rail footer's "Theme · Light"). */
+export function useThemePref(): ThemePref {
+  return useSyncExternalStore(subscribe, readPref, () => DEFAULT_THEME_PREF);
+}
+
+export const THEME_LABEL = LABEL;
+
 export function ThemeSwitch({ className }: { className?: string }) {
-  const pref = useSyncExternalStore(subscribe, readPref, () => DEFAULT_THEME_PREF);
+  const pref = useThemePref();
   return (
     <fieldset className={`flex items-center gap-3 border-0 p-0${className ? ` ${className}` : ""}`}>
       <legend className="t-label-caps float-left mr-2 text-bp-ink-tertiary">Theme</legend>
-      {THEME_PREFS.map((p) => (
+      {/* Dark and System are hidden until K5 (lib/theme.ts THEME_CHOICES_OPEN). */}
+      {OFFERED_THEME_PREFS.map((p) => (
         <label key={p} className="t-nav-item flex cursor-pointer items-center gap-1 text-bp-ink-secondary has-[:checked]:font-semibold has-[:checked]:text-bp-ink-primary">
           <input
             type="radio"

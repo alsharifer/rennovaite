@@ -40,6 +40,7 @@ import { checkMagnitude } from "./magnitude";
 import { loadShadowRates } from "./shadow-rate";
 import { itemVocabulary, validateEntry } from "./vocabulary";
 
+import { projectMembersOutsideFirm } from "@/lib/projects/firm-invariant";
 import { StoreError } from "@/lib/store-error";
 
 export { StoreError };
@@ -741,6 +742,15 @@ export async function assignProjectFirm(
   requireCaller(caller);
   if (firmId) {
     await requireFirm(db, firmId, caller);
+    // The persona invariant (K2): every member of a firm project is in the firm.
+    const outside = await projectMembersOutsideFirm(db, projectId, firmId);
+    if (outside.length > 0) {
+      throw new StoreError(
+        409,
+        "project_members_outside_firm",
+        `${outside.length} member${outside.length === 1 ? " of this project is" : "s of this project are"} not in this firm. On a firm project everyone works the firm's journey — add them to the firm first.`,
+      );
+    }
   } else {
     const { data: project, error } = await db.from("projects").select("firm_id").eq("id", projectId).maybeSingle();
     if (error) fail(error, "read project");

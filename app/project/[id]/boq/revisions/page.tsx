@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
-import { AppShell } from "@/components/app/AppShell";
 import { getCaller } from "@/lib/auth/caller";
 import { RevisionNotFound, buildProjectRevisionDiff, listRevisions } from "@/lib/boq/revisions";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -13,7 +12,6 @@ import { RevisionDiffView } from "./_components/revision-diff-view";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_NAME = "BoQ revisions";
 
 // U4 — /project/:id/boq/revisions?from=&to=
 //
@@ -28,7 +26,7 @@ export default async function RevisionsPage({ params, searchParams }: { params: 
   const caller = await getCaller();
   if (!caller) {
     return (
-      <AppShell pageName={PAGE_NAME}>
+      <>
         <div className="mx-auto max-w-4xl">
           <section className="rounded-xl border border-ink-100 bg-paper p-lg" aria-label="Sign in required">
             <p className="label-caps text-ink-500">Signed-in accounts only</p>
@@ -42,7 +40,7 @@ export default async function RevisionsPage({ params, searchParams }: { params: 
             </Link>
           </section>
         </div>
-      </AppShell>
+      </>
     );
   }
 
@@ -68,7 +66,7 @@ export default async function RevisionsPage({ params, searchParams }: { params: 
   }
 
   return (
-    <AppShell pageName={PAGE_NAME}>
+    <>
       <div className="mx-auto max-w-[1440px]">
         <header className="mb-xl">
           <p className="label-caps text-ink-500">
@@ -100,6 +98,6 @@ export default async function RevisionsPage({ params, searchParams }: { params: 
           </>
         ) : null}
       </div>
-    </AppShell>
+    </>
   );
 }

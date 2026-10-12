@@ -148,3 +148,125 @@
       "opsz" 20;
   }
 }
+
+/* Blueprint motion (R7 §1.7): skeleton pulse 1.2 s, opacity 1 → 0.6. Off under
+   reduced motion (tokens.css also zeroes every Blueprint animation then). */
+@keyframes bp-pulse {
+  50% {
+    opacity: 0.6;
+  }
+}
+@layer components {
+  .bp-pulse {
+    animation: bp-pulse 1.2s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bp-pulse {
+      animation: none;
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Blueprint shell (K2, R7 §1.5 / §2): rail + top bar + main.        */
+/*  Rail: Full 232 · Compact 56 (labels hidden; hover / focus expands  */
+/*  it as an OVERLAY — the content never reflows) · hidden on phone.  */
+/*  Compact on tablet (768–1023) everywhere, and up to 1679 on the    */
+/*  BoQ page (data-rail="compact-wide"). Full from 1680.              */
+/* ------------------------------------------------------------------ */
+/* Unlayered on purpose: these must outrank the Tailwind utilities on the
+   rail (items-start, px-6, flex) when compact mode rearranges a step. */
+.bp-shell {
+  --bp-rail-w: 232px;
+  --bp-topbar-h: 64px;
+}
+.bp-rail {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  z-index: 40;
+  width: 232px;
+  transition: width 160ms ease-out;
+}
+.bp-topbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: var(--bp-rail-w);
+  height: var(--bp-topbar-h);
+  z-index: 30;
+}
+.bp-main {
+  margin-left: var(--bp-rail-w);
+  padding-top: var(--bp-topbar-h);
+  /* A page body wider than the screen (an Atelier table on a phone) must not
+     widen the page: the rail, top bar and drawers are sized to the viewport.
+     clip, not hidden — it makes no scroll container, so sticky still works. */
+  overflow-x: clip;
+}
+.bp-rail-c,
+.bp-phone-only {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .bp-shell {
+    --bp-rail-w: 0px;
+    --bp-topbar-h: 56px;
+  }
+  .bp-rail,
+  .bp-desk-only {
+    display: none;
+  }
+  .bp-phone-only {
+    display: flex;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .bp-shell {
+    --bp-rail-w: 56px;
+  }
+  .bp-rail:not(:hover):not(:focus-within) {
+    width: 56px;
+  }
+  .bp-rail:not(:hover):not(:focus-within) .bp-rail-x {
+    display: none;
+  }
+  .bp-rail:not(:hover):not(:focus-within) .bp-rail-c {
+    display: flex;
+  }
+  .bp-rail:not(:hover):not(:focus-within) .bp-step {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding-inline: 0;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1679.98px) {
+  .bp-shell[data-rail="compact-wide"] {
+    --bp-rail-w: 56px;
+  }
+  .bp-shell[data-rail="compact-wide"] .bp-rail:not(:hover):not(:focus-within) {
+    width: 56px;
+  }
+  .bp-shell[data-rail="compact-wide"] .bp-rail:not(:hover):not(:focus-within) .bp-rail-x {
+    display: none;
+  }
+  .bp-shell[data-rail="compact-wide"] .bp-rail:not(:hover):not(:focus-within) .bp-rail-c {
+    display: flex;
+  }
+  .bp-shell[data-rail="compact-wide"] .bp-rail:not(:hover):not(:focus-within) .bp-step {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding-inline: 0;
+  }
+}
+
+/* The phone step drawer and the help drawer are native <dialog>s. */
+.bp-sheet::backdrop,
+.bp-drawer::backdrop {
+  background: color-mix(in srgb, var(--color-ink-primary) 40%, transparent);
+}
