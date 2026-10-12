@@ -118,7 +118,7 @@ try {
   const blocked = await waitJob(startBlocked.body.job_id);
   check("the export is BLOCKED before any document, on reference_basis", blocked.status === "blocked" && blocked.checklist?.some((c) => c.key === "reference_basis" && !c.ok), `${blocked.status}: ${(blocked.checklist ?? []).filter((c) => !c.ok).map((c) => c.key).join(", ") || "-"}`);
   const boqHtml = await (await fetch(`${BASE}/project/${STAND_IN}/boq`, { headers: userA.headers })).text();
-  check("the BoQ page shows the banner and the accept control", boqHtml.includes("priced from market reference — review rates before client use") && boqHtml.includes('data-basis-status="open"'));
+  check("the BoQ page shows the banner and the accept control", boqHtml.includes("priced from market reference") && boqHtml.includes('data-basis-status="open"'));
 
   console.log("\n3. acceptance — a stated choice, recorded");
   const boqId = rb.body.boq.id;

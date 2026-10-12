@@ -1,461 +1,223 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
+import { BoqReview } from "@/components/blueprint/boq/BoqReview";
+import type { FurnitureView, RoomRollup } from "@/components/blueprint/boq/Extras";
+import { GenerateFirst } from "@/components/blueprint/boq/GenerateFirst";
+import { getPageCaller } from "@/lib/auth/caller";
+import { findComponentDuplicates } from "@/lib/boq/component-dedupe";
 import { roomRollup } from "@/lib/boq/elements";
-import { elementPricer } from "@/lib/boq/rates";
-import { loadProjectFirmOverlay } from "@/lib/rates/firm";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
-import { DRAFT_STATEMENT } from "@/lib/plan/site-reference";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { curateBoq } from "@/lib/identity/curation";
+import { elementPricer } from "@/lib/boq/rates";
+import { resolveRef } from "@/lib/boq/refs";
+import { regenerateReadiness } from "@/lib/boq/regenerate";
+import { changesSinceRevision } from "@/lib/boq/changes-since";
+import { buildReviewModel, type ReviewBoq } from "@/lib/boq/review-model";
 import { sortSections } from "@/lib/boq/section-order";
+import { runPermitCheck } from "@/lib/compliance/check";
+import { packExportEnabled } from "@/lib/documents/pack-export/guard";
+import { loadProposalGate, type ProposalGate } from "@/lib/documents/proposal-gate";
+import { itemVocabulary } from "@/lib/firms/vocabulary";
+import { curateBoq } from "@/lib/identity/curation";
+import { recordBoqView } from "@/lib/pilot/views";
 import { buildBoqProvenance } from "@/lib/provenance/boq";
 import { loadProvenanceContext } from "@/lib/provenance/load";
-import type { BoqProvenance } from "@/lib/provenance/types";
-import {
-  hasTakeoffProvenance,
-  type RateBook,
-  type ScenarioBoq,
-  type Selections,
-} from "@/lib/whatif/engine";
-import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
-import { runPermitCheck, type PermitCheckResult } from "@/lib/compliance/check";
-import { PermitsCard } from "@/components/compliance/PermitsCard";
+import { loadFirmBook, loadProjectFirmOverlay } from "@/lib/rates/firm";
 import { collectFurnitureSection } from "@/lib/staging/collect";
-import type { FurnitureSection } from "@/lib/staging/furniture-boq";
-import {
-  ALL_RELEVANT_CATEGORIES,
-  categoriesForLine,
-} from "@/lib/vendor-options-helpers";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { hasTakeoffProvenance, type ScenarioBoq } from "@/lib/whatif/engine";
+import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
+import type { WhatIfEngine } from "@/components/blueprint/boq/WhatIfTab";
 
-import {
-  BoqView,
-  type BoqPayload,
-  type RoomRollupView,
-  type VendorOption,
-} from "./_components/boq-view";
-import { packExportEnabled } from "@/lib/documents/pack-export/guard";
-
-import { GenerateBoqButton } from "./_components/generate-boq-button";
-import { RegenerateBoq } from "./_components/regenerate-boq";
-import { ReferenceBasisNotice } from "./_components/reference-basis-notice";
-import { ReviewCorrections } from "./_components/review-corrections";
-import { loadProposalGate, type ProposalGate } from "@/lib/documents/proposal-gate";
-import { SupportTouch } from "@/components/app/SupportTouch";
-import { getCaller } from "@/lib/auth/caller";
-import { regenerateReadiness } from "@/lib/boq/regenerate";
-import { recordBoqView } from "@/lib/pilot/views";
 
 export const dynamic = "force-dynamic";
 
+// =============================================================================
+// /project/[id]/boq — BoQ & Review (K3, R7 §3.2), firm step 05.
+//
+// The server builds ONE view model from the STORED revision (curated for
+// identity on its way out, in canonical section order, every mark from
+// tierOf(), every chain from the I4 provenance source) and the client screen
+// renders it. Nothing on this page re-prices: what-if is a scenario, never the
+// BoQ.
+// =============================================================================
 
-type SkuRow = {
-  id: string;
-  sku: string | null;
-  brand: string | null;
-  category: string | null;
-  description_en: string | null;
-  price_aed: number | null;
-  photo_url: string | null;
-  lead_time_days: number | null;
-  in_stock: boolean | null;
+const CONSEQUENCE: Record<string, string> = {
+  permit_required: "permit required",
+  noc_required: "NOC required",
+  approval_likely: "approval likely",
+  no_permit: "no permit",
 };
 
-function isBoqPayload(value: unknown): value is BoqPayload {
+function isBoq(value: unknown): value is ReviewBoq {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return (
-    Array.isArray(v.sections) &&
-    typeof v.subtotal_aed === "number" &&
-    typeof v.grand_total_aed === "number"
-  );
+  return Array.isArray(v.sections) && typeof v.subtotal_aed === "number" && typeof v.grand_total_aed === "number";
 }
 
-function toOption(s: SkuRow): VendorOption {
-  return {
-    id: s.id,
-    sku: s.sku,
-    brand: s.brand,
-    description: s.description_en,
-    photo_url: s.photo_url,
-    price_aed: s.price_aed ?? 0,
-    lead_time_days: s.lead_time_days,
-    in_stock: s.in_stock,
-  };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "22 Sep 2026" (Dubai date) — the rail and the frames print it this way. */
+function revDate(iso: string): string {
+  const [y, m, d] = new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" }).split("-").map(Number);
+  return `${d} ${MONTHS[m! - 1]} ${y}`;
 }
 
-/**
- * Pre-compute up to 3 vendor alternatives per BoQ line, same logic as
- * /api/vendor-options but inline so each row's expansion has data ready
- * without a per-row fetch on click. Same ±25% band + category filter.
- */
-function buildLineOptions(
-  boq: BoqPayload,
-  skus: SkuRow[],
-): Record<string, VendorOption[]> {
-  const out: Record<string, VendorOption[]> = {};
-  for (const section of boq.sections) {
-    for (let idx = 0; idx < section.lines.length; idx++) {
-      const line = section.lines[idx]!;
-      const key = `${section.work_section}-${idx}`;
-      const cats = categoriesForLine(section.work_section, line.description);
-      if (cats.length === 0 || line.rate_aed <= 0) {
-        out[key] = [];
-        continue;
-      }
-      const min = line.rate_aed * 0.75;
-      const max = line.rate_aed * 1.25;
-      out[key] = skus
-        .filter(
-          (s) =>
-            s.category != null &&
-            cats.includes(s.category) &&
-            s.price_aed != null &&
-            s.price_aed >= min &&
-            s.price_aed <= max,
-        )
-        .sort(
-          (a, b) =>
-            Math.abs((a.price_aed ?? 0) - line.rate_aed) -
-            Math.abs((b.price_aed ?? 0) - line.rate_aed),
-        )
-        .slice(0, 3)
-        .map(toOption);
-    }
-  }
-  return out;
-}
-
-export default async function BoqPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ highlight?: string; view?: string; room?: string }>;
-}) {
+export default async function BoqPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ highlight?: string; view?: string; room?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
-  const supabase = getSupabaseAdmin();
-  const sb = supabase as unknown as SupabaseClient;
+  const sb = getSupabaseAdmin() as unknown as SupabaseClient;
 
-  const [projectRes, boqRes, skuRes] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("id, name, city, budget_aed")
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("boqs")
-      .select("id, total_aed, sections, locked_at, created_at")
-      .eq("project_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1),
-    sb
-      .from("pricing_skus")
-      .select(
-        "id, sku, brand, category, description_en, price_aed, photo_url, lead_time_days, in_stock",
-      )
-      .in("category", ALL_RELEVANT_CATEGORIES)
-      .not("price_aed", "is", null)
-      .returns<SkuRow[]>(),
+  const [projectRes, boqRes, countRes] = await Promise.all([
+    sb.from("projects").select("id, budget_aed, firm_id").eq("id", id).maybeSingle<{ id: string; budget_aed: number | null; firm_id: string | null }>(),
+    sb.from("boqs").select("id, sections, created_at").eq("project_id", id).order("created_at", { ascending: false }).limit(1),
+    sb.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", id),
   ]);
-
-  if (projectRes.error || !projectRes.data) {
-    // Shared boundary: app/project/[id]/not-found.tsx.
-    notFound();
-  }
-
+  if (projectRes.error || !projectRes.data) notFound();
   const project = projectRes.data;
-  // H7: the headline's budget is the CLIENT'S, on an owner project only. A
-  // firm-attached project prices against its own book, not an owner's budget;
-  // and no figure the client never entered (the old AED 850,000 platform
-  // default) is ever shown as theirs.
-  const { data: firmRow } = await sb.from("projects").select("firm_id").eq("id", id).maybeSingle();
-  const budgetAed = (firmRow as { firm_id?: string | null } | null)?.firm_id ? null : (project.budget_aed ?? null);
-  const latestBoq = boqRes.data?.[0];
-  // I4: the plan context behind every figure's source chain, and the names that
-  // must never reach the page (firm names). The stored document is CURATED on
-  // its way out — a BoQ generated before I4 still holds contractor names.
-  const provenanceCtx = await loadProvenanceContext(sb, id);
-  // H7: THE canonical section order on screen too — a revision stored before
-  // H7 shows the same order as a new one (REFs are per section; unaffected).
-  const curatedBoq =
-    latestBoq && isBoqPayload(latestBoq.sections)
-      ? curateBoq(latestBoq.sections, provenanceCtx.withheldNames)
-      : null;
-  const boqPayload = curatedBoq ? { ...curatedBoq, sections: sortSections(curatedBoq.sections) } : null;
-  const provenance: BoqProvenance | null = boqPayload
-    ? buildBoqProvenance(boqPayload as unknown as Parameters<typeof buildBoqProvenance>[0], provenanceCtx)
-    : null;
-  const skus = skuRes.data ?? [];
-  const lineOptions = boqPayload ? buildLineOptions(boqPayload, skus) : {};
-  // L4: where the rates came from, and whether a client proposal may export on them. Best-effort.
-  let proposalGate: ProposalGate | null = null;
-  if (boqPayload) {
-    try {
-      proposalGate = await loadProposalGate(sb, id);
-    } catch {
-      /* the BoQ page never fails on the gate */
-    }
-    // L5: a signed-in view of the BoQ is the checking signal (deduped per actor per 10 min).
-    const viewer = await getCaller();
-    if (viewer && latestBoq) await recordBoqView(sb, id, latestBoq.id, viewer.id);
-  }
-  // H4: may this viewer regenerate, and if not, why — the same answer the
-  // route enforces (lib/boq/regenerate.ts). Best-effort: a failed read shows
-  // the control enabled and lets the route decide.
-  let regenerateBlock: { code: string; reason: string; fix?: { label: string; href: string } } | null = null;
-  if (latestBoq) {
-    try {
-      regenerateBlock = (await regenerateReadiness(sb, id, await getCaller())).block;
-    } catch {
-      /* the route still enforces */
-    }
+  const latest = (boqRes.data?.[0] ?? null) as { id: string; sections: unknown; created_at: string } | null;
+
+  if (!latest || !isBoq(latest.sections)) {
+    return (
+      <div className="bp-boq px-6 py-8 md:px-8">
+        <h1 className="sr-only">BoQ &amp; Review</h1>
+        <GenerateFirst projectId={id} />
+      </div>
+    );
   }
 
-  const lineCount =
-    boqPayload?.sections.reduce((n, s) => n + s.lines.length, 0) ?? 0;
-  const sectionCount = boqPayload?.sections.length ?? 0;
+  // Everything below reads independently — fetched together (the page used to
+  // await a dozen round-trips one after another).
+  const rev = countRes.count ?? 1;
+  const [caller, ctx, gate] = await Promise.all([
+    // A page request carries a cookie session or (scripts) a Bearer token.
+    getPageCaller(),
+    loadProvenanceContext(sb, id),
+    // L4: where the rates came from and whether a client proposal may export on them.
+    loadProposalGate(sb, id).catch((): ProposalGate | null => null),
+  ]);
+  const curated = curateBoq(latest.sections, ctx.withheldNames) as ReviewBoq;
+  const boq: ReviewBoq = { ...curated, sections: sortSections(curated.sections) };
+  const provenance = buildBoqProvenance(boq as Parameters<typeof buildBoqProvenance>[0], ctx);
 
-  // P4: per-room rollup from takeoff_items (best-effort; empty if not seeded).
-  let byRoom: RoomRollupView[] = [];
-  try {
-    const { data: tRows } = await sb
-      .from("takeoff_items")
-      .select("work_item_key, room_id, element_id, qty, unit, wet_area")
-      .eq("project_id", id)
-      .returns<
-        {
-          work_item_key: string;
-          room_id: string | null;
-          element_id: string | null;
-          qty: number;
-          unit: string;
-          wet_area: boolean;
-        }[]
-      >();
-    const items: TakeoffItem[] = (tRows ?? []).map((r) => ({
-      work_item_key: r.work_item_key as WorkItemKey,
-      room_id: r.room_id,
-      element_id: r.element_id ?? "",
-      qty: Number(r.qty),
-      unit: r.unit,
-      wet_area: !!r.wet_area,
-    }));
-    if (items.length > 0) {
-      // T3b: room totals price each element item the way its BoQ line does.
-      const firm = await loadProjectFirmOverlay(sb, id);
-      const tier = (boqPayload as { engine?: { tier?: "value" | "mid" | "premium" } } | null)?.engine?.tier ?? "mid";
-      const rollups = roomRollup(items, elementPricer(firm, tier));
-      const { data: roomRows } = await supabase
-        .from("rooms")
-        .select("id, name_en")
-        .in("id", rollups.map((r) => r.room_id));
-      const nameById = new Map((roomRows ?? []).map((r) => [r.id, r.name_en]));
-      byRoom = rollups.map((r) => ({
-        roomId: r.room_id,
-        roomName: nameById.get(r.room_id) ?? "Room",
-        total_aed: r.total_aed,
-        items: r.items.map((w) => ({
-          description: w.description,
-          qty: w.qty,
-          unit: w.unit,
-          total_aed: w.total_aed,
-        })),
-      }));
-    }
-  } catch {
-    /* takeoff_items table absent → no By-room view */
-  }
+  // P5 what-if: the grade engine when the BoQ has take-off provenance (legacy
+  // LLM-path BoQs are refused) — wrapped, unchanged, in the inspector's What-if tab.
+  const scenarioBoq: ScenarioBoq = {
+    sections: boq.sections.map((s) => ({ work_section: s.work_section, lines: s.lines.map((l) => ({ rule_id: l.rule_id, quantity: l.quantity, rate_aed: l.rate_aed, total_aed: l.total_aed, description: l.description })) })),
+    grand_total_aed: boq.grand_total_aed,
+    subtotal_aed: boq.subtotal_aed,
+    contingency_pct: boq.contingency_pct,
+    vat_pct: boq.vat_pct,
+    ohp_pct: boq.ohp_pct,
+  };
 
-  // P5 what-if — enabled only when the BoQ has P4 takeoff provenance (legacy
-  // LLM-path BoQs are refused). Rate book falls back to grade defaults if the
-  // seed hasn't run; latest scenario restores selections across reload.
-  const whatifEnabled =
-    process.env.WHATIF_ENABLED === "true" &&
-    boqPayload != null &&
-    hasTakeoffProvenance(boqPayload as unknown as ScenarioBoq);
-  let rateBook: RateBook | null = null;
-  let initialSelections: Selections = {};
-  if (whatifEnabled) {
-    rateBook = await loadRateBook(sb);
-    const scenario = await loadLatestScenario(sb, id);
-    initialSelections = scenario?.selections ?? {};
-  }
+  const [firm, regenerateBlock, changed, rooms, permits, furniture, engine] = await Promise.all([
+    // Persona: a member of the firm this project is attached to works the firm journey.
+    (async (): Promise<Parameters<typeof buildReviewModel>[0]["firm"]> => {
+      if (!project.firm_id || !caller) return null;
+      const { data: member } = await sb.from("firm_members").select("firm_id").eq("firm_id", project.firm_id).eq("user_id", caller.id).maybeSingle();
+      if (!member) return null;
+      const book = await loadFirmBook(sb, project.firm_id).catch(() => null);
+      return {
+        id: project.firm_id,
+        brand: gate?.firm?.brand ?? "your firm",
+        bookItemKeys: new Set((book?.entries ?? []).map((e) => e.item_key)),
+        vocabulary: (k: string) => {
+          const v = itemVocabulary(k);
+          return v ? { unit: v.unit } : null;
+        },
+      };
+    })(),
+    // H4: may this viewer regenerate, and if not, why — the route's own answer.
+    regenerateReadiness(sb, id, caller)
+      .then((r) => r.block)
+      .catch(() => null /* the route still enforces */),
+    // K2/K3: "changed since rev N" is ONE function — the rail's attention reason
+    // and this control's Ready / Unchanged never disagree.
+    changesSinceRevision(sb, id, { id: latest.id, created_at: latest.created_at }, rev)
+      .then((c) => c.summary)
+      .catch(() => null),
+    // P4: cost by room (best-effort; empty when the take-off was not stored).
+    (async (): Promise<RoomRollup[]> => {
+      try {
+        const { data: tRows } = await sb.from("takeoff_items").select("work_item_key, room_id, element_id, qty, unit, wet_area").eq("project_id", id);
+        const items: TakeoffItem[] = ((tRows ?? []) as { work_item_key: string; room_id: string | null; element_id: string | null; qty: number; unit: string; wet_area: boolean }[]).map((r) => ({
+          work_item_key: r.work_item_key as WorkItemKey,
+          room_id: r.room_id,
+          element_id: r.element_id ?? "",
+          qty: Number(r.qty),
+          unit: r.unit,
+          wet_area: !!r.wet_area,
+        }));
+        if (items.length === 0) return [];
+        const overlay = await loadProjectFirmOverlay(sb, id);
+        const tier = (curated as { engine?: { tier?: "value" | "mid" | "premium" } }).engine?.tier ?? "mid";
+        const rollups = roomRollup(items, elementPricer(overlay, tier));
+        const { data: roomRows } = await sb.from("rooms").select("id, name_en").in("id", rollups.map((r) => r.room_id));
+        const names = new Map(((roomRows ?? []) as { id: string; name_en: string | null }[]).map((r) => [r.id, r.name_en ?? "Room"]));
+        return rollups.map((r) => ({ roomId: r.room_id, roomName: names.get(r.room_id) ?? "Room", total_aed: r.total_aed, items: r.items.map((w) => ({ description: w.description, qty: w.qty, unit: w.unit, total_aed: w.total_aed })) }));
+      } catch {
+        return []; // no take-off table → no room view
+      }
+    })(),
+    // P6: permit triggers over the plan diff (flagged).
+    process.env.PERMIT_CHECK_ENABLED === "true"
+      ? runPermitCheck(id)
+          .then((r) => r.fired.map((f) => ({ title: f.title_en, consequence: CONSEQUENCE[f.consequence] ?? f.consequence })))
+          .catch(() => null)
+      : Promise.resolve(null),
+    // P7: optional furniture — never in boqs.sections, never in the project total.
+    collectFurnitureSection(id, sb)
+      .then((f): FurnitureView | null => (f ? { total: f.section_total_aed, lines: f.lines.map((l) => ({ description: l.description, quantity: l.quantity, rate_aed: l.rate_aed, total_aed: l.total_aed })) } : null))
+      .catch(() => null),
+    process.env.WHATIF_ENABLED === "true" && hasTakeoffProvenance(scenarioBoq)
+      ? Promise.all([loadRateBook(sb), loadLatestScenario(sb, id)]).then(([rateBook, scenario]): WhatIfEngine => ({ rateBook, boq: scenarioBoq, initialSelections: scenario?.selections ?? {} }))
+      : Promise.resolve(null),
+  ]);
+  const persona: "firm" | "owner" = firm ? "firm" : "owner";
 
-  // P6 permit check — deterministic triggers over the plan diff.
-  let permitCheck: PermitCheckResult | null = null;
-  if (process.env.PERMIT_CHECK_ENABLED === "true") {
-    try {
-      permitCheck = await runPermitCheck(id);
-    } catch {
-      /* best-effort */
-    }
-  }
+  const duplicates = findComponentDuplicates(
+    boq.sections.flatMap((s) => s.lines.map((l) => ({ work_section: s.work_section, description: l.description, rule_id: l.rule_id ?? null, item_key: null, quantity: l.quantity, total_aed: l.total_aed }))),
+  ).map((f) => ({
+    label: f.label,
+    detail: `${f.owner_key} in ${f.owner_line.work_section} is also priced as ${f.duplicate_key} in ${f.duplicate_line.work_section}${f.duplicate_total_aed > 0 ? "" : " (unpriced today)"}`,
+  }));
 
-  // P7 furniture staging — the optional, indicative "Furniture (optional)"
-  // section from opted-in rooms. Never part of boqs.sections, so it is excluded
-  // from every contractor export by construction. Best-effort.
-  let furnitureSection: FurnitureSection | null = null;
-  try {
-    furnitureSection = await collectFurnitureSection(id, sb);
-  } catch {
-    /* best-effort */
-  }
+  const model = buildReviewModel({
+    projectId: id,
+    boqId: latest.id,
+    rev,
+    revDate: revDate(latest.created_at),
+    persona,
+    boq,
+    provenance,
+    tierCtx: { qsValidated: ctx.qsValidated },
+    firm,
+    projectHasFirm: !!project.firm_id,
+    basis: gate?.boq ? { basis: gate.boq.basis, verdict: gate.verdict, acceptance: gate.acceptance, bookReviewed: gate.firm?.book_status === "reviewed" } : null,
+    duplicates,
+    budget: project.firm_id ? null : (project.budget_aed ?? null),
+  });
+
+  // L5: a signed-in view of the BoQ is the checking signal (deduped per actor per 10 min).
+  if (caller) await recordBoqView(sb, id, latest.id, caller.id);
+
+  const highlightRef = sp.highlight ? resolveRef(boq.sections, sp.highlight) : null;
 
   return (
     <>
-      <div className="mx-auto max-w-[1440px]">
-        {/* Header */}
-        <header className="mb-xl">
-          <h1 className="mb-md font-display text-headline-lg text-ink-900">
-            Your bill of quantities.
-          </h1>
-          {/* G5: the BoQ header of a draft carries the statement, verbatim. */}
-          {boqPayload?.garden?.draft.draft && (
-            <div className="mb-md max-w-[900px] rounded-md border border-[#9d3e1d] bg-[#FDF3EE] px-md py-sm" data-boq-draft="true">
-              <p className="font-body text-body-sm font-semibold uppercase tracking-wide text-[#9d3e1d]">
-                {boqPayload.garden.draft.statement ?? DRAFT_STATEMENT}
-              </p>
-              {boqPayload.garden.draft.note && (
-                <p className="mt-1 font-body text-[12px] text-ink-700">Source: {boqPayload.garden.draft.note}</p>
-              )}
-            </div>
-          )}
-          {boqPayload?.garden && (boqPayload.garden.kept.length > 0 || boqPayload.garden.removals.length > 0 || boqPayload.garden.undecided.length > 0) && (
-            <p className="mb-md max-w-[900px] font-body text-[13px] text-ink-700">
-              Existing on site — kept and excluded: {boqPayload.garden.kept.length} · removed or replaced (in demolition): {boqPayload.garden.removals.length}
-              {boqPayload.garden.undecided.length > 0 && (
-                <span className="text-[#9A3412]"> · {boqPayload.garden.undecided.length} undecided (not in any quantity — decide on the plan)</span>
-              )}
-            </p>
-          )}
-          {proposalGate?.boq && latestBoq && (
-            <ReferenceBasisNotice
-              projectId={id}
-              boqId={latestBoq.id}
-              basis={proposalGate.boq.basis}
-              firm={proposalGate.firm ? { brand: proposalGate.firm.brand, book_status: proposalGate.firm.book_status } : null}
-              acceptance={proposalGate.acceptance}
-              verdict={proposalGate.verdict}
-            />
-          )}
-          {boqPayload ? (
-            <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
-              {lineCount} line items across {sectionCount} work sections,
-              priced against today&apos;s Dubai catalogues. Tap any line for
-              sources and sensitivity.
-            </p>
-          ) : (
-            <p className="max-w-[800px] font-body text-body-lg text-on-surface-variant">
-              POMI-formatted, priced from Dubai supplier catalogues and real
-              project quotations. Lines still awaiting a quantity
-              surveyor&apos;s review are flagged in the table.
-            </p>
-          )}
-          {/* D1 — the other surface of this step. Accessory categories are
-              rule-priced until someone chooses a specification here. */}
-          <a
-            href={`/project/${id}/accessories`}
-            className="focus-ring mt-lg inline-flex h-11 items-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
-          >
-            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-              tune
-            </span>
-            Choose accessories &amp; specs
-          </a>
-          {/* U4 — every regeneration is a revision; compare any two, and see who approved which. */}
-          {latestBoq && (
-            <a
-              href={`/project/${id}/boq/revisions`}
-              className="focus-ring ml-sm mt-lg inline-flex h-11 items-center gap-sm rounded-lg border border-ink-100 bg-paper px-lg font-body-sm text-body-sm font-semibold text-ink-900 transition-colors hover:bg-surface-container"
-              data-testid="revisions-link"
-            >
-              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                history
-              </span>
-              Revision history &amp; approvals
-            </a>
-          )}
-          {/* L5 — a support touch is pilot data, captured where checking happens. */}
-          {latestBoq && (
-            <span className="ml-sm mt-lg inline-block align-top">
-              <SupportTouch projectId={id} area="boq" />
-            </span>
-          )}
-          {/* H4 — change a rate or the plan, regenerate, see exactly what moved. */}
-          {latestBoq && <RegenerateBoq projectId={id} block={regenerateBlock} />}
-        </header>
-
-        {permitCheck && (
-          <PermitsCard
-            fired={permitCheck.fired}
-            community={permitCheck.community}
-            className="mb-xl"
-          />
-        )}
-
-        {boqPayload?.garden && process.env.GARDEN_PILOT_ENABLED === "true" && (
-          <ReviewCorrections
-            projectId={id}
-            boqId={latestBoq?.id ?? null}
-            lines={boqPayload.sections.flatMap((s, si) =>
-              s.lines.map((l, li) => ({
-                key: `${si}:${li}`,
-                item_key: (l as { item_key?: string }).item_key ?? l.rule_id ?? null,
-                description: `${s.work_section} — ${l.description}`,
-                quantity: l.quantity,
-                rate_aed: l.rate_aed,
-                element_refs: l.element_refs ?? null,
-              })),
-            )}
-          />
-        )}
-
-        {boqPayload ? (
-          <BoqView
-            projectId={id}
-            budgetAed={budgetAed}
-            boq={boqPayload}
-            lineOptions={lineOptions}
-            byRoom={byRoom}
-            initialView={sp.view === "byroom" ? "byroom" : "sections"}
-            highlightRef={sp.highlight ?? null}
-            highlightRoom={sp.room ?? null}
-            whatifEnabled={whatifEnabled}
-            rateBook={rateBook}
-            initialSelections={initialSelections}
-            furnitureSection={furnitureSection}
-            provenance={provenance}
-            packExport={packExportEnabled()}
-          />
-        ) : (
-          <EmptyState projectId={id} />
-        )}
-      </div>
+      <h1 className="sr-only">BoQ &amp; Review</h1>
+      <BoqReview
+        model={model}
+        rooms={rooms}
+        furniture={furniture}
+        permits={permits}
+        packExport={packExportEnabled()}
+        highlightRef={highlightRef}
+        view={sp.view === "byroom" ? "byroom" : "sections"}
+        highlightRoom={sp.room ?? null}
+        regen={{ rev, block: regenerateBlock, changed }}
+        engine={engine}
+      />
     </>
-  );
-}
-
-function EmptyState({ projectId }: { projectId: string }) {
-  return (
-    <div className="mt-xl flex flex-col items-center gap-lg rounded-2xl border border-dashed border-ink-100 bg-paper px-margin py-3xl text-center">
-      <span
-        className="material-symbols-outlined text-5xl text-on-surface-variant"
-        aria-hidden="true"
-      >
-        request_quote
-      </span>
-      <div className="flex flex-col gap-sm">
-        <h2 className="font-display text-headline-md text-ink-900">
-          No BoQ yet
-        </h2>
-        <p className="max-w-[520px] font-body text-body-md text-on-surface-variant">
-          Generate a priced bill of quantities from the plan, your chosen
-          style, and the approved designs. This takes about a minute.
-        </p>
-      </div>
-      <GenerateBoqButton projectId={projectId} />
-    </div>
   );
 }

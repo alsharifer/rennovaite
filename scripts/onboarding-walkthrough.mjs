@@ -227,37 +227,60 @@ try {
   await goto(`${BASE}/project/${villa}/boq`);
   await shot("boq-before-generation");
   check("Generate BoQ button present", await clickByText("button", "Generate BoQ"));
-  check("BoQ generated and rendered", await until(`document.querySelectorAll('[data-figure]').length > 40`, 120000), `${await evaluate(`document.querySelectorAll('[data-figure]').length`)} figures`);
+  check("BoQ generated and rendered", await until(`document.querySelectorAll('[data-bp-figure]').length > 40`, 120000), `${await evaluate(`document.querySelectorAll('[data-bp-figure]').length`)} figures`);
   await shot("boq-generated");
   const { data: boqRow } = await sb.from("boqs").select("id, sections").eq("project_id", villa).order("created_at", { ascending: false }).limit(1).maybeSingle();
   const lines = boqRow?.sections?.sections?.flatMap((s) => s.lines) ?? [];
   const firmLines = lines.filter((l) => l.rate_tier === "firm_private");
   check("their rates resolve at tier 1 on the element sections", firmLines.length >= 3, firmLines.map((l) => `${l.item_key ?? l.rule_id} ${l.rate_aed}`).join(", "));
   const plasterQty = lines.find((l) => l.item_key === "wall_plaster")?.quantity;
-  // Popover on a firm-priced figure: find the Plaster section's rate figure.
-  const plasterRowSel = `[data-provenance]`;
-  const idx = await evaluate(`(() => { const els = [...document.querySelectorAll('[data-provenance]')]; return els.findIndex((el) => /41\\.50|41\\.5/.test(el.textContent)); })()`);
+  // K3: the provenance popover (role="tooltip") on a RATE cell. A firm's own rate
+  // carries the measured mark, labelled "Own basis"; a rate it did not price names
+  // its own tier (derived / market reference / to be priced) — never "Own basis".
+  const rateCells = '[data-line-key] .bp-boq-col-rate';
+  const idx = await evaluate(`[...document.querySelectorAll(${JSON.stringify(rateCells)})].findIndex((el) => el.querySelector('[data-tier="measured"]') && /41\.50/.test(el.textContent))`);
   check("a firm-priced figure is on the page", idx >= 0, `index ${idx}`);
   if (idx >= 0) {
-    await hover(plasterRowSel, idx);
-    const pop = await until(`!!document.querySelector('[data-provenance-popup]')`, 5000);
-    const popText = pop ? await text("[data-provenance-popup]") : "";
-    check("its popover names the Private tier (the firm's own rate)", pop && /Private/.test(popText), popText.slice(0, 120));
+    await hover(rateCells, idx);
+    const pop = await until(`!!document.querySelector('[role="tooltip"]')`, 5000);
+    const popText = pop ? await text('[role="tooltip"]') : "";
+    check("its popover names the firm's own basis (the firm's own rate)", pop && /Own basis/i.test(popText), popText.slice(0, 120));
     await shot("popover-firm-rate");
   }
-  // A figure the firm did NOT price: hover rate figures until a popover titled "Rate —" names a non-Private tier.
-  const traced = await evaluate(`document.querySelectorAll('[data-provenance="traced"]').length`);
+  const others = await evaluate(`[...document.querySelectorAll(${JSON.stringify(rateCells)})].map((el, i) => (el.querySelector('[data-tier]')?.getAttribute('data-tier') !== 'measured' ? i : -1)).filter((i) => i >= 0)`);
   let fallbackText = "";
-  for (let i = 0; i < Math.min(traced, 60) && !fallbackText; i++) {
+  for (const i of others.slice(0, 20)) {
+    if (fallbackText) break;
     await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
     await sleep(250);
-    await hover('[data-provenance="traced"]', i);
-    if (!(await until(`!!document.querySelector('[data-provenance-popup]')`, 2500))) continue;
-    const pt = await text("[data-provenance-popup]");
-    if (/^Rate — /.test(pt) && !/Private/.test(pt)) fallbackText = pt;
+    await hover(rateCells, i);
+    if (!(await until(`!!document.querySelector('[role="tooltip"]')`, 2500))) continue;
+    fallbackText = await text('[role="tooltip"]');
   }
-  check("a figure the firm did not price: its popover names its own tier (Fallback / reference / indicative), never Private", /Fallback|actual_transaction|Indicative|market_fair|QS to price/.test(fallbackText), fallbackText.slice(0, 140));
+  check("a figure the firm did not price: its popover names its own tier, never Own basis", /Derived|Market reference|QS validated|To be priced/i.test(fallbackText) && !/Own basis/i.test(fallbackText), fallbackText.slice(0, 140));
   await shot("popover-fallback-rate");
+  // K3: the inspector on a line the book does not price → "Add to my book" opens
+  // the step-04 book with the add form PREFILLED (nothing saved).
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
+  const addHref = await evaluate(`(async () => {
+    const rows = [...document.querySelectorAll('[data-line-key]')].filter((r) => r.querySelector('.bp-boq-col-rate [data-tier]')?.getAttribute('data-tier') !== 'measured');
+    for (const r of rows) {
+      r.click();
+      await new Promise((ok) => setTimeout(ok, 250));
+      const a = [...document.querySelectorAll('[data-inspector-for] a')].find((x) => x.textContent.trim() === 'Add to my book');
+      if (a) return a.getAttribute('href');
+    }
+    return null;
+  })()`);
+  check('the inspector offers "Add to my book" on a line the book does not price', !!addHref, String(addHref));
+  await shot("inspector-add-to-book");
+  if (addHref) {
+    const want = new URL(addHref, BASE).searchParams;
+    await goto(`${BASE}${addHref}`);
+    const pre = await until(`(() => { const sel = document.querySelector('#new-entry select'); const rate = [...document.querySelectorAll('#new-entry input')].find((i) => i.getAttribute('inputmode') === 'decimal'); return sel?.value === ${JSON.stringify(want.get("add"))} && (!${JSON.stringify(want.get("rate"))} || rate?.value === ${JSON.stringify(want.get("rate"))}); })()`, 20000);
+    check("…and the book's add form opens prefilled with that item and rate (nothing saved)", pre, `${want.get("add")} @ ${want.get("rate")}`);
+    await shot("book-prefilled");
+  }
   check("the reference-basis banner does not show on a firm-priced BoQ… or shows with the reviewed book", !(await q('[data-reference-basis]')) || (await q('[data-basis-status="book_reviewed"]')));
   void plasterQty;
 
@@ -276,6 +299,10 @@ try {
   await shot("export-passed-downloads");
 
   console.log("\n6. one change → revision diff with its cause");
+  // K3: with nothing recorded since the latest revision, Regenerate is Unchanged —
+  // disabled with its reason (the same changesSinceRevision the rail reads).
+  await goto(`${BASE}/project/${villa}/boq`);
+  check("before any change: Regenerate is Unchanged (aria-disabled, reason shown)", await until(`document.querySelector('[data-testid="regenerate"]')?.getAttribute("data-regenerate-state") === "unchanged" && document.querySelector('[data-testid="regenerate-button"]')?.getAttribute("aria-disabled") === "true"`, 90000), await text('[data-testid="regenerate"]'));
   await goto(`${BASE}/firms/${firmId}`);
   await until(`!!document.querySelector('[data-item-key="wall_plaster"]')`, 20000);
   await click('[aria-label="Edit wall_plaster"]');
@@ -288,10 +315,10 @@ try {
   await goto(`${BASE}/project/${villa}/boq`);
   const { data: prevRow } = await sb.from("boqs").select("id, total_aed").eq("project_id", villa).order("created_at", { ascending: false }).limit(1).single();
   check("the page's headline is the stored revision's total (what-if with no grade chosen moves nothing)", Number(await evaluate(`document.querySelector('[data-display-total]')?.getAttribute("data-display-total")`)) === Number(prevRow?.total_aed), `page ${await evaluate(`document.querySelector('[data-display-total]')?.getAttribute("data-display-total")`)} · stored ${prevRow?.total_aed}`);
-  check("Regenerate control offered to the member, enabled", await until(`(() => { const b = document.querySelector('[data-testid="regenerate-button"]'); return !!b && !b.disabled; })()`, 30000));
+  check("after the rate edit: Regenerate is Ready and names what changed", await until(`(() => { const b = document.querySelector('[data-testid="regenerate-button"]'); const w = document.querySelector('[data-testid="regenerate"]'); return !!b && b.getAttribute('aria-disabled') !== 'true' && w?.getAttribute('data-regenerate-state') === 'ready' && /book entr/.test(w.textContent); })()`, 30000), await text('[data-testid="regenerate"]'));
   await shot("regenerate-ready");
   await click('[data-testid="regenerate-button"]');
-  check("progress shown while it runs", await until(`document.querySelector('[data-testid="regenerate"]')?.getAttribute("data-regenerate-state") === "running"`, 5000));
+  check("progress shown while it runs, and the page says it still shows the current revision", await until(`document.querySelector('[data-testid="regenerate"]')?.getAttribute("data-regenerate-state") === "running" && /Showing rev \\d+ while rev \\d+ is generated/.test(document.querySelector('[data-regenerating]')?.textContent ?? '')`, 5000));
   check("the resulting revision is shown", await until(`!!document.querySelector('[data-testid="regenerate-result"]')`, 120000), await text('[data-testid="regenerate-failure"]'));
   await sleep(1500);
   await shot("regenerate-result");

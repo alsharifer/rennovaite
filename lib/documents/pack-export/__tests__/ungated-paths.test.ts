@@ -78,9 +78,9 @@ describe("the UI has no direct link to a document route", () => {
   it("the export entry points are the Export pack action only", () => {
     const entry = files.filter((f) => /pack-export|PackExport|drawings\?export=1/.test(readFileSync(f, "utf8"))).map(rel).sort();
     expect(entry).toEqual([
-      "app/project/[id]/boq/_components/boq-view.tsx",
       "app/project/[id]/boq/page.tsx",
       "app/project/[id]/drawings/page.tsx",
+      "components/blueprint/boq/BoqReview.tsx",
       "components/documents/PackExport.tsx",
     ]);
   });

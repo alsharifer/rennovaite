@@ -4,6 +4,26 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## Found in K3 (2026-10-12)
+
+- **"Show on plan" opens the plan, not the element.** The plan page takes no
+  selection parameter; K5 (scope chrome) can add one and the inspector's link
+  can carry the line's `element_refs`.
+- **The four sensitivity modifiers carry no provenance** (K0.4 backlog, still
+  true): +15 / −8 / +6 / −3 % are hard-coded in
+  `components/blueprint/boq/WhatIfTab.tsx`.
+- **A promotion request is the firm attribution**, not its own record: a rate
+  correction attributed to the firm is a promotion candidate. If K4's
+  "Corrections to promote" needs to tell "requested" from "attributed", that is
+  an additive column (migration after 053).
+- **The BoQ page is slow in dev** (7–12 s application time under load; one 64 s
+  outlier right after a pack export). Its reads now run in parallel; the
+  remaining cost is the provenance context and the proposal gate — measure on
+  prod before optimising.
+- **Section order vs the J3 frame**: canonical (H7) puts Plumbing before the
+  external sections; the frame drew it after Irrigation. Code wins; the frame
+  should be updated.
+
 ## Found in K2 (2026-10-12)
 
 - **01 Project & Plan has no route of its own.** Blueprint v0.4 §7 makes it the

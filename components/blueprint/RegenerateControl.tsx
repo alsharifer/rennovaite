@@ -36,9 +36,9 @@ export function RegenerateControl({ value, onRegenerate }: { value: RegenerateSt
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-3" data-regenerate={value.state}>
+    <div className="flex flex-wrap items-center gap-3" data-regenerate={value.state} data-testid="regenerate" data-regenerate-state={value.state}>
       {value.state === "done" ? (
-        <p className="flex items-center gap-2" aria-live="polite">
+        <p className="flex items-center gap-2" aria-live="polite" data-testid="regenerate-result">
           <Icon name="check" className="text-[18px] text-bp-ink-secondary" />
           <span>
             <span className="t-label-caps block text-bp-ink-secondary">Rev {value.newRev} created</span>
@@ -48,21 +48,21 @@ export function RegenerateControl({ value, onRegenerate }: { value: RegenerateSt
           </span>
         </p>
       ) : value.state === "ready" ? (
-        <Button kind="primary" onClick={onRegenerate}>
+        <Button kind="primary" onClick={onRegenerate} testId="regenerate-button">
           {label}
         </Button>
       ) : (
-        <Button kind="secondary" disabled={{ reason: reasonText(value), reasonId }}>
+        <Button kind="secondary" disabled={{ reason: reasonText(value), reasonId }} testId="regenerate-button">
           {label}
         </Button>
       )}
 
       {value.state === "done" ? (
-        <Button kind="quiet" href={value.diffHref}>
+        <Button kind="quiet" href={value.diffHref} testId="regenerate-diff-link">
           View diff
         </Button>
       ) : value.state === "ready" ? (
-        <span className="t-label-md text-bp-ink-secondary">{value.changed}</span>
+        <span className="bp-reason t-label-md text-bp-ink-secondary">{value.changed}</span>
       ) : value.state === "running" ? (
         <span id={reasonId} className="t-label-md text-bp-ink-secondary" aria-live="polite">
           {value.doing}
@@ -70,7 +70,7 @@ export function RegenerateControl({ value, onRegenerate }: { value: RegenerateSt
       ) : value.state === "blocked" ? (
         <span className="inline-flex items-center gap-2">
           <Icon name="lock" className="text-[18px] text-bp-ink-secondary" />
-          <span id={reasonId} className="t-label-md text-bp-ink-secondary">
+          <span id={reasonId} className="t-label-md text-bp-ink-secondary" data-testid="regenerate-block">
             {value.reason}
           </span>
           {value.fixHref ? (
@@ -80,7 +80,7 @@ export function RegenerateControl({ value, onRegenerate }: { value: RegenerateSt
           ) : null}
         </span>
       ) : (
-        <span id={reasonId} className="t-label-md text-bp-ink-secondary">
+        <span id={reasonId} className="bp-reason t-label-md text-bp-ink-secondary">
           {reasonText(value)}
         </span>
       )}

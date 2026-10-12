@@ -93,8 +93,10 @@ describe("the wiring (static)", () => {
   });
 
   it("the page passes the server's answer in; the control posts trigger=regenerate and links the U4 diff", () => {
-    expect(read("app/project/[id]/boq/page.tsx")).toMatch(/regenerateReadiness\(sb, id, await getCaller\(\)\)/);
-    const ui = read("app/project/[id]/boq/_components/regenerate-boq.tsx");
+    // K3: Ready / Unchanged come from changesSinceRevision — the rail's one function.
+    expect(read("app/project/[id]/boq/page.tsx")).toMatch(/changesSinceRevision\(sb, id, /);
+    expect(read("app/project/[id]/boq/page.tsx")).toMatch(/regenerateReadiness\(sb, id, (caller|await getCaller\(\))\)/);
+    const ui = read("components/blueprint/boq/Regenerate.tsx");
     expect(ui).toMatch(/trigger: "regenerate"/);
     expect(ui).toMatch(/\/boq\/revisions\?from=\$\{result\.previousId\}&to=\$\{result\.boqId\}/);
     expect(ui).not.toMatch(/lucide-react/);
