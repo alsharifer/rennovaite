@@ -56,6 +56,7 @@ says where it is and why it waits. Newest first.
   Floorplan PDFs and drawings are not compressed. **H9**: direct-to-storage
   signed uploads for `/api/upload`, `/api/project-asset`, quote import. K1 only
   aligned the app's own limits (plan 20 MB both sides, structured 413).
+  Written up as `docs/H9_DIRECT_UPLOADS.md`.
 
 ## Ruled into the backlog at K0 (2026-10-12)
 

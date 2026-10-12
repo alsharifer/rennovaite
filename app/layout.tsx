@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { cookies } from "next/headers";
 import "./globals.css";
-import { THEME_COOKIE, THEME_NO_FLASH_SCRIPT, parseThemePref, serverTheme } from "@/lib/theme";
+import { THEME_NO_FLASH_SCRIPT } from "@/lib/theme";
 
 import { Providers } from "./providers";
 
@@ -77,20 +76,19 @@ export const metadata: Metadata = {
     "AI-powered villa renovation, from floorplan to finished home in 5 days.",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // R7 §1.8: an explicit Light / Dark preference renders server-side; System
-  // (and anything the cookie does not settle) is resolved by the inline script
-  // before first paint. Only Blueprint surfaces read data-theme.
-  const theme = serverTheme(parseThemePref((await cookies()).get(THEME_COOKIE)?.value));
+  // Theme (K1 review): the pre-paint inline script below is the ONLY thing that
+  // sets <html data-theme> — it reads the rv_theme cookie in the browser. The
+  // layout never reads a cookie, so static pages stay static (spec §1.8's
+  // server-side read is superseded). Only Blueprint surfaces read data-theme.
   return (
     <html
       lang="en"
-      data-theme={theme}
-      // The no-flash script may set data-theme before React hydrates.
+      // The no-flash script sets data-theme before React hydrates.
       suppressHydrationWarning
       className={`${ebGaramond.variable} ${plexSans.variable} ${inter.variable} ${jetbrainsMono.variable} ${ibmPlexArabic.variable} ${rubik.variable} h-full antialiased`}
     >

@@ -28,6 +28,20 @@
   (app sidebar and the marketing top nav), `/firms` → the single firm's book,
   `/support` → help drawer, minimal `/settings`.
 - Stacked on K1 (PR #93): the K2 PR targets `feat/k1-blueprint-foundations`.
+# K1 review fixes (2026-10-12)
+
+- **Theme by the inline script only**: the root layout no longer reads the
+  `rv_theme` cookie (it had made every page dynamic). Static again vs the K1
+  build as first reviewed: `/_not-found`, `/project`, `/rennovaite` — now the
+  same static set as master (`/_not-found`, `/privacy`, `/project`,
+  `/rennovaite`, `/terms`), plus the new `/dev/blueprint`.
+- `<Figure>` says the currency ("AED 7,329.70, derived — …"; rates "per" their
+  unit); `<Icon size>` measured on /dev/blueprint at 16 / 20 / 24 / 32 / 40 px
+  (an Atelier icon with `text-[32px]` still renders 24 — that trap stays out).
+- H9 written up (`docs/H9_DIRECT_UPLOADS.md`): Vercel's ~4.5 MB body limit,
+  measured on production; not worked around in K.
+- Scope (design owner): the owner landing is cut from K6 — K6 is sign-in +
+  intake only. bp- is the canonical token prefix whatever the pack's examples say.
 
 # K1 — Blueprint foundations: tokens, type, icons, theme, number + provenance primitives (2026-10-12)
 

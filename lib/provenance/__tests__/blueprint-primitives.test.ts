@@ -22,20 +22,22 @@ const html = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticM
 const srText = (markup: string) => /<span class="sr-only">([^<]*)<\/span>/.exec(markup)?.[1];
 
 describe("Figure — a number with its tier, spoken as one description", () => {
-  it("speaks the spec's example exactly", () => {
+  it("speaks the spec's example, with the currency (K1 review: Figures appear outside tables too)", () => {
     const m = html(createElement(Figure, { value: 7329.7, tier: "derived", inputs: { qty: "derived", rate: "market" } }));
-    expect(srText(m)).toBe("7,329.70, derived — quantity derived, rate market reference");
+    expect(srText(m)).toBe("AED 7,329.70, derived — quantity derived, rate market reference");
   });
 
   it("the visible number is ink, mono tabular, hidden from screen readers (no double reading)", () => {
     const m = html(createElement(Figure, { value: 4400, tier: "market" }));
     expect(m).toMatch(/<span aria-hidden="true" class="t-num-md text-bp-ink-primary">4,400.00<\/span>/);
     expect(m).toContain('data-tier="market"');
-    expect(srText(m)).toBe("4,400.00, market reference");
+    expect(srText(m)).toBe("AED 4,400.00, market reference");
   });
 
   it("a firm's own rate reads 'own basis'; an owner hears 'estimated' for derived", () => {
-    expect(srText(html(createElement(Figure, { value: 96, tier: "measured", role: "rate" })))).toBe("96.00, own basis");
+    expect(srText(html(createElement(Figure, { value: 96, tier: "measured", role: "rate" })))).toBe("AED 96.00, own basis");
+    expect(srText(html(createElement(Figure, { value: 105.6, tier: "market", role: "rate", unit: "m²" })))).toBe("AED 105.60 per m², market reference");
+    expect(srText(html(createElement(Figure, { value: -0.04, tier: "derived", format: "delta" })))).toBe("AED −0.04, derived");
     expect(srText(html(createElement(Figure, { value: 69.41, tier: "derived", format: "qty", role: "qty", persona: "owner", unit: "m²" })))).toBe("69.41 m², estimated");
   });
 
@@ -82,6 +84,16 @@ describe("Icon — Material Symbols Sharp by ligature", () => {
   it("decorative by default, labelled when standalone", () => {
     expect(html(createElement(Icon, { name: "lock" }))).toBe('<span class="bp-icon" aria-hidden="true" translate="no">lock</span>');
     expect(html(createElement(Icon, { name: "lock", label: "Locked" }))).toContain('role="img" aria-label="Locked"');
+  });
+
+  it("size is honoured — by prop (inline) and by a text-[…] class (.bp-icon is layered, unlike the Atelier class)", () => {
+    expect(html(createElement(Icon, { name: "lock", size: 32 }))).toContain('style="font-size:32px"');
+    const css = readFileSync(path.join(ROOT, "app/globals.css"), "utf8");
+    // .bp-icon must sit inside @layer components so utilities outrank its 20px.
+    const icon = css.indexOf(".bp-icon {");
+    const layer = css.lastIndexOf("@layer components {", icon);
+    expect(layer).toBeGreaterThan(-1);
+    expect(css.slice(layer, icon)).not.toMatch(/^}/m); // the layer is still open at .bp-icon
   });
 
   it(".bp-icon is Sharp at weight 300, grade 0, optical size 20 — the one icon font", () => {
