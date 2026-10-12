@@ -107,7 +107,6 @@ function atelierUse(entry: string): string[] {
  * them. Must equal the scan — remove a route here when its screen lands.
  */
 const ATELIER_PENDING: Record<string, string> = {
-  "/projects": "#1 Projects home (53:65)",
   "/project/[id]/design": "#3–4 Design (55:296 · 56:434)",
   "/project/[id]/render": "#5 Renders studio (57:612)",
   "/project/[id]/accessories": "#6 Specification (58:738)",

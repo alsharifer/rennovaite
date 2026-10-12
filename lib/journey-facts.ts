@@ -26,7 +26,7 @@ import { isUnpricedLine } from "@/lib/documents/boq-derived";
 import { latestPackJobs } from "@/lib/documents/pack-export/job";
 import { loadProposalGate } from "@/lib/documents/proposal-gate";
 import { listFirms } from "@/lib/firms/store";
-import { firmStepStatuses, ownerStepStatuses, type JourneyFacts, type PlanBlock, type RailContext, type RailProject, type StepStatus } from "@/lib/journey-state";
+import { firmStepStatuses, ownerStepStatuses, type JourneyFacts, type PlanBlock, type RailContext, type RailFirm, type RailProject, type StepStatus } from "@/lib/journey-state";
 import type { JourneyPersona } from "@/lib/journey";
 import { memberProjectIds } from "@/lib/projects/access";
 
@@ -90,24 +90,36 @@ export async function loadRailContextWithoutProject(db: SupabaseClient, caller: 
   return { persona: railFirms.length > 0 ? "firm" : "owner", caller: { email: caller.email }, firms: railFirms, firm, projects, project: null, statuses: {} };
 }
 
-export async function loadRailContext(db: SupabaseClient, projectId: string, caller: Caller): Promise<RailContext> {
-  const [firms, projects, projectRow, readiness, specSelections] = await Promise.all([
-    safe([], () => listFirms(db, caller)),
-    loadRailProjects(db, caller),
+/** One project's journey: its persona and every step's status (K8: also read per row by the Projects home). */
+export interface ProjectJourney {
+  persona: JourneyPersona;
+  /** The project's firm, when the caller is a member of it. */
+  firm: RailFirm | null;
+  statuses: Record<string, StepStatus>;
+  /** The latest revision (1-based) and when it was generated — null before the first BoQ. */
+  boq: { rev: number; createdAt: string } | null;
+}
+
+/**
+ * The gates for one project, run as the rail runs them. `firms` are the
+ * caller's (listFirms) — passed in so a page that reads many projects lists
+ * them once.
+ */
+export async function loadProjectJourney(db: SupabaseClient, projectId: string, caller: Caller, firms: RailFirm[]): Promise<ProjectJourney> {
+  const [projectRow, readiness, specSelections, revCount] = await Promise.all([
     safe(null as null | { firm_id: string | null }, async () => (await db.from("projects").select("firm_id").eq("id", projectId).maybeSingle()).data as { firm_id: string | null } | null),
     safe(null as Awaited<ReturnType<typeof regenerateReadiness>> | null, () => regenerateReadiness(db, projectId, caller)),
     count(db, "accessory_selections", projectId),
+    count(db, "boqs", projectId),
   ]);
 
-  const railFirms = firms.map((f) => ({ id: f.id, name: f.name }));
-  const projectFirm = projectRow?.firm_id ? (railFirms.find((f) => f.id === projectRow.firm_id) ?? null) : null;
+  const projectFirm = projectRow?.firm_id ? (firms.find((f) => f.id === projectRow.firm_id) ?? null) : null;
   // Persona: a member of the firm this project is attached to works the firm journey.
   const persona: JourneyPersona = projectFirm ? "firm" : "owner";
-  const project = projects.find((p) => p.id === projectId) ?? { id: projectId, name: "Project", rev: null, revAt: null };
 
   const block = readiness?.block && PLAN_CODES.has(readiness.block.code) ? (readiness.block as PlanBlock) : null;
   const latest = readiness?.previous ?? null;
-  const boq = latest && project.rev ? { rev: project.rev, createdAt: latest.created_at } : null;
+  const boq = latest && revCount ? { rev: revCount, createdAt: latest.created_at } : null;
 
   const facts: JourneyFacts = {
     projectId,
@@ -150,5 +162,13 @@ export async function loadRailContext(db: SupabaseClient, projectId: string, cal
   }
 
   const statuses = (persona === "firm" ? firmStepStatuses(facts) : ownerStepStatuses(facts)) as Record<string, StepStatus>;
-  return { persona, caller: { email: caller.email }, firms: railFirms, firm: projectFirm ?? null, projects, project, statuses };
+  return { persona, firm: projectFirm, statuses, boq };
+}
+
+export async function loadRailContext(db: SupabaseClient, projectId: string, caller: Caller): Promise<RailContext> {
+  const [firms, projects] = await Promise.all([safe([], () => listFirms(db, caller)), loadRailProjects(db, caller)]);
+  const railFirms = firms.map((f) => ({ id: f.id, name: f.name }));
+  const journey = await loadProjectJourney(db, projectId, caller, railFirms);
+  const project = projects.find((p) => p.id === projectId) ?? { id: projectId, name: "Project", rev: null, revAt: null };
+  return { persona: journey.persona, caller: { email: caller.email }, firms: railFirms, firm: journey.firm, projects, project, statuses: journey.statuses };
 }

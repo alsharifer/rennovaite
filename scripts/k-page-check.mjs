@@ -24,7 +24,7 @@ const projects = (opt("projects") ?? "").split(",").filter(Boolean);
 const sizes = (opt("sizes") ?? "desktop").split(",");
 const pages = args.filter((a) => !a.startsWith("--") && a.includes("=")).map((a) => a.split(/=(.*)/s).slice(0, 2));
 // reflow = 1280 CSS px at 400% zoom (WCAG 1.4.10): the page must fit 320 px without horizontal scroll.
-const SIZE = { desktop: [1440, 1000], tablet: [834, 1112], phone: [390, 844], reflow: [320, 800] };
+const SIZE = { desktop: [1440, 1000], laptop: [1280, 900], tablet: [834, 1112], phone: [390, 844], reflow: [320, 800] };
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 
 const anon = args.includes("--anon");

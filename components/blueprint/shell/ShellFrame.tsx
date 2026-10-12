@@ -24,6 +24,7 @@ import { TopBar } from "./TopBar";
 
 /** Page titles for shell pages that are not journey steps. */
 const PAGE_TITLES: [RegExp, string][] = [
+  [/^\/projects$/, "Projects"],
   [/^\/settings/, "Settings"],
   [/^\/firms\/[^/]+\/quotes\//, "Quotation"],
   [/^\/firms\/[^/]+/, "Rate book"],

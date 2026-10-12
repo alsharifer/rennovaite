@@ -108,7 +108,7 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
 
       {!ctx.project && pathname !== "/project/new" ? (
         <nav aria-label="Projects" className="flex-1 py-2">
-          <Link href={SIGNED_IN_HOME} aria-current={pathname === SIGNED_IN_HOME ? "page" : undefined} className={railItem(pathname === SIGNED_IN_HOME, "flex items-center gap-3 px-6 py-2.5")}>
+          <Link href={SIGNED_IN_HOME} aria-label="Projects" aria-current={pathname === SIGNED_IN_HOME ? "page" : undefined} className={railItem(pathname === SIGNED_IN_HOME, "flex items-center gap-3 px-6 py-2.5")}>
             <Icon name="folder_open" className="bp-rail-c text-[18px]" />
             <span className="bp-rail-x">Projects</span>
           </Link>
