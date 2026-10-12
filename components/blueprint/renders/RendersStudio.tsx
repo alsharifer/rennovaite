@@ -23,7 +23,7 @@
 // =============================================================================
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import type { AssetLite } from "@/lib/assets/types";

@@ -22,17 +22,16 @@ import { usePathname } from "next/navigation";
 
 import { signOut } from "@/app/_actions/sign-out";
 import { SIGNED_IN_HOME } from "@/lib/auth/link-error";
-import type { RailContext, RailProject } from "@/lib/journey-state";
+import type { RailContext } from "@/lib/journey-state";
 
 import { Icon } from "../Icon";
 import { THEME_LABEL, ThemeSwitch, useThemePref } from "../ThemeSwitch";
+import { revLine } from "./rev-line";
 import { StepList, type RailStep } from "./StepList";
 
 export const HELP_EVENT = "bp:help";
 export const openHelp = () => window.dispatchEvent(new Event(HELP_EVENT));
 
-const revDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dubai" });
-export const revLine = (p: RailProject | null) => (p?.rev && p.revAt ? `rev ${p.rev} · ${revDate(p.revAt)}` : "no BoQ yet");
 
 /** The same page on another project, when the path is project-scoped. */
 function onProject(pathname: string, from: string | null, to: string): string {

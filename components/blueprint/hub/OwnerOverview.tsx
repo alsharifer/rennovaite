@@ -27,7 +27,9 @@ const list = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, 
 
 export function OwnerOverview({ view }: { view: OverviewView }) {
   const e = view.estimate;
-  let primaryUsed = false;
+  // One Primary per view: the first action that isn't blocked; the rest Secondary; blocked ones Quiet.
+  const firstOpen = view.next.findIndex((a) => !a.blocked);
+  const kindOf = (i: number) => (view.next[i]!.blocked ? "quiet" : i === firstOpen ? "primary" : "secondary");
   return (
     <div className="mx-auto max-w-[1344px] px-6 py-8 pb-16 lg:px-12" data-overview>
       <TopBarActions>
@@ -170,9 +172,8 @@ export function OwnerOverview({ view }: { view: OverviewView }) {
           <h2 className="t-label-caps text-bp-ink-tertiary">NEXT</h2>
           {view.next.length ? (
             <ul>
-              {view.next.map((a) => {
-                const kind = a.blocked ? "quiet" : primaryUsed ? "secondary" : "primary";
-                if (kind === "primary") primaryUsed = true;
+              {view.next.map((a, i) => {
+                const kind = kindOf(i);
                 return (
                   <li key={a.step} className="border-b border-bp-line-hairline pb-4 pt-3.5" data-next={a.step}>
                     <p className="t-label-caps flex items-center gap-1.5 text-bp-ink-tertiary">

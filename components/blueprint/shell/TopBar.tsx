@@ -19,7 +19,8 @@ import { useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { RailContext } from "@/lib/journey-state";
 
 import { Icon } from "../Icon";
-import { openHelp, revLine } from "./JourneyRail";
+import { openHelp } from "./JourneyRail";
+import { revLine } from "./rev-line";
 import { StepList, type RailStep } from "./StepList";
 
 const ACTIONS_ID = "bp-topbar-actions";

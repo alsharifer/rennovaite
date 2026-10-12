@@ -15,7 +15,6 @@ import type { InspectBoq, RoomMeta, WallMeta } from "@/lib/viewer/inspect";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const PAGE_NAME = "3D Viewer";
 
 type RenderRow = {
   id: string;

@@ -22,7 +22,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const PAGE_NAME = "Vendors";
 const TOP_LANES = 8;
 
 type SkuRow = {

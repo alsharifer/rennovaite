@@ -108,7 +108,6 @@ function atelierUse(entry: string): string[] {
  */
 const ATELIER_PENDING: Record<string, string> = {
 
-  "/project/[id]/accessories": "#6 Specification (58:738)",
   "/project/[id]/timeline": "#7 Timeline (59:837)",
   "/project/[id]/vendors": "#8 Contractors & suppliers (60:913)",
   "/project/[id]/viewer": "#9 3D view (62:1017)",
