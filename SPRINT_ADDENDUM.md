@@ -1,3 +1,21 @@
+# K2 review fixes (2026-10-13)
+
+- **Persona invariant**: on a firm-attached project every project member is a
+  member of that firm — enforced at member-add (409 `not_a_firm_member`) and
+  firm-attach (409 `project_members_outside_firm`), tested, and obeyed by
+  `scripts/project-member-add.mjs`. Production, read-only, 13 Oct: 9 projects,
+  0 firm-attached, 0 firms — no violations.
+- **"Changed since rev N" = `changesSinceRevision`** (`lib/boq/changes-since.ts`):
+  the rail calls it; K3's Regenerate must. Runbook test: nothing recorded ⇒
+  "unchanged" AND regenerating the same state gives the same BoQ (pricing
+  fingerprint and grand total equal). A recorded correction is not a change.
+- **Theme gate**: Dark / System hidden until K5; everyone gets Light (the
+  pre-paint script ignores a stored choice while the gate is closed).
+- The hub body is K5a (spec §3.1 / 11:48) — out of the backlog. K6 is sign-in +
+  intake only (the owner landing is cut).
+- **H9 status**: written up (`docs/H9_DIRECT_UPLOADS.md`, measured on
+  production 12 Oct), **not started** — it runs next, before K3.
+
 # K2 — firm + owner journey rail, top bar, in-shell states (2026-10-12)
 
 - **One rail, two journeys**: `FIRM_STEPS` (00–08, fixed numbers) beside the

@@ -40,7 +40,7 @@ export default async function SettingsPage() {
           Appearance
         </h2>
         <ThemeSwitch />
-        <p className="t-body-sm mt-3 text-bp-ink-secondary">System follows your device. Pages not yet redesigned stay light.</p>
+        <p className="t-body-sm mt-3 text-bp-ink-secondary">Dark and System arrive once the remaining pages are redesigned.</p>
       </section>
 
       <section aria-labelledby="settings-firm" className="border-t border-bp-line-hairline py-6">

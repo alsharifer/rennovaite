@@ -27,6 +27,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Caller } from "@/lib/auth/caller";
 import { StoreError } from "@/lib/store-error";
 
+import { mayJoinProject } from "./firm-invariant";
+
 export { StoreError };
 
 /** Every kind of id a project-scoped request can carry. */
@@ -132,8 +134,15 @@ export async function memberProjectIds(db: SupabaseClient, userId: string): Prom
   return ((data ?? []) as { project_id: string }[]).map((r) => r.project_id);
 }
 
-/** Creating a project makes the creator a member (idempotent). */
+/**
+ * Creating a project makes the creator a member (idempotent). On a firm-attached
+ * project only a member of that firm may join (the persona invariant,
+ * lib/projects/firm-invariant.ts) — 409 not_a_firm_member otherwise.
+ */
 export async function addProjectMember(db: SupabaseClient, projectId: string, userId: string): Promise<void> {
+  if (!(await mayJoinProject(db, projectId, userId))) {
+    throw new StoreError(409, "not_a_firm_member", "This project belongs to a firm: only a member of that firm can join it. Add the account to the firm first.");
+  }
   const { error } = await db.from("project_members").insert({ project_id: projectId, user_id: userId });
   if (error && (error as { code?: string }).code !== "23505") throw new Error(`project_members insert failed: ${error.message}`);
 }

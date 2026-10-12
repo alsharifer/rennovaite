@@ -17,6 +17,7 @@
 // over whichever state the step has, so an active step keeps its reason.
 // =============================================================================
 
+import type { UpstreamChanges } from "@/lib/boq/changes-since";
 import type { FirmStepKey, JourneyPersona, JourneyStepKey } from "@/lib/journey";
 
 export type StepState = "done" | "available" | "attention" | "blocked";
@@ -51,23 +52,13 @@ export interface JourneyFacts {
     basis: { referenceLines: number; totalLines: number } | null;
     /** proposalGateVerdict for the latest revision (loadProposalGate). */
     gate: { ok: boolean; reason: string | null; refusal: string | null };
-    /** loadRecordedCauses since the latest revision: what moved upstream of it. */
-    upstream: { planEdits: number; bookChanges: number; decisions: number };
+    /** changesSinceRevision (lib/boq/changes-since.ts) — the SAME answer K3's Regenerate reads. */
+    upstream: UpstreamChanges;
     /** approvalStatus(latest revision). */
     approval: { firm: boolean; client: boolean } | null;
     /** Pack-export jobs that PASSED after the latest revision (any / with the proposal). */
     exported: { pack: boolean; proposal: boolean };
   } | null;
-}
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-function upstreamReason(u: NonNullable<JourneyFacts["firm"]>["upstream"], rev: number): string | null {
-  const parts: string[] = [];
-  if (u.planEdits) parts.push("plan edited");
-  if (u.bookChanges) parts.push(plural(u.bookChanges, "book entry", "book entries") + " changed");
-  if (u.decisions) parts.push(plural(u.decisions, "decision") + " recorded");
-  return parts.length ? `${parts.join(", ")} since rev ${rev}` : null;
 }
 
 /** The plan refusal as a blocked downstream step: same words, the fix in 02 Scope. */
@@ -95,7 +86,7 @@ export function firmStepStatuses(f: JourneyFacts): Record<FirmStepKey, StepStatu
   const boqReview: StepStatus = (() => {
     if (plan && plan.code !== "no_plan") return blockedByPlan(plan);
     if (!f.boq) return plan ? blockedByPlan(plan) : { state: "available" };
-    const up = firm ? upstreamReason(firm.upstream, f.boq.rev) : null;
+    const up = firm?.upstream.changed ? firm.upstream.summary : null;
     return up ? { state: "attention", reason: up, fix: { label: "Regenerate", href: `/project/${id}/boq` } } : { state: "done" };
   })();
 

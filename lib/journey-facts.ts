@@ -6,7 +6,7 @@
 // the pure lib/journey-state.ts:
 //   plan        regenerateReadiness → loadPriceablePlan's refusal (H4)
 //   rates       loadProposalGate → book status, reference basis, verdict (L4)
-//   upstream    loadRecordedCauses since the latest revision (U4)
+//   upstream    changesSinceRevision — the one "changed since rev N" (U4 causes)
 //   approval    listApprovals + approvalStatus on the latest revision (U4)
 //   documents   latestPackJobs — a PASSED export after the latest revision (T5)
 // plus the persona (a member of the project's firm → firm journey) and the two
@@ -21,7 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Caller } from "@/lib/auth/caller";
 import { approvalStatus, listApprovals } from "@/lib/boq/approvals";
 import { regenerateReadiness } from "@/lib/boq/regenerate";
-import { loadRecordedCauses } from "@/lib/boq/revision-causes";
+import { changesSinceRevision, summarizeChanges } from "@/lib/boq/changes-since";
 import { latestPackJobs } from "@/lib/documents/pack-export/job";
 import { loadProposalGate } from "@/lib/documents/proposal-gate";
 import { listFirms } from "@/lib/firms/store";
@@ -110,10 +110,10 @@ export async function loadRailContext(db: SupabaseClient, projectId: string, cal
   };
 
   if (persona === "firm") {
-    const now = new Date().toISOString();
-    const [gate, causes, approvals, jobs] = await Promise.all([
+    const now = new Date();
+    const [gate, upstream, approvals, jobs] = await Promise.all([
       safe(null as Awaited<ReturnType<typeof loadProposalGate>> | null, () => loadProposalGate(db, projectId)),
-      latest ? safe([], () => loadRecordedCauses(db, projectId, latest.created_at, now, "")) : Promise.resolve([]),
+      latest && boq ? safe(summarizeChanges([], boq.rev), () => changesSinceRevision(db, projectId, latest, boq.rev, now)) : Promise.resolve(summarizeChanges([], 0)),
       safe([], () => listApprovals(db, projectId)),
       safe([], () => latestPackJobs(db, projectId, 10)),
     ]);
@@ -123,11 +123,7 @@ export async function loadRailContext(db: SupabaseClient, projectId: string, cal
       bookStatus: gate?.firm?.book_status ?? null,
       basis: gate?.boq ? { referenceLines: gate.boq.basis.reference_lines, totalLines: gate.boq.basis.total_lines } : null,
       gate: gate?.verdict ?? { ok: false, reason: null, refusal: null },
-      upstream: {
-        planEdits: causes.filter((c) => c.kind === "plan_edit").length,
-        bookChanges: causes.filter((c) => c.kind === "firm_rate").length,
-        decisions: causes.filter((c) => c.kind === "session_decision").length,
-      },
+      upstream,
       approval: status ? { firm: !!status.firm, client: !!status.client } : null,
       exported: {
         pack: passedSince.length > 0,

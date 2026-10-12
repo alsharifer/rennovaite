@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { StepList, stepAccessibleName, type RailStep } from "@/components/blueprint/shell/StepList";
+import { summarizeChanges } from "@/lib/boq/changes-since";
 import { FIRM_STEPS, activeStepKey } from "@/lib/journey";
 import { firmStepStatuses, ownerStepStatuses, type JourneyFacts, type PlanBlock } from "@/lib/journey-state";
 
@@ -31,7 +32,7 @@ function facts(over: Partial<JourneyFacts> = {}, firm: Partial<NonNullable<Journ
       bookStatus: "reviewed",
       basis: { referenceLines: 0, totalLines: 18 },
       gate: { ok: true, reason: "firm_basis", refusal: null },
-      upstream: { planEdits: 0, bookChanges: 0, decisions: 0 },
+      upstream: summarizeChanges([], 4),
       approval: { firm: true, client: true },
       exported: { pack: true, proposal: true },
       ...firm,
@@ -87,8 +88,11 @@ describe("firm journey — the state matrix", () => {
   });
 
   it("upstream change since the revision (recorded causes) → 05 attention, naming what moved", () => {
-    expect(firmStepStatuses(facts({}, { upstream: { planEdits: 2, bookChanges: 1, decisions: 0 } })).boq_review).toMatchObject({ state: "attention", reason: "plan edited, 1 book entry changed since rev 4" });
-    expect(firmStepStatuses(facts({}, { upstream: { planEdits: 0, bookChanges: 3, decisions: 1 } })).boq_review.reason).toBe("3 book entries changed, 1 decision recorded since rev 4");
+    const causes = (...kinds: string[]) => kinds.map((kind) => ({ kind }) as { kind: "plan_edit" });
+    expect(firmStepStatuses(facts({}, { upstream: summarizeChanges(causes("plan_edit", "plan_edit", "firm_rate"), 4) })).boq_review).toMatchObject({ state: "attention", reason: "plan edited, 1 book entry changed since rev 4" });
+    expect(firmStepStatuses(facts({}, { upstream: summarizeChanges(causes("firm_rate", "firm_rate", "firm_rate", "session_decision"), 4) })).boq_review.reason).toBe("3 book entries changed, 1 decision recorded since rev 4");
+    // A recorded correction is never applied — it does not make the BoQ stale.
+    expect(firmStepStatuses(facts({}, { upstream: summarizeChanges(causes("correction"), 4) })).boq_review.state).toBe("done");
   });
 
   it("approval outstanding → 07 attention: firm first, then the client", () => {
@@ -184,7 +188,7 @@ describe("no duplicated rules: the facts come from the gates", () => {
   const read = (f: string) => readFileSync(path.join(process.cwd(), f), "utf8");
   it("the loader runs the gates the app already runs", () => {
     const src = read("lib/journey-facts.ts");
-    for (const fn of ["regenerateReadiness(", "loadProposalGate(", "approvalStatus(", "loadRecordedCauses(", "latestPackJobs(", "listFirms("]) expect(src, fn).toContain(fn);
+    for (const fn of ["regenerateReadiness(", "loadProposalGate(", "approvalStatus(", "changesSinceRevision(", "latestPackJobs(", "listFirms("]) expect(src, fn).toContain(fn);
   });
   it("the state model is pure — no database, no environment", () => {
     const src = read("lib/journey-state.ts");

@@ -44,9 +44,17 @@ if (!user) {
 const ids = rest.includes("--all") ? ((await sb.from("projects").select("id")).data ?? []).map((p) => p.id) : rest;
 const { data: have } = await sb.from("project_members").select("project_id").eq("user_id", user.id);
 const already = new Set((have ?? []).map((r) => r.project_id));
-const add = ids.filter((id) => !already.has(id));
+const candidates = ids.filter((id) => !already.has(id));
+// K2 persona invariant: on a firm-attached project every member is a member of
+// that firm (lib/projects/firm-invariant.ts). The operator act obeys it too.
+const { data: firmProjects } = candidates.length ? await sb.from("projects").select("id, firm_id").in("id", candidates).not("firm_id", "is", null) : { data: [] };
+const { data: myFirms } = await sb.from("firm_members").select("firm_id").eq("user_id", user.id);
+const inFirm = new Set((myFirms ?? []).map((r) => r.firm_id));
+const refused = (firmProjects ?? []).filter((p) => !inFirm.has(p.firm_id)).map((p) => p.id);
+for (const id of refused) console.error(`refused ${id}: it belongs to a firm ${email} is not a member of (add them to the firm first — scripts/firm-member-add.mjs)`);
+const add = candidates.filter((id) => !refused.includes(id));
 if (add.length) {
   const { error } = await sb.from("project_members").insert(add.map((project_id) => ({ project_id, user_id: user.id })));
   if (error) throw error;
 }
-console.log(`${email}: ${add.length} project(s) added, ${ids.length - add.length} already a member`);
+console.log(`${email}: ${add.length} project(s) added, ${ids.length - candidates.length} already a member${refused.length ? `, ${refused.length} refused (firm projects)` : ""}`);

@@ -11,14 +11,12 @@ says where it is and why it waits. Newest first.
   project there is no per-project intake page, so the step opens the plan
   (`FIRM_STEPS`, `lib/journey.ts`) and 02 Scope owns that route's active
   state. Decide in K5/K6 whether 01 gets a project-details page.
-- **The hub's body is still Atelier.** Spec §3.1 (estimate block, basis table,
-  Next column, revisions, documents) is not assigned to a K prompt; K2 framed
-  the existing hub in the new chrome. Its local `PhaseTracker` now duplicates
-  the rail.
-- **"Upstream change since rev" had no gate.** The rail reads it from
-  `loadRecordedCauses` (plan edits / design edits, firm book entries created or
-  retired, session decisions after the latest revision). The Regenerate
-  control's Ready state (K3) should read the same, so the two never disagree.
+- **"Upstream change since rev" had no gate** — now ONE function,
+  `changesSinceRevision` (`lib/boq/changes-since.ts`), over the recorded causes
+  (plan / design edits, firm book entries created or retired, session
+  decisions; corrections are not changes). **K3's Regenerate must call it** —
+  the rail already does — and the runbook check (no recorded change ⇒
+  regenerating leaves the BoQ unchanged) is its test.
 - **Revision number = count of BoQ rows.** The rail's "rev N" counts the
   project's `boqs` rows (as the K0 ruling allowed until 052 stores
   `revision_no`); `listRevisions` drops rows whose sections are not a valid BoQ,

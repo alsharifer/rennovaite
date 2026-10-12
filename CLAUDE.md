@@ -144,16 +144,24 @@ except `design-refs/r7-handoff/`.
   exists (01 opens the plan until a per-project intake exists; 04 is
   `/project/[id]/rates`, the project's firm's book; 08 is
   `/project/[id]/proposal`, the gate until K4). Persona: a member of the firm a
-  project is attached to → firm journey; everyone else → owner.
+  project is attached to → firm journey; everyone else → owner. **Persona
+  invariant** (`lib/projects/firm-invariant.ts`): on a firm-attached project
+  every project member is a member of that firm — `addProjectMember` refuses
+  409 `not_a_firm_member`, `assignProjectFirm` refuses 409
+  `project_members_outside_firm`, `scripts/project-member-add.mjs` skips with a
+  message. (Production on 13 Oct: no firm-attached projects, no violations.)
   `activeStepKey(persona, pathname, …)` lights the step a page is on.
 - **States are computed, never stored** (`lib/journey-state.ts`, pure):
   done / available / attention (book not reviewed, upstream change since the
   revision, approval outstanding) / blocked (plan check, the proposal gate),
   each with its reason and fix link. The facts come from the gates the app
   already runs (`lib/journey-facts.ts`: `regenerateReadiness`,
-  `loadProposalGate`, `approvalStatus`, `loadRecordedCauses` since the latest
-  revision, `latestPackJobs`) — **a new gate rule belongs in the gate, never in
-  the rail**. `lib/__tests__/journey-state.test.ts` is the state matrix.
+  `loadProposalGate`, `approvalStatus`, `changesSinceRevision`,
+  `latestPackJobs`) — **a new gate rule belongs in the gate, never in the
+  rail**. "Changed since rev N" is `changesSinceRevision`
+  (`lib/boq/changes-since.ts`) and nothing else: **K3's Regenerate calls it**;
+  its test is the runbook check (nothing recorded ⇒ regenerating leaves the
+  BoQ unchanged). `lib/__tests__/journey-state.test.ts` is the state matrix.
 - **The shell** (`components/blueprint/shell/`): `ShellFrame` (rail + top bar +
   main under one `data-system="blueprint"` root), `JourneyRail`, `TopBar`
   (breadcrumb + `<TopBarActions>` portal slot + the phone step switcher /
@@ -174,7 +182,11 @@ except `design-refs/r7-handoff/`.
   route segment suddenly 404s in dev, restart `next dev` before debugging** —
   K2 saw a dev server answer HTML 404s for whole route trees
   (`/project/[id]/*`, `/api/projects/[id]/*`) that a fresh server served fine.
-- **Transition**: until K3–K5 restyle them, page bodies are still Atelier and
+- **Theme gate**: Dark and System are hidden until K5 (`THEME_CHOICES_OPEN =
+  false` in `lib/theme.ts`): the pre-paint script gives everyone Light and the
+  switcher offers Light only. K5 flips it.
+- **Transition**: until K3–K5 restyle them (the hub body is K5a, spec §3.1 /
+  11:48), page bodies are still Atelier and
   render on their own light canvas (`ShellFrame content="atelier"`) inside the
   Blueprint chrome — the chrome follows the theme, the body does not yet.
 - **Primitives added**: `<Button>` (Primary / Secondary / Quiet, `tone="inverse"`

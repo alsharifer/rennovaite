@@ -22,6 +22,17 @@ export type Theme = "light" | "dark";
 
 /** The default is Light (spec §1.1) — not System. */
 export const DEFAULT_THEME_PREF: ThemePref = "light";
+
+/**
+ * THE GATE (K2 review): Dark and System stay hidden until K5 has converted the
+ * page bodies — a dark rail around light Atelier content is not a theme.
+ * Everyone gets Light: the pre-paint script ignores a stored dark / system
+ * choice and the switcher offers Light only. K5 flips this to true.
+ */
+export const THEME_CHOICES_OPEN = false;
+
+/** The preferences the switcher offers right now. */
+export const OFFERED_THEME_PREFS: readonly ThemePref[] = THEME_CHOICES_OPEN ? THEME_PREFS : ["light"];
 const ONE_YEAR_S = 60 * 60 * 24 * 365;
 
 export function parseThemePref(value: string | null | undefined): ThemePref {
@@ -33,10 +44,16 @@ export function parseThemePref(value: string | null | undefined): ThemePref {
  * against the OS and keeps following it. Kept small and dependency-free: it is
  * inlined verbatim by app/layout.tsx.
  */
-export const THEME_NO_FLASH_SCRIPT = `(function(){try{var d=document.documentElement,m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark|system)(?:;|$)/),p=m?m[1]:"${DEFAULT_THEME_PREF}",q=window.matchMedia("(prefers-color-scheme: dark)"),a=function(){d.setAttribute("data-theme",p==="system"?(q.matches?"dark":"light"):p)};d.setAttribute("data-theme-pref",p);a();if(p==="system"&&q.addEventListener)q.addEventListener("change",a)}catch(e){}})();`;
+export function themeNoFlashScript(open: boolean): string {
+  return `(function(){try{var d=document.documentElement,m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark|system)(?:;|$)/),p=${open ? "m?m[1]:" : ""}"${DEFAULT_THEME_PREF}",q=window.matchMedia("(prefers-color-scheme: dark)"),a=function(){d.setAttribute("data-theme",p==="system"?(q.matches?"dark":"light"):p)};d.setAttribute("data-theme-pref",p);a();if(p==="system"&&q.addEventListener)q.addEventListener("change",a)}catch(e){}})();`;
+}
+
+/** What app/layout.tsx inlines — Light only while the gate is closed. */
+export const THEME_NO_FLASH_SCRIPT = themeNoFlashScript(THEME_CHOICES_OPEN);
 
 /** Browser only: store a preference and apply it at once (the switch in the rail footer, K2). */
-export function setThemePreference(pref: ThemePref): void {
+export function setThemePreference(wanted: ThemePref): void {
+  const pref: ThemePref = OFFERED_THEME_PREFS.includes(wanted) ? wanted : DEFAULT_THEME_PREF;
   document.cookie = `${THEME_COOKIE}=${pref}; Path=/; Max-Age=${ONE_YEAR_S}; SameSite=Lax`;
   const d = document.documentElement;
   const dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
