@@ -29,6 +29,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
 import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
+import { directUpload } from "./lib/direct-upload.mjs";
 import { verificationJobs } from "./lib/verification-job.mjs";
 
 const PORT = process.argv[2] ?? "3098";
@@ -50,8 +51,8 @@ const check = (label, ok, detail = "") => {
 async function api(method, path, body, auth, extra = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { ...(body === undefined || body instanceof FormData ? {} : { "content-type": "application/json" }), ...(auth?.headers ?? {}), ...(extra.headers ?? {}) },
-    body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
+    headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...(auth?.headers ?? {}), ...(extra.headers ?? {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: res.status, headers: res.headers, body: await res.json().catch(() => ({})) };
 }
@@ -63,8 +64,10 @@ const userA = await devSession("a", { script: "proposal-export-check" });
 const userB = await devSession("b", { script: "proposal-export-check" });
 // H5: the project routes answer members only — this check's accounts are made
 // members of the projects it works on (service role, like project-member-add),
-// and exactly those rows are removed again at cleanup.
-const memberships = [await grantProjectMembership(userA.userId, [STAND_IN], { script: "proposal-export-check" }), await grantProjectMembership(userB.userId, [STAND_IN], { script: "proposal-export-check" })];
+// and exactly those rows are removed again at cleanup. Only A: on a firm
+// project every member is a member of the firm (K2 persona invariant), and B
+// is this check's outsider — a member of neither.
+const memberships = [await grantProjectMembership(userA.userId, [STAND_IN], { script: "proposal-export-check" })];
 check("two dev sessions", !!userA.token && !!userB.token);
 
 const { data: prior } = await sb.from("projects").select("firm_id, display_name").eq("id", STAND_IN).single();
@@ -82,14 +85,12 @@ try {
   check("branding: anonymous → 401, non-member → 403", b401.status === 401 && b403.status === 403, `${b401.status} ${b403.status}`);
   const bp = await api("PATCH", `/api/firms/${F}/branding`, { display_name: BRAND, terms_text: "Valid for 30 days.\nPayment: 40% on order, 50% on completion, 10% on handover." }, userA);
   check("PATCH branding → brand + terms", bp.status === 200 && bp.body.branding.brand === BRAND && !!bp.body.branding.terms_text, `${bp.status} ${bp.body.error ?? ""}`);
-  const fd = new FormData();
-  fd.append("logo", new Blob([PNG], { type: "image/png" }), "logo.png");
-  const lg = await api("POST", `/api/firms/${F}/branding`, fd, userA);
+  // H9: the logo goes straight to Storage; the branding route completes the path.
+  const lg = await directUpload(BASE, userA.headers, { kind: "logo", firm_id: F, bytes: PNG, type: "image/png", filename: "logo.png" }, `/api/firms/${F}/branding`);
   check("POST logo → stored, public URL returned", lg.status === 201 && typeof lg.body.branding?.logo_url === "string", `${lg.status} ${lg.body.error ?? ""}`);
   if (lg.body.branding?.logo_url) created.logo = new URL(lg.body.branding.logo_url).pathname.split("/plan-uploads/")[1];
-  const bad = new FormData();
-  bad.append("logo", new Blob([Buffer.from("not an image")], { type: "text/plain" }), "x.txt");
-  check("a non-image logo → 422", (await api("POST", `/api/firms/${F}/branding`, bad, userA)).status === 422);
+  const bad = await directUpload(BASE, userA.headers, { kind: "logo", firm_id: F, bytes: Buffer.from("not an image"), type: "text/plain", filename: "x.txt" }, `/api/firms/${F}/branding`);
+  check("a non-image logo → 415 unsupported_type, before any byte moves", bad.status === 415 && bad.body.code === "unsupported_type" && !bad.path, `${bad.status} ${bad.body.code}`);
 
   console.log("\n2. the reference-basis gate — refusal path");
   const assign = await api("PATCH", `/api/projects/${STAND_IN}`, { firm_id: F, display_name: NAME }, userA);
@@ -122,7 +123,7 @@ try {
   console.log("\n3. acceptance — a stated choice, recorded");
   const boqId = rb.body.boq.id;
   const a403 = await api("POST", `/api/projects/${STAND_IN}/reference-basis`, { boq_id: boqId }, userB);
-  check("a non-member cannot accept → 403", a403.status === 403 && a403.body.code === "not_a_member", `${a403.status}`);
+  check("a non-member cannot accept → 403", a403.status === 403 && a403.body.code === "not_a_project_member", `${a403.status} ${a403.body.code}`);
   const acc = await api("POST", `/api/projects/${STAND_IN}/reference-basis`, { boq_id: boqId, note: "L4 check — client agreed to market pricing" }, userA);
   check("the member accepts → 201, an event for this revision", acc.status === 201 && acc.body.acceptance?.boq_id === boqId && acc.body.acceptance?.reference_lines === rb.body.boq.basis.reference_lines, `${acc.status} ${acc.body.error ?? ""}`);
   const rb2 = await api("GET", `/api/projects/${STAND_IN}/reference-basis`, undefined, userA);

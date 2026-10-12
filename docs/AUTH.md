@@ -92,6 +92,7 @@ read:
 | --- | --- |
 | `/auth/callback` (route handler) | the magic link lands here before any session exists |
 | `/api/health` | liveness for uptime checks — anonymous callers get env *presence* only; the key fingerprints need a session |
+| `/api/cron/uploads-sweep` | H9: the daily orphan-upload sweep, called by Vercel Cron — authenticated by its own `Authorization: Bearer $CRON_SECRET` (503 without the secret, 401 with a wrong one), not a session |
 | pages `/`, `/rennovaite`, `/auth`, `/privacy`, `/terms` | the landing surfaces, sign-in, the legal pages the footer links |
 | server actions `sign-in-with-email`, `sign-out` | getting and ending a session |
 

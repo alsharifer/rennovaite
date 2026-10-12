@@ -11,6 +11,7 @@ import { generateRenderPack } from "@/lib/documents/render-pack-pdf";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { projectAccess } from "@/lib/projects/http";
+import { fileResponse } from "@/lib/documents/file-response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,14 +64,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ ...summary, readiness, bytes: pdf.byteLength });
     }
     await recordPilotEvent(sb, parsed.data, "pack_exported", { document: "render_pack", pages: summary.pages.length, gate: summary.gate.map((g) => g.outcome) }, { actor: await packJobActor(request) });
-    return new NextResponse(new Uint8Array(pdf), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="render-pack-${parsed.data.slice(0, 8)}.pdf"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    // H9: over ~4 MB a PDF cannot be a function response — a signed download instead.
+    return fileResponse(sb, new Uint8Array(pdf), { filename: `render-pack-${parsed.data.slice(0, 8)}.pdf`, contentType: "application/pdf", projectId: parsed.data });
   } catch (err) {
     console.error("[api/render-pack] error", err);
     return NextResponse.json(

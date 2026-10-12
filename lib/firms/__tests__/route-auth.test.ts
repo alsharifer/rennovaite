@@ -43,7 +43,7 @@ const CALLER_TAKING = [
   // U4
   "listEntryHistory", "recordApproval",
   // L4
-  "getBranding", "updateBranding", "setLogo", "acceptReferenceBasis",
+  "getBranding", "updateBranding", "setLogoPath", "acceptReferenceBasis",
 ];
 
 describe("every firm route resolves the caller and passes it to the store", () => {
@@ -175,7 +175,7 @@ describe("H1: every route outside the public allowlist requires a signed-in call
       expect(reason.length, file).toBeGreaterThan(10);
     }
     // The callback is the only way to obtain a session, health the only probe.
-    expect(Object.keys(PUBLIC_ROUTE_FILES).sort()).toEqual(["app/api/health/route.ts", "app/auth/callback/route.ts"]);
+    expect(Object.keys(PUBLIC_ROUTE_FILES).sort()).toEqual(["app/api/cron/uploads-sweep/route.ts", "app/api/health/route.ts", "app/auth/callback/route.ts"]);
   });
 
   it("scans every API route file", () => {
@@ -250,6 +250,11 @@ describe("H1: every server action outside the public allowlist requires a signed
 
 const PROJECT_ROUTES = GUARDED_ROUTES.filter((f) => !(f in NON_PROJECT_ROUTE_FILES));
 const CREATES_PROJECT = new Set(["app/api/upload/route.ts", "app/api/draw-plan/route.ts"]);
+// H9: routes that take a pending upload authorize INSIDE signUpload / finishUpload
+// (lib/uploads/server.ts authorizeScope → authorizeProject / requireFirm, before
+// any storage read or signature — asserted below). They reach one of those.
+const UPLOAD_ROUTES = new Set(["app/api/uploads/sign/route.ts", "app/api/uploads/complete/route.ts", "app/api/upload/route.ts", "app/api/project-asset/route.ts", "app/api/room-photo/route.ts"]);
+const UPLOAD_ENTRY = /await (finishUpload|signUpload)\(/;
 const PRE_CHECK_OK = /^(getCaller\(|(?:\w+\.)?params\b|projectIdOf\(|request\.(json|formData)\(|firmDenied\()/;
 
 describe("H5: every project-scoped route requires membership of the project it touches", () => {
@@ -270,8 +275,9 @@ describe("H5: every project-scoped route requires membership of the project it t
   it.each(PROJECT_ROUTES)("%s", (file) => {
     const src = readFileSync(path.join(ROOT, file), "utf8");
     for (const h of exportedFunctions(src, HTTP_METHODS)) {
-      const idx = [h.body.indexOf("await projectAccess("), CREATES_PROJECT.has(file) ? h.body.indexOf("await addProjectMember(") : -1].filter((i) => i >= 0);
-      expect(idx.length, `${h.name} reaches projectAccess${CREATES_PROJECT.has(file) ? " or addProjectMember" : ""}`).toBeGreaterThan(0);
+      const upload = UPLOAD_ROUTES.has(file) ? (UPLOAD_ENTRY.exec(h.body)?.index ?? -1) : -1;
+      const idx = [h.body.indexOf("await projectAccess("), CREATES_PROJECT.has(file) ? h.body.indexOf("await addProjectMember(") : -1, upload].filter((i) => i >= 0);
+      expect(idx.length, `${h.name} reaches projectAccess${CREATES_PROJECT.has(file) ? " or addProjectMember" : ""}${UPLOAD_ROUTES.has(file) ? " or finishUpload / signUpload" : ""}`).toBeGreaterThan(0);
       const first = Math.min(...idx);
       // The addProjectMember path follows the project INSERT by design; the rule is for the check.
       if (h.body.indexOf("await projectAccess(") === first) {
@@ -279,6 +285,19 @@ describe("H5: every project-scoped route requires membership of the project it t
         expect(before, `${h.name}: nothing but caller, params and body awaited before the project check`).toEqual([]);
       }
     }
+  });
+
+  it("H9: signUpload and completeUpload authorize the scope before any storage call", () => {
+    const src = readFileSync(path.join(ROOT, "lib/uploads/server.ts"), "utf8");
+    const sign = src.slice(src.indexOf("export async function signUpload"));
+    expect(sign.indexOf("await authorizeScope(")).toBeGreaterThan(-1);
+    expect(sign.indexOf("await authorizeScope(")).toBeLessThan(sign.indexOf("createSignedUploadUrl("));
+    const complete = src.slice(src.indexOf("export async function completeUpload"));
+    expect(complete.indexOf("ref.callerId !== caller.id")).toBeGreaterThan(-1);
+    expect(complete.indexOf("await authorizeScope(")).toBeLessThan(complete.indexOf(".download("));
+    const scope = src.slice(src.indexOf("async function authorizeScope"));
+    expect(scope).toContain("authorizeProject(db, caller, { project_id: scopeId })");
+    expect(scope).toContain("requireFirm(db, scopeId, caller)");
   });
 
   it("the store's own contract: 401, then 404 for a missing id, then 403 for a non-member", () => {

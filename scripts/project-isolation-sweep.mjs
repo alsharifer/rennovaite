@@ -42,7 +42,8 @@ const { url, key } = resolveTarget({ script: "project-isolation-sweep", writes: 
 const sb = createClient(url, key, { auth: { persistSession: false } });
 
 // Mirrors lib/auth/access.ts — literal, so the sweep does not trust the list it checks.
-const PUBLIC = new Set(["app/api/health/route.ts"]);
+// H9: the cron sweep is on the allowlist too (its own CRON_SECRET; not a project route).
+const PUBLIC = new Set(["app/api/health/route.ts", "app/api/cron/uploads-sweep/route.ts"]);
 const NON_PROJECT = (f) => f.startsWith("app/api/firms/") || f === "app/api/rate-vocabulary/route.ts";
 const CREATES = new Set(["app/api/upload/route.ts|POST", "app/api/draw-plan/route.ts|POST"]);
 
@@ -53,14 +54,10 @@ const check = (label, ok, detail = "") => {
   out.push(`${ok ? "  ok  " : "  FAIL"}  ${label}${detail ? `  — ${detail}` : ""}`);
 };
 
-async function call(who, { method, path: p, body, form }) {
+async function call(who, { method, path: p, body }) {
   const headers = { ...who.headers };
   let payload;
-  if (form) {
-    const fd = new FormData();
-    for (const [k, v] of Object.entries(form)) fd.append(k, v);
-    payload = fd;
-  } else if (body !== undefined) {
+  if (body !== undefined) {
     headers["content-type"] = "application/json";
     payload = JSON.stringify(body);
   }
@@ -71,7 +68,21 @@ async function call(who, { method, path: p, body, form }) {
   return { status: res.status, body: json, text };
 }
 
-const PNG = new Blob([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64")], { type: "image/png" });
+/**
+ * H9: a file reaches a project only as a direct upload — sign, PUT straight to
+ * Storage, then the route completes the path. Returns the pending path.
+ */
+async function upload(who, { kind, project_id, asset_kind }) {
+  const sign = await call(who, { method: "POST", path: "/api/uploads/sign", body: { kind, project_id, size: PNG_BYTES.byteLength, type: "image/png", filename: "seed.png", asset_kind } });
+  if (sign.status !== 200) throw new Error(`sign ${kind}: ${sign.status} ${sign.text.slice(0, 160)}`);
+  const put = await fetch(sign.body.signedUrl, { method: "PUT", headers: { "content-type": "image/png", "x-upsert": "false" }, body: PNG_BYTES });
+  if (!put.ok) throw new Error(`PUT ${kind}: ${put.status}`);
+  return sign.body.path;
+}
+/** A pending path the intruder could WRITE (their own signer id) naming a project that is not theirs. */
+const forged = (kind, P, uid) => `pending/${kind}/${P}/${uid}/${randomUUID()}.png`;
+
+const PNG_BYTES = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
 const sq = (x, y, s = 0.3) => [[x, y], [x + s, y], [x + s, y + s], [x, y + s]];
 
 // --- templates: one per project-scoped handler ------------------------------------
@@ -114,7 +125,7 @@ const T = {
   "app/api/plan-openings/route.ts|PATCH": (o) => ({ method: "PATCH", path: "/api/plan-openings", body: { id: o.OP, width_mm: 900 } }),
   "app/api/plan-openings/route.ts|DELETE": (o) => ({ method: "DELETE", path: `/api/plan-openings?id=${o.OP}` }),
   "app/api/plan-zones/route.ts|PATCH": (o) => ({ method: "PATCH", path: "/api/plan-zones", body: { id: o.R, level_mm: 150 } }),
-  "app/api/project-asset/route.ts|POST": (o) => ({ method: "POST", path: "/api/project-asset", form: { project_id: o.P, kind: "photo", file: new File([PNG], "iso.png", { type: "image/png" }) } }),
+  "app/api/project-asset/route.ts|POST": (o, m) => ({ method: "POST", path: "/api/project-asset", body: { path: forged("project_asset", o.P, m.UID), kind: "photo" } }),
   "app/api/project-asset/route.ts|PATCH": (o) => ({ method: "PATCH", path: "/api/project-asset", body: { asset_id: o.AS, room_id: o.R } }),
   "app/api/project-brief/route.ts|GET": (o) => ({ method: "GET", path: `/api/project-brief?project_id=${o.P}` }),
   "app/api/project-brief/route.ts|POST": (o) => ({ method: "POST", path: "/api/project-brief", body: { project_id: o.P, answers: {} } }),
@@ -145,8 +156,11 @@ const T = {
   "app/api/render/scene/route.ts|GET": (o) => ({ method: "GET", path: `/api/render/scene?project_id=${o.P}` }),
   "app/api/render/scene/route.ts|POST": (o) => ({ method: "POST", path: "/api/render/scene", body: { project_id: o.P, camera_id: "zone:iso", view: "day", cache_only: true } }),
   "app/api/render/status/route.ts|GET": (o) => ({ method: "GET", path: `/api/render/status?prediction_id=${o.PRED}` }),
-  "app/api/room-photo/route.ts|POST": (o) => ({ method: "POST", path: "/api/room-photo", form: { room_id: o.R, file: new File([PNG], "iso.png", { type: "image/png" }) } }),
+  "app/api/room-photo/route.ts|POST": (o, m) => ({ method: "POST", path: "/api/room-photo", body: { path: forged("room_photo", o.P, m.UID), room_id: o.R } }),
   "app/api/style-choice/route.ts|POST": (o) => ({ method: "POST", path: "/api/style-choice", body: { project_id: o.P, style_key: "desert-modern" } }),
+  // H9: signing for, or completing into, someone else's project.
+  "app/api/uploads/sign/route.ts|POST": (o) => ({ method: "POST", path: "/api/uploads/sign", body: { kind: "project_asset", project_id: o.P, size: 68, type: "image/png", filename: "iso.png", asset_kind: "photo" } }),
+  "app/api/uploads/complete/route.ts|POST": (o, m) => ({ method: "POST", path: "/api/uploads/complete", body: { path: forged("project_asset", o.P, m.UID), asset_kind: "photo" } }),
   "app/api/update-plan/route.ts|POST": (o) => ({ method: "POST", path: "/api/update-plan", body: { plan_id: o.PL, rooms: [] } }),
   "app/api/vendor-options/route.ts|POST": (o) => ({ method: "POST", path: "/api/vendor-options", body: { boq_id: o.BQ } }),
   "app/api/vendor-selections/route.ts|POST": (o) => ({ method: "POST", path: "/api/vendor-selections", body: { project_id: o.P, boq_id: o.BQ, boq_line_id: "x", sku_id: randomUUID() } }),
@@ -162,6 +176,8 @@ const MIXED = [
   ["moodboard: own project + owner's asset", (o, m) => ({ method: "POST", path: "/api/moodboard", body: { kind: "asset", project_id: m.P, asset_id: o.AS } })],
   ["project-asset: owner's asset → own room", (o, m) => ({ method: "PATCH", path: "/api/project-asset", body: { asset_id: o.AS, room_id: m.R } })],
   ["project-asset: own asset → owner's room", (o, m) => ({ method: "PATCH", path: "/api/project-asset", body: { asset_id: m.AS, room_id: o.R } })],
+  ["room-photo: own upload + owner's room", (o, m) => ({ method: "POST", path: "/api/uploads/complete", body: { path: m.UP_RP, room_id: o.R } })],
+  ["project-asset: own photo upload + owner's room", (o, m) => ({ method: "POST", path: "/api/uploads/complete", body: { path: m.UP_AS, asset_kind: "photo", room_id: o.R } })],
   ["vendor-selections: own project + owner's BoQ", (o, m) => ({ method: "POST", path: "/api/vendor-selections", body: { project_id: m.P, boq_id: o.BQ, boq_line_id: "x", sku_id: randomUUID() } })],
   ["boq-corrections: own project + owner's BoQ", (o, m) => ({ method: "POST", path: "/api/boq-corrections", body: { project_id: m.P, boq_id: o.BQ, line_description: "x", correction_type: "rate" } })],
   ["plan-elements: own plan + owner's room", (o, m) => ({ method: "POST", path: "/api/plan-elements", body: { plan_id: m.PL, room_id: o.R, kind: "boundary_wall", polyline: [[0, 0], [0.3, 0]] } })],
@@ -186,7 +202,7 @@ async function makeProject(who, name) {
   const op = await call(who, { method: "POST", path: "/api/plan-openings", body: { plan_id: PL, kind: "door", position: [0.3, 0.1] } });
   const cx = await call(who, { method: "POST", path: "/api/plan-context", body: { plan_id: PL, kind: "boundary_wall", polygon: sq(0, 0.95, 0.04) } });
   const mb = await call(who, { method: "POST", path: "/api/moodboard", body: { kind: "style", project_id: P, style_key: "scandi-arabic", style_room: "living" } });
-  const as = await call(who, { method: "POST", path: "/api/project-asset", form: { project_id: P, kind: "photo", file: new File([PNG], "seed.png", { type: "image/png" }) } });
+  const as = await call(who, { method: "POST", path: "/api/project-asset", body: { path: await upload(who, { kind: "project_asset", project_id: P, asset_kind: "photo" }), kind: "photo", filename: "seed.png" } });
   const pick = (r, ...keys) => { for (const k of keys) { const v = k.split(".").reduce((x, y) => x?.[y], r.body); if (v) return v; } throw new Error(`seed ${keys[0]}: ${r.status} ${r.text.slice(0, 160)}`); };
   const ids = {
     P, PL, R,
@@ -196,6 +212,10 @@ async function makeProject(who, name) {
     CX: pick(cx, "context.id", "id"),
     MB: pick(mb, "item.id", "items.0.id"),
     AS: pick(as, "asset_id", "asset.id", "id"),
+    UID: who.userId,
+    // Uploaded but not completed: the mixed-reference attacks complete them against the other project's room.
+    UP_RP: await upload(who, { kind: "room_photo", project_id: P }),
+    UP_AS: await upload(who, { kind: "project_asset", project_id: P, asset_kind: "photo" }),
   };
   // No route creates these cheaply — a render row, a BoQ revision and a pack job, as the service role.
   ids.PRED = `iso-${randomUUID()}`;
@@ -317,6 +337,11 @@ try {
   for (const ids of [o, m].filter(Boolean)) {
     const { data: objs } = await sb.storage.from("plan-uploads").list(`${ids.P}/assets`);
     if (objs?.length) await sb.storage.from("plan-uploads").remove(objs.map((x) => `${ids.P}/assets/${x.name}`));
+    for (const kind of ["project_asset", "room_photo"]) {
+      const dir = `pending/${kind}/${ids.P}/${ids.UID}`;
+      const { data: pend } = await sb.storage.from("uploads").list(dir);
+      if (pend?.length) await sb.storage.from("uploads").remove(pend.map((x) => `${dir}/${x.name}`));
+    }
     await sb.from("pilot_events").delete().eq("project_id", ids.P);
     await sb.from("pack_exports").delete().eq("project_id", ids.P);
     for (const t of ["renders", "boqs", "moodboard_items", "project_assets", "plan_fixtures", "feedback_events", "boq_corrections"]) await sb.from(t).delete().eq("project_id", ids.P);

@@ -37,6 +37,9 @@ const ROOT = process.cwd();
 // Mirrors lib/auth/access.ts. Literal on purpose: a sweep that imported the
 // allowlist it checks would pass whatever the allowlist became.
 const PUBLIC_ROUTES = new Set(["app/api/health/route.ts", "app/auth/callback/route.ts"]);
+// H9: on the allowlist (no session) but guarded by its own CRON_SECRET bearer —
+// anonymous is 401 (or 503 where the secret is not configured), never 200.
+const SECRET_ROUTES = new Set(["app/api/cron/uploads-sweep/route.ts"]);
 const PUBLIC_PAGES = new Set(["/", "/rennovaite", "/auth", "/privacy", "/terms"]);
 
 function walk(dir, name, out = []) {
@@ -84,7 +87,7 @@ for (const file of routeFiles) {
   for (const m of src.matchAll(/^export async function (GET|POST|PUT|PATCH|DELETE)\(/gm)) handlers.push({ file, method: m[1] });
 }
 const apiFiles = routeFiles.filter((f) => f.startsWith("app/api/"));
-console.log(`census: ${apiFiles.length} API route files, ${handlers.length} handlers (incl. the auth callback); ${handlers.filter((h) => !PUBLIC_ROUTES.has(h.file)).length} must refuse an anonymous caller`);
+console.log(`census: ${apiFiles.length} API route files, ${handlers.length} handlers (incl. the auth callback); ${handlers.filter((h) => !PUBLIC_ROUTES.has(h.file) && !SECRET_ROUTES.has(h.file)).length} must refuse an anonymous caller`);
 
 // --- 1 + 2. every API method, anonymous and forged ---------------------------------
 console.log("\n1–2. API handlers: anonymous, then a forged Bearer");
@@ -102,6 +105,11 @@ for (const h of handlers) {
     check(`${h.method} ${fill(h.file)} (public) answers anonymously`, r.status === 200, `${r.status}`);
     continue;
   }
+  if (SECRET_ROUTES.has(h.file)) {
+    const forged = await call(h.method, url, { authorization: FORGED[0] });
+    check(`${h.method} ${fill(h.file)} (cron secret) refuses anonymous + forged`, [401, 503].includes(r.status) && [401, 503].includes(forged.status), `${r.status} / ${forged.status}`);
+    continue;
+  }
   const ok = r.status === 401 && r.body?.code === "unauthenticated";
   if (ok) anon401++;
   check(`${h.method} ${h.file.replace(/^app/, "").replace(/\/route\.ts$/, "")} anonymous → 401`, ok, ok ? "" : `${r.status} ${JSON.stringify(r.body)?.slice(0, 120)}`);
@@ -110,7 +118,7 @@ for (const h of handlers) {
     if (f.status !== 401) check(`${h.method} ${h.file} with a forged token → 401`, false, `${f.status}`);
   }
 }
-check(`every off-allowlist API handler refused anonymously (${anon401})`, anon401 === handlers.filter((h) => !PUBLIC_ROUTES.has(h.file)).length);
+check(`every off-allowlist API handler refused anonymously (${anon401})`, anon401 === handlers.filter((h) => !PUBLIC_ROUTES.has(h.file) && !SECRET_ROUTES.has(h.file)).length);
 check("forged / expired Bearer tokens → 401 on every off-allowlist handler", true);
 
 // Health: public, but no key fingerprints for a stranger.

@@ -308,6 +308,12 @@
       "version": "20260101005100",
       "name": "rate_book_integrity",
       "sha256": "78d218f13e18d3b62a0e6bec5c418dddc378f83a7696eb80b4e98407f878084c"
+    },
+    {
+      "legacy": null,
+      "version": "20260101005200",
+      "name": "upload_bucket",
+      "sha256": "e5ff0d27acc7b07165a9cceeb6027515a2676878d9e733043e7b1772f9a3d534"
     }
   ]
 }

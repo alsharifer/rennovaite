@@ -8,6 +8,7 @@ import { renderRevisionDiffPdf } from "@/lib/documents/revision-diff-pdf";
 import { findWithheldIdentities, loadWithheldNames } from "@/lib/identity/curation";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { projectAccess } from "@/lib/projects/http";
+import { fileResponse } from "@/lib/documents/file-response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,14 +64,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "The document would print a withheld identity; refused.", code: "identity_leak" }, { status: 500 });
     }
     if (q.data.format === "pages") return NextResponse.json({ success: true, pages, diff: result.diff });
-    return new NextResponse(new Uint8Array(pdf), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="boq-diff-${id.slice(0, 8)}-${q.data.from.slice(0, 8)}-${q.data.to.slice(0, 8)}.pdf"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    // H9: over ~4 MB a PDF cannot be a function response — a signed download instead.
+    return fileResponse(sb, new Uint8Array(pdf), { filename: `boq-diff-${id.slice(0, 8)}-${q.data.from.slice(0, 8)}-${q.data.to.slice(0, 8)}.pdf`, contentType: "application/pdf", projectId: id });
   } catch (e) {
     if (e instanceof RevisionNotFound) return NextResponse.json({ error: e.message, code: "revision_not_found" }, { status: 404 });
     console.error("[api/boq-diff]", e);

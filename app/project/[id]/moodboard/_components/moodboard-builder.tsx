@@ -17,6 +17,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { AssetPicker } from "@/components/assets/AssetPicker";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
+import { uploadFile } from "@/lib/uploads/client";
 import type { AssetLite } from "@/lib/assets/types";
 import {
   STYLE_ROOM_LABEL,
@@ -169,18 +170,13 @@ export function MoodboardBuilder({
         return;
       }
 
-      const form = new FormData();
-      form.append("file", toUpload);
-      form.append("project_id", projectId);
-      form.append("kind", "reference_image");
-      form.append("source", "moodboard");
-      const res = await fetch("/api/project-asset", { method: "POST", body: form });
-      const json = (await res.json().catch(() => null)) as
-        | { asset_id?: string; public_url?: string; error?: string }
-        | null;
-      if (!res.ok || !json?.asset_id) {
-        throw new Error(json?.error ?? "Upload failed.");
-      }
+      // H9: straight to Storage, then verified + registered (lib/uploads/client.ts).
+      const json = await uploadFile<{ asset_id?: string; public_url?: string }>(
+        toUpload,
+        { kind: "project_asset", projectId, assetKind: "reference_image" },
+        { asset_kind: "reference_image", source: "moodboard", filename: file.name },
+      );
+      if (!json?.asset_id) throw new Error("The upload didn't complete. Please try again.");
       setAssets((cur) => [
         {
           id: json.asset_id!,

@@ -23,6 +23,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
+import { directUpload } from "./lib/direct-upload.mjs";
 import { devSession, grantProjectMembership } from "./lib/dev-auth.mjs";
 import { readXlsx, writeXlsx } from "../lib/quotes/xlsx.ts";
 
@@ -48,12 +49,11 @@ const api = async (method, p, body, auth = me, raw = false) => {
   const res = await fetch(`${BASE}${p}`, { method, headers: { ...(raw ? {} : { "content-type": "application/json" }), ...(auth?.headers ?? {}) }, body: raw ? body : body === undefined ? undefined : JSON.stringify(body) });
   return { status: res.status, headers: res.headers, body: raw ? await res.arrayBuffer() : await res.json().catch(() => ({})) };
 };
+// H9: sign → PUT straight to Storage → the quotes route completes the path.
 const upload = async (firmId, bytes, meta, auth = me) => {
-  const fd = new FormData();
-  fd.append("file", new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), meta.filename ?? "quote.xlsx");
-  for (const [k, v] of Object.entries(meta)) if (k !== "filename") fd.append(k, String(v));
-  const res = await fetch(`${BASE}/api/firms/${firmId}/quotes`, { method: "POST", headers: auth?.headers ?? {}, body: fd });
-  return { status: res.status, body: await res.json().catch(() => ({})) };
+  const { filename = "quote.xlsx", ...terms } = meta;
+  const r = await directUpload(BASE, auth?.headers ?? {}, { kind: "quote", firm_id: firmId, bytes: new Uint8Array(bytes), type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename }, `/api/firms/${firmId}/quotes`, terms);
+  return { status: r.status, body: r.body };
 };
 
 const { data: standIn } = await sb.from("projects").select("firm_id").eq("id", STAND_IN).single();

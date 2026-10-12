@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { UploadFailed, uploadDirect } from "@/lib/uploads/client";
 
 // L4 — what this firm's client sees on a proposal: the display name (defaults
 // to the registered name), a logo, and a free-text terms block. Every request
@@ -70,9 +71,15 @@ export function BrandingPanel({ firmId }: { firmId: string }) {
     setMsg(null);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("logo", f);
-      const res = await fetch(`/api/firms/${firmId}/branding`, { method: "POST", body: fd });
+      // H9: the logo goes straight to Storage on a URL signed for THIS firm.
+      let path: string;
+      try {
+        path = (await uploadDirect(f, { kind: "logo", firmId })).path;
+      } catch (err) {
+        setError(err instanceof UploadFailed ? err.message : "The upload didn't complete. Please try again.");
+        return;
+      }
+      const res = await fetch(`/api/firms/${firmId}/branding`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path }) });
       const body = (await res.json().catch(() => ({}))) as { branding?: Branding } & ApiError;
       if (!res.ok || !body.branding) {
         setError(body.error ?? `The upload failed (${res.status}).`);
