@@ -145,5 +145,10 @@ export default async function ViewerPage({
       ? { steps: Object.fromEntries(FIRM_STEPS.map((x) => [x.key, { label: x.label, href: x.href(projectId) }])), fallback: "scope" }
       : { steps: Object.fromEntries(OWNER_STEPS.map((x) => [x.key, { label: x.label, href: ownerStepHref(x.key, projectId, flags) }])), fallback: "renders" };
 
-  return <ViewerLoader scene={scene} data={data} finishes={finishes} back={back} />;
+  return (
+    <>
+      <h1 className="sr-only">3D view</h1>
+      <ViewerLoader scene={scene} data={data} finishes={finishes} back={back} />
+    </>
+  );
 }
