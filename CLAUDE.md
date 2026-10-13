@@ -513,6 +513,7 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
 - **Specification options**: three equal cells (`min-[1100px]:grid-cols-3`) down to 1100 px, then one column (`data-spec-options`; `scripts/k10-spec-grid-shots.mjs` measures 1440 / 1280 / 1100 / 1099 / 390 read-only on the dev Demo villa).
 - **Client documents hide zero-value sections** (`clientSections` in `lib/documents/proposal.ts`, also the 08 Proposal screen's preview): a section totals 0 only when every line is still to be priced — those lines stay named under Exclusions & to be priced and in the total's sentence; the printed section totals still add up to the subtotal. The BoQ PDF (internal) is unchanged.
 - **Project files on the Overview body grid** (`components/blueprint/hub/HubFiles.tsx`, client): the screens' `files` slot puts it in the main column (owner: under Your design; firm hub: under Documents) instead of a full-width block below the page — the first 5 (`FILES_SHOWN`) and "Show all N" / "Show fewer". Kept on the Overview, not moved to 06 Documents: the owner's uploads are the project's, not the tender's. Live: `scripts/k10-hub-files-shots.mjs`.
+- **Duplicate-component notice, owner copy** (`components/blueprint/boq/Notices.tsx`): the owner reads "N items may be counted twice — we'll confirm before tender" with the item names only; the firm keeps "N components priced twice" with the mechanism and the QS-ruling sentence. Engine resolution is in K_BACKLOG → K10.
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 

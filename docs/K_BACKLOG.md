@@ -4,6 +4,16 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## K10 (2026-10-13) — from the K8/K9 QA
+
+- **Duplicate components — engine resolution (K10 #10 left it out of scope).**
+  `findComponentDuplicates()` finds components charged by two mechanisms (an
+  R-xx line and an accessory selection, a joinery lump and its own line) and the
+  BoQ keeps BOTH; the owner now reads "N items may be counted twice — we'll
+  confirm before tender", the firm the mechanism. Deciding which line survives
+  (per component, recorded, regenerated) is an engine change with a pricing
+  consequence — it needs a QS ruling per pair before it is built.
+
 ## K9 (2026-10-13) — the K8 review's follow-ups
 
 Done: document fonts (Plex Sans / JetBrains Mono / EB Garamond, OFL), the
