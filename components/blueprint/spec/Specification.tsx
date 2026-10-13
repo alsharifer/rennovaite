@@ -205,7 +205,9 @@ export function Specification(props: {
               </div>
               {qty === undefined ? <p className="t-body-sm mt-2 text-bp-ink-secondary">Your plan produces no quantity for this item, so it carries no cost line — a choice here would price nothing.</p> : null}
 
-              <ul className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 min-[1400px]:grid-cols-3">
+              {/* K10 #7: three EQUAL cells (repeat(3, minmax(0, 1fr))) down to 1100 px, then one column —
+                  never the two-up that left the third option alone on its own row. */}
+              <ul className="mt-3 grid grid-cols-1 gap-3 min-[1100px]:grid-cols-3" data-spec-options>
                 {cells.map((c) => {
                   const on = c.id === selectedId;
                   return (
