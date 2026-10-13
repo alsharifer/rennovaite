@@ -210,12 +210,13 @@ export async function listRecentlyDeleted(db: SupabaseClient, caller: Caller): P
   if (me) throw new Error(`project_members read failed: ${me.message}`);
   const ids = ((m ?? []) as { project_id: string }[]).map((r) => r.project_id);
   if (ids.length === 0) return [];
-  const { data, error } = await db.from("projects").select("id, name, display_name, firm_id, created_by, deleted_at, deleted_by").in("id", ids).not("deleted_at", "is", null);
+  // `*`: draft_since arrives with 056. A swept intake draft (K11 #1) was never seen by anyone — not listed.
+  const { data, error } = await db.from("projects").select("*").in("id", ids).not("deleted_at", "is", null);
   if (error) {
     if (isMissingColumn(error)) return [];
     throw new Error(`projects read failed: ${error.message}`);
   }
-  const rows = (data ?? []) as ProjectRow[];
+  const rows = ((data ?? []) as (ProjectRow & { draft_since?: string | null })[]).filter((p) => !p.draft_since);
   const out: DeletedProject[] = [];
   for (const p of rows) {
     const admin = p.firm_id ? await isFirmAdmin(db, p.firm_id, caller.id) : false;
