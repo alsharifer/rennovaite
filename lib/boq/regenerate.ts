@@ -51,7 +51,10 @@ export async function regenerateAuthority(db: SupabaseClient, projectId: string,
   return { code: "not_a_project_member", reason: "Only the project's members can regenerate its BoQ." };
 }
 
-function planBlock(refusal: { status: number; body: Record<string, unknown> }, projectId: string): RegenerateBlock {
+/** K10 #11: the words when a revision EXISTS but its plan does not (a BoQ with no plan is not "nothing to price yet"). */
+export const PLAN_MISSING_REASON = "BoQ exists; the plan is missing.";
+
+function planBlock(refusal: { status: number; body: Record<string, unknown> }, projectId: string, hasBoq = false): RegenerateBlock {
   const code = String(refusal.body.code ?? "not_priceable") as RegenerateBlockCode;
   const toPlan = { label: "Open the plan", href: `/project/${projectId}/plan` };
   switch (code) {
@@ -60,7 +63,9 @@ function planBlock(refusal: { status: number; body: Record<string, unknown> }, p
       return { code, reason: `${n} room${n === 1 ? "" : "s"} on the plan overlap — they would double-count floor and wall area.`, fix: { label: "Fix overlaps on the plan", href: `/project/${projectId}/plan` } };
     }
     case "no_plan":
-      return { code, reason: "The project has no plan to price yet.", fix: { label: "Add a plan", href: `/project/${projectId}/plan` } };
+      return hasBoq
+        ? { code, reason: PLAN_MISSING_REASON, fix: { label: "Add the plan", href: `/project/${projectId}/plan` } }
+        : { code, reason: "The project has no plan to price yet.", fix: { label: "Add a plan", href: `/project/${projectId}/plan` } };
     case "no_area":
       return { code, reason: "The plan has no total area, so nothing can be measured.", fix: toPlan };
     case "no_rooms":
@@ -80,6 +85,6 @@ export async function regenerateReadiness(db: SupabaseClient, projectId: string,
     db.from("boqs").select("id, total_aed, created_at").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; total_aed: number; created_at: string }>(),
   ]);
   const previous = prev.data ? { id: prev.data.id, total_aed: Number(prev.data.total_aed), created_at: prev.data.created_at } : null;
-  const block = authority ?? (priceable.refusal ? planBlock(priceable.refusal, projectId) : null);
+  const block = authority ?? (priceable.refusal ? planBlock(priceable.refusal, projectId, previous !== null) : null);
   return { ok: block === null, block, previous };
 }

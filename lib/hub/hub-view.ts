@@ -107,7 +107,7 @@ export function nextFromRail(projectId: string, rail: Pick<RailContext, "persona
     } else if (s.key === "revisions") {
       title = /client/.test(reason) ? "Client approval outstanding" : "Firm approval outstanding";
       secondary = { label: "Open revision", href: `/project/${projectId}/boq/revisions` };
-    } else if (s.key === "boq_review") title = "BoQ out of date";
+    } else if (s.key === "boq_review") title = /^BoQ exists; the plan is missing/.test(reason) ? "The plan is missing" : "BoQ out of date";
     else if (s.key === "proposal") title = "Proposal locked";
     else if (s.key === "scope" || s.key === "plan") title = "Plan can't be priced yet";
     else if (s.key === "cost") title = st.state === "blocked" ? "Cost is blocked" : "Some items are not priced";

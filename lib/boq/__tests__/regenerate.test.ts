@@ -67,6 +67,15 @@ describe("regenerateReadiness", () => {
     expect((await regenerateReadiness(db.client, "p1", alice)).block?.code).toBe("no_plan");
   });
 
+  it("K10 #11: a BoQ with no plan says so — not 'no plan to price yet'", async () => {
+    db.tables.plans = [];
+    const withBoq = (await regenerateReadiness(db.client, "p1", alice)).block;
+    expect(withBoq).toMatchObject({ code: "no_plan", reason: "BoQ exists; the plan is missing.", fix: { label: "Add the plan", href: "/project/p1/plan" } });
+    db.tables.boqs = [];
+    const fresh = (await regenerateReadiness(db.client, "p1", alice)).block;
+    expect(fresh).toMatchObject({ code: "no_plan", reason: "The project has no plan to price yet.", fix: { label: "Add a plan" } });
+  });
+
   it("membership is decided before the plan: a non-member sees why they cannot, not a plan problem", async () => {
     db.tables.plans = [];
     expect((await regenerateReadiness(db.client, "p1", bob)).block?.code).toBe("not_a_project_member");
