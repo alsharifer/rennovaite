@@ -66,6 +66,18 @@ export interface HomeRow {
   /** The latest locked view's image, if any. */
   thumb: string | null;
   archived: boolean;
+  /** K10 (§6.12): may THIS caller delete it — with the reason the menu shows when not. */
+  deletable: { allowed: boolean; reason: string | null };
+}
+
+/** K10: a project in Recently deleted (lib/projects/lifecycle.ts listRecentlyDeleted). */
+export interface HomeDeleted {
+  id: string;
+  name: string;
+  deletedAt: string;
+  deletedBy: string | null;
+  purgeOn: string;
+  canDeleteNow: boolean;
 }
 
 export interface HomeActivity {
@@ -79,6 +91,8 @@ export interface HomeView {
   rows: HomeRow[];
   counts: { active: number; onHold: number; completed: number; archived: number };
   activity: HomeActivity[];
+  /** K10: Recently deleted — the caller's projects deleted in the last 30 days. */
+  deleted: HomeDeleted[];
 }
 
 /** The project's own status word (projects.status), when it says more than "draft". */

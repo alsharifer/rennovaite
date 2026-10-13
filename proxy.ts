@@ -87,15 +87,23 @@ export async function proxy(request: NextRequest) {
 
 const PROJECT_PAGE = /^\/project\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
 
-/** One indexed read of project_members with the service role. Fails closed. */
+/**
+ * One indexed read of project_members with the service role. Fails closed.
+ * K10 (055): joined to the project, so a DELETED project's pages 404 like a
+ * missing one. A database without 055 rejects the join filter (400) — then
+ * the plain membership read answers, as before 055.
+ */
 async function isProjectMember(supabaseUrl: string, projectId: string, userId: string): Promise<boolean> {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) return false;
-  try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/project_members?select=project_id&project_id=eq.${projectId}&user_id=eq.${userId}&limit=1`, {
+  const read = async (query: string) =>
+    fetch(`${supabaseUrl}/rest/v1/project_members?${query}&project_id=eq.${projectId}&user_id=eq.${userId}&limit=1`, {
       headers: { apikey: key, authorization: `Bearer ${key}` },
       cache: "no-store",
     });
+  try {
+    let res = await read("select=project_id,projects!inner(deleted_at)&projects.deleted_at=is.null");
+    if (res.status === 400) res = await read("select=project_id");
     if (!res.ok) return false;
     return ((await res.json()) as unknown[]).length > 0;
   } catch {

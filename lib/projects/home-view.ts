@@ -24,6 +24,7 @@ import { journeyFlagsFromEnv, ownerStepHref, FIRM_STEPS, type OwnerStepKey } fro
 import { loadProjectJourney } from "@/lib/journey-facts";
 import { loadProvenanceContext } from "@/lib/provenance/load";
 import { memberProjectIds } from "@/lib/projects/access";
+import { deletePermissionsFor, listRecentlyDeleted, type DeletePermission } from "@/lib/projects/lifecycle";
 
 import { homeNext, homeStage, shortDate, type HomeActivity, type HomeRow, type HomeView } from "./home";
 
@@ -35,7 +36,7 @@ async function safe<T>(fallback: T, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-type ProjectRow = { id: string; name: string | null; display_name: string | null; city: string | null; status: string | null; created_at: string; firm_id: string | null };
+type ProjectRow = { id: string; name: string | null; display_name: string | null; city: string | null; status: string | null; created_at: string; firm_id: string | null; created_by?: string | null };
 
 function scopeOf(rooms: { unroofed: boolean | null }[]): string | null {
   if (rooms.length === 0) return null;
@@ -45,7 +46,7 @@ function scopeOf(rooms: { unroofed: boolean | null }[]): string | null {
 
 const latestIso = (...xs: (string | null | undefined)[]) => xs.filter((x): x is string => !!x).reduce((a, b) => (a > b ? a : b), "");
 
-async function loadRow(db: SupabaseClient, p: ProjectRow, caller: Caller, firms: { id: string; name: string }[], archived: boolean): Promise<HomeRow> {
+async function loadRow(db: SupabaseClient, p: ProjectRow, caller: Caller, firms: { id: string; name: string }[], archived: boolean, deletable: DeletePermission): Promise<HomeRow> {
   const flags = journeyFlagsFromEnv();
   const [journey, boqs, plan, approved, render] = await Promise.all([
     loadProjectJourney(db, p.id, caller, firms),
@@ -80,6 +81,7 @@ async function loadRow(db: SupabaseClient, p: ProjectRow, caller: Caller, firms:
     updatedAt: latestIso(p.created_at, plan?.created_at, latest?.created_at, approved?.created_at, render?.created_at),
     thumb,
     archived,
+    deletable,
   };
 }
 
@@ -123,9 +125,12 @@ async function loadActivity(db: SupabaseClient, projects: ProjectRow[]): Promise
 export async function loadProjectsHome(db: SupabaseClient, caller: Caller): Promise<HomeView> {
   const [ids, firms] = await Promise.all([memberProjectIds(db, caller.id), safe([], () => listFirms(db, caller))]);
   const railFirms = firms.map((f) => ({ id: f.id, name: f.name }));
-  if (ids.length === 0) return { rows: [], counts: { active: 0, onHold: 0, completed: 0, archived: 0 }, activity: [] };
+  // K10: Recently deleted is the caller's too (memberProjectIds already leaves deleted projects out).
+  const deleted = await safe([], () => listRecentlyDeleted(db, caller));
+  if (ids.length === 0) return { rows: [], counts: { active: 0, onHold: 0, completed: 0, archived: 0 }, activity: [], deleted };
 
-  const { data } = await db.from("projects").select("id, name, display_name, city, status, created_at, firm_id").in("id", ids);
+  // `*`: created_by arrives with 055; a database without it still lists projects.
+  const { data } = await db.from("projects").select("*").in("id", ids);
   const projects = (data ?? []) as ProjectRow[];
   // Archived (migration 030) — read best-effort; archiving hides, never deletes.
   const archived = await safe(new Set<string>(), async () => {
@@ -133,7 +138,8 @@ export async function loadProjectsHome(db: SupabaseClient, caller: Caller): Prom
     return new Set(((a ?? []) as { id: string }[]).map((r) => r.id));
   });
 
-  const [rows, activity] = await Promise.all([Promise.all(projects.map((p) => loadRow(db, p, caller, railFirms, archived.has(p.id)))), loadActivity(db, projects.filter((p) => !archived.has(p.id)))]);
+  const perms = await deletePermissionsFor(db, caller, projects);
+  const [rows, activity] = await Promise.all([Promise.all(projects.map((p) => loadRow(db, p, caller, railFirms, archived.has(p.id), perms.get(p.id)!))), loadActivity(db, projects.filter((p) => !archived.has(p.id)))]);
   const live = rows.filter((r) => !r.archived);
   return {
     rows,
@@ -144,5 +150,6 @@ export async function loadProjectsHome(db: SupabaseClient, caller: Caller): Prom
       archived: rows.length - live.length,
     },
     activity,
+    deleted,
   };
 }

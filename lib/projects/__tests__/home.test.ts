@@ -50,7 +50,7 @@ describe("next", () => {
 });
 
 describe("tabs, sort, ages", () => {
-  const row = (id: string, stage: HomeRow["stage"], over: Partial<HomeRow> = {}): HomeRow => ({ id, name: id, scope: null, stage, rev: null, estimate: null, next: null, updatedAt: "2026-10-01T00:00:00Z", thumb: null, archived: false, ...over });
+  const row = (id: string, stage: HomeRow["stage"], over: Partial<HomeRow> = {}): HomeRow => ({ id, name: id, scope: null, stage, rev: null, estimate: null, next: null, updatedAt: "2026-10-01T00:00:00Z", thumb: null, archived: false, deletable: { allowed: true, reason: null }, ...over });
   const rows = [row("a", "plan"), row("b", "design"), row("c", "costing"), row("d", "approval"), row("e", "documents"), row("f", "in_progress"), row("g", "completed"), row("h", "on_hold")];
 
   it("counts per tab: Design takes Plan, Approval takes Documents, All takes everything", () => {

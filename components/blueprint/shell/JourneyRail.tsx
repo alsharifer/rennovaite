@@ -152,7 +152,7 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
           <span className="t-label-md flex h-8 w-8 shrink-0 items-center justify-center border border-bp-line-control text-bp-ink-primary">{initials}</span>
           <span className="bp-rail-x min-w-0">
             <span className="t-body-sm block truncate text-bp-ink-primary">{ctx.caller.email ?? "Signed in"}</span>
-            <span className="t-label-caps block text-bp-ink-tertiary">{firm ? "Firm member" : "Owner"}</span>
+            <span className="t-label-caps block text-bp-ink-tertiary">{firm ? (ctx.firm?.admin ? "Firm admin" : "Firm member") : "Owner"}</span>
           </span>
         </summary>
         <div className="bp-rail-x border-t border-bp-line-hairline bg-bp-surface-raised py-2">

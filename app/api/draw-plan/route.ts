@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { addProjectMember } from "@/lib/projects/access";
+import { recordProjectCreator } from "@/lib/projects/lifecycle";
 import { projectAccess } from "@/lib/projects/http";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -123,6 +124,8 @@ export async function POST(request: Request) {
     createdProjectId = project.id;
     // H5: creating a project makes the creator its member (rolled back with it).
     await addProjectMember(supabase as unknown as SupabaseClient, project.id, caller.id);
+    // K10 (055): the creator is who may delete an owner project.
+    await recordProjectCreator(supabase as unknown as SupabaseClient, project.id, caller.id);
 
     // parsed_json stays NULL — there is nothing parsed about this plan, and
     // writing a decorative object there would make an authored plan

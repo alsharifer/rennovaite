@@ -11,6 +11,10 @@
 // Next = the rail's first Attention / Blocked reason · updated) · the
 // estimate footnote · Recent activity (≤ 6 plain rows). No KPI tiles.
 //
+// K10 (§6.12): a trailing "⋯" on every row (Open · Rename · Archive · Delete
+// project…), "Recently deleted (N)" beside "Show archived" (?view=deleted —
+// Restore / Delete now), and the undo toast after a delete (?undo=<id>).
+//
 // Tabs, search, archived and sort live in the URL (?tab=&q=&archived=1&sort=)
 // so a link or a reload lands on the same view. Phone: a filter select + a
 // search toggle, a full-width Primary and two-line rows.
@@ -18,14 +22,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { formatAED, headlineSpokenText } from "@/lib/format/aed";
-import { HOME_TABS, STAGE_ICON, STAGE_LABEL, age, inTab, sortRows, tabCounts, type HomeRow, type HomeSort, type HomeTab, type HomeView } from "@/lib/projects/home";
+import { HOME_TABS, STAGE_ICON, STAGE_LABEL, age, inTab, sortRows, tabCounts, type HomeDeleted, type HomeRow, type HomeSort, type HomeTab, type HomeView } from "@/lib/projects/home";
 import { tierLabel } from "@/lib/provenance/tier-vocab";
 
 import { Button } from "../Button";
 import { Icon } from "../Icon";
+import { DeleteNowDialog, ProjectActionsMenu, UndoToast } from "../projects/ProjectActions";
 import { ProvenanceMark } from "../ProvenanceMark";
 import { StateBlock } from "../StateBlock";
 
@@ -96,6 +101,94 @@ function Next({ row, compact = false }: { row: HomeRow; compact?: boolean }) {
   );
 }
 
+const longDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dubai" });
+const longTime = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Dubai" });
+
+/** Recently deleted (77:2905): the 30-day rule, then each project with Restore / Delete now. */
+function RecentlyDeleted({ rows, now }: { rows: HomeDeleted[]; now: number }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [purging, setPurging] = useState<HomeDeleted | null>(null);
+  async function restore(id: string) {
+    setBusy(id);
+    const res = await fetch(`/api/projects/${id}/restore`, { method: "POST" }).catch(() => null);
+    setBusy(null);
+    if (!res?.ok) return setError(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? "Restore failed. Try again.");
+    router.refresh();
+  }
+  return (
+    <section aria-label="Recently deleted" className="mt-6" data-recently-deleted>
+      <p className="t-body-sm flex items-start gap-3 bg-bp-surface-sunken px-4 py-3.5 text-bp-ink-primary">
+        <Icon name="schedule" size={20} />
+        Deleted projects are hidden from everyone on them. Each is removed permanently 30 days after it was deleted — including uploaded drawings, photos and renders.
+      </p>
+      {error ? (
+        <p role="alert" className="surface-inverse t-body-sm mt-3 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink">
+          {error}
+        </p>
+      ) : null}
+      {rows.length === 0 ? (
+        <p className="t-body-sm mt-6 text-bp-ink-secondary">Nothing deleted in the last 30 days.</p>
+      ) : (
+        <div className="relative mt-6 overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse" aria-label="Recently deleted projects">
+            <thead>
+              <tr className="bg-bp-surface-sunken text-left">
+                <th scope="col" className="t-label-caps px-3 py-2.5 text-bp-ink-tertiary">PROJECT</th>
+                <th scope="col" className="t-label-caps px-2 py-2.5 text-bp-ink-tertiary">DELETED</th>
+                <th scope="col" className="t-label-caps px-2 py-2.5 text-bp-ink-tertiary">BY</th>
+                <th scope="col" className="t-label-caps px-2 py-2.5 text-bp-ink-tertiary">REMOVED PERMANENTLY</th>
+                <th scope="col" className="px-3 py-2.5">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const days = Math.max(0, Math.ceil((Date.parse(r.purgeOn) - now) / 86_400_000));
+                return (
+                  <tr key={r.id} className="border-b border-bp-line-hairline align-middle" data-deleted-project={r.id}>
+                    <td className="t-heading-sm px-3 py-3.5 text-bp-ink-primary">{r.name}</td>
+                    <td className="t-label-md whitespace-nowrap px-2 py-3.5 font-bp-mono text-bp-ink-secondary">
+                      {longDate(r.deletedAt)} · {longTime(r.deletedAt)}
+                    </td>
+                    <td className="t-body-sm px-2 py-3.5 text-bp-ink-secondary">{r.deletedBy ?? "—"}</td>
+                    <td className="t-label-md whitespace-nowrap px-2 py-3.5 font-bp-mono text-bp-ink-secondary">
+                      {longDate(r.purgeOn)} · in {days} day{days === 1 ? "" : "s"}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <span className="flex items-center justify-end gap-5">
+                        <Button kind="secondary" onClick={() => void restore(r.id)} disabled={busy === r.id ? { reason: "Restoring…", reasonId: `restoring-${r.id}`, showReason: false } : false} testId="restore-project">
+                          {busy === r.id ? "Restoring…" : "Restore"}
+                        </Button>
+                        {r.canDeleteNow ? (
+                          <Button kind="quiet" onClick={() => setPurging(r)} testId="delete-now">
+                            Delete now
+                          </Button>
+                        ) : null}
+                        {busy === r.id ? (
+                          <span id={`restoring-${r.id}`} className="sr-only">
+                            Restoring…
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="t-label-caps mt-4 text-bp-ink-tertiary">
+        &ldquo;DELETE NOW&rdquo; ONLY FOR THE PROJECT CREATOR (OWNER PROJECTS) OR A FIRM ADMIN (FIRM PROJECTS); IT ASKS FOR THE NAME AGAIN. RESTORE PUTS THE PROJECT BACK EXACTLY AS IT WAS, SAME MEMBERS.
+      </p>
+      {purging ? <DeleteNowDialog project={purging} open onClose={() => setPurging(null)} /> : null}
+    </section>
+  );
+}
+
 export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: "firm" | "owner"; now: number }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -103,6 +196,9 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
   const tab = (HOME_TABS.find((t) => t.key === sp.get("tab"))?.key ?? "all") as HomeTab;
   const sort = (SORTS.find((s) => s.key === sp.get("sort"))?.key ?? "updated") as HomeSort;
   const showArchived = sp.get("archived") === "1";
+  const showDeleted = sp.get("view") === "deleted";
+  const undoId = sp.get("undo");
+  const undoName = undoId ? (view.deleted.find((d) => d.id === undoId)?.name ?? null) : null;
   const [q, setQ] = useState(sp.get("q") ?? "");
   const [phoneSearch, setPhoneSearch] = useState(!!sp.get("q"));
 
@@ -116,6 +212,9 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
     return s ? `${pathname}?${s}` : pathname;
   };
   const go = (patch: Record<string, string | null>) => router.replace(href(patch), { scroll: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- dismissing only drops ?undo from the current URL
+  const dismissUndo = useCallback(() => go({ undo: null }), [sp]);
+  const toast = undoId && undoName ? <UndoToast key={undoId} projectId={undoId} name={undoName} onDone={dismissUndo} /> : null;
 
   const pool = useMemo(() => view.rows.filter((r) => (showArchived ? r.archived : !r.archived)), [view.rows, showArchived]);
   const counts = useMemo(() => tabCounts(pool), [pool]);
@@ -128,7 +227,7 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
   const c = view.counts;
   const countsLine = [`${c.active} active`, c.onHold ? `${c.onHold} on hold` : null, `${c.completed} completed`].filter(Boolean).join(" · ");
 
-  if (view.rows.length === 0) {
+  if (view.rows.length === 0 && view.deleted.length === 0) {
     return (
       <div className="mx-auto max-w-[1344px] px-4 py-8 md:px-12" data-home>
         <p className="t-label-caps text-bp-brass-text">PROJECTS</p>
@@ -197,6 +296,12 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
             className="t-body-sm min-w-0 flex-1 bg-transparent text-bp-ink-primary outline-none placeholder:text-bp-ink-tertiary"
           />
         </label>
+        {view.deleted.length > 0 || showDeleted ? (
+          <Link href={href({ view: showDeleted ? null : "deleted", archived: null })} replace scroll={false} aria-current={showDeleted ? "page" : undefined} className={`mb-2 inline-flex min-h-11 items-center gap-1.5 border-b-2 ${showDeleted ? "t-nav-item-active border-bp-brass text-bp-ink-primary" : "t-body-sm border-transparent text-bp-ink-secondary hover:text-bp-ink-primary"}`} data-testid="recently-deleted-link">
+            <Icon name="delete" className="text-[20px]" />
+            Recently deleted <span className="t-label-md text-bp-ink-tertiary">{view.deleted.length}</span>
+          </Link>
+        ) : null}
         {c.archived > 0 || showArchived ? (
           <Link href={href({ archived: showArchived ? null : "1" })} replace scroll={false} aria-pressed={showArchived} className="t-body-sm mb-2 inline-flex min-h-11 items-center gap-1.5 text-bp-ink-secondary hover:text-bp-ink-primary">
             <Icon name="inventory_2" className="text-[20px]" />
@@ -254,8 +359,18 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
         </Button>
       </div>
 
+      {/* K10: the phone reaches Recently deleted under the filters. */}
+      {view.deleted.length > 0 || showDeleted ? (
+        <Link href={href({ view: showDeleted ? null : "deleted", archived: null })} replace scroll={false} className="t-body-sm mt-3 inline-flex min-h-11 items-center gap-1.5 text-bp-ink-secondary md:hidden">
+          <Icon name="delete" className="text-[20px]" />
+          {showDeleted ? "Back to projects" : `Recently deleted (${view.deleted.length})`}
+        </Link>
+      ) : null}
+
       {/* Table — desktop / tablet */}
-      {rows.length === 0 ? (
+      {showDeleted ? (
+        <RecentlyDeleted rows={view.deleted} now={now} />
+      ) : rows.length === 0 ? (
         <p className="t-body-sm mt-6 text-bp-ink-secondary">No projects match {needle ? `“${q.trim()}”` : "this filter"}.</p>
       ) : (
         <>
@@ -271,6 +386,9 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
                 <th scope="col" className="t-label-caps w-[184px] px-2 py-2.5 text-right text-bp-ink-tertiary">ESTIMATE · AED</th>
                 <th scope="col" className="t-label-caps px-2 py-2.5 text-bp-ink-tertiary">NEXT</th>
                 <th scope="col" className="t-label-caps hidden w-[72px] px-3 py-2.5 text-right text-bp-ink-tertiary lg:table-cell">UPDATED</th>
+                <th scope="col" className="w-12 px-2 py-2.5">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -294,6 +412,9 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
                     <Next row={r} />
                   </td>
                   <td className="t-label-md hidden px-3 py-3 text-right font-bp-mono text-bp-ink-tertiary lg:table-cell">{age(r.updatedAt, now)}</td>
+                  <td className="px-2 py-3 text-right">
+                    <ProjectActionsMenu project={r} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -316,6 +437,7 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
                     <Next row={r} compact />
                   </span>
                 </div>
+                <ProjectActionsMenu project={r} />
               </li>
             ))}
           </ul>
@@ -344,6 +466,7 @@ export function ProjectsHome({ view, persona, now }: { view: HomeView; persona: 
           </ul>
         </section>
       ) : null}
+      {toast}
     </div>
   );
 }

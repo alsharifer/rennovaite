@@ -456,6 +456,38 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
   Live: `node --env-file=.env.local scripts/k9-proposal-ref-check.mjs`
   (scratch firms + projects, deleted after).
 
+### K10 — the K8/K9 QA (13 Oct)
+
+- **Project actions + safe delete** (§6.12, frames 76:2719 · 76:2981 ·
+  77:2905; migration **055**; `lib/projects/lifecycle.ts`,
+  `components/blueprint/projects/ProjectActions.tsx`). A "⋯" on every
+  Projects-home row and in the Overview / hub top bar: Open · Rename ·
+  Archive/Unarchive · Delete project… (menu-button keyboard pattern). **Who**:
+  rename / archive / restore = any member; delete and "Delete now" = an owner
+  project's `created_by` or a firm **admin** (`firm_members.role`; the firm's
+  creator, backfilled — else its earliest member); everyone else sees Delete
+  disabled with "Only a firm admin can delete this project". **Delete is SOFT**
+  (`projects.deleted_at` / `deleted_by`): `authorizeProject` answers any
+  reference into a deleted project 404 `project_not_found`,
+  `isProjectMember` / `memberProjectIds` leave it out, `proxy.ts` 404s its
+  pages (join filter, plain-read fallback before 055). Only lifecycle.ts sees
+  one (`requireMember` / `requireDeleter`: 401 → 404 → 403) — the routes
+  `DELETE /api/projects/:id { confirm_name }`, `POST …/restore`,
+  `POST …/delete-now { confirm_name }` (only from Recently deleted), `GET
+  …/delete-preview` (real counts, issued-proposal warning, the caller's
+  permission). Name gate: case-insensitive, trimmed. Restore = clear the mark
+  (rows untouched → exactly as it was). **Purge** removes the project's Storage
+  objects (`projectStoragePrefixes`: plan-uploads `<id>/`, renders / packs /
+  drawings `projects/<id>/`, packs `downloads/<id>/`, uploads
+  `pending/<kind>/<id>/`) then the row (FK cascade); the daily
+  `/api/cron/projects-purge` (CRON_SECRET, dry-run until
+  `PROJECT_PURGE_APPLY="true"`) takes projects deleted > 30 days, logging ids
+  and counts only. The rail footer says "Firm admin". Checks:
+  `lib/projects/__tests__/lifecycle.test.ts`, `scripts/k10-purge-check.mjs`
+  (synthetic files, live), the isolation sweep's phase 6 (every route + page
+  404 for a deleted project, restore round-trip byte-identical),
+  `scripts/k10-actions-shots.mjs` (keyboard, axe, light + dark).
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic
@@ -2421,6 +2453,7 @@ surface: the rail keeps the step you came from, `shell/step-memory.ts`).
 | `AUTH_SIGNUP_ALLOWLIST`           | server — H5: who may be GIVEN an account (comma/space separated addresses or `prefix+*@domain` patterns). Unset = nobody new; existing accounts still sign in |
 | `CRON_SECRET`                     | server — H9: the bearer Vercel Cron sends to `/api/cron/uploads-sweep`. Unset = the sweep answers 503 |
 | `UPLOAD_SWEEP_APPLY`              | server — H9: `"true"` lets the daily sweep DELETE stale pending uploads / staged downloads. Unset = dry-run (logs what it would delete) |
+| `PROJECT_PURGE_APPLY`             | server — K10: `"true"` lets the daily purge remove projects deleted > 30 days ago (rows + Storage). Unset = dry-run (logs ids and counts) |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
 
 ### Feature flags — read at server start (flip → restart)

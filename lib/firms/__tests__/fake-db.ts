@@ -98,6 +98,17 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
     this.filters.push((r) => r[col] !== val);
     return this;
   }
+  /** K10: only `.not(col, "is", null)` — what the lifecycle reads use. */
+  not(col: string, op: "is", val: null) {
+    void op;
+    void val;
+    this.filters.push((r) => r[col] !== null && r[col] !== undefined);
+    return this;
+  }
+  lt(col: string, val: string | number) {
+    this.filters.push((r) => r[col] != null && (r[col] as string | number) < val);
+    return this;
+  }
   like(col: string, pattern: string) {
     const re = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*")}$`);
     this.filters.push((r) => re.test(String(r[col])));

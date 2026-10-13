@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { storeErrorResponse } from "@/lib/firms/http";
 import { StoreError, assignProjectFirm } from "@/lib/firms/store";
+import { softDeleteProject } from "@/lib/projects/lifecycle";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { projectAccess } from "@/lib/projects/http";
 
@@ -12,60 +14,32 @@ export const dynamic = "force-dynamic";
 
 const IdSchema = z.string().uuid();
 
-// DELETE /api/projects/:id — permanently removes a project and everything under
-// it. The projects FK graph is `on delete cascade` (plans → rooms, style_choices,
-// renders, approved_designs, boqs, vendor_selections, feedback_events), so a
-// single row delete tears down the whole tree. Irreversible; the UI gates this
-// behind a confirm dialog.
-//
-// H1: a signed-in caller only. There is still no per-user ownership check —
-// data access runs through the service-role admin client and projects have no
-// owner yet (docs/AUTH.md, stage 2).
+// K10 (spec §6.12, migration 055) — DELETE /api/projects/:id { confirm_name }
+// is a SOFT delete: the project moves to Recently deleted for 30 days, hidden
+// from everyone on it (every project route and page then answers not found),
+// and the daily purge removes it with its Storage objects. Only an owner
+// project's creator or a firm admin may delete (403 not_allowed_to_delete,
+// with the reason the menu shows); the typed name must match (422
+// name_mismatch). Restore: POST …/restore. "Delete now": POST …/delete-now.
+// It used to be an instant hard delete any member could run, which also left
+// the project's files in Storage.
+const DeleteSchema = z.object({ confirm_name: z.string().max(400) });
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const caller = await getCaller(request);
   if (!caller) return unauthenticated();
+  const parsed = IdSchema.safeParse((await params).id);
+  if (!parsed.success) return NextResponse.json({ success: false, error: "Invalid project id." }, { status: 400 });
+  const body = DeleteSchema.safeParse(await request.json().catch(() => null));
+  if (!body.success) return NextResponse.json({ success: false, error: "Body must be { confirm_name: string }.", code: "bad_request" }, { status: 400 });
   try {
-    const { id } = await params;
-    const parsed = IdSchema.safeParse(id);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: "Invalid project id." },
-        { status: 400 },
-      );
-    }
-    const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: parsed.data });
-    if (access.denied) return access.denied;
-
-    const supabase = getSupabaseAdmin();
-
-    // Look up first so we can 404 (rather than silently succeed on a bad id).
-    const { data: existing, error: lookupErr } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("id", parsed.data)
-      .maybeSingle();
-    if (lookupErr) throw new Error(lookupErr.message);
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: "Project not found." },
-        { status: 404 },
-      );
-    }
-
-    const { error } = await supabase
-      .from("projects")
-      .delete()
-      .eq("id", parsed.data);
-    if (error) throw new Error(error.message);
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("[api/projects DELETE] error", err);
-    const message = err instanceof Error ? err.message : "Delete failed.";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const r = await softDeleteProject(getSupabaseAdmin() as unknown as SupabaseClient, parsed.data, caller, body.data.confirm_name);
+    return NextResponse.json({ success: true, ...r });
+  } catch (e) {
+    return storeErrorResponse(e);
   }
 }
 
@@ -76,12 +50,14 @@ export async function DELETE(
 const PatchSchema = z
   .object({
     archived: z.boolean().optional(),
+    // K10: rename — the name the list shows (display_name when one is set, else name).
+    name: z.string().trim().min(1).max(200).optional(),
     display_name: z.string().trim().min(1).max(200).nullable().optional(),
     firm_id: z.string().uuid().nullable().optional(),
   })
   .refine(
-    (b) => b.archived !== undefined || b.display_name !== undefined || b.firm_id !== undefined,
-    "Body needs archived, display_name or firm_id.",
+    (b) => b.archived !== undefined || b.display_name !== undefined || b.firm_id !== undefined || b.name !== undefined,
+    "Body needs archived, name, display_name or firm_id.",
   );
 
 // PATCH /api/projects/:id — archive or un-archive. The counterpart to DELETE,
@@ -114,12 +90,23 @@ export async function PATCH(
     const body = PatchSchema.safeParse(await request.json());
     if (!body.success) {
       return NextResponse.json(
-        { success: false, error: "Body must be { archived?: boolean, display_name?: string | null, firm_id?: uuid | null }." },
+        { success: false, error: "Body must be { archived?: boolean, name?: string, display_name?: string | null, firm_id?: uuid | null }." },
         { status: 400 },
       );
     }
 
     const supabase = getSupabaseAdmin();
+    if (body.data.name !== undefined) {
+      // K10 rename (any member): the list shows display_name || name, so the
+      // rename writes whichever the list is showing — a client-facing
+      // display_name (038) is renamed in place, never shadowed.
+      const db = supabase as unknown as SupabaseClient;
+      const { data: cur } = await db.from("projects").select("display_name").eq("id", parsedId.data).maybeSingle<{ display_name: string | null }>();
+      const patch = cur?.display_name ? { display_name: body.data.name } : { name: body.data.name };
+      const { error } = await db.from("projects").update(patch).eq("id", parsedId.data);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ success: true, name: body.data.name });
+    }
     if (body.data.firm_id !== undefined) {
       // U1: attaching a firm needs a signed-in member of that firm (detaching,
       // a member of the firm being detached). The rest of this PATCH needs a

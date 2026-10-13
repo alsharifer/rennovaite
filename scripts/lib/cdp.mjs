@@ -168,7 +168,8 @@ export async function openBrowser(opts = {}) {
     /** Run axe-core (node_modules) on the page; returns violations. */
     async axe(context = "document") {
       const src = fs.readFileSync(path.join(process.cwd(), "node_modules/axe-core/axe.min.js"), "utf8");
-      await evaluate(src);
+      // K10: `;void 0` — the script's own completion value (the axe object) is too deep to return by value.
+      await evaluate(`${src}\n;void 0`);
       return evaluate(`axe.run(${context}, { resultTypes: ["violations"] }).then((r) => r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.slice(0, 5).map((n) => n.target.join(" ") + " — " + (n.failureSummary || "").split("\\n").slice(1, 3).join(" ")) })))`);
     },
     async close() {

@@ -20,6 +20,11 @@
 // name their own project and pass another project's room or render beside it.
 // Every reference is resolved, so a request is allowed only when everything it
 // touches lies in one project the caller is a member of.
+//
+// K10 (055): a DELETED project (soft delete, `deleted_at`) is not found — on
+// every route (404 project_not_found, whatever reference led to it) and every
+// page (proxy.ts). Only lib/projects/lifecycle.ts sees one (restore, Recently
+// deleted, purge).
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -115,13 +120,25 @@ const NOT_FOUND: Record<RefKind, string> = {
   moodboard_item_id: "moodboard_item",
 };
 
+/** K10: which of these projects are deleted (055). Before 055 nothing can be. */
+export async function deletedAmong(db: SupabaseClient, ids: readonly string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { data, error } = await db.from("projects").select("id, deleted_at").in("id", [...ids]);
+  if (error) {
+    if (/deleted_at|schema cache|does not exist/i.test(error.message)) return new Set();
+    throw new Error(`projects read failed: ${error.message}`);
+  }
+  return new Set(((data ?? []) as { id: string; deleted_at?: string | null }[]).filter((r) => !!r.deleted_at).map((r) => r.id));
+}
+
+/** A member of a LIVE project (a deleted project has no members as far as the app is concerned). */
 export async function isProjectMember(db: SupabaseClient, projectId: string, userId: string): Promise<boolean> {
   const { data, error } = await db.from("project_members").select("project_id").eq("project_id", projectId).eq("user_id", userId).maybeSingle();
   if (error) {
     if (isMissingTable(error)) throw new StoreError(500, "migration_required", "Project membership is not migrated yet (050) — nothing project-scoped is served until it is.");
     throw new Error(`project_members read failed: ${error.message}`);
   }
-  return !!data;
+  return !!data && !(await deletedAmong(db, [projectId])).has(projectId);
 }
 
 /** The projects a user is a member of (the dashboard lists these, and nothing else). */
@@ -131,7 +148,9 @@ export async function memberProjectIds(db: SupabaseClient, userId: string): Prom
     if (isMissingTable(error)) throw new StoreError(500, "migration_required", "Project membership is not migrated yet (050).");
     throw new Error(`project_members read failed: ${error.message}`);
   }
-  return ((data ?? []) as { project_id: string }[]).map((r) => r.project_id);
+  const ids = ((data ?? []) as { project_id: string }[]).map((r) => r.project_id);
+  const gone = await deletedAmong(db, ids);
+  return ids.filter((id) => !gone.has(id));
 }
 
 /**
@@ -163,6 +182,8 @@ export async function authorizeProject(db: SupabaseClient, caller: Caller | null
     if (!projectId) throw new StoreError(404, `${NOT_FOUND[kind]}_not_found`, `No such ${NOT_FOUND[kind].replace("_", " ")}.`);
     projects.add(projectId);
   }
+  // K10: a deleted project is not found, whichever of its ids led here.
+  if ((await deletedAmong(db, [...projects])).size > 0) throw new StoreError(404, "project_not_found", "No such project.");
   for (const projectId of projects) {
     if (!(await isProjectMember(db, projectId, who.id))) {
       throw new StoreError(403, "not_a_project_member", "You are not a member of this project.");

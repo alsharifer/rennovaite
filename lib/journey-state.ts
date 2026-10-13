@@ -182,6 +182,8 @@ export function ownerStepStatuses(f: JourneyFacts): Record<OwnerStepKey, StepSta
 export interface RailFirm {
   id: string;
   name: string;
+  /** K10 (055): the caller is this firm's admin (the role that may delete its projects). */
+  admin?: boolean;
 }
 
 export interface RailProject {

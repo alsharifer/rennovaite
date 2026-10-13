@@ -26,8 +26,8 @@ interface Entry {
   created_at?: string | null;
 }
 
-/** Every object under `prefix` (Storage lists one folder at a time; folders have no id). */
-async function walk(db: SupabaseClient, bucket: string, prefix: string, out: { path: string; createdAt: string | null }[] = []) {
+/** Every object under `prefix` (Storage lists one folder at a time; folders have no id). Also the K10 project purge's lister. */
+export async function walk(db: SupabaseClient, bucket: string, prefix: string, out: { path: string; createdAt: string | null }[] = []) {
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await db.storage.from(bucket).list(prefix, { limit: 1000, offset });
     if (error) throw new Error(`list ${bucket}/${prefix} failed: ${error.message}`);

@@ -23,6 +23,8 @@ export const PUBLIC_ROUTE_FILES: Readonly<Record<string, string>> = {
   "app/api/health/route.ts": "health: liveness + env presence, fingerprints only when signed in",
   // H9: Vercel Cron has no session; the route checks Authorization: Bearer <CRON_SECRET> and fails closed without it.
   "app/api/cron/uploads-sweep/route.ts": "cron: the daily orphan-upload sweep, authenticated by CRON_SECRET",
+  // K10: the daily purge of projects deleted more than 30 days ago — the same CRON_SECRET bearer, fails closed.
+  "app/api/cron/projects-purge/route.ts": "cron: the daily purge of soft-deleted projects, authenticated by CRON_SECRET",
 };
 
 /**
@@ -57,7 +59,7 @@ export const NON_PROJECT_ROUTE_FILES: Readonly<Record<string, string>> = {
 };
 
 /** URL paths of the public route handlers above (exact match). */
-export const PUBLIC_API_PATHS: readonly string[] = ["/api/health", "/api/cron/uploads-sweep"];
+export const PUBLIC_API_PATHS: readonly string[] = ["/api/health", "/api/cron/uploads-sweep", "/api/cron/projects-purge"];
 
 /**
  * Pages a visitor may see signed out: the landing surfaces, sign-in itself and

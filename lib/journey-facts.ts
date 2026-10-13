@@ -86,10 +86,18 @@ async function loadRailProjects(db: SupabaseClient, caller: Caller): Promise<Rai
   });
 }
 
+/** K10 (055): the caller's firms with their role — the rail footer says "Firm admin" or "Firm member". */
+async function railFirmsOf(db: SupabaseClient, caller: Caller, firms: { id: string; name: string }[]): Promise<RailFirm[]> {
+  if (firms.length === 0) return [];
+  const { data, error } = await db.from("firm_members").select("firm_id, role").eq("user_id", caller.id);
+  const admin = new Set(error ? [] : ((data ?? []) as { firm_id: string; role?: string | null }[]).filter((r) => r.role === "admin").map((r) => r.firm_id));
+  return firms.map((f) => ({ id: f.id, name: f.name, admin: admin.has(f.id) }));
+}
+
 /** The rail for a page with no project (settings, the firm book, quote review). */
 export async function loadRailContextWithoutProject(db: SupabaseClient, caller: Caller, opts: { firmId?: string } = {}): Promise<RailContext> {
   const [firms, projects] = await Promise.all([safe([], () => listFirms(db, caller)), loadRailProjects(db, caller)]);
-  const railFirms = firms.map((f) => ({ id: f.id, name: f.name }));
+  const railFirms = await railFirmsOf(db, caller, firms);
   const firm = railFirms.find((f) => f.id === opts.firmId) ?? railFirms[0] ?? null;
   return { persona: railFirms.length > 0 ? "firm" : "owner", caller: { email: caller.email }, firms: railFirms, firm, projects, project: null, statuses: {} };
 }
@@ -171,7 +179,7 @@ export async function loadProjectJourney(db: SupabaseClient, projectId: string, 
 
 export async function loadRailContext(db: SupabaseClient, projectId: string, caller: Caller): Promise<RailContext> {
   const [firms, projects] = await Promise.all([safe([], () => listFirms(db, caller)), loadRailProjects(db, caller)]);
-  const railFirms = firms.map((f) => ({ id: f.id, name: f.name }));
+  const railFirms = await railFirmsOf(db, caller, firms);
   const journey = await loadProjectJourney(db, projectId, caller, railFirms);
   const project = projects.find((p) => p.id === projectId) ?? { id: projectId, name: "Project", rev: null, revAt: null };
   return { persona: journey.persona, caller: { email: caller.email }, firms: railFirms, firm: journey.firm, projects, project, statuses: journey.statuses };

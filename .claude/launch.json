@@ -26,7 +26,7 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "set GARDEN_PILOT_ENABLED=true&& set DRAWINGS_ENABLED=true&& set OVERLAYS_ENABLED=true&& set PACK_EXPORT_ENABLED=true&& set WHATIF_ENABLED=true&& set VIEWER_3D_ENABLED=true&& set KG_ENABLED=false&& npx next dev --port 3098"
+        "set GARDEN_PILOT_ENABLED=true&& set DRAWINGS_ENABLED=true&& set OVERLAYS_ENABLED=true&& set PACK_EXPORT_ENABLED=true&& set CRON_SECRET=k10-local-cron&& set WHATIF_ENABLED=true&& set VIEWER_3D_ENABLED=true&& set KG_ENABLED=false&& npx next dev --port 3098"
       ],
       "port": 3098
     },
