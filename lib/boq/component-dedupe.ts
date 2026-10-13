@@ -161,6 +161,8 @@ export const COMPONENT_OWNERS: ComponentOwner[] = [
 
 /** A line as it appears in a generated BoQ, reduced to what dedupe needs. */
 export interface DedupeLine {
+  /** K11 #3: the caller's row key, carried through to the finding (never read here). */
+  key?: string;
   work_section: string;
   description: string;
   item_key?: string | null;

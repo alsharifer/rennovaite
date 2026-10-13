@@ -14,12 +14,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { formatAED, formatDelta } from "@/lib/format/aed";
 
+import { boqIssues, nextIssueKey, type IssueRow } from "@/lib/boq/issues";
 import type { ReviewLine, ReviewModel } from "@/lib/boq/review-types";
+import type { StepStatus } from "@/lib/journey-state";
 import type { FigureRole } from "@/lib/provenance/tier-vocab";
 
 import { Button } from "../Button";
 import { Icon } from "../Icon";
 import { RegenerateControl } from "../RegenerateControl";
+import { IssuesNavigator } from "../shell/IssuesNavigator";
 import { TopBarActions } from "../shell/TopBar";
 import { BoqGrid, rowDomId, sectionDomId } from "./BoqGrid";
 import { correctionsFor, type Applied, type Correction } from "./CorrectionsTab";
@@ -49,12 +52,14 @@ export interface BoqReviewProps {
   regen: RegenerateStart;
   /** P5: the grade engine, when the BoQ has take-off provenance and WHATIF is on. */
   engine: WhatIfEngine | null;
+  /** K11 #3: the rail's status for this step (owner 04 Cost / firm 05 BoQ & Review) — the navigator's step row. */
+  stepStatus?: StepStatus | null;
 }
 
 const HOVER_DELAY = 250;
 const CLOSE_GRACE = 120;
 
-export function BoqReview({ model, rooms, furniture, permits, packExport, highlightRef, view, highlightRoom, regen, engine }: BoqReviewProps) {
+export function BoqReview({ model, rooms, furniture, permits, packExport, highlightRef, view, highlightRoom, regen, engine, stepStatus = null }: BoqReviewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef<HTMLDivElement>(null);
   const lineByRef = useMemo(() => new Map(model.sections.flatMap((s) => s.lines.map((l) => [l.ref, l] as const))), [model.sections]);
@@ -69,6 +74,14 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
   const [corrections, setCorrections] = useState<Correction[]>([]);
   // K11 #4: the revision an applied price / correction just created (the page refreshes to it).
   const [applied, setApplied] = useState<Applied | null>(null);
+  // K11 #3: the Issues navigator — from the model and the rail's own status for this step.
+  const issues = useMemo(() => boqIssues(model, stepStatus), [model, stepStatus]);
+  const [onlyIssues, setOnlyIssues] = useState(false);
+  const issueKeys = useMemo(() => new Set(issues.lineKeys), [issues.lineKeys]);
+  const gridSections = useMemo(
+    () => (onlyIssues && issueKeys.size > 0 ? model.sections.map((s) => ({ ...s, lines: s.lines.filter((l) => issueKeys.has(l.key)) })).filter((s) => s.lines.length > 0) : model.sections),
+    [onlyIssues, issueKeys, model.sections],
+  );
   const router = useRouter();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const opener = useRef<string | null>(null);
@@ -230,6 +243,58 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
       });
     }
   };
+  /** K11 #3: scroll a line under the sticky header, opening its section if it is collapsed. */
+  const revealLine = (key: string) => {
+    const section = model.sections.find((s) => s.lines.some((l) => l.key === key));
+    if (section && collapsed.has(section.name)) toggleSection(section.name);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const row = document.querySelector<HTMLElement>(`[data-line-key="${CSS.escape(key)}"]`);
+        // Below the sticky section header too (it pins over the first rows of its section).
+        const header = row?.closest("[data-section]")?.querySelector<HTMLElement>("[role='row']")?.offsetHeight ?? 48;
+        if (!row) return;
+        window.scrollTo({ top: row.getBoundingClientRect().top + window.scrollY - stickyOffset() - header - 8, behavior: "instant" as ScrollBehavior });
+        // Then correct by what is really pinned above it (the column header row sticks too).
+        const pinnedHeader = row.closest("[data-section]")?.querySelector<HTMLElement>("[role='row']");
+        const overlap = pinnedHeader ? pinnedHeader.getBoundingClientRect().bottom + 4 - row.getBoundingClientRect().top : 0;
+        if (overlap > 0) window.scrollBy({ top: -overlap, behavior: "instant" as ScrollBehavior });
+      }),
+    );
+  };
+  /** A navigator row: scroll to the line, select it, open the inspector on the right action. */
+  const goToIssue = (row: IssueRow) => {
+    if (!row.lineKey) return;
+    if (onlyIssues && !issueKeys.has(row.lineKey)) setOnlyIssues(false);
+    openLine(row.lineKey);
+    setTab("line");
+    setCapturing(row.open === "price");
+    revealLine(row.lineKey);
+  };
+  /** J / Shift+J — the next / previous issue line. */
+  const nextIssue = (back = false) => {
+    const key = nextIssueKey(issues.lineKeys, selectedKey, back);
+    if (!key) return;
+    openLine(key);
+    setTab("line");
+    revealLine(key);
+  };
+  const nextIssueRef = useRef(nextIssue);
+  useEffect(() => {
+    nextIssueRef.current = nextIssue;
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "j" && e.key !== "J") return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      nextIssueRef.current(e.shiftKey);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   /** Close returns focus to the row it was opened from (§4.2 #4). */
   const closeInspector = () => {
     const key = opener.current ?? selectedKey;
@@ -248,6 +313,7 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
           rev {model.rev} · {model.revDate}
           {model.notices.draft ? " · draft" : ""}
         </span>
+        <IssuesNavigator issues={issues} onRow={goToIssue} onlyThese={{ on: onlyIssues, set: setOnlyIssues }} onNext={() => nextIssue(false)} context={`rev ${model.rev}`} />
         <Button kind="quiet" href={`/project/${model.projectId}/boq/revisions`}>
           Revisions &amp; diff
         </Button>
@@ -309,8 +375,16 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
           }
         />
         <div className="min-w-0">
+          {onlyIssues ? (
+            <p role="status" className="t-body-sm mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 bg-bp-surface-sunken px-4 py-2 text-bp-ink-secondary" data-only-issues="">
+              Showing only the {issues.lineKeys.length} line{issues.lineKeys.length === 1 ? "" : "s"} to fix
+              <button type="button" onClick={() => setOnlyIssues(false)} className="t-nav-item-active text-bp-ink-primary underline underline-offset-2">
+                Show every line
+              </button>
+            </p>
+          ) : null}
           <BoqGrid
-            sections={model.sections}
+            sections={gridSections}
             collapsed={collapsed}
             onToggleSection={toggleSection}
             selectedKey={selectedKey}
@@ -345,6 +419,7 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
               setCapturing={setCapturing}
               onCorrectionSaved={(c) => setCorrections((cur) => [...cur, c])}
               onApplied={onApplied}
+              onNextIssue={issues.lineKeys.length > 0 ? () => nextIssue(false) : undefined}
               engine={engine}
               furniture={furniture?.total ?? null}
               onClose={closeInspector}
@@ -367,6 +442,7 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
               setCapturing={setCapturing}
               onCorrectionSaved={(c) => setCorrections((cur) => [...cur, c])}
               onApplied={onApplied}
+              onNextIssue={issues.lineKeys.length > 0 ? () => nextIssue(false) : undefined}
               engine={engine}
               furniture={furniture?.total ?? null}
               onClose={closeInspector}

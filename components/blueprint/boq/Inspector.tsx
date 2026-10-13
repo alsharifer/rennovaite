@@ -48,6 +48,8 @@ export interface InspectorProps {
   onCorrectionSaved: (c: Correction) => void;
   /** K11 #4: a price / correction applied — the next revision exists. */
   onApplied: (a: Applied) => void;
+  /** K11 #3: "Next issue J" — present while the BoQ has issue lines. */
+  onNextIssue?: () => void;
   engine: WhatIfEngine | null;
   furniture: number | null;
   onClose: () => void;
@@ -134,9 +136,16 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
       </div>
 
       <div role="tabpanel" id={`${base}-panel-${p.tab}`} aria-labelledby={`${base}-tab-${p.tab}`} className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-4">
-        <p className="t-label-caps text-bp-ink-tertiary">
-          {line.ref} · {line.section.toUpperCase()}
-        </p>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="t-label-caps text-bp-ink-tertiary">
+            {line.ref} · {line.section.toUpperCase()}
+          </p>
+          {p.onNextIssue ? (
+            <button type="button" onClick={p.onNextIssue} className="t-label-caps flex shrink-0 items-center gap-1.5 text-bp-ink-secondary hover:text-bp-ink-primary" aria-keyshortcuts="J" data-next-issue="">
+              Next issue <kbd className="border border-bp-line-control px-1 font-bp-mono">J</kbd>
+            </button>
+          ) : null}
+        </div>
         <h2 ref={headingRef} id="bp-boq-inspector-heading" tabIndex={-1} className="t-heading-md mt-2 text-bp-ink-primary outline-none" data-inspector-heading="">
           {line.description}
         </h2>

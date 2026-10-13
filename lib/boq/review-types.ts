@@ -103,7 +103,8 @@ export interface ReviewModel {
       acceptedOn: string | null;
       acceptedNote: string | null;
     } | null;
-    duplicates: { label: string; detail: string }[];
+    /** K11 #3: `lineKeys` = the two lines a finding names (row keys), for the Issues navigator. */
+    duplicates: { label: string; detail: string; lineKeys?: string[] }[];
     garden: { kept: number; removed: number; undecided: number } | null;
   };
   /** The client's own entered budget — owner projects only (H7). */

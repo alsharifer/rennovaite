@@ -59,8 +59,8 @@ export interface ReviewInputs {
   projectHasFirm?: boolean;
   /** L4: the reference-basis gate's facts for this revision (best-effort; null = unknown). */
   basis: { basis: ReferenceBasis; verdict: ProposalGateVerdict; acceptance: ReferenceBasisAcceptance | null; bookReviewed: boolean } | null;
-  /** findComponentDuplicates() findings, already worded. */
-  duplicates: { label: string; detail: string }[];
+  /** findComponentDuplicates() findings, already worded (K11 #3: with the row keys they name). */
+  duplicates: { label: string; detail: string; lineKeys?: string[] }[];
   /** The client's own budget — owner projects only (H7: never a platform default, never on a firm project). */
   budget: number | null;
 }

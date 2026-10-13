@@ -29,6 +29,7 @@ import { collectFurnitureSection } from "@/lib/staging/collect";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { hasTakeoffProvenance, type ScenarioBoq } from "@/lib/whatif/engine";
 import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
+import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
 import type { WhatIfEngine } from "@/components/blueprint/boq/WhatIfTab";
 
 
@@ -181,9 +182,11 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
   const persona: "firm" | "owner" = firm ? "firm" : "owner";
 
   const duplicates = findComponentDuplicates(
-    boq.sections.flatMap((s) => s.lines.map((l) => ({ work_section: s.work_section, description: l.description, rule_id: l.rule_id ?? null, item_key: null, quantity: l.quantity, total_aed: l.total_aed }))),
+    boq.sections.flatMap((s) => s.lines.map((l, i) => ({ key: `${s.work_section}-${i}`, work_section: s.work_section, description: l.description, rule_id: l.rule_id ?? null, item_key: null, quantity: l.quantity, total_aed: l.total_aed }))),
   ).map((f) => ({
     label: f.label,
+    // K11 #3: the Issues navigator selects the lines a finding names.
+    lineKeys: [f.owner_line.key, f.duplicate_line.key].filter((k): k is string => !!k),
     detail: `${f.owner_key} in ${f.owner_line.work_section} is also priced as ${f.duplicate_key} in ${f.duplicate_line.work_section}${f.duplicate_total_aed > 0 ? "" : " (unpriced today)"}`,
   }));
 
@@ -207,6 +210,9 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
   if (caller) await recordBoqView(sb, id, latest.id, caller.id);
 
   const highlightRef = sp.highlight ? resolveRef(boq.sections, sp.highlight) : null;
+  // K11 #3: the Issues navigator's step row is the rail's own status for this step (shared load).
+  const rail = await loadProjectRail(id);
+  const stepStatus = rail ? (rail.statuses[rail.persona === "firm" ? "boq_review" : "cost"] ?? null) : null;
 
   return (
     <>
@@ -234,6 +240,7 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
         highlightRoom={sp.room ?? null}
         regen={{ rev, block: regenerateBlock, changed }}
         engine={engine}
+        stepStatus={stepStatus}
       />
     </>
   );
