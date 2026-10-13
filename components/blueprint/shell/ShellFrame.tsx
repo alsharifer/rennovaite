@@ -19,6 +19,7 @@ import type { RailContext } from "@/lib/journey-state";
 
 import { HelpDrawer } from "./HelpDrawer";
 import { JourneyRail } from "./JourneyRail";
+import { StepFooter } from "./StepFooter";
 import { noSubscribe, readStep, writeStep } from "./step-memory";
 import type { RailStep } from "./StepList";
 import { TopBar } from "./TopBar";
@@ -71,6 +72,8 @@ export function ShellFrame({ ctx, flags, skin, title, children }: { ctx: RailCon
       <TopBar ctx={ctx} steps={steps} activeKey={activeKey} pageTitle={pageTitle} />
       <main id="main" className="bp-main">
         {children}
+        {/* K11 #2: previous · next on every journey step page (not a side surface, not the intake). */}
+        {projectId && stepKey ? <StepFooter steps={steps} activeKey={stepKey} /> : null}
       </main>
       <Suspense fallback={null}>
         <HelpDrawer

@@ -1,6 +1,7 @@
 import { Button } from "@/components/blueprint/Button";
 import { PageHeader } from "@/components/blueprint/PageHeader";
 import { StateBlock } from "@/components/blueprint/StateBlock";
+import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
 import { TopBarActions } from "@/components/blueprint/shell/TopBar";
 import { GardenTimelineView, TimelineView } from "@/components/blueprint/timeline/TimelineView";
 import { journeyFlagsFromEnv, nextOwnerStep, ownerStepHref } from "@/lib/journey";
@@ -16,12 +17,15 @@ export const dynamic = "force-dynamic";
  */
 export default async function TimelinePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const data = await loadTimeline(id);
+  const [data, rail] = await Promise.all([loadTimeline(id), loadProjectRail(id)]);
   const next = nextOwnerStep("timeline")!;
+  // K11 #2: the same answer as the step footer — 06 Tender blocked → disabled with the rail's reason.
+  const nextStatus = rail?.statuses[next.key];
+  const blocked = nextStatus?.state === "blocked" ? (nextStatus.reason ?? "This step is blocked") : null;
   return (
     <div className="mx-auto max-w-[1344px] px-6 pb-16 pt-8 lg:px-12" data-timeline>
       <TopBarActions>
-        <Button kind="primary" href={ownerStepHref(next.key, id, journeyFlagsFromEnv())}>
+        <Button kind="primary" href={blocked ? undefined : ownerStepHref(next.key, id, journeyFlagsFromEnv())} disabled={blocked ? { reason: blocked, reasonId: "timeline-continue-why", showReason: true } : false}>
           Continue to {next.label.toLowerCase()}
         </Button>
       </TopBarActions>
