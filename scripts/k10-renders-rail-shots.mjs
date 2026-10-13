@@ -21,7 +21,10 @@ import { devSession } from "./lib/dev-auth.mjs";
 
 const PORT = /^\d+$/.test(process.argv[2] ?? "") ? process.argv[2] : "3098";
 const BASE = `http://localhost:${PORT}`;
-const SHOTS = (process.argv.find((a) => a.startsWith("--shots=")) ?? "--shots=screenshots/k10/renders").slice(8);
+const SHOTS_BASE = (process.argv.find((a) => a.startsWith("--shots=")) ?? "--shots=screenshots/k10/renders").slice(8);
+// --theme=dark: the same run in Dark (the rv_theme cookie, as the app sets it), shots under <dir>/dark.
+const THEME = (process.argv.find((a) => a.startsWith("--theme=")) ?? "--theme=light").slice(8);
+const SHOTS = THEME === "dark" ? `${SHOTS_BASE}/dark` : SHOTS_BASE;
 const { url, key } = resolveTarget({ script: "k10-renders-rail-shots", writes: true });
 const sb = createClient(url, key, { auth: { persistSession: false } });
 
@@ -57,6 +60,7 @@ try {
   const b = await openBrowser({ who: "k10-renders", script: "k10-renders-rail-shots" });
   try {
     await b.viewport(1440, 1000);
+    await b.send("Network.setCookie", { name: "rv_theme", value: THEME, domain: "localhost", path: "/" });
     await b.goto(`${BASE}/projects`, "[data-home]");
     const home = await b.evaluate(`document.querySelector('[data-project="${P}"]')?.innerText ?? ""`);
     check("Projects home Next: 03 · RENDERS — 1 / 3 locked", /03 · RENDERS/.test(home) && /1 \/ 3 locked/.test(home), home.replace(/\s+/g, " ").slice(0, 200));
