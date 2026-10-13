@@ -30,6 +30,9 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { hasTakeoffProvenance, type ScenarioBoq } from "@/lib/whatif/engine";
 import { loadLatestScenario, loadRateBook } from "@/lib/whatif/rate-book";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
+import { loadAppliedCorrections } from "@/lib/boq/own-basis-load";
+import type { OwnBasisDoc } from "@/lib/boq/own-basis";
+import { curateText } from "@/lib/identity/curation";
 import type { WhatIfEngine } from "@/components/blueprint/boq/WhatIfTab";
 
 
@@ -204,6 +207,13 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
     basis: gate?.boq ? { basis: gate.boq.basis, verdict: gate.verdict, acceptance: gate.acceptance, bookReviewed: gate.firm?.book_status === "reviewed" } : null,
     duplicates,
     budget: project.firm_id ? null : (project.budget_aed ?? null),
+    // K11: applied prices this revision could not place — only those still applying (Remove stops one).
+    unmatched: await (async () => {
+      const recorded = (latest.sections as OwnBasisDoc).own_basis?.unmatched ?? [];
+      if (recorded.length === 0) return [];
+      const live = new Set((await loadAppliedCorrections(sb, id)).map((c) => c.id));
+      return recorded.filter((u) => live.has(u.correction_id)).map((u) => ({ ...u, label: u.label ? curateText(u.label, ctx.withheldNames) : null, note: u.note ? curateText(u.note, ctx.withheldNames) : null }));
+    })(),
   });
 
   // L5: a signed-in view of the BoQ is the checking signal (deduped per actor per 10 min).

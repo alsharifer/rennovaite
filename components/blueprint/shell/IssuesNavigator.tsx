@@ -24,6 +24,8 @@ export interface IssuesNavigatorProps {
   issues: IssueList;
   /** A row that names a line. */
   onRow?: (row: IssueRow) => void;
+  /** K11: a row with its own actions (an unmatched price: Remove / Re-apply to…). */
+  onAction?: (row: IssueRow, action: "release" | "retarget") => void;
   /** "Show only these lines" — present when the page can filter. */
   onlyThese?: { on: boolean; set: (on: boolean) => void };
   /** "Next issue J" — present when the page cycles issue lines. */
@@ -32,7 +34,7 @@ export interface IssuesNavigatorProps {
   context?: string | null;
 }
 
-export function IssuesNavigator({ issues, onRow, onlyThese, onNext, context }: IssuesNavigatorProps) {
+export function IssuesNavigator({ issues, onRow, onAction, onlyThese, onNext, context }: IssuesNavigatorProps) {
   const [open, setOpen] = useState(false);
   const [alignRight, setAlignRight] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -124,6 +126,30 @@ export function IssuesNavigator({ issues, onRow, onlyThese, onNext, context }: I
                       </>
                     );
                     const cls = "flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-bp-surface-sunken focus-visible:bg-bp-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-bp-focus-ring";
+                    if (r.actions && onAction) {
+                      return (
+                        <li key={r.id} className="px-4 py-2.5" data-issue-row={r.id}>
+                          <span className="t-body-sm block text-bp-ink-primary">{r.title}</span>
+                          {r.detail ? <span className="t-label-md block font-bp-mono text-bp-ink-tertiary">{r.detail}</span> : null}
+                          <span className="mt-2 flex gap-5">
+                            {r.actions.map((a) => (
+                              <button
+                                key={a.key}
+                                type="button"
+                                onClick={() => {
+                                  close(false);
+                                  onAction(r, a.key);
+                                }}
+                                className="t-nav-item-active text-bp-ink-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring"
+                                data-issue-action={a.key}
+                              >
+                                {a.label}
+                              </button>
+                            ))}
+                          </span>
+                        </li>
+                      );
+                    }
                     return (
                       <li key={r.id}>
                         {r.lineKey && onRow ? (

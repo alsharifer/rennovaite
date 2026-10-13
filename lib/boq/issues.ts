@@ -23,7 +23,7 @@ import type { StepStatus } from "@/lib/journey-state";
 
 import type { ReviewModel } from "./review-types";
 
-export type IssueGroupKey = "unpriced" | "duplicates" | "derived" | "basis" | "step";
+export type IssueGroupKey = "unmatched" | "unpriced" | "duplicates" | "derived" | "basis" | "step";
 
 export interface IssueRow {
   id: string;
@@ -37,6 +37,9 @@ export interface IssueRow {
   /** What the inspector opens on: the price form, or the line. */
   open: "price" | "line" | null;
   href: string | null;
+  /** K11: an applied price that no longer matches a line — Remove / Re-apply to…. */
+  correctionId?: string;
+  actions?: { key: "release" | "retarget"; label: string }[];
 }
 
 export interface IssueGroup {
@@ -56,6 +59,7 @@ export interface IssueList {
 }
 
 export const GROUP_TITLE: Record<IssueGroupKey, string> = {
+  unmatched: "YOUR PRICES — NO LONGER MATCHED",
   unpriced: "NOT PRICED — LEFT OUT OF THE TOTAL",
   duplicates: "POSSIBLY COUNTED TWICE",
   derived: "DERIVED — CONFIRM ON SITE",
@@ -70,6 +74,32 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
   const lines = model.sections.flatMap((s) => s.lines);
   const order = new Map(lines.map((l, i) => [l.key, i]));
   const groups: IssueGroup[] = [];
+
+  // K11: a price someone added whose line is gone (or no longer unique) after a regenerate —
+  // it prices nothing and is never attached elsewhere; it waits here until removed or re-applied.
+  const lost = model.unmatchedPrices ?? [];
+  if (lost.length > 0) {
+    groups.push({
+      key: "unmatched",
+      title: GROUP_TITLE.unmatched,
+      count: lost.length,
+      rows: lost.map((u) => ({
+        id: `unmatched:${u.correctionId}`,
+        ref: null,
+        title: `Your price for ${u.item} no longer matches a line`,
+        detail: [`${u.type === "rate" ? "rate" : "quantity"} ${u.value.toLocaleString("en-US", { minimumFractionDigits: u.type === "rate" ? 2 : 0, maximumFractionDigits: 2 })}`, u.basis, u.by ? `added by ${u.by}` : null].filter(Boolean).join(" · "),
+        action: "Re-apply to…",
+        lineKey: null,
+        open: null,
+        href: null,
+        correctionId: u.correctionId,
+        actions: [
+          { key: "release", label: "Remove" },
+          { key: "retarget", label: "Re-apply to…" },
+        ],
+      })),
+    });
+  }
 
   const unpriced = lines.filter((l) => l.unpriced);
   if (unpriced.length > 0) {

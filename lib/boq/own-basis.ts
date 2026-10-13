@@ -14,7 +14,12 @@
 //           price someone added.
 //
 // A correction finds its line by the line's STABLE identity (line-identity.ts:
-// `${section}|${identity}[#n]`), never by REF or position. A rate correction
+// `${section}|${identity}` — item_key, + room when the line has one), never by
+// REF or position. A key that is not on exactly ONE line (the line is gone, or
+// the identity repeats — `#n` is positional) is UNMATCHED: it prices nothing,
+// is never attached to another line, and is recorded on the document
+// (`own_basis.unmatched`) so the Issues navigator says "Your price for <item>
+// no longer matches a line" (Remove / Re-apply to…). A rate correction
 // makes the line YOUR PRICE — rate_tier own_price (tierOf → measured, "own
 // basis"), rate_status priced (so a QS-to-price line is no longer excluded),
 // the curated source label, and `price_basis` (what the popover and the diff
@@ -38,6 +43,21 @@ export interface AppliedCorrection {
   note: string | null;
   byName: string | null;
   appliedAt: string;
+  /** How the correction names its line ("Soft Landscaping — Planting beds …"). */
+  label?: string | null;
+}
+
+/** An applied price whose line is not (unambiguously) in this BoQ — recorded on the document. */
+export interface UnmatchedOwnBasis {
+  correction_id: string;
+  label: string | null;
+  type: "rate" | "quantity";
+  value: number;
+  origin: CorrectionOrigin;
+  basis_kind: BasisKind | null;
+  note: string | null;
+  by: string | null;
+  at: string;
 }
 
 /** What a priced-on-review line carries (also its quantity's `qty_basis`). */
@@ -65,7 +85,7 @@ type Line = {
   qty_basis?: OwnBasisRecord;
 };
 /** A BoQ document as this module reads it (the chain fields + its lines). */
-export type OwnBasisDoc = Omit<ChainedDoc, "sections"> & { sections: { work_section: string; lines: Line[]; section_total_aed: number }[] };
+export type OwnBasisDoc = Omit<ChainedDoc, "sections"> & { sections: { work_section: string; lines: Line[]; section_total_aed: number }[]; own_basis?: { unmatched: UnmatchedOwnBasis[] } };
 type Doc = OwnBasisDoc;
 
 // The provenance aside a QS-to-price line's description carries — false once it is priced.
@@ -94,25 +114,41 @@ export function applyToLine<L extends Line>(line: L, c: AppliedCorrection): L {
  * ids whose line is no longer in this BoQ.
  */
 export function applyOwnBasis<T extends Doc>(boq: T, corrections: readonly AppliedCorrection[]): { boq: T; applied: string[]; missing: string[] } {
-  if (corrections.length === 0) return { boq, applied: [], missing: [] };
+  if (corrections.length === 0 && !boq.own_basis) return { boq, applied: [], missing: [] };
+  // Every line's base identity (no #n) and how many lines share it.
+  const at = new Map<string, { s: number; i: number }[]>();
   const keys = stableLineKeys(boq.sections);
-  const byKey = new Map<string, { s: number; i: number }>();
-  boq.sections.forEach((s, si) => s.lines.forEach((_, li) => byKey.set(keys[`${s.work_section}-${li}`]!, { s: si, i: li })));
+  boq.sections.forEach((s, si) =>
+    s.lines.forEach((_, li) => {
+      const base = baseKey(keys[`${s.work_section}-${li}`]!);
+      (at.get(base) ?? at.set(base, []).get(base)!).push({ s: si, i: li });
+    }),
+  );
   const sections = boq.sections.map((s) => ({ ...s, lines: [...s.lines] }));
   const applied: string[] = [];
   const missing: string[] = [];
+  const unmatched: UnmatchedOwnBasis[] = [];
   for (const c of [...corrections].sort((a, b) => a.appliedAt.localeCompare(b.appliedAt) || a.id.localeCompare(b.id))) {
-    const at = byKey.get(c.lineKey);
-    if (!at || !Number.isFinite(c.value) || c.value < 0) {
+    // Exactly one line with this identity — never a positional #n, never a guess.
+    const hits = /#\d+$/.test(c.lineKey) ? [] : (at.get(c.lineKey) ?? []);
+    if (hits.length !== 1 || !Number.isFinite(c.value) || c.value < 0) {
       missing.push(c.id);
+      unmatched.push({ correction_id: c.id, label: c.label ?? null, type: c.type, value: c.value, origin: c.origin, basis_kind: c.basisKind, note: c.note, by: c.byName, at: c.appliedAt });
       continue;
     }
-    sections[at.s]!.lines[at.i] = applyToLine(sections[at.s]!.lines[at.i]!, c);
+    const h = hits[0]!;
+    sections[h.s]!.lines[h.i] = applyToLine(sections[h.s]!.lines[h.i]!, c);
     applied.push(c.id);
   }
-  if (applied.length === 0) return { boq, applied, missing };
-  return { boq: rechain({ ...boq, sections } as unknown as ChainedDoc) as unknown as T, applied, missing };
+  const { own_basis: _old, ...rest } = boq;
+  void _old;
+  const base = (unmatched.length > 0 ? { ...rest, own_basis: { unmatched } } : rest) as unknown as T;
+  if (applied.length === 0) return { boq: base, applied, missing };
+  return { boq: rechain({ ...base, sections } as unknown as ChainedDoc) as unknown as T, applied, missing };
 }
+
+/** A stable key without its positional repeat number. */
+const baseKey = (key: string) => key.replace(/#\d+$/, "");
 
 /** The stable key of the line at a BoQ view row key (`${section}-${idx}`), or null. */
 export function lineKeyAt(boq: { sections: { work_section: string; lines: Line[] }[] }, rowKey: string): string | null {

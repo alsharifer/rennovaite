@@ -14,6 +14,7 @@ import { boqDerivedInfo, derivedLineNote, isUnpricedLine } from "@/lib/documents
 import type { ProposalGateVerdict, ReferenceBasis, ReferenceBasisAcceptance } from "@/lib/documents/reference-basis-types";
 import { REFERENCE_BASIS_BANNER } from "@/lib/documents/reference-basis-types";
 import { summaryChainOf } from "./totals";
+import { basisText, type BasisKind } from "./own-basis-vocab";
 import { headlineSpokenText } from "@/lib/format/aed";
 import { lineItemKey, type ProvLine } from "@/lib/provenance/boq";
 import { tierOf, weakest, type Persona, type ProvTier, type TierContext } from "@/lib/provenance/tier";
@@ -63,6 +64,8 @@ export interface ReviewInputs {
   duplicates: { label: string; detail: string; lineKeys?: string[] }[];
   /** The client's own budget — owner projects only (H7: never a platform default, never on a firm project). */
   budget: number | null;
+  /** K11: the revision's unmatched applied prices (`own_basis.unmatched`), only those still applying. */
+  unmatched?: { correction_id: string; label: string | null; type: "rate" | "quantity"; value: number; basis_kind: BasisKind | null; note: string | null; by: string | null }[];
 }
 
 // "(no reference rate — QS to price)" / "(absorbed at no charge … — QS to confirm)":
@@ -211,6 +214,15 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
         : null,
     },
     budget: i.persona === "owner" ? i.budget : null,
+    unmatchedPrices: (i.unmatched ?? []).map((u) => ({
+      correctionId: u.correction_id,
+      // "Soft Landscaping — Planting beds … (QS to price)" → "Planting beds …"
+      item: splitAside((u.label ?? "this line").replace(/^[^—]+—\s*/, "")).title,
+      type: u.type,
+      value: u.value,
+      basis: basisText(u.basis_kind, u.note),
+      by: u.by,
+    })),
     programme: b.programme ?? null,
   };
 }

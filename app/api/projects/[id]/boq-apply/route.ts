@@ -33,6 +33,8 @@ const Body = z.object({
   line_description: z.string().max(500).nullable().optional(),
   element_refs: z.array(z.string()).max(200).nullable().optional(),
   firm_id: z.string().uuid().nullable().optional(),
+  /** K11: "Re-apply to…" an applied price whose line no longer matches (correction_id + row_key). */
+  retarget: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       lineDescription: b.line_description ?? null,
       elementRefs: b.element_refs ?? null,
       firmId: b.firm_id ?? null,
+      retarget: b.retarget ?? false,
     });
     return NextResponse.json({
       success: true,

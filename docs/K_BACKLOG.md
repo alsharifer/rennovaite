@@ -10,8 +10,12 @@ says where it is and why it waits. Newest first.
   insert and Continue fall back without it, nothing is a draft) and the applied
   corrections (`boq-apply` answers 500 `migration_required` without it; every
   read degrades to "nothing applied").
-- **Abdallah's latest "Untitled" project** — rename to "Jumeirah Parks Garden"
-  only on his say-so (K10 Rename covers it otherwise). Not touched.
+- **A firm admin may attach / detach projects created by members of their
+  firm** (approved 14 Oct as the next step after creator-only attach). Today
+  attach / move is the project creator's act (`assignProjectFirm`); detach is any
+  member of the current firm. Extend: an admin of the target firm may attach a
+  project whose creator is a member of that firm; the preview and the 409 / 403
+  wording follow.
 - **Abdallah's corrections on prod** — the read-only check of which correction
   rows exist and whether they would now apply waits for his OK. A correction
   saved before 057 has no `line_key`: it applies from its own line's

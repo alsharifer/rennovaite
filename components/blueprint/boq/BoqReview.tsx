@@ -34,6 +34,7 @@ import { ByRoom, Furniture, Programme, type FurnitureView, type RoomRollup } fro
 import { Notices } from "./Notices";
 import { PinnedTotal } from "./PinnedTotal";
 import { ProvenancePopover, type PopoverTarget } from "./ProvenancePopover";
+import { RetargetPrice } from "./RetargetPrice";
 import { SectionChips, SectionIndex } from "./SectionIndex";
 import { SUMMARY_ID, SummaryChain } from "./SummaryChain";
 
@@ -77,6 +78,9 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
   // K11 #3: the Issues navigator — from the model and the rail's own status for this step.
   const issues = useMemo(() => boqIssues(model, stepStatus), [model, stepStatus]);
   const [onlyIssues, setOnlyIssues] = useState(false);
+  // K11: an applied price that no longer matches a line — being re-applied to a chosen line.
+  const [retarget, setRetarget] = useState<{ correctionId: string; item: string } | null>(null);
+  const [issueError, setIssueError] = useState<string | null>(null);
   const issueKeys = useMemo(() => new Set(issues.lineKeys), [issues.lineKeys]);
   const gridSections = useMemo(
     () => (onlyIssues && issueKeys.size > 0 ? model.sections.map((s) => ({ ...s, lines: s.lines.filter((l) => issueKeys.has(l.key)) })).filter((s) => s.lines.length > 0) : model.sections),
@@ -270,6 +274,18 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
     setCapturing(row.open === "price");
     revealLine(row.lineKey);
   };
+  /** An unmatched price's actions: Remove (stop applying, kept on record) or Re-apply to a chosen line. */
+  const onIssueAction = async (row: IssueRow, action: "release" | "retarget") => {
+    if (!row.correctionId) return;
+    setIssueError(null);
+    if (action === "retarget") {
+      setRetarget({ correctionId: row.correctionId, item: row.title.replace(/^Your price for /, "").replace(/ no longer matches a line$/, "") });
+      return;
+    }
+    const res = await fetch(`/api/projects/${model.projectId}/boq-release`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ correction_id: row.correctionId }) });
+    if (!res.ok) setIssueError(((await res.json().catch(() => ({}))) as { error?: string }).error ?? `Not removed (${res.status}).`);
+    else router.refresh();
+  };
   /** J / Shift+J — the next / previous issue line. */
   const nextIssue = (back = false) => {
     const key = nextIssueKey(issues.lineKeys, selectedKey, back);
@@ -313,7 +329,7 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
           rev {model.rev} · {model.revDate}
           {model.notices.draft ? " · draft" : ""}
         </span>
-        <IssuesNavigator issues={issues} onRow={goToIssue} onlyThese={{ on: onlyIssues, set: setOnlyIssues }} onNext={() => nextIssue(false)} context={`rev ${model.rev}`} />
+        <IssuesNavigator issues={issues} onRow={goToIssue} onAction={(r, a) => void onIssueAction(r, a)} onlyThese={{ on: onlyIssues, set: setOnlyIssues }} onNext={() => nextIssue(false)} context={`rev ${model.rev}`} />
         <Button kind="quiet" href={`/project/${model.projectId}/boq/revisions`}>
           Revisions &amp; diff
         </Button>
@@ -344,6 +360,12 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
           </button>
         </p>
       ) : null}
+      {issueError ? (
+        <p role="alert" className="surface-inverse t-body-sm mx-6 mt-4 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink md:mx-8">
+          {issueError}
+        </p>
+      ) : null}
+      {retarget ? <RetargetPrice model={model} correctionId={retarget.correctionId} item={retarget.item} onClose={() => setRetarget(null)} onApplied={onApplied} /> : null}
       <Notices model={model} permits={permits} />
       {regenerate.running ? (
         <p role="status" className="t-body-sm mx-6 mt-4 flex items-center gap-2 bg-bp-surface-sunken px-4 py-3 text-bp-ink-secondary md:mx-8" data-regenerating="">

@@ -88,6 +88,8 @@ export interface ApplyInput {
   elementRefs?: string[] | null;
   /** A firm correction to promote later (the route checked membership). */
   firmId?: string | null;
+  /** K11: "Re-apply to…" — move an applied price whose line no longer matches onto `rowKey`'s line. */
+  retarget?: boolean;
 }
 
 export interface ApplyResult {
@@ -117,10 +119,15 @@ export async function applyCorrection(db: SupabaseClient, projectId: string, cal
     if (!c) throw new StoreError(404, "correction_not_found", "No such correction on this project.");
     if (c.correction_type !== "rate" && c.correction_type !== "quantity") throw new StoreError(422, "not_applicable", "Only a rate or a quantity correction changes a figure — this one stays a note.");
     if (c.new_value == null) throw new StoreError(422, "not_applicable", "This correction carries no figure to apply.");
-    if (c.applied_boq_id && !c.reverted_at) throw new StoreError(409, "already_applied", "This correction already applies to the BoQ.");
+    const active = !!c.applied_boq_id && !c.reverted_at;
+    const unmatchedNow = (doc.own_basis?.unmatched ?? []).some((u) => u.correction_id === input.correctionId);
+    if (active && !input.retarget) throw new StoreError(409, "already_applied", "This correction already applies to the BoQ.");
+    if (input.retarget && !(active && unmatchedNow)) throw new StoreError(409, "still_matched", "This price still matches its line — nothing to re-apply.");
     // A correction saved before 057 names its line only by description: the member's row key pins it.
-    const lineKey = (c.line_key as string | null) ?? (input.rowKey ? lineKeyAt(doc, input.rowKey) : null);
+    // "Re-apply to…" pins it to the line the member chose.
+    const lineKey = input.retarget ? (input.rowKey ? lineKeyAt(doc, input.rowKey) : null) : ((c.line_key as string | null) ?? (input.rowKey ? lineKeyAt(doc, input.rowKey) : null));
     if (!lineKey) throw new StoreError(422, "line_unknown", "Open the line this correction belongs to and apply it from there.");
+    if (/#\d+$/.test(lineKey)) throw new StoreError(422, "line_ambiguous", "That line repeats in its section — a price cannot be pinned to it unambiguously.");
     const { error: upErr } = await db.from("boq_corrections").update({ line_key: lineKey, reverted_at: null, reverted_by: null, reverted_by_boq_id: null }).eq("id", input.correctionId);
     if (upErr) throw isMissingSchema(upErr) ? new StoreError(500, "migration_required", MIGRATION_057) : new Error(upErr.message);
     correctionId = input.correctionId;
@@ -197,6 +204,21 @@ export async function applyCorrection(db: SupabaseClient, projectId: string, cal
     { actor: caller.id },
   );
   return { boqId: stored.id, rev: revs.length + 1, previousBoqId: latest.id, previousTotal: Number(doc.grand_total_aed), total: out.boq.grand_total_aed, correctionId };
+}
+
+/**
+ * K11 — "Remove" on an applied price that no longer matches a line: it stops
+ * applying (reverted, kept on record). No revision: the current one prices
+ * nothing with it already. The Issues navigator drops it on the next read.
+ */
+export async function releaseCorrection(db: SupabaseClient, projectId: string, caller: Caller, correctionId: string): Promise<void> {
+  const { data: c, error } = await db.from("boq_corrections").select("id, applied_boq_id, reverted_at").eq("id", correctionId).eq("project_id", projectId).maybeSingle<Row>();
+  if (error) throw isMissingSchema(error) ? new StoreError(500, "migration_required", MIGRATION_057) : new Error(error.message);
+  if (!c) throw new StoreError(404, "correction_not_found", "No such correction on this project.");
+  if (!c.applied_boq_id || c.reverted_at) throw new StoreError(409, "not_applied", "This correction does not apply to the BoQ.");
+  const { error: upErr } = await db.from("boq_corrections").update({ reverted_at: new Date().toISOString(), reverted_by: caller.id, reverted_by_boq_id: null }).eq("id", correctionId);
+  if (upErr) throw new Error(`boq_corrections update failed: ${upErr.message}`);
+  await recordPilotEvent(db, projectId, "correction", { action: "released", correction_id: correctionId }, { actor: caller.id });
 }
 
 export interface RevertResult {

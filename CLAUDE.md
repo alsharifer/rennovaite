@@ -532,7 +532,8 @@ commit per item; shots in `screenshots/k11/` (light + dark).
   left out of Projects, the switcher and Recently deleted (`withoutDrafts`); the
   daily purge job soft-deletes drafts older than 24 h (`sweepIntakeDrafts`,
   always applied — reversible; the 30-day purge and `PROJECT_PURGE_APPLY`
-  decide the rest). Live: `scripts/k11-intake-name-check.mjs`.
+  decide the rest). A swept draft is NEVER listed in Recently deleted (nobody
+  saw it) but leaves by the same 30-day purge (`lifecycle.test.ts`). Live: `scripts/k11-intake-name-check.mjs`.
 - **Step footer** (#2, component 80:944, `shell/StepFooter.tsx`): ShellFrame
   draws "← PREVIOUS <step>" · "NEXT <step>" + Secondary "Continue to <step>"
   under every project step page (owner 00–06, firm 00–08; not a side surface,
@@ -574,6 +575,18 @@ commit per item; shots in `screenshots/k11/` (light + dark).
   diff's causes: "Price added by <name>" / "Correction by <name>" / reverted
   (`line_keys` match exactly); Revisions offers "Revert to rev N". Live:
   `scripts/k11-add-price-shots.mjs`.
+  **Matching (approval check, 14 Oct)**: a price follows its LINE — section +
+  item_key (+ the room when a line carries `room_id`; today's lines are
+  aggregated, none do) — never its REF or position. A key not on exactly ONE
+  line (gone from the scope, or a repeated identity — `#n` is positional) is
+  UNMATCHED: it prices nothing, is never attached elsewhere, and the document
+  records it (`own_basis.unmatched`); the Issues navigator leads with "YOUR
+  PRICES — NO LONGER MATCHED · Your price for <item> no longer matches a line"
+  → **Remove** (`POST …/boq-release`: stops applying, kept on record, no
+  revision) or **Re-apply to…** (the member picks the line; `boq-apply {
+  correction_id, row_key, retarget: true }` → the next revision). Tests: the
+  scope change that renumbers REFs in `own-basis.test.ts`; live:
+  `scripts/k11-unmatched-price-shots.mjs`.
 - **Move to firm…** (#5): in the project ⋯ menu (home row + Overview / hub),
   the Delete dialog's layout. `assignProjectFirm` holds the rules: attach / move
   = the project's CREATOR (403 `not_project_creator`) who is in the target firm;

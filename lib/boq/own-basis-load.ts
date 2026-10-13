@@ -24,6 +24,7 @@ export const toApplied = (r: Row): AppliedCorrection => ({
   note: (r.note as string | null) ?? null,
   byName: (r.applied_by_name as string | null) ?? null,
   appliedAt: String(r.applied_at),
+  label: (r.line_description as string | null) ?? null,
 });
 
 /** The project's applied, un-reverted corrections — [] before 057. */
@@ -31,7 +32,7 @@ export async function loadAppliedCorrections(db: SupabaseClient, projectId: stri
   try {
     const { data, error } = await db
       .from("boq_corrections")
-      .select("id, correction_type, line_key, new_value, origin, basis_kind, note, applied_by_name, applied_at, applied_boq_id, reverted_at")
+      .select("id, correction_type, line_key, new_value, origin, basis_kind, note, applied_by_name, applied_at, applied_boq_id, reverted_at, line_description")
       .eq("project_id", projectId)
       .not("applied_boq_id", "is", null)
       .is("reverted_at", null);

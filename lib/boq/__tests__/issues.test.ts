@@ -73,6 +73,15 @@ describe("boqIssues", () => {
     expect(list.count).toBe(5);
   });
 
+  it("K11: an applied price that no longer matches a line leads the list — Remove / Re-apply to…", () => {
+    const m = build({ unmatched: [{ correction_id: "c1", label: "Soft Landscaping — Planting beds — soil preparation and planting (no reference rate — QS to price)", type: "rate", value: 85, basis_kind: "own_estimate", note: "Oct 2026", by: "abdallah" }] });
+    const list = boqIssues(m, null);
+    expect(list.groups[0]).toMatchObject({ key: "unmatched", title: "YOUR PRICES — NO LONGER MATCHED", count: 1 });
+    expect(list.groups[0]!.rows[0]).toMatchObject({ title: "Your price for Planting beds — soil preparation and planting no longer matches a line", correctionId: "c1", lineKey: null, actions: [{ key: "release", label: "Remove" }, { key: "retarget", label: "Re-apply to…" }] });
+    expect(list.groups[0]!.rows[0]!.detail).toBe("rate 85.00 · My own estimate — Oct 2026 · added by abdallah");
+    expect(list.count).toBe(boqIssues(build(), null).count + 1);
+  });
+
   it("nothing to fix → N = 0 and the button is not drawn", () => {
     const priced = REV4.sections.map((s) => ({ ...s, lines: s.lines.map((l) => ({ ...l, rate_status: "priced", qty_derived: false, rate_aed: l.rate_aed || 1, total_aed: l.total_aed || l.quantity })) }));
     const clean = build({ boq: { ...REV4, sections: priced } as ReviewBoq });

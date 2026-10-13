@@ -109,5 +109,7 @@ export interface ReviewModel {
   };
   /** The client's own entered budget — owner projects only (H7). */
   budget: number | null;
+  /** K11: applied prices whose line is not in this revision — never dropped silently (Issues navigator). */
+  unmatchedPrices: { correctionId: string; item: string; type: "rate" | "quantity"; value: number; basis: string | null; by: string | null }[];
   programme: { total_days: number; phases: { name: string; start_day: number; days: number }[]; basis: string } | null;
 }

@@ -18,6 +18,7 @@ import {
   softDeleteProject,
 } from "../lifecycle";
 import { StoreError } from "../access";
+import { sweepIntakeDrafts } from "../intake";
 
 // K10 #1 (spec §6.12) — project delete is soft, permissioned, restorable, and
 // purged with its Storage objects. Synthetic rows and synthetic files only.
@@ -213,6 +214,24 @@ describe("purge — rows and Storage", () => {
       uploads: ["pending/plan/other/u/def.pdf"],
     });
     expect(db.tables.projects!.map((p) => p.id).sort()).toEqual(["frm", "other"]);
+  });
+
+  it("K11: an auto-cleaned intake draft is never in Recently deleted, and leaves by the normal 30-day purge", async () => {
+    // The owner's upload became a draft nobody continued; the daily sweep soft-deleted it (no deleted_by).
+    const swept = { id: "draft", name: "Untitled", display_name: null, firm_id: null, created_by: owner.id, deleted_at: null as string | null, deleted_by: null, draft_since: "2026-09-01T08:00:00.000Z" };
+    db.tables.projects!.push(swept);
+    db.tables.project_members!.push({ project_id: "draft", user_id: owner.id });
+    expect(await sweepIntakeDrafts(db.client, { now: new Date("2026-09-02T09:00:00Z") })).toEqual(["draft"]);
+    expect(swept.deleted_at).toBe("2026-09-02T09:00:00.000Z");
+    // A project the owner deleted themselves sits beside it.
+    await softDeleteProject(db.client, "own", owner, "Villa 12, The Springs");
+    const listed = (await listRecentlyDeleted(db.client, owner)).map((p) => p.id);
+    expect(listed).toEqual(["own"]); // the draft is hidden — nobody ever saw it
+    // 30 days after its sweep, the normal purge takes it (rows + Storage), exactly like any deleted project.
+    const later = await purgeExpiredProjects(db.client, { apply: false, now: new Date("2026-10-03T00:00:00Z") });
+    expect(later.projects.map((p) => p.projectId)).toContain("draft");
+    const early = await purgeExpiredProjects(db.client, { apply: false, now: new Date("2026-09-20T00:00:00Z") });
+    expect(early.projects.map((p) => p.projectId)).not.toContain("draft");
   });
 
   it("the daily job purges only projects deleted more than 30 days ago, and dry-run removes nothing", async () => {
