@@ -14,6 +14,8 @@
 // Georgia there). Drawings are always light (spec §6.11).
 // =============================================================================
 
+import type { LinearElementKind } from "@/lib/plan/elements";
+
 export const SHEET_W = 420; // mm (A3 landscape)
 export const SHEET_H = 297;
 export const SHEET_MARGIN = 12;
@@ -30,10 +32,39 @@ export const INK_500 = "#62676B";
 export const INK_100 = "#D6D1C5";
 /** Inverse text on ink (the status strip, the draft stamp). */
 export const ON_INK = "#F5F2EA";
-export const BONE = "#EDE6D8";
-export const BRASS = "#A4793A";
-export const TERRACOTTA = "#9d3e1d"; // `tertiary`
+/**
+ * K9 (K8 review ruling 5): drawings are INK ONLY. No brass, no terracotta, no
+ * hue inside a sheet — demolition is dashed, an estimated item is hatched and
+ * carries the derived ring (○), symbols are ink, fills are paper tints.
+ * lib/drawings/__tests__/ink-only.test.ts holds every sheet module to it.
+ */
+export const BONE = "#ECE8DE"; // paper-200 — a fill tint (the name predates K9)
+export const PAPER_100 = "#F5F2EA";
 export const PAPER = "#FFFFFF";
+/** The derived mark as text — the open ring of the provenance glyph. */
+export const DERIVED_GLYPH = "○";
+
+/** The derived ring beside an estimated item (the provenance glyph's ring, in ink). */
+export function derivedRing(cx: number, cy: number, r = 0.9): string {
+  return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r}" fill="${PAPER}" stroke="${INK_900}" stroke-width="0.3" data-derived-mark="true"/>`;
+}
+
+/**
+ * A run's ink on a sheet. `LINEAR_ELEMENT_META.color` is the EDITOR's hue and
+ * never reaches a drawing: on paper a run is told apart by its tone and its
+ * code (CT / BN / PL …), which every run label carries.
+ */
+export const RUN_INK: Record<LinearElementKind, string> = {
+  boundary_wall: INK_900,
+  counter_run: INK_900,
+  bench_run: INK_700,
+  planter_run: INK_500,
+  stepping_path: INK_500,
+  string_light_run: INK_700,
+};
+
+/** The hatch an estimated area is drawn with: sparse ink diagonals. Put `HATCH_DEFS` in the sheet's <defs>. */
+export const HATCH_DEFS = `<pattern id="pat-derived" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="2.4" stroke="${INK_500}" stroke-width="0.14"/></pattern>`;
 
 export const FONT_UI = "var(--font-plex-sans), 'IBM Plex Sans', Arial, Helvetica, sans-serif";
 export const FONT_MONO =
@@ -61,8 +92,20 @@ export interface SheetMeta {
   draft?: string | null;
   /** K8: who prepared the set — the project's firm (its own project only), else omitted. */
   preparedBy?: string | null;
-  /** K8: the drawing revision, when one is kept. Plans have none today: "—". */
-  rev?: string | null;
+  /**
+   * K9: the BoQ revision the set was generated from (`sheetRev`) — the rail's
+   * rev N = the N-th BoQ, so a sheet and the bill beside it carry the same REV.
+   */
+  rev: string;
+}
+
+/**
+ * K9 (K8 review): a sheet's REV is the BoQ revision it was generated from —
+ * never "—". rev N = the project's N-th BoQ (oldest = rev 1, the revisions
+ * view's numbering); a set drawn before the first BoQ is rev 0.
+ */
+export function sheetRev(boqRevisions: number): string {
+  return String(Math.max(0, Math.floor(boqRevisions)));
 }
 
 /** The status every sheet carries until a construction issue exists (68:1542). */
@@ -135,7 +178,7 @@ function titleBlock(meta: SheetMeta, sheetNumber: string, sheetTitle: string): s
     ${tl(cols[1]! + 2.5, r[2]! + 3.6, "Scale")}
     ${tv(cols[1]! + 2.5, r[2]! + 9, `${meta.scale} @ A3`, 3.2, FONT_MONO)}
     ${tl(cols[2]! + 2.5, r[2]! + 3.6, "Rev")}
-    ${tv(cols[2]! + 2.5, r[2]! + 9, meta.rev?.trim() || "—", 3.2, FONT_MONO)}
+    ${tv(cols[2]! + 2.5, r[2]! + 9, meta.rev, 3.2, FONT_MONO)}
     ${tl(cols[3]! + 2.5, r[2]! + 3.6, "Date")}
     ${tv(cols[3]! + 2.5, r[2]! + 9, fmtDate(meta.dateISO), 3.2, FONT_MONO)}
     ${tl(x + 2.5, r[3]! + 3.4, "Prepared by")}

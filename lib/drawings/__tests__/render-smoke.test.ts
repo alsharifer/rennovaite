@@ -14,7 +14,7 @@ const META: SheetMeta = {
   community: "Mudon Al Naseem",
   level: "first floor",
   scale: "1:100",
-  dateISO: "2026-07-28",
+  dateISO: "2026-07-28", rev: "1",
 };
 
 describe("drawing sheets render deterministic, valid SVG", () => {

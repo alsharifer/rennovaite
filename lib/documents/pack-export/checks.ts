@@ -45,7 +45,7 @@ export interface PrintedInput {
   } | null;
   pairsWithAdds: { outOfCrop: string[]; caption: string }[];
   /** L4: present when the run produced the firm's client proposal. */
-  proposal?: { pages: string[]; brand: string; terms: boolean; basis: string | null } | null;
+  proposal?: { pages: string[]; brand: string; terms: boolean; basis: string | null; reference?: string | null } | null;
 }
 
 /** Text a client proposal must never print: a rate's provenance is the firm's business, not the client's. */
@@ -160,6 +160,9 @@ export function printedChecks(i: PrintedInput): PackCheck[] {
     if (i.boq.programme) check("the proposal carries the indicative programme", pp.some((p) => p.includes("data-programme-phase")));
     const propFonts = pp.flatMap((s) => [...s.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1])));
     if (propFonts.length) check("legibility: no text in the proposal under 2.2 mm (the prepared-with mark) and body ≥ 2.6 mm", propFonts.every((f) => f >= 2.2), `min ${Math.min(...propFonts)} mm`);
+    // K9: the firm's reference — on the cover and on every numbered page.
+    const ref = i.proposal.reference ?? null;
+    check("the proposal carries its reference on the cover and every page", !!ref && !!pp[0]?.includes(`data-proposal-ref="cover"`) && pp.slice(1).every((p) => p.includes(`data-proposal-ref="header"`) && p.includes(`>${ref}`)), ref ?? "no reference assigned");
     check("the proposal's pricing basis was a stated choice", i.proposal.basis === "firm_basis" || i.proposal.basis === "book_reviewed" || i.proposal.basis === "accepted", String(i.proposal.basis));
   }
 

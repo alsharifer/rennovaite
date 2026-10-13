@@ -18,7 +18,7 @@ const graph = buildPlanGraph({
   plot: rec.plot,
   source: "user_drawn",
 });
-const META = { projectNameEn: "Villa 94 garden", projectNameAr: null, community: "Dubai", level: "ground", scale: "1:100", dateISO: "2026-09-13" };
+const META = { projectNameEn: "Villa 94 garden", projectNameAr: null, community: "Dubai", level: "ground", scale: "1:100", dateISO: "2026-09-13", rev: "1" };
 const variants = Object.fromEntries(rec.elements.map((e) => [e.id, e.variant]));
 const sheets = buildElevationSheets(graph, rec.fixtures, META, variants);
 

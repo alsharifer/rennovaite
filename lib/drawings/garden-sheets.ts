@@ -34,7 +34,9 @@ import { roomTypeLabel } from "@/lib/plan/zones";
 
 import {
   BONE,
-  BRASS,
+  DERIVED_GLYPH,
+  HATCH_DEFS,
+  derivedRing,
   esc,
   FONT_DISPLAY,
   FONT_MONO,
@@ -48,7 +50,9 @@ import {
   SHEET_H,
   SHEET_MARGIN,
   SHEET_W,
-  TERRACOTTA,
+  ON_INK,
+  PAPER_100,
+  RUN_INK,
   TITLE_H,
   TITLE_W,
   type SheetMeta,
@@ -299,32 +303,39 @@ export function toMetres(graph: PlanGraph, p: [number, number]): Point {
 // --- Styling -------------------------------------------------------------------
 
 const ZONE_STYLE: Record<string, { fill: string; pattern: string; label: string }> = {
-  paving: { fill: "#F4EFE6", pattern: "pat-paving", label: "Paving" },
-  path: { fill: "#F4EFE6", pattern: "pat-paving", label: "Path" },
-  artificial_grass: { fill: "#E4EBDD", pattern: "pat-grass", label: "Artificial grass" },
-  planting_bed: { fill: "#E8E4D2", pattern: "pat-planting", label: "Planting" },
-  deck: { fill: "#EFE3D0", pattern: "pat-deck", label: "Deck" },
-  structure: { fill: "#E6E2EA", pattern: "pat-structure", label: "Structure" },
-  pool: { fill: "#DDEAF0", pattern: "pat-water", label: "Pool" },
+  paving: { fill: PAPER_100, pattern: "pat-paving", label: "Paving" },
+  path: { fill: PAPER_100, pattern: "pat-paving", label: "Path" },
+  artificial_grass: { fill: BONE, pattern: "pat-grass", label: "Artificial grass" },
+  planting_bed: { fill: BONE, pattern: "pat-planting", label: "Planting" },
+  deck: { fill: PAPER_100, pattern: "pat-deck", label: "Deck" },
+  structure: { fill: BONE, pattern: "pat-structure", label: "Structure" },
+  pool: { fill: PAPER, pattern: "pat-water", label: "Pool" },
 };
 const zoneStyle = (type: string | null) => ZONE_STYLE[type ?? ""] ?? { fill: BONE, pattern: "", label: roomTypeLabel(type) };
 
-const IRRIGATION_BLUE = "#2F6F9F";
-const LIGHT_AMBER = "#B7791F";
+// K9: ink only — irrigation and lighting are told apart by line style and symbol code, not hue.
+const IRRIGATION_BLUE = INK_700;
+const LIGHT_AMBER = INK_900;
 
 function defs(): string {
   return `<defs>
     <pattern id="pat-paving" width="3" height="3" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="0.22" fill="${INK_500}"/></pattern>
-    <pattern id="pat-grass" width="3.2" height="3.2" patternUnits="userSpaceOnUse"><path d="M1 2.2 L1.6 1.1 L2.2 2.2" fill="none" stroke="#5B7F4A" stroke-width="0.2"/></pattern>
-    <pattern id="pat-planting" width="2.6" height="2.6" patternUnits="userSpaceOnUse"><path d="M0 2.6 L2.6 0" stroke="#7A6A3A" stroke-width="0.18"/></pattern>
-    <pattern id="pat-deck" width="2" height="2" patternUnits="userSpaceOnUse"><path d="M0 1 L2 1" stroke="#8A5A2B" stroke-width="0.15"/></pattern>
-    <pattern id="pat-structure" width="2.4" height="2.4" patternUnits="userSpaceOnUse"><path d="M0 0 L2.4 2.4 M2.4 0 L0 2.4" stroke="#6B5B7A" stroke-width="0.14"/></pattern>
-    <pattern id="pat-water" width="3" height="3" patternUnits="userSpaceOnUse"><path d="M0 1.5 Q0.75 0.9 1.5 1.5 T3 1.5" fill="none" stroke="#2F6F9F" stroke-width="0.16"/></pattern>
+    <pattern id="pat-grass" width="3.2" height="3.2" patternUnits="userSpaceOnUse"><path d="M1 2.2 L1.6 1.1 L2.2 2.2" fill="none" stroke="${INK_500}" stroke-width="0.2"/></pattern>
+    <pattern id="pat-planting" width="2.6" height="2.6" patternUnits="userSpaceOnUse"><path d="M0 2.6 L2.6 0" stroke="${INK_500}" stroke-width="0.18"/></pattern>
+    <pattern id="pat-deck" width="2" height="2" patternUnits="userSpaceOnUse"><path d="M0 1 L2 1" stroke="${INK_500}" stroke-width="0.15"/></pattern>
+    <pattern id="pat-structure" width="2.4" height="2.4" patternUnits="userSpaceOnUse"><path d="M0 0 L2.4 2.4 M2.4 0 L0 2.4" stroke="${INK_500}" stroke-width="0.14"/></pattern>
+    <pattern id="pat-water" width="3" height="3" patternUnits="userSpaceOnUse"><path d="M0 1.5 Q0.75 0.9 1.5 1.5 T3 1.5" fill="none" stroke="${INK_500}" stroke-width="0.16"/></pattern>
+    ${HATCH_DEFS}
   </defs>`;
 }
 
 function polyPts(poly: readonly Point[], f: Frame): string {
   return poly.map(([x, y]) => `${f2(f.px(x))},${f2(f.py(y))}`).join(" ");
+}
+
+/** Estimated, not measured: a derived outline (037) or a derived area (035). */
+export function isEstimatedZone(room: Pick<Room, "area_derived_m2"> & { dims_derived?: boolean | null }): boolean {
+  return !!room.dims_derived || room.area_derived_m2 != null;
 }
 
 function zoneShape(room: Room, f: Frame, opts: { faint?: boolean; highlight?: string } = {}): string {
@@ -333,9 +344,13 @@ function zoneShape(room: Room, f: Frame, opts: { faint?: boolean; highlight?: st
   const fillOpacity = opts.faint ? 0.35 : 1;
   const strokeOpacity = opts.faint ? 0.35 : 1;
   const stroke = opts.highlight ?? INK_900;
+  // K9 (ruling 5): an ESTIMATED zone — its outline or its area derived, not measured — is hatched;
+  // its label carries the derived ring (zoneRefMark).
+  const estimated = isEstimatedZone(room);
   return (
     `<polygon points="${pts}" fill="${s.fill}" fill-opacity="${fillOpacity}" stroke="none"/>` +
     (s.pattern ? `<polygon points="${pts}" fill="url(#${s.pattern})" fill-opacity="${fillOpacity}" stroke="none"/>` : "") +
+    (estimated ? `<polygon points="${pts}" fill="url(#pat-derived)" fill-opacity="${fillOpacity}" stroke="none" data-estimated="true"/>` : "") +
     `<polygon points="${pts}" fill="none" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${opts.highlight ? 0.55 : 0.3}" data-zone="${esc(room.id)}"/>`
   );
 }
@@ -365,9 +380,9 @@ function runSvg(el: LinearElement, f: Frame, withLabel = true): string {
   const pts = el.polyline.map(([x, y]) => `${f2(f.px(x))},${f2(f.py(y))}`).join(" ");
   const mid = el.polyline[Math.floor(el.polyline.length / 2)] ?? el.polyline[0]!;
   const label = withLabel
-    ? `<text x="${f2(f.px(mid[0]) + 1.2)}" y="${f2(f.py(mid[1]) - 1.2)}" font-size="2.4" fill="${meta.color}" style="font-family:${FONT_MONO}" data-dim="run" data-mm="${Math.round(el.length_m * 1000)}">${meta.code} ${Math.round(el.length_m * 1000)}</text>`
+    ? `<text x="${f2(f.px(mid[0]) + 1.2)}" y="${f2(f.py(mid[1]) - 1.2)}" font-size="2.4" fill="${RUN_INK[el.kind]}" style="font-family:${FONT_MONO}" data-dim="run" data-mm="${Math.round(el.length_m * 1000)}">${meta.code} ${Math.round(el.length_m * 1000)}</text>`
     : "";
-  return `<polyline points="${pts}" fill="none" stroke="${meta.color}" stroke-width="${f2(w)}" stroke-opacity="${removed ? 0.3 : 0.85}"${dash} stroke-linecap="butt" stroke-linejoin="miter" data-run="${esc(el.id)}"/>${label}`;
+  return `<polyline points="${pts}" fill="none" stroke="${RUN_INK[el.kind]}" stroke-width="${f2(w)}" stroke-opacity="${removed ? 0.3 : 0.85}"${dash} stroke-linecap="butt" stroke-linejoin="miter" data-run="${esc(el.id)}"/>${label}`;
 }
 
 /**
@@ -498,7 +513,7 @@ export function gatesSvg(graph: PlanGraph, f: Frame): string {
     const t = b ? Math.max(0.15, alongX ? b.maxY - b.minY : b.maxX - b.minX) : 0.2;
     const w = o.width_mm / 1000;
     const [cx, cy] = o.position!;
-    const color = o.site_reference ? BRASS : INK_900;
+    const color = o.site_reference ? INK_500 : INK_900;
     const jamb = (d: number) =>
       alongX
         ? `<line x1="${f2(f.px(cx + d))}" y1="${f2(f.py(cy - t / 2))}" x2="${f2(f.px(cx + d))}" y2="${f2(f.py(cy + t / 2))}" stroke="${INK_900}" stroke-width="0.35"/>`
@@ -526,7 +541,7 @@ function shedFootprint(graph: PlanGraph, u: GardenFixture, f: Frame, removed: bo
   const d = (typeof sp.depth_mm === "number" ? sp.depth_mm : 1000) / 1000;
   const [x, y] = toMetres(graph, u.position);
   const dash = u.site_reference ? ` stroke-dasharray="1 0.6"` : "";
-  return `<rect x="${f2(f.px(x - w / 2))}" y="${f2(f.py(y - d / 2))}" width="${f2(w * f.k)}" height="${f2(d * f.k)}" fill="#D9DCDF" fill-opacity="${removed ? 0.15 : 0.6}" stroke="${u.site_reference ? BRASS : INK_700}" stroke-width="0.3"${dash}/>`;
+  return `<rect x="${f2(f.px(x - w / 2))}" y="${f2(f.py(y - d / 2))}" width="${f2(w * f.k)}" height="${f2(d * f.k)}" fill="#D9DCDF" fill-opacity="${removed ? 0.15 : 0.6}" stroke="${u.site_reference ? INK_500 : INK_700}" stroke-width="0.3"${dash}/>`;
 }
 
 /** Tags for step treads (only the top tread of each footprint is readable, so all are tagged). */
@@ -549,7 +564,7 @@ function structureTopTags(graph: PlanGraph, fixtures: readonly GardenFixture[], 
     const b = bboxOf(z.polygon);
     const p: Point = [(b.minX + b.maxX) / 2, b.minY];
     if (!include(p)) continue;
-    s += planLevelTag(f.px(b.minX) + 1.5, f.py(b.minY) + 2.4, (z.level_mm ?? 0) + z.height_mm!, "TRL", `room:${z.id}:level_mm + room:${z.id}:height_mm`, BRASS);
+    s += planLevelTag(f.px(b.minX) + 1.5, f.py(b.minY) + 2.4, (z.level_mm ?? 0) + z.height_mm!, "TRL", `room:${z.id}:level_mm + room:${z.id}:height_mm`);
   }
   const code: Record<string, string> = { counter_run: "CTL", bench_run: "TOS", planter_run: "TOC" };
   for (const el of graph.elements.filter((e) => (e.kind === "counter_run" || e.kind === "bench_run" || e.kind === "planter_run") && isNewWork(e))) {
@@ -560,7 +575,7 @@ function structureTopTags(graph: PlanGraph, fixtures: readonly GardenFixture[], 
     const lv = levelUnder(graph, mid);
     const vertical = Math.abs(b[0] - a[0]) < Math.abs(b[1] - a[1]);
     const dy = el.kind === "planter_run" ? -2.2 : 2.6;
-    s += planLevelTag(f.px(mid[0]) + (vertical ? 1.6 : -4), f.py(mid[1]) + (vertical ? (el.kind === "planter_run" ? -6 : 6) : dy), lv.mm + el.height_mm, code[el.kind] ?? "TOC", `${lv.src} + el:${el.id}:height_mm`, LINEAR_ELEMENT_META[el.kind].color);
+    s += planLevelTag(f.px(mid[0]) + (vertical ? 1.6 : -4), f.py(mid[1]) + (vertical ? (el.kind === "planter_run" ? -6 : 6) : dy), lv.mm + el.height_mm, code[el.kind] ?? "TOC", `${lv.src} + el:${el.id}:height_mm`, RUN_INK[el.kind]);
   }
   for (const u of fixtures.filter((x) => x.layer === "landscape" && x.type !== "tree" && typeof x.spec?.height_mm === "number" && isNewWork({ site_reference: x.site_reference ?? false, disposition: x.disposition ?? null }))) {
     const m = toMetres(graph, u.position);
@@ -687,14 +702,14 @@ function levelsLegend(y: number, graph?: PlanGraph): { svg: string; y: number } 
   }
   const levels = graph ? statedLevels(graph) : [];
   if (levels.length === 0) {
-    const t = panelText(cy, "No levels are carried by this plan. Confirm FFL / GL / TS on site before setting out falls or steps.", { size: 2.3, color: TERRACOTTA });
+    const t = panelText(cy, `${DERIVED_GLYPH} No levels are carried by this plan. Confirm FFL / GL / TS on site before setting out falls or steps.`, { size: 2.3, color: INK_900 });
     return { svg: svg + t.svg, y: t.y + 2 };
   }
   const t1 = panelText(cy, `Datum ±000 FFL. Levels stated on the plan: ${levels.map(fmtLevel).join(", ")}. Structure tops tagged TRL / CTL / TOS / TOC.`, { size: 2.3 });
   svg += t1.svg;
   const unstated = graph!.rooms.filter((r) => r.unroofed && r.level_mm == null);
   if (unstated.length === 0) return { svg, y: t1.y + 2 };
-  const t2 = panelText(t1.y + 0.8, `No level stated for: ${unstated.map((r) => r.name_en).join(", ")} (top of soil). Confirm on site.`, { size: 2.3, color: TERRACOTTA });
+  const t2 = panelText(t1.y + 0.8, `${DERIVED_GLYPH} No level stated for: ${unstated.map((r) => r.name_en).join(", ")} (top of soil). Confirm on site.`, { size: 2.3, color: INK_900 });
   return { svg: svg + t2.svg, y: t2.y + 2 };
 }
 
@@ -735,7 +750,7 @@ export function renderSitePlan(
 
   let body = defs();
   body += contextSvg(graph, f, true);
-  body += graph.rooms.map((r) => zoneShape(r, f, r.site_reference ? { highlight: BRASS } : {})).join("");
+  body += graph.rooms.map((r) => zoneShape(r, f, r.site_reference ? { highlight: INK_900 } : {})).join("");
   body += wallsSvg(graph, f);
   body += gatesSvg(fullGraph, f);
 
@@ -754,16 +769,16 @@ export function renderSitePlan(
     if (u.type === "tree") {
       const s = (u.spec ?? {}) as Record<string, unknown>;
       const r = ((typeof s.canopy_mm === "number" ? s.canopy_mm : 3000) / 2000) * f.k;
-      body += `<circle cx="${f2(f.px(m[0]))}" cy="${f2(f.py(m[1]))}" r="${f2(r)}" fill="#4F7A52" fill-opacity="${removed ? 0.04 : 0.12}" stroke="#4F7A52" stroke-width="0.25"${u.site_reference ? ' stroke-dasharray="1 0.6"' : ""}/>`;
+      body += `<circle cx="${f2(f.px(m[0]))}" cy="${f2(f.py(m[1]))}" r="${f2(r)}" fill="${INK_500}" fill-opacity="${removed ? 0.03 : 0.08}" stroke="${INK_700}" stroke-width="0.25"${u.site_reference ? ' stroke-dasharray="1 0.6"' : ""}/>`;
     }
     if (u.type === "shed") body += shedFootprint(graph, u, f, removed);
-    body += unitSymbol(f.px(m[0]), f.py(m[1]), `${removed ? "×" : ""}${UNIT_META[u.type]?.code ?? "?"}`, u.site_reference ? BRASS : INK_900, u.id);
+    body += unitSymbol(f.px(m[0]), f.py(m[1]), `${removed ? "×" : ""}${UNIT_META[u.type]?.code ?? "?"}`, u.site_reference ? INK_500 : INK_900, u.id);
   }
   // Existing zones the design removes: faint, crossed, named.
   for (const r of removedZones) {
     const p = labelPoint(r.polygon);
-    body += `<polygon points="${polyPts(r.polygon, f)}" fill="none" stroke="${TERRACOTTA}" stroke-width="0.35" stroke-dasharray="1.4 0.9" data-zone="${esc(r.id)}"/>`;
-    body += `<text x="${f2(f.px(p[0]))}" y="${f2(f.py(p[1]))}" text-anchor="middle" font-size="2.2" fill="${TERRACOTTA}" style="font-family:${FONT_UI};font-weight:600">${esc(r.name_en)} — TO REMOVE</text>`;
+    body += `<polygon points="${polyPts(r.polygon, f)}" fill="none" stroke="${INK_900}" stroke-width="0.35" stroke-dasharray="1.4 0.9" data-zone="${esc(r.id)}"/>`;
+    body += `<text x="${f2(f.px(p[0]))}" y="${f2(f.py(p[1]))}" text-anchor="middle" font-size="2.2" fill="${INK_900}" style="font-family:${FONT_UI};font-weight:600">${esc(r.name_en)} — TO REMOVE</text>`;
   }
 
   // Zone tags, with the zone's level where the plan has more than one.
@@ -772,7 +787,8 @@ export function renderSitePlan(
     const p = labelPoint(r.polygon);
     const x = f.px(p[0]);
     const y = f.py(p[1]);
-    body += `<circle cx="${f2(x)}" cy="${f2(y)}" r="2.3" fill="${PAPER}" stroke="${BRASS}" stroke-width="0.35"/><text x="${f2(x)}" y="${f2(y + 0.8)}" text-anchor="middle" font-size="2" fill="${BRASS}" style="font-family:${FONT_MONO};font-weight:600">${zoneRef(i)}</text>`;
+    body += `<circle cx="${f2(x)}" cy="${f2(y)}" r="2.3" fill="${PAPER}" stroke="${INK_900}" stroke-width="0.35"/><text x="${f2(x)}" y="${f2(y + 0.8)}" text-anchor="middle" font-size="2" fill="${INK_900}" style="font-family:${FONT_MONO};font-weight:600">${zoneRef(i)}</text>`;
+    if (isEstimatedZone(r)) body += derivedRing(x + 2.7, y - 2.1); // K9: estimated — hatched, with the ring
     if (levelsDiffer && r.level_mm != null) body += planLevelTag(x - 3.5, y + 4.4, r.level_mm, "FFL", `room:${r.id}:level_mm`);
   });
   if (levelsDiffer) body += stepLevelTags(graph, f);
@@ -790,7 +806,7 @@ export function renderSitePlan(
     const approx = r.dims_derived ? "≈ " : "";
     const short = r.name_en.length > 32 ? `${r.name_en.slice(0, 31).trimEnd()}…` : r.name_en;
     if (short !== r.name_en) truncated.push({ ref: zoneRef(i), name: r.name_en });
-    body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${BRASS}" style="font-family:${FONT_MONO}">${zoneRef(i)}</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(short)}</text><text x="${panelX() + 70}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(zoneStyle(r.type).label)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO}" data-area="${r.area_m2}">${approx}${r.area_m2.toFixed(2)}${flag}</text>`;
+    body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${INK_500}" style="font-family:${FONT_MONO}">${zoneRef(i)}</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(short)}</text><text x="${panelX() + 70}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(zoneStyle(r.type).label)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO}" data-area="${r.area_m2}">${approx}${r.area_m2.toFixed(2)}${flag}</text>`;
     y += 3.5;
   });
   const total = r2(zones.reduce((s, r) => s + r.area_m2, 0));
@@ -819,7 +835,7 @@ export function renderSitePlan(
   }
   for (const el of uniqueRunKinds(graph)) {
     const m = LINEAR_ELEMENT_META[el];
-    body += `<line x1="${panelX()}" y1="${f2(y - 0.9)}" x2="${panelX() + 6}" y2="${f2(y - 0.9)}" stroke="${m.color}" stroke-width="1"/><text x="${panelX() + 9}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${m.code} — ${esc(m.label)} (length mm)</text>`;
+    body += `<line x1="${panelX()}" y1="${f2(y - 0.9)}" x2="${panelX() + 6}" y2="${f2(y - 0.9)}" stroke="${RUN_INK[el]}" stroke-width="1"/><text x="${panelX() + 9}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${m.code} — ${esc(m.label)} (length mm)</text>`;
     y += 4;
   }
   body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">All dimensions in millimetres. Plot boundary dashed.</text>`;
@@ -854,7 +870,7 @@ export function renderSitePlan(
   if (fullGraph.meta.plot?.dims_derived || zones.some((r) => r.dims_derived)) {
     body += panelHeading(y, "Derived dimensions (≈)");
     y += 5;
-    const t = panelText(y, `Boundary and zone dimensions are DERIVED, not measured: ${fullGraph.meta.plot?.dims_note ?? zones.find((r) => r.dims_derived)?.derived_note ?? "reference layout"}.`, { size: 2.2, color: TERRACOTTA });
+    const t = panelText(y, `Boundary and zone dimensions are DERIVED, not measured: ${fullGraph.meta.plot?.dims_note ?? zones.find((r) => r.dims_derived)?.derived_note ?? "reference layout"}. Hatched zones with ${DERIVED_GLYPH} are estimated.`, { size: 2.2, color: INK_900 });
     body += t.svg;
     y = t.y + 2;
   }
@@ -932,7 +948,7 @@ export function renderZoneSheet(
   body += contextSvg(graph, f, false);
   body += gatesSvg(graph, f);
   body += graph.rooms.filter((r) => r.id !== zone.id).map((r) => zoneShape(r, f, { faint: true })).join("");
-  body += zoneShape(zone, f, { highlight: BRASS });
+  body += zoneShape(zone, f, { highlight: INK_900 });
   body += wallsSvg(graph, f);
 
   // What stands in this zone.
@@ -967,7 +983,7 @@ export function renderZoneSheet(
 
   // Side panel.
   let y = SHEET_MARGIN + 8;
-  body += `<text x="${panelX()}" y="${f2(y + 2)}" font-size="7" fill="${BRASS}" style="font-family:${FONT_MONO}">${esc(ref)}</text><text x="${panelX() + 18}" y="${f2(y + 2)}" font-size="5" fill="${INK_900}" style="font-family:${FONT_DISPLAY}">${esc(zone.name_en)}</text>`;
+  body += `<text x="${panelX()}" y="${f2(y + 2)}" font-size="7" fill="${INK_900}" style="font-family:${FONT_MONO}">${esc(ref)}</text><text x="${panelX() + 18}" y="${f2(y + 2)}" font-size="5" fill="${INK_900}" style="font-family:${FONT_DISPLAY}">${esc(zone.name_en)}</text>`;
   y += 10;
   const perimeter = r2(zone.polygon.reduce((s, a, i) => {
     const b = zone.polygon[(i + 1) % zone.polygon.length]!;
@@ -997,7 +1013,7 @@ export function renderZoneSheet(
     y += 5;
     for (const el of runs) {
       const m = LINEAR_ELEMENT_META[el.kind];
-      body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${m.color}" style="font-family:${FONT_MONO}">${m.code}</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(m.label)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO}">${Math.round(el.length_m * 1000)} mm</text>`;
+      body += `<text x="${panelX()}" y="${f2(y)}" font-size="2.4" fill="${RUN_INK[el.kind]}" style="font-family:${FONT_MONO}">${m.code}</text><text x="${panelX() + 10}" y="${f2(y)}" font-size="2.4" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(m.label)}</text><text x="${panelX() + PANEL_W}" y="${f2(y)}" text-anchor="end" font-size="2.4" fill="${INK_900}" style="font-family:${FONT_MONO}">${Math.round(el.length_m * 1000)} mm</text>`;
       y += 3.6;
     }
     for (const u of units) {
@@ -1018,7 +1034,7 @@ export function renderZoneSheet(
   }
 
   if (hasCurve(zone.polygon)) {
-    const t = panelText(y, "Curved edge: traced chords, not dimensioned individually. Set out the curve from its end points on site.", { size: 2.3, color: TERRACOTTA });
+    const t = panelText(y, `${DERIVED_GLYPH} Curved edge: traced chords, not dimensioned individually. Set out the curve from its end points on site.`, { size: 2.3, color: INK_900 });
     body += t.svg;
     y = t.y + 2;
   }
@@ -1099,7 +1115,7 @@ export function renderLightingOverlay(
   }
 
   let y = SHEET_MARGIN + 8;
-  body += `<rect x="${panelX() - 2}" y="${f2(y - 4)}" width="${PANEL_W + 4}" height="15" fill="#FFF7E8" stroke="${LIGHT_AMBER}" stroke-width="0.35"/>`;
+  body += `<rect x="${panelX() - 2}" y="${f2(y - 4)}" width="${PANEL_W + 4}" height="15" fill="${PAPER_100}" stroke="${INK_900}" stroke-width="0.35"/>`;
   const banner = panelText(y + 0.5, LIGHTING_SOURCE_STATEMENT, { size: 2.6, color: INK_900, maxChars: 70 });
   body += banner.svg;
   y += 16;
@@ -1314,10 +1330,10 @@ export function renderCoverSheet(
 
   if (meta.draft) {
     const h = 30 + Math.min(draft?.derived.length ?? 0, 6) * 0;
-    body += `<rect x="${x0}" y="${y}" width="232" height="${h}" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.7" data-draft-cover="true" data-draft-statement="${esc(meta.draft)}"/>`;
+    body += `<rect x="${x0}" y="${y}" width="232" height="${h}" fill="${INK_900}" data-draft-cover="true" data-draft-statement="${esc(meta.draft)}"/>`;
     const [head, ...rest] = meta.draft.split(" — ");
-    body += `<text x="${x0 + 5}" y="${y + 10}" font-size="7" fill="${TERRACOTTA}" style="font-family:${FONT_UI};font-weight:700;letter-spacing:0.05em">${esc(head ?? meta.draft)}</text>`;
-    body += `<text x="${x0 + 5}" y="${y + 17}" font-size="3.6" fill="${TERRACOTTA}" style="font-family:${FONT_UI}">${esc(rest.join(" — "))}</text>`;
+    body += `<text x="${x0 + 5}" y="${y + 10}" font-size="7" fill="${ON_INK}" style="font-family:${FONT_UI};font-weight:700;letter-spacing:0.05em">${esc(head ?? meta.draft)}</text>`;
+    body += `<text x="${x0 + 5}" y="${y + 17}" font-size="3.6" fill="${ON_INK}" style="font-family:${FONT_UI}">${esc(rest.join(" — "))}</text>`;
     if (draft?.note) {
       wrap(`Source: ${draft.note}`, 120).forEach((line, i) => {
         body += `<text x="${x0 + 5}" y="${y + 23 + i * 3.6}" font-size="2.8" fill="${INK_700}" style="font-family:${FONT_UI}">${esc(line)}</text>`;
@@ -1335,7 +1351,7 @@ export function renderCoverSheet(
   index.forEach((s, i) => {
     const cx = x0 + (i < col ? 0 : 118);
     const cy = y + (i < col ? i : i - col) * 5;
-    body += `<text x="${cx}" y="${cy}" font-size="3" fill="${BRASS}" style="font-family:${FONT_MONO}" data-index="${esc(s.sheetNumber)}">${esc(s.sheetNumber)}</text><text x="${cx + 16}" y="${cy}" font-size="3" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(s.title.slice(0, 48))}</text>`;
+    body += `<text x="${cx}" y="${cy}" font-size="3" fill="${INK_900}" style="font-family:${FONT_MONO}" data-index="${esc(s.sheetNumber)}">${esc(s.sheetNumber)}</text><text x="${cx + 16}" y="${cy}" font-size="3" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(s.title.slice(0, 48))}</text>`;
   });
   y += col * 5 + 6;
 
@@ -1373,7 +1389,7 @@ export function renderCoverSheet(
     py += 5.5;
     for (const e of existing.slice(0, 26)) {
       const decision = e.tag.replace("existing · ", "");
-      const colour = e.tag.endsWith("undecided") ? TERRACOTTA : BRASS;
+      const colour = e.tag.endsWith("undecided") ? INK_900 : INK_500;
       body += `<text x="${px}" y="${f2(py)}" font-size="2.35" fill="${INK_900}" style="font-family:${FONT_UI}">${esc(e.name)}</text>`;
       py += 3.1;
       // The decision under the name, wrapped — a long "replace → …" never runs

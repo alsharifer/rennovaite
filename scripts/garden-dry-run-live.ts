@@ -185,7 +185,7 @@ async function main() {
     plot: records.plot,
     source: "user_drawn",
   });
-  const meta = { projectNameEn: PROJECT_NAME, projectNameAr: null, community: "Dubai", level: "ground", scale: "1:100", dateISO: "2026-09-14" };
+  const meta = { projectNameEn: PROJECT_NAME, projectNameAr: null, community: "Dubai", level: "ground", scale: "1:100", dateISO: "2026-09-14", rev: "1" };
   const variants = Object.fromEntries(records.elements.map((e) => [e.id, e.variant]));
   const pureSheets = [...buildGardenSheets(graph, records.fixtures, meta), ...buildElevationSheets(graph, records.fixtures, meta, variants)];
   check("live drawing set generates", Array.isArray(liveSet.sheets), liveSet.error ?? `${liveSet.sheets?.length} sheets`);

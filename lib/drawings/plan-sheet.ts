@@ -14,7 +14,6 @@ import type { Opening, PlanGraph, Point, Wall } from "@/lib/plan/geometry";
 import { dimensionChain, envelopeDimensionMm, graphBbox, roomBbox } from "./dimensions";
 import {
   BONE,
-  BRASS,
   drawRegion,
   esc,
   FONT_MONO,
@@ -25,6 +24,7 @@ import {
   INK_900,
   MM_PER_M,
   renderSheet,
+  RUN_INK,
   type SheetMeta,
 } from "./sheet";
 
@@ -98,7 +98,7 @@ function openingSvg(op: Opening, graph: PlanGraph, pl: Placement): string {
     cy = pl.py(my);
   const wPaper = op.width_mm / 100;
   if (op.type === "window") {
-    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="0.6" fill="${BRASS}"/>`;
+    return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="0.6" fill="${INK_900}"/>`;
   }
   // door: a small quarter-circle swing marker
   return `<path d="M ${cx} ${cy} l ${wPaper} 0 a ${wPaper} ${wPaper} 0 0 1 ${-wPaper} ${wPaper} Z" fill="none" stroke="${INK_500}" stroke-width="0.3"/>`;
@@ -119,8 +119,8 @@ function elementSvg(el: LinearElement, pl: Placement): string {
   const lx = pl.px(mid[0]);
   const ly = pl.py(mid[1]) - 1.6;
   return (
-    `<polyline points="${pts}" fill="none" stroke="${meta.color}" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" text-anchor="middle" font-size="2.5" fill="${meta.color}" style="font-family:${FONT_MONO}">${meta.code} ${el.length_m.toFixed(2)} m</text>`
+    `<polyline points="${pts}" fill="none" stroke="${RUN_INK[el.kind]}" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" text-anchor="middle" font-size="2.5" fill="${RUN_INK[el.kind]}" style="font-family:${FONT_MONO}">${meta.code} ${el.length_m.toFixed(2)} m</text>`
   );
 }
 

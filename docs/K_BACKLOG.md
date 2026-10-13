@@ -4,11 +4,27 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## K9 (2026-10-13) — the K8 review's follow-ups
+
+Done: document fonts (Plex Sans / JetBrains Mono / EB Garamond, OFL), the
+garden timeline from the BoQ programme, ink-only drawings + render pack, sheet
+REV = the BoQ revision, the per-firm proposal reference (054).
+
+- **Proposal prefix has no control yet.** It is derived from the brand at the
+  first issue and kept on `firms.proposal_prefix`; a firm that wants another
+  prefix needs it set in SQL BEFORE its first issue. A field in the proposal
+  setup is the obvious home.
+- **A reference is not retired.** A project that changes firm gets a new
+  reference from the new firm's series; the old one survives only in pack
+  manifests and the `pack_exported` event (`detail.reference`).
+- **Plan revisions still have no number** (the 3D view's "from plan rev N").
+  The sheet REV is the BoQ's — the K8 ruling — not a plan revision.
+
 ## Found in K8 (2026-10-13) — everything on Blueprint, Dark open
 
 **Ruled in the K8 review (13 Oct) — #100 approved for squash-merge**
 
-- **PDF typefaces → K9.** Add IBM Plex Sans, JetBrains Mono and EB Garamond
+- **PDF typefaces → done in K9.** Add IBM Plex Sans, JetBrains Mono and EB Garamond
   (OFL) as TTF/OTF with their licence files; every server-rendered document
   uses them (resvg reads TTF/OTF only — today they print in Arial / Consolas /
   Georgia).
@@ -17,20 +33,20 @@ says where it is and why it waits. Newest first.
   agreed before you are charged." Counsel finalises. The parked, unrouted
   `components/marketing/home-landing.tsx` still prints "Project fee AED
   1,000" — fix it if that landing ever returns.
-- **Garden timeline → K9.** Never the interior model for a garden project:
+- **Garden timeline → done in K9.** Never the interior model for a garden project:
   show the BoQ programme duration with the derived mark and the basis note
   "scaled from one real Dubai garden project (~90 days)". Interior unchanged.
 - **Supplier choices into the BoQ → not this cycle.** `vendor_selections` are
   saved and the Tender page's live total follows them, but `generate-boq`
   never reads them; the page keeps its "scenario" label. Revisit after the
   pilot.
-- **Drawings → K9, ink only.** No brass / terracotta inside sheets
+- **Drawings → done in K9, ink only.** No brass / terracotta inside sheets
   (`lib/drawings/plan-sheet|demo-sheet|garden-sheets|garden-elevations.ts`,
   ~33 uses): demolition = dashed, estimated items = hatch + the derived glyph,
   symbols in ink.
 - **/community and /marketplace → done in #100.** The stub pages are deleted;
   the 307 redirects to the projects home live in `next.config.ts`.
-- **Also K9**: the proposal reference = a per-firm sequence (e.g.
+- **Also done in K9**: the proposal reference = a per-firm sequence (e.g.
   `MFO-P-0001`) stored on the proposal row; the drawing sheet's REV = the BoQ
   revision the pack was generated from (never "—").
 - **Still open — headline basis.** Frames print "excl. VAT" beside headline
@@ -39,9 +55,9 @@ says where it is and why it waits. Newest first.
 
 **Not built (shown honestly, or left out, with the reason)**
 
-- No proposal reference number, firm contact line, "Design" or "Acceptance"
-  sections in the proposal (67:1396); no plan revision numbers (the 3D view's
-  "from plan rev N", the sheet's REV prints "—").
+- No firm contact line, "Design" or "Acceptance" sections in the proposal
+  (67:1396); no plan revision numbers (the 3D view's "from plan rev N"). (The
+  proposal reference and the sheet REV landed in K9.)
 - Supplier distance (60:913): the catalogue has none — the old page printed a
   hard-coded per-brand table; dropped. "Send scope to contractors" has no
   in-app sending: it explains the hand-over and links to Documents.

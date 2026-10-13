@@ -9,6 +9,7 @@
 // their own resolution.
 // =============================================================================
 
+import { documentFontOptions } from "./doc-fonts";
 import { stampPdfDay } from "@/lib/documents/pdf-date";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -315,7 +316,7 @@ export async function generateRenderPack(projectId: string): Promise<{ pdf: Uint
   };
 
   for (const p of pages) {
-    const png = new Resvg(p.svg, { fitTo: { mode: "width", value: 4134 } }).render().asPng();
+    const png = new Resvg(p.svg, { fitTo: { mode: "width", value: 4134 }, font: documentFontOptions() }).render().asPng();
     const page = pdf.addPage([PAGE_W * MM_TO_PT, PAGE_H * MM_TO_PT]);
     page.drawImage(await pdf.embedPng(png), { x: 0, y: 0, width: PAGE_W * MM_TO_PT, height: PAGE_H * MM_TO_PT });
     for (const slot of p.images) {

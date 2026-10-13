@@ -13,6 +13,7 @@
 // =============================================================================
 
 import type { TimelineEstimate } from "@/lib/timeline/estimate";
+import type { GardenTimeline } from "@/lib/timeline/garden";
 import { tierLabel } from "@/lib/provenance/tier-vocab";
 
 import { Icon } from "../Icon";
@@ -114,6 +115,67 @@ export function TimelineView({ estimate: e }: { estimate: TimelineEstimate }) {
           </ul>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A garden project's timeline (K9; K8 review ruling 3): the BoQ's indicative
+ * programme — one duration with the DERIVED mark and its basis, and the
+ * phases as ink bars on a hairline track. Never the interior model.
+ */
+export function GardenTimelineView({ timeline: t }: { timeline: GardenTimeline }) {
+  const pct = (d: number) => `${(d / t.totalDays) * 100}%`;
+  return (
+    <div data-garden-timeline>
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-10">
+        <div>
+          <p className="t-label-caps text-bp-ink-tertiary">ESTIMATED DURATION</p>
+          <p className="mt-1.5 flex items-center gap-2.5" data-timeline-days={t.totalDays}>
+            <span aria-hidden="true" className="t-num-xl text-bp-ink-primary">
+              ≈ {t.totalDays} days
+            </span>
+            <ProvenanceMark tier="derived" />
+            <span className="sr-only">
+              About {t.totalDays} days, {tierLabel("derived", "owner").toLowerCase()}
+            </span>
+          </p>
+          <p className="t-label-md mt-1.5 font-bp-mono text-bp-ink-tertiary">
+            {t.phases.length} phases · indicative
+          </p>
+        </div>
+        <p className="t-body-sm flex max-w-[520px] items-start gap-2.5 bg-bp-surface-sunken px-3.5 py-3 text-bp-ink-secondary" data-garden-basis>
+          <Icon name="info" className="text-[20px]" />
+          {t.basis}
+        </p>
+      </div>
+
+      <section aria-labelledby="garden-phases-h" className="mt-8">
+        <h2 id="garden-phases-h" className="t-heading-md border-b-2 border-bp-line-strong pb-2.5 text-bp-ink-primary">
+          Phases
+        </h2>
+        <ol>
+          {t.phases.map((p, i) => (
+            <li key={p.name} className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b border-bp-line-hairline py-3 md:grid-cols-[32px_220px_minmax(0,1fr)_96px]">
+              <span className="t-label-md font-bp-mono text-bp-ink-tertiary">{String(i + 1).padStart(2, "0")}</span>
+              <span className="t-body-sm text-bp-ink-primary">{p.name}</span>
+              <span className="relative col-span-3 h-2.5 md:col-span-1 md:col-start-3 md:row-start-1" aria-hidden="true">
+                <span className="absolute inset-x-0 top-[5px] h-px bg-bp-line-hairline" />
+                <span className="absolute top-0 h-2.5 bg-bp-ink-primary" style={{ left: pct(p.start_day - 1), width: pct(p.days) }} />
+              </span>
+              <span className="t-num-sm text-right text-bp-ink-primary md:col-start-4 md:row-start-1">{p.days} days</span>
+            </li>
+          ))}
+        </ol>
+        <div className="grid grid-cols-[32px_minmax(0,1fr)_auto] gap-x-4 pt-2 md:grid-cols-[32px_220px_minmax(0,1fr)_96px]" aria-hidden="true">
+          <span className="hidden md:block" />
+          <span className="hidden md:block" />
+          <span className="t-label-md col-span-3 flex justify-between font-bp-mono text-bp-ink-tertiary md:col-span-1">
+            <span>day 1</span>
+            <span>day {t.totalDays}</span>
+          </span>
+        </div>
+      </section>
     </div>
   );
 }

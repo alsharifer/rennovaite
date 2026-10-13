@@ -1,3 +1,6 @@
 *.sh text eol=lf
 *.sql text eol=lf
 *.yml text eol=lf
+
+# K9: the document fonts and their licences are pinned by sha256 (lib/documents/fonts/SOURCES.json) — no line-ending conversion.
+lib/documents/fonts/** -text

@@ -11,6 +11,7 @@
 //   TODO(P-later): DXF via dxf-writer
 // =============================================================================
 
+import { documentFontOptions } from "@/lib/documents/doc-fonts";
 import { stampPdfDay } from "@/lib/documents/pdf-date";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -36,7 +37,7 @@ import { graphDraftStatus } from "@/lib/plan/geometry";
 import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
 import { renderPlumbingSheet } from "./plumbing-sheet";
-import type { SheetMeta } from "./sheet";
+import { sheetRev, type SheetMeta } from "./sheet";
 import { layerOf, type FixtureType } from "@/lib/overlays/types";
 
 export type SheetKind =
@@ -147,6 +148,8 @@ interface ProjectMetaRow {
   city: string | null;
   /** K8: the project's own firm, as its clients read it (display name, else name). */
   firm: string | null;
+  /** K9: how many BoQ revisions the project has — the set is drawn from the latest (`sheetRev`). */
+  boqRevisions: number;
 }
 
 async function loadProjectMeta(projectId: string): Promise<ProjectMetaRow> {
@@ -164,7 +167,11 @@ async function loadProjectMeta(projectId: string): Promise<ProjectMetaRow> {
   } catch {
     firm = null; // pre-041 or no firm: the title block says "—"
   }
-  return { name: p.name, city: p.city, firm };
+  // K9: REV = the BoQ revision this set is generated from. A pack export
+  // regenerates the BoQ before it asks for the drawings, so the latest
+  // revision IS the one the pack carries.
+  const { count } = await db.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", projectId);
+  return { name: p.name, city: p.city, firm, boqRevisions: count ?? 0 };
 }
 
 function sheetMeta(
@@ -181,6 +188,7 @@ function sheetMeta(
     scale: graph.meta.scale,
     dateISO: new Date().toISOString().slice(0, 10),
     preparedBy: project.firm,
+    rev: sheetRev(project.boqRevisions),
   };
 }
 
@@ -431,7 +439,7 @@ export async function renderSetPdf(svgs: readonly string[]): Promise<Uint8Array>
   const pdf = stampPdfDay(await PDFDocument.create());
   for (const svg of svgs) {
     // 250 dpi keeps a 20-sheet set openable while text stays crisp.
-    const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4134 } });
+    const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4134 }, font: documentFontOptions() });
     const png = resvg.render().asPng();
     const page = pdf.addPage([420 * MM_TO_PT, 297 * MM_TO_PT]);
     const img = await pdf.embedPng(png);
@@ -452,7 +460,7 @@ export async function renderSheetPdf(svg: string): Promise<Uint8Array> {
   const { PDFDocument } = await import("pdf-lib");
 
   // A3 landscape width 420 mm ≈ 16.54 in → 4961 px at 300 dpi.
-  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4961 } });
+  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4961 }, font: documentFontOptions() });
   const png = resvg.render().asPng();
 
   const pdf = stampPdfDay(await PDFDocument.create());

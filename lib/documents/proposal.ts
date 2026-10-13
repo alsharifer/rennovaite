@@ -53,6 +53,12 @@ export interface ProposalInput {
   boq: BoqPdfInput["boq"];
   /** K8: "Based on — Bill of quantities, revision N". Absent = not printed. */
   revision?: number | null;
+  /**
+   * K9: the firm's reference for this proposal, "MFO-P-0001" (054) — cover top
+   * right, a cover fact, and every page header. Null on a preview before the
+   * first issue (the cover says it is assigned on issue).
+   */
+  reference?: string | null;
   // --- K4 setup (053). All optional: absent = the L4 document, unchanged. ---------
   /** Who the cover names as the client. Printed on the cover only. */
   clientLabel?: string | null;
@@ -147,7 +153,9 @@ export function buildProposalPages(input: ProposalInput): string[] {
     y += 12;
   }
   svg += text(M, y, brand, { size: 5.8, weight: 500, attrs: `data-firm-brand="cover" data-logo="${input.logoDataUri ? "present" : "none"}" data-proposal-cover="true"` });
-  if (input.revision) svg += text(R, 24, `BoQ rev ${input.revision}`, { size: 2.6, fill: DOC.INK_3, font: DOC.MONO, anchor: "end" });
+  if (input.reference) svg += text(R, 24, input.reference, { size: 3.4, weight: 500, font: DOC.MONO, anchor: "end", attrs: 'data-proposal-ref="cover"' });
+  else if (input.preview) svg += text(R, 24, "Reference assigned on issue", { size: 2.6, fill: DOC.INK_3, font: DOC.MONO, anchor: "end", attrs: 'data-proposal-ref="pending"' });
+  if (input.revision) svg += text(R, 29.5, `BoQ rev ${input.revision}`, { size: 2.6, fill: DOC.INK_3, font: DOC.MONO, anchor: "end" });
   y = 74;
   svg += label(M, y, "Proposal");
   y += 15;
@@ -157,6 +165,7 @@ export function buildProposalPages(input: ProposalInput): string[] {
   }
   y += 4;
   const facts: [string, string, string?][] = [
+    ...(input.reference ? ([["Reference", input.reference, 'data-proposal-ref="fact"']] as [string, string, string][]) : []),
     ...(input.clientLabel ? ([["Prepared for", input.clientLabel, 'data-client="true"']] as [string, string, string][]) : []),
     ["Date", longDate(input.dateISO)],
     ...(input.community ? ([["Location", input.community]] as [string, string][]) : []),
@@ -187,7 +196,7 @@ export function buildProposalPages(input: ProposalInput): string[] {
   // --- the numbered sections ------------------------------------------------------------
   const header = () => {
     let s = text(M, 16, `${brand} · ${input.projectName}`, { size: 2.6, fill: DOC.INK_2, font: DOC.MONO, attrs: 'data-firm-brand="header"' });
-    s += text(R, 16, `page ${pages.length + 1} of ${PAGE_COUNT_TOKEN}`, { size: 2.6, fill: DOC.INK_2, font: DOC.MONO, anchor: "end" });
+    s += text(R, 16, `${input.reference ? `${input.reference} · ` : ""}page ${pages.length + 1} of ${PAGE_COUNT_TOKEN}`, { size: 2.6, fill: DOC.INK_2, font: DOC.MONO, anchor: "end", attrs: input.reference ? 'data-proposal-ref="header"' : undefined });
     s += hline(M, R, 20);
     let yy = 28;
     const b = draftBand(24);

@@ -11,6 +11,8 @@ import { recordPilotEvent } from "@/lib/pilot/events";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { projectAccess } from "@/lib/projects/http";
 import { fileResponse } from "@/lib/documents/file-response";
+import { storeErrorResponse } from "@/lib/firms/http";
+import { StoreError } from "@/lib/firms/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,7 +53,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (format === "json") return NextResponse.json({ ready: gate.verdict.ok, ...summary });
     if (!gate.verdict.ok) return NextResponse.json({ error: gate.verdict.refusal, code: "proposal_not_ready", ...summary }, { status: 409 });
 
-    const loaded = await loadProposalInput(sb, projectId, gate);
+    // K9: issuing assigns the proposal's reference (once per project; reused after).
+    const loaded = await loadProposalInput(sb, projectId, gate, { issue: true });
     if (!loaded) return NextResponse.json({ error: "No BoQ has been generated for this project." }, { status: 404 });
     const { pdf, pages } = await renderProposalPdf(loaded.input);
     // Identity: the firm's own brand is allowed (withheld names exclude the
@@ -61,11 +64,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       console.error("[api/proposal] withheld identity on a printed page", leaks);
       return NextResponse.json({ error: "The proposal would print a withheld identity; refused.", code: "identity_leak" }, { status: 500 });
     }
-    if (format === "pages") return NextResponse.json({ pages, ...summary, boq_id: loaded.boqId });
-    await recordPilotEvent(sb, projectId, "pack_exported", { document: "proposal", boq_id: loaded.boqId, pages: pages.length, basis: gate.verdict.reason }, { actor: await packJobActor(request) });
+    if (format === "pages") return NextResponse.json({ pages, ...summary, boq_id: loaded.boqId, reference: loaded.input.reference ?? null });
+    await recordPilotEvent(sb, projectId, "pack_exported", { document: "proposal", reference: loaded.input.reference ?? null, boq_id: loaded.boqId, pages: pages.length, basis: gate.verdict.reason }, { actor: await packJobActor(request) });
     // H9: over ~4 MB a PDF cannot be a function response — a signed download instead.
     return fileResponse(sb, new Uint8Array(pdf), { filename: `proposal-${projectId.slice(0, 8)}.pdf`, contentType: "application/pdf", projectId: projectId });
   } catch (err) {
+    if (err instanceof StoreError) return storeErrorResponse(err);
     console.error("[api/proposal] error", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Proposal failed." }, { status: 500 });
   }
