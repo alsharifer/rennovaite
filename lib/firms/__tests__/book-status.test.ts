@@ -16,7 +16,7 @@ const alice: Caller = { id: "00000000-0000-4000-8000-00000000a11c", email: "alic
 let db: FakeDb;
 
 beforeEach(() => {
-  db = fakeDb({ projects: [{ id: "p1", firm_id: null }], boq_corrections: [], firm_members: [] });
+  db = fakeDb({ projects: [{ id: "p1", firm_id: null, created_by: alice.id }], boq_corrections: [], firm_members: [] });
 });
 
 describe("book status", () => {

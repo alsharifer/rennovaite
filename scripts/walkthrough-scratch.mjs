@@ -56,7 +56,8 @@ if (mode === "seed") {
   fs.writeFileSync(path.join(OUT, "bearer.txt"), me.token);
   const projectId = randomUUID();
   const planId = randomUUID();
-  let r = await sb.from("projects").insert({ id: projectId, name: VILLA, city: "Dubai", currency: "AED", budget_aed: 850000, status: "draft" });
+  // K11 #5: the walkthrough account is the villa's creator (attaching a firm is the creator's act).
+  let r = await sb.from("projects").insert({ id: projectId, name: VILLA, city: "Dubai", currency: "AED", budget_aed: 850000, status: "draft", created_by: me.userId });
   // H5: the account the walkthrough drives owns its villa (removed with it on teardown).
   if (!r.error) r = await sb.from("project_members").insert({ project_id: projectId, user_id: me.userId });
   if (r.error) throw new Error(`villa: ${r.error.message}`);

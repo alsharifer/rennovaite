@@ -46,7 +46,9 @@ const memberships = [await grantProjectMembership(userA.userId, [STAND_IN], { sc
 // Pages read the COOKIE session (getCaller() with no request), not a Bearer header.
 const cookieHeader = { cookie: userA.cookies.map((c) => `${c.name}=${c.value}`).join("; ") };
 const t0 = new Date().toISOString();
-const { data: prior } = await sb.from("projects").select("firm_id").eq("id", STAND_IN).single();
+const { data: prior } = await sb.from("projects").select("firm_id, created_by").eq("id", STAND_IN).single();
+// K11 #5: attaching a firm is the project CREATOR's act — user A is the stand-in's creator for this run (restored after).
+await sb.from("projects").update({ created_by: userA.userId }).eq("id", STAND_IN);
 const created = { firm: null, corrections: [] };
 const eventsSince = async (extra = {}) => {
   let q = sb.from("pilot_events").select("id, project_id, firm_id, kind, actor, duration_ms, stage, detail").gte("recorded_at", t0);
@@ -93,7 +95,7 @@ try {
 } finally {
   for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
-  await sb.from("projects").update({ firm_id: prior.firm_id ?? null }).eq("id", STAND_IN);
+  await sb.from("projects").update({ firm_id: prior.firm_id ?? null, created_by: prior.created_by ?? null }).eq("id", STAND_IN);
   await sb.from("pilot_events").delete().gte("recorded_at", t0).or(`project_id.eq.${STAND_IN},firm_id.eq.${created.firm ?? "00000000-0000-0000-0000-000000000000"}`);
   for (const id of created.corrections.filter(Boolean)) await sb.from("boq_corrections").delete().eq("id", id);
   if (created.firm) await sb.from("firms").delete().eq("id", created.firm);

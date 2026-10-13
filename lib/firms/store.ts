@@ -40,7 +40,7 @@ import { checkMagnitude } from "./magnitude";
 import { loadShadowRates } from "./shadow-rate";
 import { itemVocabulary, validateEntry } from "./vocabulary";
 
-import { projectMembersOutsideFirm } from "@/lib/projects/firm-invariant";
+import { NOT_CREATOR_REASON, emailOf, outsideReason, projectMembersOutsideFirm } from "@/lib/projects/firm-invariant";
 import { StoreError } from "@/lib/store-error";
 
 export { StoreError };
@@ -756,6 +756,10 @@ export async function promoteCorrection(
 /**
  * Attach a firm to a project (membership of that firm required), or detach the
  * current one (membership of the firm being detached required).
+ *
+ * K11 #5 ("Move to firm…"): attaching — or moving to another firm — is the
+ * project CREATOR's act (projects.created_by, 055), and the refusal names who
+ * is outside the firm. lib/projects/move-firm.ts previews the same rules.
  */
 export async function assignProjectFirm(
   db: SupabaseClient,
@@ -765,15 +769,17 @@ export async function assignProjectFirm(
 ): Promise<void> {
   requireCaller(caller);
   if (firmId) {
-    await requireFirm(db, firmId, caller);
+    const firm = await requireFirm(db, firmId, caller);
+    const { data: project, error: pErr } = await db.from("projects").select("firm_id, created_by").eq("id", projectId).maybeSingle<{ firm_id: string | null; created_by: string | null }>();
+    if (pErr) fail(pErr, "read project");
+    if (!project) throw new StoreError(404, "project_not_found", "Project not found.");
+    if (project.firm_id === firmId) return; // already there
+    if (project.created_by !== caller!.id) throw new StoreError(403, "not_project_creator", NOT_CREATOR_REASON);
     // The persona invariant (K2): every member of a firm project is in the firm.
     const outside = await projectMembersOutsideFirm(db, projectId, firmId);
     if (outside.length > 0) {
-      throw new StoreError(
-        409,
-        "project_members_outside_firm",
-        `${outside.length} member${outside.length === 1 ? " of this project is" : "s of this project are"} not in this firm. On a firm project everyone works the firm's journey — add them to the firm first.`,
-      );
+      const labels = await Promise.all(outside.map((u) => emailOf(db, u)));
+      throw new StoreError(409, "project_members_outside_firm", outsideReason(firm.name, labels), { outside: labels });
     }
   } else {
     const { data: project, error } = await db.from("projects").select("firm_id").eq("id", projectId).maybeSingle();

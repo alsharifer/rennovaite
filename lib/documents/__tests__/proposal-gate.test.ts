@@ -28,7 +28,7 @@ async function expectStoreError(p: Promise<unknown>, status: number, code: strin
 }
 
 beforeEach(async () => {
-  db = fakeDb({ projects: [{ id: "p1", firm_id: null }], boqs: [{ id: BOQ, project_id: "p1", sections: REF_BOQ, created_at: "2026-09-27T09:00:00Z" }], firm_members: [] });
+  db = fakeDb({ projects: [{ id: "p1", firm_id: null, created_by: alice.id }], boqs: [{ id: BOQ, project_id: "p1", sections: REF_BOQ, created_at: "2026-09-27T09:00:00Z" }], firm_members: [] });
   A = await createFirm(db.client, { name: "Firm A" }, alice);
 });
 
