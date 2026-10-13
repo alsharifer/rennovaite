@@ -47,7 +47,8 @@ export interface JourneyFacts {
    * Owner-journey evidence. `unpricedLines` = the latest BoQ's lines still to be
    * priced (isUnpricedLine, lib/documents/boq-derived.ts — the D4 rule).
    */
-  owner: { brief: boolean; moodboardItems: number; renders: number; unpricedLines: number };
+  /** K10: renderViews = renderable rooms / zones and how many of them have a locked design (lib/render-lock-progress.ts). */
+  owner: { brief: boolean; moodboardItems: number; renders: number; renderViews: { locked: number; total: number }; unpricedLines: number };
   /** Firm-journey evidence — null for an owner project. */
   firm: {
     bookStatus: "draft" | "reviewed" | null;
@@ -142,6 +143,7 @@ export const DESIGN_MIN_REFERENCES = 3;
  * The owner journey (spec §6.0). Only existing facts: the plan refusal, the
  * pinned references, the renders, and the latest BoQ's D4 unpriced lines.
  *   02 Design  attention "Add references" while fewer than 3 are pinned
+ *   03 Renders done only when every renderable view is locked; else available "N / M locked" (K10)
  *   04 Cost    attention "N items not priced" while unpriced lines exist
  *   06 Tender  blocked "Price N items first" while unpriced lines exist, or
  *              blocked by the plan check (its own words and fix)
@@ -159,7 +161,13 @@ export function ownerStepStatuses(f: JourneyFacts): Record<OwnerStepKey, StepSta
       f.owner.moodboardItems < DESIGN_MIN_REFERENCES
         ? { state: "attention", reason: "Add references", fix: { label: "Pin references", href: `/project/${id}/design?view=references` } }
         : { state: "done" },
-    renders: f.owner.renders > 0 ? { state: "done" } : { state: "available" },
+    // K10: Done only when every renderable view is locked; otherwise Available with "N / M locked".
+    renders:
+      f.owner.renderViews.total > 0 && f.owner.renderViews.locked >= f.owner.renderViews.total
+        ? { state: "done" }
+        : f.owner.renderViews.total > 0
+          ? { state: "available", reason: `${f.owner.renderViews.locked} / ${f.owner.renderViews.total} locked`, fix: { label: "Open renders", href: `/project/${id}/render` } }
+          : { state: "available" },
     cost: planFails
       ? blockedByPlan(planFails)
       : n > 0

@@ -85,16 +85,19 @@ function Next({ row, compact = false }: { row: HomeRow; compact?: boolean }) {
     );
   }
   const n = row.next;
+  // K10: an available step with a reason (03 Renders "4 / 10 locked") reads as next, not as a flag.
+  const icon = n.state === "blocked" ? "lock" : n.state === "attention" ? "flag" : "arrow_forward";
+  const said = n.state === "blocked" ? "blocked" : n.state === "attention" ? "needs attention" : "next";
   return (
-    <Link href={n.href} className="group block outline-offset-2" aria-label={`${n.step} — ${n.state === "blocked" ? "blocked" : "needs attention"}: ${n.reason}`}>
+    <Link href={n.href} className="group block outline-offset-2" aria-label={`${n.step} — ${said}: ${n.reason}`}>
       {compact ? null : (
         <span className="flex items-center gap-1.5 text-bp-ink-primary">
-          <Icon name={n.state === "blocked" ? "lock" : "flag"} className="text-[20px]" />
+          <Icon name={icon} className="text-[20px]" />
           <span className="t-label-caps">{n.step}</span>
         </span>
       )}
       <span className={`t-body-sm flex items-center gap-1.5 text-bp-ink-primary group-hover:underline ${compact ? "" : "pl-0"}`}>
-        {compact ? <Icon name={n.state === "blocked" ? "lock" : "flag"} className="text-[18px]" /> : null}
+        {compact ? <Icon name={icon} className="text-[18px]" /> : null}
         {n.reason}
       </span>
     </Link>

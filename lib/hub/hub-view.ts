@@ -94,7 +94,9 @@ export function nextFromRail(projectId: string, rail: Pick<RailContext, "persona
   const out: HubNext[] = [];
   for (const s of steps) {
     const st = statuses[s.key];
-    if (!st || (st.state !== "attention" && st.state !== "blocked")) continue;
+    // K10: an available step that states a reason (03 Renders "1 / 3 locked") is next too — the rail and
+    // the Projects home say the same.
+    if (!st || st.state === "done" || (st.state === "available" && !st.reason)) continue;
     const eyebrow = `${s.number} · ${s.label.toUpperCase()}`;
     const reason = st.reason ?? "";
     let title = st.state === "blocked" ? `${s.label} is blocked` : `${s.label} needs attention`;
@@ -110,6 +112,7 @@ export function nextFromRail(projectId: string, rail: Pick<RailContext, "persona
     else if (s.key === "scope" || s.key === "plan") title = "Plan can't be priced yet";
     else if (s.key === "cost") title = st.state === "blocked" ? "Cost is blocked" : "Some items are not priced";
     else if (s.key === "design") title = "Add references";
+    else if (s.key === "renders") title = "Lock the remaining views";
     else if (s.key === "tender") title = "Tender is blocked";
     out.push({ step: eyebrow, title, sentence: reason, primary: st.fix ?? { label: `Open ${s.label}`, href: s.href }, secondary });
     if (out.length === 3) break;

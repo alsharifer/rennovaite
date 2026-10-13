@@ -60,7 +60,7 @@ export interface HomeRow {
   stage: HomeStage;
   rev: { n: number; date: string } | null;
   estimate: { total: number; estimate: boolean; excludes: number; tier: ProvTier | null } | null;
-  next: { state: "attention" | "blocked"; step: string; reason: string; href: string } | null;
+  next: { state: "attention" | "blocked" | "available"; step: string; reason: string; href: string } | null;
   /** ISO of the latest thing that happened on the project. */
   updatedAt: string;
   /** The latest locked view's image, if any. */
@@ -124,8 +124,9 @@ export function homeNext(projectId: string, persona: JourneyPersona, statuses: R
   const steps: readonly { key: string; number: string; label: string }[] = persona === "firm" ? FIRM_STEPS : OWNER_STEPS;
   for (const s of steps) {
     const st = statuses[s.key];
-    if (!st || (st.state !== "attention" && st.state !== "blocked")) continue;
-    return { state: st.state, step: `${s.number} · ${s.label.toUpperCase()}`, reason: st.reason ?? "", href: st.fix?.href ?? href(s.key) };
+    // K10: an AVAILABLE step that states a reason (03 Renders "4 / 10 locked") is next too — in journey order.
+    if (!st || st.state === "done" || (st.state === "available" && !st.reason)) continue;
+    return { state: st.state as "attention" | "blocked" | "available", step: `${s.number} · ${s.label.toUpperCase()}`, reason: st.reason ?? "", href: st.fix?.href ?? href(s.key) };
   }
   return null;
 }

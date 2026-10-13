@@ -28,7 +28,7 @@ function facts(over: Partial<JourneyFacts> = {}, firm: Partial<NonNullable<Journ
     planBlock: null,
     boq: { rev: 4, createdAt: "2026-10-01T10:00:00Z" },
     specSelections: 2,
-    owner: { brief: true, moodboardItems: 3, renders: 5, unpricedLines: 0 },
+    owner: { brief: true, moodboardItems: 3, renders: 5, renderViews: { locked: 4, total: 4 }, unpricedLines: 0 },
     firm: {
       bookStatus: "reviewed",
       basis: { referenceLines: 0, totalLines: 18 },
@@ -127,7 +127,7 @@ describe("firm journey — the state matrix", () => {
 });
 
 describe("owner journey (K8, spec §6.0)", () => {
-  const owner = (o: Partial<JourneyFacts["owner"]> = {}, over: Partial<JourneyFacts> = {}) => facts({ firm: null, ...over, owner: { brief: true, moodboardItems: 3, renders: 5, unpricedLines: 0, ...o } });
+  const owner = (o: Partial<JourneyFacts["owner"]> = {}, over: Partial<JourneyFacts> = {}) => facts({ firm: null, ...over, owner: { brief: true, moodboardItems: 3, renders: 5, renderViews: { locked: 4, total: 4 }, unpricedLines: 0, ...o } });
 
   it("one status per owner step, in the step list's keys", () => {
     expect(Object.keys(ownerStepStatuses(owner())).sort()).toEqual(OWNER_STEPS.map((s) => s.key).sort());

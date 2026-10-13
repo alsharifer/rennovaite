@@ -29,6 +29,7 @@ import { listFirms } from "@/lib/firms/store";
 import { firmStepStatuses, ownerStepStatuses, type JourneyFacts, type PlanBlock, type RailContext, type RailFirm, type RailProject, type StepStatus } from "@/lib/journey-state";
 import type { JourneyPersona } from "@/lib/journey";
 import { memberProjectIds } from "@/lib/projects/access";
+import { renderLockProgress } from "@/lib/render-lock-progress";
 
 const PLAN_CODES = new Set(["no_plan", "no_area", "no_rooms", "plan_has_overlaps", "not_priceable"]);
 
@@ -138,7 +139,7 @@ export async function loadProjectJourney(db: SupabaseClient, projectId: string, 
     planBlock: block,
     boq,
     specSelections,
-    owner: { brief: false, moodboardItems: 0, renders: 0, unpricedLines: 0 },
+    owner: { brief: false, moodboardItems: 0, renders: 0, renderViews: { locked: 0, total: 0 }, unpricedLines: 0 },
     firm: null,
   };
 
@@ -164,13 +165,23 @@ export async function loadProjectJourney(db: SupabaseClient, projectId: string, 
       },
     };
   } else {
-    const [brief, moodboardItems, renders, unpricedLines] = await Promise.all([
+    const [brief, moodboardItems, renders, unpricedLines, renderViews] = await Promise.all([
       count(db, "project_briefs", projectId),
       count(db, "moodboard_items", projectId),
       count(db, "renders", projectId),
       latest ? unpricedLineCount(db, latest.id) : Promise.resolve(0),
+      // K10: the renderable rooms of the latest plan and the ones with a locked design.
+      safe({ locked: 0, total: 0 }, async () => {
+        const { data: plan } = await db.from("plans").select("id").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string }>();
+        if (!plan) return { locked: 0, total: 0 };
+        const [{ data: rooms }, { data: approved }] = await Promise.all([
+          db.from("rooms").select("id, room_type").eq("plan_id", plan.id),
+          db.from("approved_designs").select("room_id").eq("project_id", projectId),
+        ]);
+        return renderLockProgress((rooms ?? []) as { id: string; room_type: string | null }[], ((approved ?? []) as { room_id: string | null }[]).map((a) => a.room_id).filter((x): x is string => !!x));
+      }),
     ]);
-    facts.owner = { brief: brief > 0, moodboardItems, renders, unpricedLines };
+    facts.owner = { brief: brief > 0, moodboardItems, renders, renderViews, unpricedLines };
   }
 
   const statuses = (persona === "firm" ? firmStepStatuses(facts) : ownerStepStatuses(facts)) as Record<string, StepStatus>;
