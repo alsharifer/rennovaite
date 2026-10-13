@@ -56,7 +56,7 @@ export function StepList({ steps, activeKey, onNavigate }: { steps: RailStep[]; 
               <span className={`t-label-md pt-0.5 ${active ? "text-bp-brass-text" : "text-bp-ink-tertiary"}`}>{s.number}</span>
               <span className="bp-rail-x min-w-0 flex-1 flex-col">
                 <span className={`block ${active ? "t-nav-item-active text-bp-ink-primary" : `t-nav-item ${blocked ? "text-bp-ink-tertiary" : "text-bp-ink-primary"}`}`}>{s.label}</span>
-                {s.status.reason && (s.status.state === "attention" || s.status.state === "blocked") ? (
+                {s.status.reason && s.status.state !== "done" ? (
                   <span className="t-label-md mt-0.5 block text-bp-ink-tertiary">{s.status.reason}</span>
                 ) : null}
               </span>

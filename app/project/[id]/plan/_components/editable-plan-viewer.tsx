@@ -1496,7 +1496,7 @@ export function EditablePlanViewer({
                                 fill={INK}
                                 pointerEvents="none"
                                 style={{
-                                  fontFamily: "var(--font-rubik), serif",
+                                  fontFamily: "var(--font-ibm-plex-arabic), var(--font-plex-sans), sans-serif",
                                   direction: "rtl",
                                 }}
                               >

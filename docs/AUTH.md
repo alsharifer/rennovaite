@@ -82,6 +82,53 @@ request body.
   server action + cookie session cover what exists. Add one when a firm page
   needs client-side calls.
 
+## Sign-in reliability — the e-mailed code + the URL settings (K10, 13 Oct)
+
+**Two ways in, one e-mail.** The magic-link e-mail
+(`supabase/templates/magic-link.html`) carries the sign-in button AND the
+one-time code (`{{ .Token }}`) under it. The button is the PKCE link: it works
+only in the browser that asked for it, and a mail scanner that opens it first
+uses it up. The code is typed on `/auth` ("Or enter the code from the email",
+or "I have a code from the email" on a second device) and verified server-side
+(`app/_actions/verify-email-code.ts` → `verifyOtp({ email, token, type:
+"email" })`), so it works on any device and survives scanners. A wrong, expired,
+replaced code and an address with no account are ONE answer (no enumeration);
+only a rate limit is told apart. The failed-LINK states (`?error=link_expired`
+…) are unchanged. Live: `node --env-file=.env.local
+scripts/k10-signin-code-check.mjs [port]` (no mail — generateLink returns the
+code the e-mail would carry).
+
+**What each Supabase project has (read 13 Oct).**
+
+| | Site URL | Redirect URLs | Email OTP length |
+| --- | --- | --- | --- |
+| dev `askzyqgcnjmbqegfifxq` | `http://localhost:3000` (probed) | `http://localhost:3098 / 3091 / 3000` callbacks allowed; neither prod host | **8** (probed) |
+| prod `efrcgktrlsjnzkzzuhof` | not readable from this machine (no prod service key; the CLI's token stays in the OS keyring) | — | — |
+
+`node --env-file=.env.local scripts/auth-url-probe.mjs [url …]` re-reads dev
+(generateLink's redirect_to; refuses production).
+
+**What to set — dashboard only** (Supabase → the project → Authentication):
+
+1. **prod** → URL Configuration → **Site URL** = `https://rennovaite.fit`.
+   **Redirect URLs** = `https://rennovaite.fit/**` **and**
+   `https://www.rennovaite.fit/**`. The apex answers 307 to `www`, and the
+   sign-in action builds its link from the host the visitor is on (`www`): a
+   link to a host off the list falls back to the Site URL root — the proxy
+   still forwards a stray `?code=` to the callback (12 Oct), but listing
+   `www` keeps the link on its intended path.
+2. **dev** → Site URL = `http://localhost:3098` (the dev server's own URL);
+   Redirect URLs = `http://localhost:3098/**`, `http://localhost:3091/**`,
+   `http://localhost:3097/**`.
+3. **both** → Providers → Email → **Email OTP Length = 6** (dev issues 8 today;
+   the form accepts 6–10 and never states a number, so nothing breaks either
+   way) and **Email OTP Expiration = 3600** (the e-mail and the form say 60
+   minutes).
+4. **both** → Emails → **Magic Link**: paste
+   `supabase/templates/magic-link.html` (subject "Sign in to RenovAIte"). The
+   hosted projects do not read the repo file; without the paste the code is not
+   in the e-mail.
+
 ## A session everywhere (H1)
 
 Every API route and every app page needs a signed-in caller, except the

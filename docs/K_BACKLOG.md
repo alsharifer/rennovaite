@@ -4,6 +4,34 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## K10 (2026-10-13) — from the K8/K9 QA
+
+- **Sign-in settings are dashboard-only (Abdallah).** docs/AUTH.md → "Sign-in
+  reliability" lists them: prod Site URL `https://rennovaite.fit`, Redirect URLs
+  `https://rennovaite.fit/**` AND `https://www.rennovaite.fit/**` (the apex
+  307s to www, and the sign-in action builds the link from the visitor's host);
+  dev Site URL `http://localhost:3098`; Email OTP Length 6 on both (dev issues 8
+  today — the form accepts 6–10); paste `supabase/templates/magic-link.html` into
+  both projects (without it the e-mail carries no code). Prod's current values
+  were not readable from this machine.
+- **Live phone / laptop sign-in by code** — needs the template pasted first;
+  verified headless on dev with generateLink's code (desktop + phone viewport),
+  not with a real e-mail.
+- **No UI to name a firm admin.** 055 makes the firm's creator its admin (else
+  its earliest member); `firm_members.role` can only be changed in SQL. A
+  Settings → Firm members list with a role control is the obvious home.
+- **Project purge runs dry until `PROJECT_PURGE_APPLY="true"`** in Vercel — set
+  it after the first dry-run logs look right (it logs ids and counts only).
+- **055 before deploy**: the soft-delete columns and firm roles; the proxy and
+  the access resolver tolerate their absence, but delete needs them.
+- **Duplicate components — engine resolution (K10 #10 left it out of scope).**
+  `findComponentDuplicates()` finds components charged by two mechanisms (an
+  R-xx line and an accessory selection, a joinery lump and its own line) and the
+  BoQ keeps BOTH; the owner now reads "N items may be counted twice — we'll
+  confirm before tender", the firm the mechanism. Deciding which line survives
+  (per component, recorded, regenerated) is an engine change with a pricing
+  consequence — it needs a QS ruling per pair before it is built.
+
 ## K9 (2026-10-13) — the K8 review's follow-ups
 
 Done: document fonts (Plex Sans / JetBrains Mono / EB Garamond, OFL), the

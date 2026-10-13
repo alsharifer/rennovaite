@@ -150,15 +150,15 @@ const config: Config = {
       },
       fontFamily: {
         // Semantic
-        display: ["var(--font-eb-garamond)", "var(--font-rubik)", "serif"],
-        serif: ["var(--font-eb-garamond)", "var(--font-rubik)", "serif"],
+        display: ["var(--font-eb-garamond)", "var(--font-ibm-plex-arabic)", "serif"],
+        serif: ["var(--font-eb-garamond)", "var(--font-ibm-plex-arabic)", "serif"],
         sans: [
-          "var(--font-inter)",
+          "var(--font-plex-sans)",
           "var(--font-ibm-plex-arabic)",
           "sans-serif",
         ],
         body: [
-          "var(--font-inter)",
+          "var(--font-plex-sans)",
           "var(--font-ibm-plex-arabic)",
           "sans-serif",
         ],
@@ -167,41 +167,41 @@ const config: Config = {
         // Stitch per-token families (used across the reference HTML)
         "display-hero": [
           "var(--font-eb-garamond)",
-          "var(--font-rubik)",
+          "var(--font-ibm-plex-arabic)",
           "serif",
         ],
         "headline-lg": [
           "var(--font-eb-garamond)",
-          "var(--font-rubik)",
+          "var(--font-ibm-plex-arabic)",
           "serif",
         ],
         "headline-lg-mobile": [
           "var(--font-eb-garamond)",
-          "var(--font-rubik)",
+          "var(--font-ibm-plex-arabic)",
           "serif",
         ],
         "headline-md": [
           "var(--font-eb-garamond)",
-          "var(--font-rubik)",
+          "var(--font-ibm-plex-arabic)",
           "serif",
         ],
         "body-lg": [
-          "var(--font-inter)",
+          "var(--font-plex-sans)",
           "var(--font-ibm-plex-arabic)",
           "sans-serif",
         ],
         "body-md": [
-          "var(--font-inter)",
+          "var(--font-plex-sans)",
           "var(--font-ibm-plex-arabic)",
           "sans-serif",
         ],
         "body-sm": [
-          "var(--font-inter)",
+          "var(--font-plex-sans)",
           "var(--font-ibm-plex-arabic)",
           "sans-serif",
         ],
         "label-caps": [
-          "var(--font-inter)",
+          "var(--font-plex-sans)",
           "var(--font-ibm-plex-arabic)",
           "sans-serif",
         ],

@@ -43,7 +43,10 @@ const sb = createClient(url, key, { auth: { persistSession: false } });
 
 // Mirrors lib/auth/access.ts — literal, so the sweep does not trust the list it checks.
 // H9: the cron sweep is on the allowlist too (its own CRON_SECRET; not a project route).
-const PUBLIC = new Set(["app/api/health/route.ts", "app/api/cron/uploads-sweep/route.ts"]);
+const PUBLIC = new Set(["app/api/health/route.ts", "app/api/cron/uploads-sweep/route.ts", "app/api/cron/projects-purge/route.ts"]);
+// K10: the lifecycle routes answer a non-member 404 project_not_found — they
+// never confirm a project exists (lib/projects/lifecycle.ts requireMember).
+const LIFECYCLE = new Set(["app/api/projects/[id]/route.ts|DELETE", "app/api/projects/[id]/restore/route.ts|POST", "app/api/projects/[id]/delete-now/route.ts|POST", "app/api/projects/[id]/delete-preview/route.ts|GET"]);
 const NON_PROJECT = (f) => f.startsWith("app/api/firms/") || f === "app/api/rate-vocabulary/route.ts";
 const CREATES = new Set(["app/api/upload/route.ts|POST", "app/api/draw-plan/route.ts|POST"]);
 
@@ -145,7 +148,13 @@ const T = {
   "app/api/projects/[id]/reference-basis/route.ts|POST": (o) => ({ method: "POST", path: `/api/projects/${o.P}/reference-basis`, body: { boq_id: o.BQ } }),
   "app/api/projects/[id]/render-pack/route.ts|GET": (o) => ({ method: "GET", path: `/api/projects/${o.P}/render-pack?format=json` }),
   "app/api/projects/[id]/route.ts|PATCH": (o) => ({ method: "PATCH", path: `/api/projects/${o.P}`, body: { display_name: "hijacked" } }),
-  "app/api/projects/[id]/route.ts|DELETE": (o) => ({ method: "DELETE", path: `/api/projects/${o.P}` }),
+  "app/api/projects/[id]/route.ts|DELETE": (o) => ({ method: "DELETE", path: `/api/projects/${o.P}`, body: { confirm_name: o.NAME } }),
+  "app/api/projects/[id]/restore/route.ts|POST": (o) => ({ method: "POST", path: `/api/projects/${o.P}/restore` }),
+  "app/api/projects/[id]/delete-now/route.ts|POST": (o) => ({ method: "POST", path: `/api/projects/${o.P}/delete-now`, body: { confirm_name: o.NAME } }),
+  "app/api/projects/[id]/delete-preview/route.ts|GET": (o) => ({ method: "GET", path: `/api/projects/${o.P}/delete-preview` }),
+  "app/api/projects/[id]/proposal-preview/route.ts|GET": (o) => ({ method: "GET", path: `/api/projects/${o.P}/proposal-preview` }),
+  "app/api/projects/[id]/proposal-setup/route.ts|GET": (o) => ({ method: "GET", path: `/api/projects/${o.P}/proposal-setup` }),
+  "app/api/projects/[id]/proposal-setup/route.ts|PUT": (o) => ({ method: "PUT", path: `/api/projects/${o.P}/proposal-setup`, body: { cover_note: "hijacked" } }),
   "app/api/render-iterate/route.ts|POST": (o) => ({ method: "POST", path: "/api/render-iterate", body: { project_id: o.P, room_id: o.R, parent_render_id: o.RD, tweak: "iso" } }),
   "app/api/render/batch/route.ts|POST": (o) => ({ method: "POST", path: "/api/render/batch", body: { project_id: o.P } }),
   "app/api/render/consistency/route.ts|POST": (o) => ({ method: "POST", path: "/api/render/consistency", body: { project_id: o.P, anchor_render_id: o.RD } }),
@@ -187,7 +196,8 @@ const MIXED = [
   ["feedback: own project + owner's render", (o, m) => ({ method: "POST", path: "/api/feedback", body: { project_id: m.P, entity_type: "render", entity_id: o.RD, action: "accepted" } })],
 ];
 
-const PAGES = ["", "/boq", "/boq/revisions", "/plan", "/render", "/drawings", "/viewer", "/vendors", "/moodboard", "/ideation", "/style", "/timeline", "/accessories", "/rates", "/proposal"];
+// K8: /moodboard, /ideation and /style became 308s to /design (next.config.ts) — the page is /design.
+const PAGES = ["", "/boq", "/boq/revisions", "/plan", "/render", "/drawings", "/viewer", "/vendors", "/design", "/timeline", "/accessories", "/rates", "/proposal"];
 
 // --- setup --------------------------------------------------------------------------
 async function makeProject(who, name) {
@@ -205,7 +215,7 @@ async function makeProject(who, name) {
   const as = await call(who, { method: "POST", path: "/api/project-asset", body: { path: await upload(who, { kind: "project_asset", project_id: P, asset_kind: "photo" }), kind: "photo", filename: "seed.png" } });
   const pick = (r, ...keys) => { for (const k of keys) { const v = k.split(".").reduce((x, y) => x?.[y], r.body); if (v) return v; } throw new Error(`seed ${keys[0]}: ${r.status} ${r.text.slice(0, 160)}`); };
   const ids = {
-    P, PL, R,
+    P, PL, R, NAME: name,
     FX: pick(fx, "fixture.id", "id"),
     EL: pick(el, "element.id", "id"),
     OP: pick(op, "opening.id", "id"),
@@ -279,7 +289,7 @@ try {
     const tpl = T[h];
     if (!tpl) { check(`${h}: has a sweep template`, false, "add one — every project handler is swept"); continue; }
     const r = await call(intruder, tpl(o, m));
-    const ok = r.status === 403 && r.body?.code === "not_a_project_member";
+    const ok = LIFECYCLE.has(h) ? r.status === 404 && r.body?.code === "project_not_found" : r.status === 403 && r.body?.code === "not_a_project_member";
     if (ok) refused++;
     check(`intruder → ${h.replace("app/api", "").replace("/route.ts", "")}`, ok, ok ? "" : `${r.status} ${(r.body?.code ?? r.text).toString().slice(0, 120)}`);
   }
@@ -301,7 +311,8 @@ try {
     else check(`intruder → page /project/[owner]${p}`, false, `${r.status}`);
   }
   check(`every project page is not-found for the intruder (${pages404}/${PAGES.length})`, pages404 === PAGES.length);
-  const dash = await call(cookie(intruder), { method: "GET", path: "/dashboard" });
+  // K8: /projects is the signed-in home (/dashboard redirects there).
+  const dash = await call(cookie(intruder), { method: "GET", path: "/projects" });
   check("the intruder's dashboard lists their project and not the owner's", dash.status === 200 && dash.text.includes(m.P) && !dash.text.includes(o.P), `${dash.status}`);
 
   // 3b. attaching a firm needs membership of BOTH the firm and the project
@@ -332,6 +343,46 @@ try {
   check("control: the owner gets past the gate on the same routes", res.every(([, s]) => s !== 401 && s !== 403), res.map(([h, s]) => `${h.split("/api/")[1].replace("/route.ts", "")} ${s}`).join(" · "));
   const page = await call(cookie(owner), { method: "GET", path: `/project/${o.P}/plan` });
   check("control: the owner opens the project's pages", page.status === 200, `${page.status}`);
+
+  // 6. K10 — a DELETED project is not found on every project route and page,
+  //    for its own members; restore brings it back exactly as it was.
+  const keep = await snapshot(o);
+  const wrong = await call(owner, T["app/api/projects/[id]/route.ts|DELETE"]({ ...o, NAME: "not the name" }, m));
+  check("K10: delete refuses a name that does not match (422 name_mismatch)", wrong.status === 422 && wrong.body?.code === "name_mismatch", `${wrong.status} ${wrong.body?.code}`);
+  const preview = await call(owner, T["app/api/projects/[id]/delete-preview/route.ts|GET"](o, m));
+  check("K10: the confirm dialog's preview names the project and counts what goes", preview.status === 200 && preview.body?.name === o.NAME && preview.body?.counts?.revisions === 1 && preview.body?.permission?.allowed === true, `${preview.status} ${JSON.stringify(preview.body?.counts)}`);
+  const del = await call(owner, T["app/api/projects/[id]/route.ts|DELETE"](o, m));
+  check("K10: the creator soft-deletes their project", del.status === 200 && !!del.body?.deleted_at, `${del.status} ${del.body?.code ?? ""}`);
+  let gone = 0;
+  const swept404 = handlers.filter((h) => !CREATES.has(h) && !LIFECYCLE.has(h) && T[h]);
+  const OWN_UPLOAD = {
+    "app/api/project-asset/route.ts|POST": { method: "POST", path: "/api/project-asset", body: { path: o.UP_AS, kind: "photo" } },
+    "app/api/room-photo/route.ts|POST": { method: "POST", path: "/api/room-photo", body: { path: o.UP_RP, room_id: o.R } },
+    "app/api/uploads/complete/route.ts|POST": { method: "POST", path: "/api/uploads/complete", body: { path: o.UP_AS, asset_kind: "photo" } },
+  };
+  for (const h of swept404) {
+    const r = await call(owner, OWN_UPLOAD[h] ?? T[h](o, m));
+    const ok = r.status === 404;
+    if (ok) gone++;
+    else check(`K10: deleted project → ${h.replace("app/api", "").replace("/route.ts", "")} is not found`, false, `${r.status} ${(r.body?.code ?? r.text).toString().slice(0, 100)}`);
+  }
+  check(`K10: every project route answers the deleted project not found, for its own creator (${gone}/${swept404.length})`, gone === swept404.length);
+  const pv2 = await call(owner, T["app/api/projects/[id]/delete-preview/route.ts|GET"](o, m));
+  check("K10: the delete preview of a deleted project is not found", pv2.status === 404, `${pv2.status}`);
+  let pagesGone = 0;
+  for (const p of PAGES) if ((await call(cookie(owner), { method: "GET", path: `/project/${o.P}${p}` })).status === 404) pagesGone++;
+  check(`K10: every page of the deleted project is not found (${pagesGone}/${PAGES.length})`, pagesGone === PAGES.length);
+  const home = await call(cookie(owner), { method: "GET", path: "/projects?view=deleted" });
+  check("K10: Recently deleted lists it", home.status === 200 && home.text.includes(`data-deleted-project="${o.P}"`), `${home.status}`);
+  const intr = await call(intruder, T["app/api/projects/[id]/restore/route.ts|POST"](o, m));
+  check("K10: a non-member cannot restore it (404 — never confirmed)", intr.status === 404, `${intr.status}`);
+  const back = await call(owner, T["app/api/projects/[id]/restore/route.ts|POST"](o, m));
+  check("K10: restore → 200", back.status === 200, `${back.status} ${back.body?.error ?? ""}`);
+  const again = await snapshot(o);
+  const changed = Object.keys(keep).filter((t) => keep[t] !== again[t]);
+  check("K10: restore round-trip — every owned row byte-identical to before the delete (same members, same revisions)", changed.length === 0, changed.join(", "));
+  const page2 = await call(cookie(owner), { method: "GET", path: `/project/${o.P}/plan` });
+  check("K10: after restore the owner opens the project again", page2.status === 200, `${page2.status}`);
 } finally {
   console.log("cleanup");
   for (const ids of [o, m].filter(Boolean)) {

@@ -198,7 +198,8 @@ export async function loadBookView(db: SupabaseClient, firmId: string, caller: C
       .eq("correction_type", "rate")
       .is("promoted_at", null)
       .order("recorded_at", { ascending: false }),
-    db.from("projects").select("id", { count: "exact", head: true }).eq("firm_id", firmId),
+    // K10: a deleted project (055) is not one of the firm's projects; before 055 the column is absent and every row counts.
+    db.from("projects").select("*").eq("firm_id", firmId),
   ]);
   const rows = (entriesRes.data ?? []) as Row[];
   const quoteRef = new Map(((quotesRes.data ?? []) as { id: string; quote_ref: string | null }[]).map((q) => [q.id, q.quote_ref]));
@@ -321,6 +322,6 @@ export async function loadBookView(db: SupabaseClient, firmId: string, caller: C
     lastChange: history[0] ? dayLabel(history.reduce((a, h) => (h.superseded_at && h.superseded_at > a ? h.superseded_at : h.created_at > a ? h.created_at : a), history[0].created_at)) : null,
     reviewBlock: reviewBlockText(conflicts.length, attention.length),
     project,
-    projectCount: projectsRes.count ?? 0,
+    projectCount: ((projectsRes.data ?? []) as { deleted_at?: string | null }[]).filter((p) => !p.deleted_at).length,
   };
 }

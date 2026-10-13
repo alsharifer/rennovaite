@@ -60,7 +60,8 @@
     @apply border-border outline-ring/50;
   }
   html {
-    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    /* K10: Plex is the base face (Inter and Rubik are gone — nothing routed used them). */
+    font-family: var(--font-plex-sans), var(--font-ibm-plex-arabic), ui-sans-serif, system-ui, sans-serif;
   }
   body {
     background: #fdf9f2;
@@ -94,10 +95,25 @@
   outline-offset: 2px;
 }
 
-/* Icons — ONE font, Material Symbols Sharp (variable), delivered via the <link>
-   in app/layout.tsx. Atelier pages keep their class name and weight 400 / opsz
-   24 (the glyph shapes moved from Outlined to Sharp in K1 — accepted, rather
-   than ship two icon fonts); Blueprint pages use <Icon> (.bp-icon, 300 / 20). */
+/* Icons — ONE font, Material Symbols Sharp, SELF-HOSTED since K10: a subset of
+   the icons the app can draw (lib/icons/subset.json, scripts/k10-icon-subset.mjs),
+   weight 300–400, FILL 0, GRAD 0, optical size 20–24, preloaded by app/layout.tsx.
+   font-display: block, a fixed 1em box and transparent glyphs until the
+   pre-paint check sees the font (html[data-icons="ready"]): the ligature text
+   ("open_in_new") is never visible, even on a slow first load. Atelier pages
+   keep their class name at 400 / opsz 24; Blueprint uses <Icon> (.bp-icon,
+   300 / 20). */
+@font-face {
+  font-family: "Material Symbols Sharp";
+  src: url("/fonts/material-symbols-sharp.woff2") format("woff2");
+  font-weight: 300 400;
+  font-style: normal;
+  font-display: block;
+}
+html:not([data-icons="ready"]) .bp-icon,
+html:not([data-icons="ready"]) .material-symbols-outlined {
+  color: transparent !important;
+}
 .material-symbols-outlined {
   font-family: "Material Symbols Sharp";
   font-weight: normal;
@@ -114,6 +130,9 @@
   word-wrap: normal;
   white-space: nowrap;
   direction: ltr;
+  /* A square glyph: the box never grows to the width of the name. */
+  width: 1em;
+  overflow: hidden;
   font-feature-settings: "liga";
   font-variation-settings:
     "FILL" 0,
@@ -140,6 +159,8 @@
     word-wrap: normal;
     white-space: nowrap;
     direction: ltr;
+    width: 1em;
+    overflow: hidden;
     font-feature-settings: "liga";
     font-variation-settings:
       "FILL" 0,

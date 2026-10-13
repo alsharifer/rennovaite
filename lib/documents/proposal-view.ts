@@ -10,7 +10,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { sortSections } from "@/lib/boq/section-order";
+import { clientSections } from "@/lib/documents/proposal";
 import type { BoqPdfInput } from "@/lib/documents/boq-pdf";
 import { boqDerivedInfo, derivedTotal, isUnpricedLine } from "@/lib/documents/boq-derived";
 import { loadProposalGate, type ProposalGate } from "@/lib/documents/proposal-gate";
@@ -26,7 +26,8 @@ export interface ProposalPriceRow {
 
 export interface ProposalView {
   projectId: string;
-  gate: { ok: boolean; refusal: string | null; reason: string | null; noFirm: boolean; noBoq: boolean };
+  /** K10: preRounding = the revision predates the H7 rounding (regenerate before anything else). */
+  gate: { ok: boolean; refusal: string | null; reason: string | null; noFirm: boolean; noBoq: boolean; preRounding: boolean };
   firm: { id: string; name: string; displayName: string | null; brand: string; logo: boolean; termsSet: boolean; ohpPct: number | null } | null;
   setup: ProposalSetup | null;
   rev: number | null;
@@ -69,7 +70,8 @@ export async function loadProposalView(db: SupabaseClient, projectId: string): P
     const boq = curateBoq(boqRow.data.sections, withheld);
     const info = boqDerivedInfo(boq);
     const total = derivedTotal(boq.grand_total_aed, info);
-    const sections = sortSections(boq.sections);
+    // K10 #8: what the client receives — no zero-value section (clientSections, the document's own list).
+    const sections = clientSections(boq.sections);
     const reference = gate.boq?.basis.reference_lines ?? 0;
     const ohpMissing = !!ohpPct && ohpPct > 0 && !(boq.ohp_aed && boq.ohp_aed > 0);
     price = {
@@ -101,7 +103,7 @@ export async function loadProposalView(db: SupabaseClient, projectId: string): P
 
   return {
     projectId,
-    gate: { ok: gate.verdict.ok, refusal: gate.verdict.refusal, reason: gate.verdict.reason, noFirm: !gate.firm, noBoq: !gate.boq },
+    gate: { ok: gate.verdict.ok, refusal: gate.verdict.refusal, reason: gate.verdict.reason, noFirm: !gate.firm, noBoq: !gate.boq, preRounding: !!gate.preRounding },
     firm: gate.firm ? { id: gate.firm.firm_id, name: gate.firm.name, displayName: gate.firm.display_name, brand: gate.firm.brand, logo: !!gate.firm.logo_path, termsSet: !!gate.firm.terms_text, ohpPct } : null,
     setup,
     rev,

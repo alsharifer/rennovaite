@@ -10,6 +10,9 @@ export const REFERENCE_BASIS_BANNER = "priced from market reference — review r
 /** The proposal's discreet mark — the firm is the brand. */
 export const PREPARED_WITH_MARK = "Prepared with RenovAIte";
 
+/** K10: a revision priced before the H7 rounding (engine < 0.3.0) is not issued — the chain would not reconcile to the fil. */
+export const PRE_ROUNDING_REFUSAL = "Regenerate first — this revision predates the rounding fix.";
+
 export type PricingBasis = "firm" | "reference" | "mixed" | "unpriced" | "none";
 
 export interface ReferenceBasis {

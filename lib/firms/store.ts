@@ -148,6 +148,10 @@ export async function createFirm(
   if (error) fail(error, `firm "${input.name}"`);
   const firm = data as Firm;
   await addMember(db, firm.id, who.id);
+  // K10 (055): the firm's creator is its admin — the role that may delete a
+  // firm project. Before 055 there is no role column; nothing to set.
+  const { error: roleErr } = await db.from("firm_members").update({ role: "admin" }).eq("firm_id", firm.id).eq("user_id", who.id);
+  if (roleErr && !/role|schema cache|does not exist/i.test(roleErr.message)) fail(roleErr, "set firm admin");
   return firm;
 }
 

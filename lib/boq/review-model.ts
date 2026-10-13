@@ -13,6 +13,7 @@
 import { boqDerivedInfo, derivedLineNote, isUnpricedLine } from "@/lib/documents/boq-derived";
 import type { ProposalGateVerdict, ReferenceBasis, ReferenceBasisAcceptance } from "@/lib/documents/reference-basis-types";
 import { REFERENCE_BASIS_BANNER } from "@/lib/documents/reference-basis-types";
+import { summaryChainOf } from "./totals";
 import { headlineSpokenText } from "@/lib/format/aed";
 import { lineItemKey, type ProvLine } from "@/lib/provenance/boq";
 import { tierOf, weakest, type Persona, type ProvTier, type TierContext } from "@/lib/provenance/tier";
@@ -149,10 +150,12 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
   const info = boqDerivedInfo(i.boq as Parameters<typeof boqDerivedInfo>[0]);
   const estimate = headTier === "derived" || info.draft;
   const b = i.boq;
-  const ohpPct = b.ohp_pct && b.ohp_pct > 0 ? b.ohp_pct : 0;
-  const ohpAed = b.ohp_aed ?? 0;
-  const contingencyBase = b.subtotal_aed + ohpAed;
-  const vatBase = contingencyBase + b.contingency_aed;
+  // K10: the ONE chain reader — the client proposal prints these same figures.
+  const chain = summaryChainOf(b);
+  const ohpPct = chain.ohpPct;
+  const ohpAed = chain.ohp;
+  const contingencyBase = chain.subtotal + ohpAed;
+  const vatBase = contingencyBase + chain.contingency;
 
   const garden = b.garden ?? null;
   const draft = garden?.draft?.draft ? draftNotice(garden.draft.statement ?? info.statement ?? "") : null;

@@ -45,7 +45,22 @@ export function Notices({ model, permits }: { model: ReviewModel; permits: { tit
         </Row>
       ) : null}
       {n.reference ? <ReferenceRow model={model} /> : null}
-      {n.duplicates.length > 0 ? (
+      {n.duplicates.length > 0 && model.persona === "owner" ? (
+        // K10 #10: the owner's words — the same finding, no mechanism or QS ruling talk. Which line the
+        // engine keeps is an engine decision (docs/K_BACKLOG.md → K10), not the owner's.
+        <Row k={`${n.duplicates.length} ${n.duplicates.length === 1 ? "item" : "items"} may be counted twice`} data={{ "data-duplicates": String(n.duplicates.length), "data-duplicates-owner": "true" }}>
+          <details>
+            <summary className="cursor-pointer">We&rsquo;ll confirm before tender — nothing is taken out of your estimate until then.</summary>
+            <ul className="mt-2 space-y-1">
+              {n.duplicates.map((d) => (
+                <li key={d.label + d.detail} className="text-bp-ink-primary">
+                  {d.label}
+                </li>
+              ))}
+            </ul>
+          </details>
+        </Row>
+      ) : n.duplicates.length > 0 ? (
         <Row k={n.duplicates.length === 1 ? "Priced twice" : `${n.duplicates.length} components priced twice`} data={{ "data-duplicates": String(n.duplicates.length) }}>
           <details>
             <summary className="cursor-pointer">Charged by two mechanisms — nothing removed automatically; which line survives is a QS scope ruling.</summary>

@@ -214,6 +214,9 @@ const before3 = (v: string | null) => {
   return a !== x ? a < x : b !== y ? b < y : c < z;
 };
 
+/** K10: was this revision priced before the H7 rounding? (No engine version recorded = yes.) */
+export const predatesRounding = (version: string | null | undefined): boolean => !version || before3(version);
+
 /**
  * H7: a line's movement is the H7 rounding — and named so — only when the
  * RECORDS say so: the two revisions' stored engine versions straddle 0.3.0,

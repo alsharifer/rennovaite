@@ -24,6 +24,7 @@ import { isAssetKind, isAssetSource, type AssetKind } from "@/lib/assets/types";
 import type { Caller } from "@/lib/auth/caller";
 import { setLogoPath } from "@/lib/firms/branding";
 import { addProjectMember, authorizeProject } from "@/lib/projects/access";
+import { recordProjectCreator } from "@/lib/projects/lifecycle";
 import { importQuote } from "@/lib/quotes/store";
 import { StoreError } from "@/lib/store-error";
 
@@ -69,6 +70,8 @@ async function registerPlan(db: SupabaseClient, caller: Caller, done: CompletedU
     projectId = project.id;
     // H5: creating a project makes the uploader its member (rolled back with it).
     await addProjectMember(db, project.id, caller.id);
+    // K10 (055): the creator is who may delete an owner project.
+    await recordProjectCreator(db, project.id, caller.id);
 
     const path = `${project.id}/${randomUUID()}.${done.ext}`;
     await promoteUpload(db, done, ASSET_BUCKET, path);

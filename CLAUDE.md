@@ -87,10 +87,17 @@ except `design-refs/r7-handoff/`.
 - Fonts are self-hosted `next/font/local` variables on `<html>`:
   `--font-plex-sans` (IBM Plex Sans latin 400–600, Blueprint UI),
   `--font-jetbrains-mono`, `--font-eb-garamond`; tokens.css builds
-  `--font-sans/mono/serif` from them inside the Blueprint scope. Inter stays for
-  Atelier pages; Plex Sans Arabic / Rubik remain the Arabic fallbacks.
-- **One icon font**: Material Symbols **Sharp** (variable), a runtime `<link>`.
-  Blueprint: `<Icon name>` (`components/blueprint/Icon.tsx`, `.bp-icon`:
+  `--font-sans/mono/serif` from them inside the Blueprint scope. Plex Sans is
+  also the base face on `<html>`; Plex Sans Arabic the Arabic one. (Inter and
+  Rubik were removed in K10 — nothing routed used them.)
+- **One icon font**: Material Symbols **Sharp**, SELF-HOSTED since K10 — a subset
+  of the icons the app draws (`public/fonts/material-symbols-sharp.woff2`,
+  `lib/icons/subset.json`; regenerate with `scripts/k10-icon-subset.mjs
+  <codepoints>`), weight 300–400, FILL 0, GRAD 0, opsz 20–24, ~76 KiB,
+  preloaded, `font-display: block`; icons are a 1em clipped box and stay
+  transparent until `<html data-icons="ready">` (`lib/icons/ready.ts`), so a
+  ligature name is never visible. **A new icon name must be in the subset** —
+  `lib/icons/__tests__/subset.test.ts` fails otherwise. Blueprint: `<Icon name>` (`components/blueprint/Icon.tsx`, `.bp-icon`:
   weight 300, grade 0, opsz 20, 20px, layered so size utilities work).
 - **Theme**: `rv_theme` cookie = `light` (default) | `dark` | `system`
   (`lib/theme.ts`). ONLY the pre-paint inline script reads it and sets
@@ -455,6 +462,59 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
   require it. Without 054 the route answers 500 `migration_required`.
   Live: `node --env-file=.env.local scripts/k9-proposal-ref-check.mjs`
   (scratch firms + projects, deleted after).
+
+### K10 — the K8/K9 QA (13 Oct)
+
+- **Project actions + safe delete** (§6.12, frames 76:2719 · 76:2981 ·
+  77:2905; migration **055**; `lib/projects/lifecycle.ts`,
+  `components/blueprint/projects/ProjectActions.tsx`). A "⋯" on every
+  Projects-home row and in the Overview / hub top bar: Open · Rename ·
+  Archive/Unarchive · Delete project… (menu-button keyboard pattern). **Who**:
+  rename / archive / restore = any member; delete and "Delete now" = an owner
+  project's `created_by` or a firm **admin** (`firm_members.role`; the firm's
+  creator, backfilled — else its earliest member); everyone else sees Delete
+  disabled with "Only a firm admin can delete this project". **Delete is SOFT**
+  (`projects.deleted_at` / `deleted_by`): `authorizeProject` answers any
+  reference into a deleted project 404 `project_not_found`,
+  `isProjectMember` / `memberProjectIds` leave it out, `proxy.ts` 404s its
+  pages (join filter, plain-read fallback before 055). Only lifecycle.ts sees
+  one (`requireMember` / `requireDeleter`: 401 → 404 → 403) — the routes
+  `DELETE /api/projects/:id { confirm_name }`, `POST …/restore`,
+  `POST …/delete-now { confirm_name }` (only from Recently deleted), `GET
+  …/delete-preview` (real counts, issued-proposal warning, the caller's
+  permission). Name gate: case-insensitive, trimmed. Restore = clear the mark
+  (rows untouched → exactly as it was). **Purge** removes the project's Storage
+  objects (`projectStoragePrefixes`: plan-uploads `<id>/`, renders / packs /
+  drawings `projects/<id>/`, packs `downloads/<id>/`, uploads
+  `pending/<kind>/<id>/`) then the row (FK cascade); the daily
+  `/api/cron/projects-purge` (CRON_SECRET, dry-run until
+  `PROJECT_PURGE_APPLY="true"`) takes projects deleted > 30 days, logging ids
+  and counts only. The rail footer says "Firm admin". Checks:
+  `lib/projects/__tests__/lifecycle.test.ts`, `scripts/k10-purge-check.mjs`
+  (synthetic files, live), the isolation sweep's phase 6 (every route + page
+  404 for a deleted project, restore round-trip byte-identical),
+  `scripts/k10-actions-shots.mjs` (keyboard, axe, light + dark).
+- **Sign in with the e-mailed code** (`app/_actions/verify-email-code.ts`,
+  `lib/auth/email-code.ts`; docs/AUTH.md → "Sign-in reliability"). The
+  magic-link e-mail shows `{{ .Token }}` under its button; `/auth` takes it
+  under the sent state or via "I have a code from the email" and verifies it
+  server-side (`verifyOtp({ email, token, type: "email" })`) — any device,
+  survives mail scanners and the PKCE same-browser rule. One answer for wrong /
+  expired / replaced / no account (no enumeration). 6–10 digits accepted, no
+  number stated on screen (dev issues 8 until "Email OTP Length" is set to 6).
+  The hosted projects need the template pasted and the URL settings in the
+  dashboard — dev's Site URL is `http://localhost:3000`
+  (`scripts/auth-url-probe.mjs`, dev only); prod is read in the dashboard.
+  Live: `scripts/k10-signin-code-check.mjs`.
+- **The proposal reconciles to the fil** (`lib/boq/totals.ts summaryChainOf`, `lib/documents/__tests__/proposal-chain.test.ts`). QA saw the proposal at 102,892.07 / 8,231.00 / 5,556.00 / 116,679.07 beside a BoQ page at 102,892.03 / 8,231.36 / 5,556.17 / 116,679.56: two revisions of one project — a pre-H7 one (engine 0.2.0, whole-dirham contingency and VAT; every Arabella fixture revision, which the doc shots rendered) and the regenerated H7 one. Now the proposal and the BoQ page's review model read ONE chain (`summaryChainOf`) of the same revision, and the proposal gate refuses a pre-H7 revision first — `predatesRounding(engine.version)` → "Regenerate first — this revision predates the rounding fix." (`PRE_ROUNDING_REFUSAL`; 08 Proposal shows it with Open BoQ & Review; the export checklist item `proposal_rounding`). `reroundRevision` reproduces H7 regeneration on a stored revision for fixtures and shots (stage 7 → 116,679.56). Live: `scripts/k10-proposal-chain-shots.mjs`.
+- **Plan page gate** (`lib/plan/plan-gate.ts planGate`): the editor opens whenever the plan has rooms — counted from the same `roomList` the header counts — or is authored; the not-analysed card ("No drawing attached") only with truly no rooms. A parse record is no longer required: the dev Demo villa (13 rooms, `parsed_json` NULL, no drawing; snapshot `lib/plan/__fixtures__/demo-villa-plan.json`) showed the card under a 13-room header. The header says "no drawing attached" instead of "parsed from the drawing" when there is none. Live: `scripts/k10-plan-gate-shots.mjs` (scratch copies — the Demo villa itself is never opened).
+- **03 Renders = locked, not rendered** (`lib/render-lock-progress.ts`): one lockable view per renderable room or zone (`roomTypeFromDb`; a design is locked per room); the owner step is Done only when all are locked, else Available with "N / M locked" (fix: Open renders). The rail now prints an available step's reason; Projects home `homeNext`, the Overview's `overviewNext` and `nextFromRail` take, in journey order, the first step that is attention, blocked or available-with-a-reason — so all three say "03 · RENDERS — 1 / 3 locked". Live: `scripts/k10-renders-rail-shots.mjs`.
+- **Icon font self-hosted** (see "Fonts, icons, theme"): the Google stylesheet is gone; a cold load on throttled Slow 4G never shows an icon name (`scripts/k10-icons-cold-shots.mjs` samples every 250 ms; light + dark). Inter and Rubik are removed (files, `SOURCES.json`, the Tailwind stacks now point at Plex — an undefined `var()` would void the whole declaration).
+- **Specification options**: three equal cells (`min-[1100px]:grid-cols-3`) down to 1100 px, then one column (`data-spec-options`; `scripts/k10-spec-grid-shots.mjs` measures 1440 / 1280 / 1100 / 1099 / 390 read-only on the dev Demo villa).
+- **Client documents hide zero-value sections** (`clientSections` in `lib/documents/proposal.ts`, also the 08 Proposal screen's preview): a section totals 0 only when every line is still to be priced — those lines stay named under Exclusions & to be priced and in the total's sentence; the printed section totals still add up to the subtotal. The BoQ PDF (internal) is unchanged.
+- **Project files on the Overview body grid** (`components/blueprint/hub/HubFiles.tsx`, client): the screens' `files` slot puts it in the main column (owner: under Your design; firm hub: under Documents) instead of a full-width block below the page — the first 5 (`FILES_SHOWN`) and "Show all N" / "Show fewer". Kept on the Overview, not moved to 06 Documents: the owner's uploads are the project's, not the tender's. Live: `scripts/k10-hub-files-shots.mjs`.
+- **Duplicate-component notice, owner copy** (`components/blueprint/boq/Notices.tsx`): the owner reads "N items may be counted twice — we'll confirm before tender" with the item names only; the firm keeps "N components priced twice" with the mechanism and the QS-ruling sentence. Engine resolution is in K_BACKLOG → K10.
+- **A BoQ with no plan** (`lib/boq/regenerate.ts PLAN_MISSING_REASON`): when a revision exists and the plan does not, the refusal the rail, the hub's Next ("The plan is missing") and the BoQ top bar show is "BoQ exists; the plan is missing." with "Add the plan" — not "no plan to price yet".
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 
@@ -2421,6 +2481,7 @@ surface: the rail keeps the step you came from, `shell/step-memory.ts`).
 | `AUTH_SIGNUP_ALLOWLIST`           | server — H5: who may be GIVEN an account (comma/space separated addresses or `prefix+*@domain` patterns). Unset = nobody new; existing accounts still sign in |
 | `CRON_SECRET`                     | server — H9: the bearer Vercel Cron sends to `/api/cron/uploads-sweep`. Unset = the sweep answers 503 |
 | `UPLOAD_SWEEP_APPLY`              | server — H9: `"true"` lets the daily sweep DELETE stale pending uploads / staged downloads. Unset = dry-run (logs what it would delete) |
+| `PROJECT_PURGE_APPLY`             | server — K10: `"true"` lets the daily purge remove projects deleted > 30 days ago (rows + Storage). Unset = dry-run (logs ids and counts) |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
 
 ### Feature flags — read at server start (flip → restart)

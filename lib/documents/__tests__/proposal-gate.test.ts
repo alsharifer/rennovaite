@@ -13,8 +13,10 @@ const alice: Caller = { id: "00000000-0000-4000-8000-00000000a11c", email: "alic
 const bob: Caller = { id: "00000000-0000-4000-8000-000000000b0b", email: "bob@firm-b.test" };
 const BOQ = "10000000-0000-4000-8000-000000000001";
 const line = (rate_tier: string, rate_aed = 100) => ({ description: "PCC", quantity: 1, unit: "m2", rate_aed, total_aed: rate_aed, vendor_or_source: "market reference — Dubai garden 2026", notes: null, rate_tier });
-const REF_BOQ = { sections: [{ work_section: "Hardscape & Structures", lines: [line("reference"), line("reference")] }], grand_total_aed: 200 };
-const FIRM_BOQ = { sections: [{ work_section: "Hardscape & Structures", lines: [line("firm_private")] }], grand_total_aed: 100 };
+// K10: current (H7) revisions — a pre-H7 one is refused before its basis is read (proposal-chain.test.ts).
+const H7 = { engine: { version: "0.3.0" } };
+const REF_BOQ = { ...H7, sections: [{ work_section: "Hardscape & Structures", lines: [line("reference"), line("reference")] }], grand_total_aed: 200 };
+const FIRM_BOQ = { ...H7, sections: [{ work_section: "Hardscape & Structures", lines: [line("firm_private")] }], grand_total_aed: 100 };
 
 let db: FakeDb;
 let A: { id: string };
@@ -87,7 +89,7 @@ describe("acceptReferenceBasis", () => {
     expect(g2.acceptance?.id).toBe(a.id);
     expect(g2.verdict).toMatchObject({ ok: true, reason: "accepted" });
     // A revision where a line MOVED is a new basis: no acceptance covers it.
-    const moved = { sections: [{ work_section: "Hardscape & Structures", lines: [line("reference"), line("reference", 120)] }], grand_total_aed: 220 };
+    const moved = { ...H7, sections: [{ work_section: "Hardscape & Structures", lines: [line("reference"), line("reference", 120)] }], grand_total_aed: 220 };
     db.tables.boqs!.push({ id: "10000000-0000-4000-8000-000000000003", project_id: "p1", sections: moved, created_at: "2026-09-27T11:00:00Z" });
     const g3 = await loadProposalGate(db.client, "p1");
     expect(g3.acceptance).toBeNull();

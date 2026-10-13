@@ -174,8 +174,9 @@ describe("H1: every route outside the public allowlist requires a signed-in call
       expect(ALL_ROUTES, file).toContain(file);
       expect(reason.length, file).toBeGreaterThan(10);
     }
-    // The callback is the only way to obtain a session, health the only probe.
-    expect(Object.keys(PUBLIC_ROUTE_FILES).sort()).toEqual(["app/api/cron/uploads-sweep/route.ts", "app/api/health/route.ts", "app/auth/callback/route.ts"]);
+    // The callback is the only way to obtain a session, health the only probe;
+    // the two crons check CRON_SECRET themselves (H9 sweep, K10 project purge).
+    expect(Object.keys(PUBLIC_ROUTE_FILES).sort()).toEqual(["app/api/cron/projects-purge/route.ts", "app/api/cron/uploads-sweep/route.ts", "app/api/health/route.ts", "app/auth/callback/route.ts"]);
   });
 
   it("scans every API route file", () => {
@@ -255,6 +256,12 @@ const CREATES_PROJECT = new Set(["app/api/upload/route.ts", "app/api/draw-plan/r
 // any storage read or signature — asserted below). They reach one of those.
 const UPLOAD_ROUTES = new Set(["app/api/uploads/sign/route.ts", "app/api/uploads/complete/route.ts", "app/api/upload/route.ts", "app/api/project-asset/route.ts", "app/api/room-photo/route.ts"]);
 const UPLOAD_ENTRY = /await (finishUpload|signUpload)\(/;
+// K10: a DELETED project is not found through projectAccess, so the lifecycle
+// routes (delete, restore, delete now, the delete preview) check membership
+// inside lib/projects/lifecycle.ts (requireMember / requireDeleter: 401 → 404 →
+// 403) — asserted below — and reach one of these.
+const LIFECYCLE_ROUTES = new Set(["app/api/projects/[id]/route.ts", "app/api/projects/[id]/restore/route.ts", "app/api/projects/[id]/delete-now/route.ts", "app/api/projects/[id]/delete-preview/route.ts"]);
+const LIFECYCLE_ENTRY = /await (softDeleteProject|restoreProject|deleteNow|deletePreview)\(/;
 const PRE_CHECK_OK = /^(getCaller\(|(?:\w+\.)?params\b|projectIdOf\(|request\.(json|formData)\(|firmDenied\()/;
 
 describe("H5: every project-scoped route requires membership of the project it touches", () => {
@@ -276,8 +283,9 @@ describe("H5: every project-scoped route requires membership of the project it t
     const src = readFileSync(path.join(ROOT, file), "utf8");
     for (const h of exportedFunctions(src, HTTP_METHODS)) {
       const upload = UPLOAD_ROUTES.has(file) ? (UPLOAD_ENTRY.exec(h.body)?.index ?? -1) : -1;
-      const idx = [h.body.indexOf("await projectAccess("), CREATES_PROJECT.has(file) ? h.body.indexOf("await addProjectMember(") : -1, upload].filter((i) => i >= 0);
-      expect(idx.length, `${h.name} reaches projectAccess${CREATES_PROJECT.has(file) ? " or addProjectMember" : ""}${UPLOAD_ROUTES.has(file) ? " or finishUpload / signUpload" : ""}`).toBeGreaterThan(0);
+      const lifecycle = LIFECYCLE_ROUTES.has(file) ? (LIFECYCLE_ENTRY.exec(h.body)?.index ?? -1) : -1;
+      const idx = [h.body.indexOf("await projectAccess("), CREATES_PROJECT.has(file) ? h.body.indexOf("await addProjectMember(") : -1, upload, lifecycle].filter((i) => i >= 0);
+      expect(idx.length, `${h.name} reaches projectAccess${CREATES_PROJECT.has(file) ? " or addProjectMember" : ""}${UPLOAD_ROUTES.has(file) ? " or finishUpload / signUpload" : ""}${LIFECYCLE_ROUTES.has(file) ? " or a lifecycle entry" : ""}`).toBeGreaterThan(0);
       const first = Math.min(...idx);
       // The addProjectMember path follows the project INSERT by design; the rule is for the check.
       if (h.body.indexOf("await projectAccess(") === first) {
@@ -285,6 +293,19 @@ describe("H5: every project-scoped route requires membership of the project it t
         expect(before, `${h.name}: nothing but caller, params and body awaited before the project check`).toEqual([]);
       }
     }
+  });
+
+  it("K10: every lifecycle entry checks membership (and, to delete, the role) before anything else", () => {
+    const src = readFileSync(path.join(ROOT, "lib/projects/lifecycle.ts"), "utf8");
+    for (const [fn, guard] of [["softDeleteProject", "requireDeleter"], ["deleteNow", "requireDeleter"], ["restoreProject", "requireMember"], ["deletePreview", "requireMember"]] as const) {
+      const body = src.slice(src.indexOf(`export async function ${fn}(`));
+      expect(/\bawait\s+([A-Za-z]+)\(/.exec(body)?.[1], fn).toBe(guard);
+    }
+    const member = src.slice(src.indexOf("async function requireMember("));
+    expect(member.indexOf("unauthenticated")).toBeLessThan(member.indexOf("await loadProject("));
+    const deleter = src.slice(src.indexOf("async function requireDeleter("), src.indexOf("// --- What a delete"));
+    expect(deleter).toMatch(/await requireMember\(/);
+    expect(deleter).toContain("not_allowed_to_delete");
   });
 
   it("H9: signUpload and completeUpload authorize the scope before any storage call", () => {

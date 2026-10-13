@@ -75,7 +75,8 @@ export function overviewNext(projectId: string, statuses: Record<string, StepSta
   const out: OverviewAction[] = [];
   for (const s of OWNER_STEPS) {
     const st = statuses[s.key];
-    if (!st || (st.state !== "attention" && st.state !== "blocked")) continue;
+    // K10: an available step that states a reason (03 Renders "1 / 3 locked") is next too — as on the rail and the Projects home.
+    if (!st || st.state === "done" || (st.state === "available" && !st.reason)) continue;
     const href = st.fix?.href ?? ownerStepHref(s.key as OwnerStepKey, projectId, flags);
     const step = `${s.number} · ${s.label.toUpperCase()}`;
     const blocked = st.state === "blocked";
@@ -87,6 +88,10 @@ export function overviewNext(projectId: string, statuses: Record<string, StepSta
       title = "Add references for your design";
       sentence = `${ctx.direction ? `Your direction is ${ctx.direction}. ` : ""}Pin 3–6 images you like so every render is checked against them.`;
       label = "Open design";
+    } else if (s.key === "renders") {
+      title = "Lock the remaining views";
+      sentence = `${st.reason ?? ""} — lock each view once you are happy with it.`;
+      label = "Open renders";
     } else if (s.key === "cost" && !blocked) {
       title = `${n === 1 ? "One item isn't" : `${n} items aren't`} priced yet`;
       sentence = `${n ? `${list(ctx.unpriced)} ${n === 1 ? "has" : "have"} no price, so ${n === 1 ? "it is" : "they are"} left out of the total. ` : ""}Ask for a price or pick a product.`;

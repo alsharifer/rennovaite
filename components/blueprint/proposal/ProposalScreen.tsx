@@ -82,7 +82,9 @@ export function ProposalScreen({ view, eyebrow }: { view: ProposalView; eyebrow:
     ? "Locked — this project has no firm attached"
     : gate.noBoq
       ? "Locked — generate the BoQ first"
-      : "Locked — review your rate book or accept the market basis (above)";
+      : gate.preRounding
+        ? "Locked — regenerate the BoQ first (this revision predates the rounding fix)"
+        : "Locked — review your rate book or accept the market basis (above)";
 
   return (
     <div className="mx-auto max-w-[1344px] px-6 py-8 pb-16 lg:px-10" data-proposal data-gate={gate.ok ? "open" : "locked"} ref={(el) => el?.setAttribute("data-hydrated", "")}>
@@ -99,6 +101,11 @@ export function ProposalScreen({ view, eyebrow }: { view: ProposalView; eyebrow:
           ) : gate.noBoq ? (
             <StateBlock kind="gate" title="Client proposal locked" options={["Generate the BoQ from the plan"]} actions={<Button kind="secondary" tone="inverse" href={`/project/${projectId}/boq`}>Open BoQ &amp; Review</Button>}>
               There is no priced BoQ to propose yet.
+            </StateBlock>
+          ) : gate.preRounding ? (
+            // K10: a revision priced before the H7 rounding — its chain would not reconcile to the fil with the BoQ page.
+            <StateBlock kind="gate" title="Client proposal locked" options={["Regenerate the BoQ on BoQ & Review — the new revision prices to the fil"]} actions={<Button kind="secondary" tone="inverse" href={`/project/${projectId}/boq`}>Open BoQ &amp; Review</Button>}>
+              {gate.refusal}
             </StateBlock>
           ) : (
             <StateBlock
