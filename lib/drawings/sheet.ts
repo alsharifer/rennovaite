@@ -92,8 +92,20 @@ export interface SheetMeta {
   draft?: string | null;
   /** K8: who prepared the set — the project's firm (its own project only), else omitted. */
   preparedBy?: string | null;
-  /** K8: the drawing revision, when one is kept. Plans have none today: "—". */
-  rev?: string | null;
+  /**
+   * K9: the BoQ revision the set was generated from (`sheetRev`) — the rail's
+   * rev N = the N-th BoQ, so a sheet and the bill beside it carry the same REV.
+   */
+  rev: string;
+}
+
+/**
+ * K9 (K8 review): a sheet's REV is the BoQ revision it was generated from —
+ * never "—". rev N = the project's N-th BoQ (oldest = rev 1, the revisions
+ * view's numbering); a set drawn before the first BoQ is rev 0.
+ */
+export function sheetRev(boqRevisions: number): string {
+  return String(Math.max(0, Math.floor(boqRevisions)));
 }
 
 /** The status every sheet carries until a construction issue exists (68:1542). */
@@ -166,7 +178,7 @@ function titleBlock(meta: SheetMeta, sheetNumber: string, sheetTitle: string): s
     ${tl(cols[1]! + 2.5, r[2]! + 3.6, "Scale")}
     ${tv(cols[1]! + 2.5, r[2]! + 9, `${meta.scale} @ A3`, 3.2, FONT_MONO)}
     ${tl(cols[2]! + 2.5, r[2]! + 3.6, "Rev")}
-    ${tv(cols[2]! + 2.5, r[2]! + 9, meta.rev?.trim() || "—", 3.2, FONT_MONO)}
+    ${tv(cols[2]! + 2.5, r[2]! + 9, meta.rev, 3.2, FONT_MONO)}
     ${tl(cols[3]! + 2.5, r[2]! + 3.6, "Date")}
     ${tv(cols[3]! + 2.5, r[2]! + 9, fmtDate(meta.dateISO), 3.2, FONT_MONO)}
     ${tl(x + 2.5, r[3]! + 3.4, "Prepared by")}

@@ -20,7 +20,7 @@ const files = [
   path.join(ROOT, "lib", "documents", "render-pack.ts"),
 ];
 
-const META = { projectNameEn: "Reference garden", projectNameAr: null, community: "Dubai", level: "ground", scale: "1:100", dateISO: "2026-10-13" };
+const META = { projectNameEn: "Reference garden", projectNameAr: null, community: "Dubai", level: "ground", scale: "1:100", dateISO: "2026-10-13", rev: "1" };
 
 /** Ink (Blueprint ink-900/700/600), paper tints (paper-50/100/200/300) and neutral greys. */
 const ALLOWED = new Set(["#1A1D1F", "#4A5054", "#62676B", "#D6D1C5", "#F5F2EA", "#ECE8DE", "#FBFAF6", "#FFFFFF", "#E4E4E4", "#D9DCDF", "#E6E6E6"]);

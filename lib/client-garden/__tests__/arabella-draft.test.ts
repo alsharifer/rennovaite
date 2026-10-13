@@ -44,7 +44,7 @@ const graphOf = (d: Disp = {}) => {
   };
 };
 
-const meta = { projectNameEn: "Arabella Garden — Draft for Review", community: "Dubai", level: "ground", scale: "1:100", dateISO: "2026-09-14", projectId: "arabella" };
+const meta = { projectNameEn: "Arabella Garden — Draft for Review", community: "Dubai", level: "ground", scale: "1:100", dateISO: "2026-09-14", rev: "1", projectId: "arabella" };
 const identity = String(INTERNAL_REF).split(/[^A-Za-z0-9]+/)[0]!;
 
 describe("the client garden on derived reference dimensions", () => {
@@ -159,7 +159,7 @@ describe("the draft watermark on every document", () => {
 
   it("leaves an interior sheet exactly as it was", () => {
     const mudon = buildPlanGraph(MUDON_FIXTURE);
-    const svg = renderPlanSheet(mudon, { projectNameEn: "Mudon", community: "Dubai", level: "first floor", scale: "1:100", dateISO: "2026-09-14" }, { sheetNumber: "A-101", title: "As-Built Plan" });
+    const svg = renderPlanSheet(mudon, { projectNameEn: "Mudon", community: "Dubai", level: "first floor", scale: "1:100", dateISO: "2026-09-14", rev: "1" }, { sheetNumber: "A-101", title: "As-Built Plan" });
     expect(svg).not.toContain("data-draft");
   });
 

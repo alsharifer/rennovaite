@@ -37,7 +37,7 @@ import { graphDraftStatus } from "@/lib/plan/geometry";
 import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
 import { renderPlumbingSheet } from "./plumbing-sheet";
-import type { SheetMeta } from "./sheet";
+import { sheetRev, type SheetMeta } from "./sheet";
 import { layerOf, type FixtureType } from "@/lib/overlays/types";
 
 export type SheetKind =
@@ -148,6 +148,8 @@ interface ProjectMetaRow {
   city: string | null;
   /** K8: the project's own firm, as its clients read it (display name, else name). */
   firm: string | null;
+  /** K9: how many BoQ revisions the project has — the set is drawn from the latest (`sheetRev`). */
+  boqRevisions: number;
 }
 
 async function loadProjectMeta(projectId: string): Promise<ProjectMetaRow> {
@@ -165,7 +167,11 @@ async function loadProjectMeta(projectId: string): Promise<ProjectMetaRow> {
   } catch {
     firm = null; // pre-041 or no firm: the title block says "—"
   }
-  return { name: p.name, city: p.city, firm };
+  // K9: REV = the BoQ revision this set is generated from. A pack export
+  // regenerates the BoQ before it asks for the drawings, so the latest
+  // revision IS the one the pack carries.
+  const { count } = await db.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", projectId);
+  return { name: p.name, city: p.city, firm, boqRevisions: count ?? 0 };
 }
 
 function sheetMeta(
@@ -182,6 +188,7 @@ function sheetMeta(
     scale: graph.meta.scale,
     dateISO: new Date().toISOString().slice(0, 10),
     preparedBy: project.firm,
+    rev: sheetRev(project.boqRevisions),
   };
 }
 

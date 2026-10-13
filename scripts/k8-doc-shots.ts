@@ -55,7 +55,7 @@ boqPages.forEach((p, i) => png(p, `boq-${i + 1}.png`));
 const room = (x: number, y: number, w: number, h: number, name: string) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#1A1D1F" stroke-width="0.7"/><text x="${x + 3}" y="${y + 6}" font-size="3" fill="#1A1D1F" style="font-family:Consolas">${name}</text>`;
 const sheet = (draft: string | null) =>
   renderSheet({
-    meta: { projectNameEn: "Garden — Draft for Review", community: "Dubai", level: "ground", scale: "1:50", dateISO: "2026-10-12", preparedBy: "Scratch Landscapes & Co.", draft },
+    meta: { projectNameEn: "Garden — Draft for Review", community: "Dubai", level: "ground", scale: "1:50", dateISO: "2026-10-12", rev: "1", preparedBy: "Scratch Landscapes & Co.", draft },
     sheetNumber: "L-100",
     title: "Site plan",
     body: room(40, 30, 110, 80, "REAR LAWN 47.8 m²") + room(150, 30, 70, 80, "PERGOLA 12.3 m²"),
