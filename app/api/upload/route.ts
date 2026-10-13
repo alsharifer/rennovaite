@@ -18,10 +18,10 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   const caller = await getCaller(request);
   if (!caller) return unauthenticated();
-  const body = (await request.json().catch(() => null)) as { path?: unknown; filename?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { path?: unknown; filename?: unknown; name?: unknown; city?: unknown } | null;
   if (!body || typeof body.path !== "string") return NextResponse.json({ error: "Upload the plan first, then send its path.", code: "bad_request" }, { status: 400 });
   try {
-    const result = await finishUpload(supabaseAdmin as unknown as SupabaseClient, caller, body.path, { filename: typeof body.filename === "string" ? body.filename : null }, "plan");
+    const result = await finishUpload(supabaseAdmin as unknown as SupabaseClient, caller, body.path, { filename: typeof body.filename === "string" ? body.filename : null, name: typeof body.name === "string" ? body.name : null, city: typeof body.city === "string" ? body.city : null }, "plan");
     return NextResponse.json(result);
   } catch (e) {
     return uploadErrorResponse(e, "api/upload");

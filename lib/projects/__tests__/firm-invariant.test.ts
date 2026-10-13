@@ -19,7 +19,7 @@ const bob: Caller = { id: "00000000-0000-4000-8000-000000000b0b", email: "bob@el
 let db: FakeDb;
 beforeEach(() => {
   db = fakeDb({
-    projects: [{ id: "p1", firm_id: null }, { id: "p2", firm_id: null }],
+    projects: [{ id: "p1", firm_id: null, created_by: alice.id }, { id: "p2", firm_id: null, created_by: alice.id }],
     project_members: [{ project_id: "p1", user_id: alice.id }],
   });
 });

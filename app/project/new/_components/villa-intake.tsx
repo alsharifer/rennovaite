@@ -61,10 +61,13 @@ type PlanState =
 type AssetStatus = "queued" | "uploading" | "done" | "error";
 type AssetItem = { id: string; file: File; name: string; kind: AssetKind; previewUrl?: string; status: AssetStatus; error?: string };
 
-/** H9: the plan goes straight to Storage on a signed URL, then /complete verifies it and creates the project. */
-async function uploadWithProgress(file: File, onProgress: (pct: number) => void): Promise<UploadResponse> {
+/**
+ * H9: the plan goes straight to Storage on a signed URL, then /complete verifies it and creates the project.
+ * K11 #1: with the name and city typed so far — the project is a draft until Continue (finishIntake).
+ */
+async function uploadWithProgress(file: File, project: { name: string; city: string }, onProgress: (pct: number) => void): Promise<UploadResponse> {
   const { path } = await uploadDirect(file, { kind: "plan", onProgress });
-  return completeUpload<UploadResponse>(path, "plan", { filename: file.name });
+  return completeUpload<UploadResponse>(path, "plan", { filename: file.name, name: project.name.trim() || null, city: project.city });
 }
 
 const mb = (b: number) => `${(b / (1024 * 1024)).toFixed(1)} MB`;
@@ -89,7 +92,7 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
   const [discipline, setDiscipline] = useState<AssetKind>("drawing_mep");
   const [projectName, setProjectName] = useState("");
   const [city, setCity] = useState("Dubai");
-  const [busy, setBusy] = useState<null | "parse" | "draw">(null);
+  const [busy, setBusy] = useState<null | "save" | "parse" | "draw">(null);
   const [error, setError] = useState<string | null>(null);
 
   const ways = WAYS.filter((w) => !w.garden || gardenPilot);
@@ -131,14 +134,14 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
     setError(null);
     setPlan({ kind: "uploading", name: f.name, progress: 0 });
     try {
-      const res = await uploadWithProgress(f, (pct) => setPlan({ kind: "uploading", name: f.name, progress: pct }));
+      const res = await uploadWithProgress(f, { name: projectName, city }, (pct) => setPlan({ kind: "uploading", name: f.name, progress: pct }));
       setPlan({ kind: "ready", name: f.name, size: f.size, res });
       track(AnalyticsEvent.ProjectStarted, { project_id: res.project_id });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed.";
       setPlan(/too large|413|payload/i.test(message) ? { kind: "too_large", name: f.name, size: f.size } : { kind: "error", message });
     }
-  }, []);
+  }, [projectName, city]);
 
   const onPlanRejected = useCallback((rejections: FileRejection[]) => {
     const r = rejections[0];
@@ -167,10 +170,19 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
   const drawingDz = useDropzone({ onDrop: (f) => addAssets(f, discipline, setDrawings, patchDrawing), accept: DRAWING_ACCEPT, maxSize: ASSET_MAX_BYTES, multiple: true });
 
   // K8 #12: Continue on an uploaded plan hands over to "Reading your plan", which runs the parse.
-  function analyze() {
+  // K11 #1: first it saves the name and city the form holds NOW and ends the project's draft.
+  async function analyze() {
     if (plan.kind !== "ready" || busy) return;
     setError(null);
-    setBusy("parse");
+    setBusy("save");
+    try {
+      const res = await fetch(`/api/projects/${plan.res.project_id}/intake`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: projectName.trim() || null, city }) });
+      if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `The project could not be saved (${res.status}).`);
+      setBusy("parse");
+    } catch (err) {
+      setBusy(null);
+      setError(err instanceof Error ? err.message : "The project could not be saved.");
+    }
   }
 
   /** G1: a project with nothing to parse — the plot is its scale. Queued photos and drawings upload before we leave. */
@@ -195,7 +207,9 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
   // Continue: one action per way, disabled with the reason until that way is valid.
   const plotOk = !!parsePlot(plot);
   const blockReason =
-    busy === "parse"
+    busy === "save"
+      ? "Saving the project…"
+      : busy === "parse"
       ? "Reading your plan…"
       : busy === "draw"
         ? "Opening the canvas…"

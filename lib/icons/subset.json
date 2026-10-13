@@ -1,7 +1,7 @@
 {
   "family": "Material Symbols Sharp",
   "axes": "opsz,wght,FILL,GRAD@20..24,300..400,0,0",
-  "count": 208,
+  "count": 210,
   "names": [
     "2d",
     "3d_rotation",
@@ -13,6 +13,7 @@
     "approval",
     "architecture",
     "archive",
+    "arrow_back",
     "arrow_forward",
     "arrow_upward",
     "assistant",
@@ -158,6 +159,7 @@
     "roofing",
     "room",
     "rule",
+    "save",
     "scale",
     "scene",
     "schedule",

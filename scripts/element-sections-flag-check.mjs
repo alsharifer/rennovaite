@@ -116,6 +116,8 @@ if (mode === "capture") {
       const villa = await seedScratchVilla();
       // H5: the check's account owns its scratch villa (the row goes with the villa).
       await grantProjectMembership(me.userId, [villa.projectId], { script: "element-sections-flag-check" });
+      // K11 #5: attaching a firm is the project creator's act — this account made the scratch villa.
+      await sb.from("projects").update({ created_by: me.userId }).eq("id", villa.projectId);
       const fa = await api("POST", "/api/firms", { name: FIRM_NAME }, me);
       check("scratch villa seeded from the plan fixture + scratch firm created", fa.status === 201, `${fa.status} ${fa.body.error ?? ""}`);
       for (const s of SIX) {

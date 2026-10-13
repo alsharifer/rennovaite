@@ -44,7 +44,7 @@ async function expectStoreError(p: Promise<unknown>, status: number, code?: stri
 }
 
 beforeEach(async () => {
-  db = fakeDb({ rate_book: [{ id: "r1", city: "Dubai", item_key: "garden.pcc_base", grade: "standard", unit: "m2", rate_aed: 105.6, scope: "install_only", provenance: "actual_transaction", valid_from: "2026-09-12", work_section: "External Works" }], projects: [{ id: "p1", firm_id: null }], boq_corrections: [], firm_members: [], firm_quotes: [], firm_quote_lines: [] });
+  db = fakeDb({ rate_book: [{ id: "r1", city: "Dubai", item_key: "garden.pcc_base", grade: "standard", unit: "m2", rate_aed: 105.6, scope: "install_only", provenance: "actual_transaction", valid_from: "2026-09-12", work_section: "External Works" }], projects: [{ id: "p1", firm_id: null, created_by: alice.id }], boq_corrections: [], firm_members: [], firm_quotes: [], firm_quote_lines: [] });
   A = await createFirm(db.client, { name: "Firm A" }, alice);
   snapshot = JSON.stringify(db.tables.rate_book);
 });

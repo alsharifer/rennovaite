@@ -28,6 +28,8 @@ import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { elementPricer } from "@/lib/boq/rates";
 import type { EngineRoom, LabourRate as EngineLabourRate, PricingSku as EnginePricingSku } from "@/lib/boq/schema";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
+import { applyOwnBasis } from "@/lib/boq/own-basis";
+import { loadAppliedCorrections } from "@/lib/boq/own-basis-load";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { getProposedGraph } from "@/lib/plan/snapshots";
@@ -316,9 +318,13 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
   // units, points) priced at the calibrated landscape rates. No-op for a
   // project with no outdoor zones, which is every interior project.
   const gardened = await appendGardenSections(withJoinery, projectId, supabase, { persist: !opts.dryRun, firm });
+  // K11 #4 (057): prices added on review and corrections that were applied —
+  // re-applied to every regeneration, so a regenerated BoQ never silently drops
+  // one. A no-op (the document untouched) when the project has none.
+  const owned = applyOwnBasis(gardened as unknown as Parameters<typeof applyOwnBasis>[0], await loadAppliedCorrections(supabase, projectId)).boq as unknown as typeof gardened;
   // L1: the firm's OH&P, LAST — its own summary line over the priced
   // subtotal, never inside a rate. A no-op without a firm book.
-  return applyOhp(gardened, firm.ohpPct);
+  return applyOhp(owned, firm.ohpPct);
 }
 
 /** Load + price in one call (the dry-run scripts and the invariance test). */

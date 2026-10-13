@@ -18,7 +18,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { formatAed } from "@/lib/format/aed";
 import { isMissingSchema } from "@/lib/rates/firm";
+
+import { appliedHeadline, basisText, type BasisKind, type CorrectionOrigin } from "./own-basis-vocab";
 
 import type { RecordedCause } from "./revision-diff";
 
@@ -44,8 +47,32 @@ const num = (v: unknown) => (v == null ? null : Number(v));
 export async function loadRecordedCauses(db: SupabaseClient, projectId: string, fromISO: string, toISO: string, toBoqId: string): Promise<RecordedCause[]> {
   const out: RecordedCause[] = [];
 
+  // K11 #4 (057): corrections APPLIED to the BoQ in the window — line-level by their
+  // stable line key: "Price added by <name> — …" / "Correction by <name> — …"; and
+  // the ones a revert in the window undid.
+  const applied = await rows(db, () => db.from("boq_corrections").select("id, correction_type, old_value, new_value, note, origin, basis_kind, line_key, applied_by_name, applied_at, reverted_at").eq("project_id", projectId).gt("applied_at", fromISO).lte("applied_at", toISO));
+  const appliedIds = new Set(applied.map((c) => str(c.id)));
+  for (const c of applied) {
+    const o = num(c.old_value);
+    const n = num(c.new_value);
+    const isRate = str(c.correction_type) === "rate";
+    const fig = (v: number | null) => (v == null ? "—" : isRate ? formatAed(v, "money") : String(v));
+    const figures = isRate && (o == null || o === 0) && str(c.origin) === "add_price" ? ` — ${fig(n)}` : ` — ${isRate ? "rate" : "quantity"} ${fig(o)} → ${fig(n)}`;
+    const basis = basisText(c.basis_kind as BasisKind | null, c.note as string | null);
+    out.push({
+      kind: "applied_correction",
+      at: str(c.applied_at),
+      summary: `${appliedHeadline(str(c.origin) as CorrectionOrigin, c.applied_by_name as string | null)}${figures}${basis ? ` (${basis})` : ""}`,
+      line_keys: c.line_key ? [str(c.line_key)] : [],
+    });
+  }
+  for (const c of await rows(db, () => db.from("boq_corrections").select("id, origin, line_key, applied_by_name, reverted_at").eq("project_id", projectId).gt("reverted_at", fromISO).lte("reverted_at", toISO))) {
+    out.push({ kind: "reverted_correction", at: str(c.reverted_at), summary: `${appliedHeadline(str(c.origin) as CorrectionOrigin, c.applied_by_name as string | null)} — reverted`, line_keys: c.line_key ? [str(c.line_key)] : [] });
+  }
+
   // Corrections — line-level.
-  for (const c of await rows(db, () => db.from("boq_corrections").select("item_key, line_description, correction_type, field, old_value, new_value, note, recorded_at").eq("project_id", projectId).gt("recorded_at", fromISO).lte("recorded_at", toISO))) {
+  for (const c of await rows(db, () => db.from("boq_corrections").select("id, item_key, line_description, correction_type, field, old_value, new_value, note, recorded_at").eq("project_id", projectId).gt("recorded_at", fromISO).lte("recorded_at", toISO))) {
+    if (appliedIds.has(str(c.id))) continue; // its application above names the line exactly
     const type = str(c.correction_type);
     const o = num(c.old_value);
     const n = num(c.new_value);

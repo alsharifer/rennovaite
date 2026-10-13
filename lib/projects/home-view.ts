@@ -131,7 +131,8 @@ export async function loadProjectsHome(db: SupabaseClient, caller: Caller): Prom
 
   // `*`: created_by arrives with 055; a database without it still lists projects.
   const { data } = await db.from("projects").select("*").in("id", ids);
-  const projects = (data ?? []) as ProjectRow[];
+  // K11 #1 (056): a draft (an intake upload nobody continued) is not on the list.
+  const projects = ((data ?? []) as (ProjectRow & { draft_since?: string | null })[]).filter((p) => !p.draft_since);
   // Archived (migration 030) — read best-effort; archiving hides, never deletes.
   const archived = await safe(new Set<string>(), async () => {
     const { data: a } = await db.from("projects").select("id").in("id", ids).not("archived_at", "is", null);

@@ -57,7 +57,7 @@ async function expectStoreError(p: Promise<unknown>, status: number, code?: stri
 beforeEach(() => {
   db = fakeDb({
     rate_book: REFERENCE,
-    projects: [{ id: "p1", firm_id: null }, { id: "p2", firm_id: null }],
+    projects: [{ id: "p1", firm_id: null, created_by: alice.id }, { id: "p2", firm_id: null, created_by: alice.id }],
     boq_corrections: [],
     firm_members: [],
   });

@@ -17,8 +17,12 @@ import { Suspense, useEffect, useSyncExternalStore, type ReactNode } from "react
 import { FIRM_STEPS, OWNER_STEPS, activeStepKey, ownerStepHref, type JourneyFlags } from "@/lib/journey";
 import type { RailContext } from "@/lib/journey-state";
 
+import { stepIssues } from "@/lib/boq/issues";
+
 import { HelpDrawer } from "./HelpDrawer";
+import { IssuesNavigator } from "./IssuesNavigator";
 import { JourneyRail } from "./JourneyRail";
+import { StepFooter } from "./StepFooter";
 import { noSubscribe, readStep, writeStep } from "./step-memory";
 import type { RailStep } from "./StepList";
 import { TopBar } from "./TopBar";
@@ -64,13 +68,19 @@ export function ShellFrame({ ctx, flags, skin, title, children }: { ctx: RailCon
   // K4: Revisions & Approval (21:450) takes the compact rail too — a seven-column diff beside a 360 column.
   const compactWide = activeKey === "boq_review" || activeKey === "revisions" || (ctx.persona === "owner" && /\/boq(\/revisions)?$/.test(pathname));
   const pageTitle = title ?? PAGE_TITLES.find(([re]) => re.test(pathname))?.[1] ?? null;
+  // K11 #3: "⚑ N TO FIX" on a step page that has a reason — the rail's own. The BoQ page draws its
+  // own navigator (every unpriced / duplicate / derived line), so the shell's stays off there.
+  const activeStep = projectId && stepKey ? (steps.find((x) => x.key === stepKey) ?? null) : null;
+  const generic = activeStep && !/\/boq$/.test(pathname) ? stepIssues(activeStep.status, activeStep.label) : null;
 
   return (
     <div data-system="blueprint" data-skin={skin} data-rail={compactWide ? "compact-wide" : "standard"} className="bp-shell min-h-screen bg-bp-surface-base font-bp-sans text-bp-ink-primary">
       <JourneyRail ctx={ctx} steps={steps} activeKey={activeKey} />
-      <TopBar ctx={ctx} steps={steps} activeKey={activeKey} pageTitle={pageTitle} />
+      <TopBar ctx={ctx} steps={steps} activeKey={activeKey} pageTitle={pageTitle} issues={generic && generic.count > 0 ? <IssuesNavigator issues={generic} /> : null} />
       <main id="main" className="bp-main">
         {children}
+        {/* K11 #2: previous · next on every journey step page (not a side surface, not the intake). */}
+        {projectId && stepKey ? <StepFooter steps={steps} activeKey={stepKey} /> : null}
       </main>
       <Suspense fallback={null}>
         <HelpDrawer

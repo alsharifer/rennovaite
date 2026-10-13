@@ -24,6 +24,7 @@ import { isAssetKind, isAssetSource, type AssetKind } from "@/lib/assets/types";
 import type { Caller } from "@/lib/auth/caller";
 import { setLogoPath } from "@/lib/firms/branding";
 import { addProjectMember, authorizeProject } from "@/lib/projects/access";
+import { insertIntakeProject } from "@/lib/projects/intake";
 import { recordProjectCreator } from "@/lib/projects/lifecycle";
 import { importQuote } from "@/lib/quotes/store";
 import { StoreError } from "@/lib/store-error";
@@ -37,6 +38,9 @@ const Uuid = z.string().uuid();
 export interface FinishFields {
   /** The browser's original file name (shown in the asset library; never trusted for type). */
   filename?: string | null;
+  // plan (K11 #1): the intake's typed project name and city, when there are any
+  name?: string | null;
+  city?: string | null;
   // project_asset
   asset_kind?: string | null;
   source?: string | null;
@@ -65,8 +69,8 @@ async function registerPlan(db: SupabaseClient, caller: Caller, done: CompletedU
   let projectId: string | null = null;
   let stored: string | null = null;
   try {
-    const { data: project, error } = await db.from("projects").insert({ city: "Dubai", name: "Untitled" }).select("id").single<{ id: string }>();
-    if (error || !project) throw error ?? new Error("Failed to create project row.");
+    // K11 #1 (056): the typed name and city, and a DRAFT until the intake's Continue (lib/projects/intake.ts).
+    const project = await insertIntakeProject(db, f);
     projectId = project.id;
     // H5: creating a project makes the uploader its member (rolled back with it).
     await addProjectMember(db, project.id, caller.id);

@@ -13,6 +13,10 @@
 // the QUANTITY and RATE blocks from the curated provenance, and — for a firm —
 // whether its own book has an entry ("Add to my book" opens the book's add
 // form PREFILLED; nothing is saved until the member saves it there).
+//
+// K11 #4 (spec §7.3, 80:9042 · 80:9088): an unpriced line offers "Add a
+// price", and "Capture correction" opens the capture form IN the Line tab
+// (./CorrectionsTab CaptureForm); applying either creates the next revision.
 // =============================================================================
 
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
@@ -26,7 +30,7 @@ import { Button } from "../Button";
 import { Icon } from "../Icon";
 import { ProvenanceMark } from "../ProvenanceMark";
 import { TierLabel } from "../TierLabel";
-import { CorrectionsTab, type Correction } from "./CorrectionsTab";
+import { CaptureForm, CorrectionsList, type Applied, type Correction } from "./CorrectionsTab";
 import { displayUnit } from "./format";
 import { weakerSentence } from "./ProvenancePopover";
 import { WhatIfTab, type WhatIfEngine } from "./WhatIfTab";
@@ -42,6 +46,10 @@ export interface InspectorProps {
   capturing: boolean;
   setCapturing: (v: boolean) => void;
   onCorrectionSaved: (c: Correction) => void;
+  /** K11 #4: a price / correction applied — the next revision exists. */
+  onApplied: (a: Applied) => void;
+  /** K11 #3: "Next issue J" — present while the BoQ has issue lines. */
+  onNextIssue?: () => void;
   engine: WhatIfEngine | null;
   furniture: number | null;
   onClose: () => void;
@@ -128,14 +136,38 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
       </div>
 
       <div role="tabpanel" id={`${base}-panel-${p.tab}`} aria-labelledby={`${base}-tab-${p.tab}`} className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-4">
-        <p className="t-label-caps text-bp-ink-tertiary">
-          {line.ref} · {line.section.toUpperCase()}
-        </p>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="t-label-caps text-bp-ink-tertiary">
+            {line.ref} · {line.section.toUpperCase()}
+          </p>
+          {p.onNextIssue ? (
+            <button type="button" onClick={p.onNextIssue} className="t-label-caps flex shrink-0 items-center gap-1.5 text-bp-ink-secondary hover:text-bp-ink-primary" aria-keyshortcuts="J" data-next-issue="">
+              Next issue <kbd className="border border-bp-line-control px-1 font-bp-mono">J</kbd>
+            </button>
+          ) : null}
+        </div>
         <h2 ref={headingRef} id="bp-boq-inspector-heading" tabIndex={-1} className="t-heading-md mt-2 text-bp-ink-primary outline-none" data-inspector-heading="">
           {line.description}
         </h2>
 
-        {p.tab === "line" ? (
+        {p.tab === "line" && p.capturing ? (
+          <div className="mt-5">
+            <CaptureForm
+              line={line}
+              model={model}
+              onCancel={() => p.setCapturing(false)}
+              onSaved={(c) => {
+                p.onCorrectionSaved(c);
+                p.setCapturing(false);
+                p.setTab("corrections");
+              }}
+              onApplied={(a) => {
+                p.setCapturing(false);
+                p.onApplied(a);
+              }}
+            />
+          </div>
+        ) : p.tab === "line" ? (
           <>
             <Block>
               <p className="flex items-center gap-2">
@@ -143,7 +175,14 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
                 <TierLabel tier={line.tiers.amount} persona={model.persona} />
               </p>
               {line.unpriced ? (
-                <p className="t-body-sm mt-2 text-bp-ink-secondary">Not in any total — {line.unpricedReason}.</p>
+                <>
+                  <p className="t-body-sm mt-2 text-bp-ink-secondary">Not in any total — {line.unpricedReason}.</p>
+                  <div className="mt-3">
+                    <Button kind="primary" onClick={() => p.setCapturing(true)} testId="add-a-price">
+                      Add a price
+                    </Button>
+                  </div>
+                </>
               ) : (
                 <>
                   <p className="t-num-sm mt-2 flex flex-wrap items-center gap-1.5">
@@ -212,13 +251,7 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
 
             <Block>
               <div className="flex flex-wrap items-center gap-6">
-                <Button
-                  kind="secondary"
-                  onClick={() => {
-                    p.setCapturing(true);
-                    p.setTab("corrections");
-                  }}
-                >
+                <Button kind="secondary" onClick={() => p.setCapturing(true)}>
                   Capture correction
                 </Button>
                 <Button kind="quiet" href={`/project/${model.projectId}/boq/revisions`}>
@@ -233,7 +266,16 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
           </div>
         ) : (
           <div className="mt-5">
-            <CorrectionsTab line={line} model={model} corrections={lineCorrections} capturing={p.capturing} setCapturing={p.setCapturing} onSaved={p.onCorrectionSaved} />
+            <CorrectionsList
+              line={line}
+              model={model}
+              corrections={lineCorrections}
+              onCapture={() => {
+                p.setCapturing(true);
+                p.setTab("line");
+              }}
+              onApplied={p.onApplied}
+            />
           </div>
         )}
       </div>

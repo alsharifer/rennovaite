@@ -133,6 +133,8 @@ export interface RecordedCause {
   summary: string;
   item_keys?: string[];
   descriptions?: string[];
+  /** K11 #4: the stable line keys a record names exactly (an applied correction). */
+  line_keys?: string[];
   /** `true` = explains the whole revision (e.g. the generation that produced it). */
   revision_level?: boolean;
 }
@@ -199,7 +201,8 @@ function causesFor(line: RevisionLine, recorded: readonly RecordedCause[]): Caus
     if (c.revision_level) continue;
     const byKey = line.item_key != null && (c.item_keys ?? []).includes(line.item_key);
     const byDesc = (c.descriptions ?? []).some((d) => norm(d) === norm(line.description));
-    if (byKey || byDesc) out.push({ kind: c.kind, at: c.at, summary: c.summary });
+    const byLine = (c.line_keys ?? []).includes(line.key);
+    if (byKey || byDesc || byLine) out.push({ kind: c.kind, at: c.at, summary: c.summary });
   }
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
@@ -308,7 +311,7 @@ export function diffRevisions(before: RevisionSnapshot, after: RevisionSnapshot,
       delta_pct: before.summary.grand_total_aed ? r2((grand.delta / before.summary.grand_total_aed) * 100) : null,
     },
     window_causes: window
-      .filter((c) => c.revision_level || (!(c.item_keys?.length) && !(c.descriptions?.length)))
+      .filter((c) => c.revision_level || (!(c.item_keys?.length) && !(c.descriptions?.length) && !(c.line_keys?.length)))
       .map((c) => ({ kind: c.kind, at: c.at, summary: c.summary }))
       .sort((x, y) => x.at.localeCompare(y.at)),
     counts: {

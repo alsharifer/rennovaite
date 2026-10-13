@@ -35,7 +35,7 @@ export function TopBarActions({ children }: { children: ReactNode }) {
   return target ? createPortal(children, target) : null;
 }
 
-export function TopBar({ ctx, steps, activeKey, pageTitle }: { ctx: RailContext; steps: RailStep[]; activeKey: string | null; pageTitle: string | null }) {
+export function TopBar({ ctx, steps, activeKey, pageTitle, issues = null }: { ctx: RailContext; steps: RailStep[]; activeKey: string | null; pageTitle: string | null; issues?: ReactNode }) {
   const drawer = useRef<HTMLDialogElement>(null);
   const active = steps.find((s) => s.key === activeKey) ?? null;
   // A page title names a page that is not a step (a side surface keeps the rail's step lit).
@@ -55,6 +55,8 @@ export function TopBar({ ctx, steps, activeKey, pageTitle }: { ctx: RailContext;
           ))}
         </ol>
       </nav>
+      {/* K11 #3: the shell's Issues navigator (a step's rail reason) sits before the page's actions. */}
+      {issues ? <div className="bp-desk-only shrink-0">{issues}</div> : null}
       <div className="bp-desk-only shrink-0">
         <div id={ACTIONS_ID} className="flex items-center gap-4" />
       </div>

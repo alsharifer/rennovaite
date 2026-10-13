@@ -32,7 +32,7 @@ let A: { id: string };
 beforeEach(async () => {
   db = fakeDb({
     rate_book: [ref("r1", "garden.pcc_base", "m2", 105.6), ref("r2", "garden.pergola", "m2 plan", 1366.6928), ref("r3", "garden.grass_supply", "m2", 26.4)],
-    projects: [{ id: "p1", firm_id: null }],
+    projects: [{ id: "p1", firm_id: null, created_by: alice.id }],
     boq_corrections: [],
     firm_members: [],
     firm_quotes: [],

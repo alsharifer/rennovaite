@@ -4,6 +4,38 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## K11 (2026-10-14) — from the pilot walkthrough
+
+- **056 and 057 before deploy** (prod): `projects.draft_since` (the intake
+  insert and Continue fall back without it, nothing is a draft) and the applied
+  corrections (`boq-apply` answers 500 `migration_required` without it; every
+  read degrades to "nothing applied").
+- **A firm admin may attach / detach projects created by members of their
+  firm** (approved 14 Oct as the next step after creator-only attach). Today
+  attach / move is the project creator's act (`assignProjectFirm`); detach is any
+  member of the current firm. Extend: an admin of the target firm may attach a
+  project whose creator is a member of that firm; the preview and the 409 / 403
+  wording follow.
+- **Abdallah's corrections on prod** — the read-only check of which correction
+  rows exist and whether they would now apply waits for his OK. A correction
+  saved before 057 has no `line_key`: it applies from its own line's
+  Corrections tab (the row key pins it), not blind.
+- **The member name on a cause** is the account's profile name, else the
+  e-mail's local part ("dev-scripts+k11-owner" on dev). A display-name field in
+  Settings would make "Price added by …" read as a person.
+- **Revert is whole-revision**: "Revert to rev N" restores rev N's figures and
+  stops every correction applied after it. Undoing ONE of several later
+  corrections (keeping the others) is not offered — it needs a per-correction
+  "stop applying" + regenerate-from-stored, a small follow-up.
+- **The BoQ PDF still prints a priced garden line's "(… QS to price)" aside**
+  when that aside is part of the line's identity (garden labels key on the
+  description) — stripping it would orphan the price on the next revision. The
+  screen and the proposal drop it. Fix = write `item_key` on every unpriced
+  garden line at generation.
+- **Issues navigator on the phone**: the button is desk / tablet only (the
+  phone top bar holds the step switcher); J / Shift+J and the inspector's
+  "Next issue" work everywhere.
+
 ## K10 (2026-10-13) — from the K8/K9 QA
 
 - **Sign-in settings are dashboard-only (Abdallah).** docs/AUTH.md → "Sign-in

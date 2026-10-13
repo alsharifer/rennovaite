@@ -332,6 +332,18 @@
       "version": "20260101005500",
       "name": "project_soft_delete",
       "sha256": "b19f3e59f05425385932cd1150385009de48cda7c5faa4483bb653399e1044b9"
+    },
+    {
+      "legacy": null,
+      "version": "20260101005600",
+      "name": "project_intake_draft",
+      "sha256": "0684bc2e1ce4fac5f3b9cc05096f15a2c133eabaf9db1283e1c148dceb0d5a37"
+    },
+    {
+      "legacy": null,
+      "version": "20260101005700",
+      "name": "applied_corrections",
+      "sha256": "c8e81172a73ff5663a8fc02a072f2b06ac1eae9c5f40690da54d44b7e24c18c4"
     }
   ]
 }

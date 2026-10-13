@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { sweepIntakeDrafts } from "@/lib/projects/intake";
 import { purgeExpiredProjects } from "@/lib/projects/lifecycle";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -30,13 +31,16 @@ export async function GET(request: NextRequest) {
   if (!sameSecret(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) return NextResponse.json({ error: "Not allowed.", code: "unauthenticated" }, { status: 401 });
   const apply = process.env.PROJECT_PURGE_APPLY === "true";
   try {
+    // K11 #1: intake drafts older than 24 h are soft-deleted first — always (reversible; nothing leaves the database).
+    const drafts = await sweepIntakeDrafts(getSupabaseAdmin() as unknown as SupabaseClient);
+    if (drafts.length > 0) console.log(`[cron/projects-purge] intake drafts soft-deleted=${drafts.length}`, drafts);
     const report = await purgeExpiredProjects(getSupabaseAdmin() as unknown as SupabaseClient, { apply });
     const objects = report.projects.reduce((s, p) => s + p.objects, 0);
     console.log(
       `[cron/projects-purge] ${apply ? "APPLY" : "DRY-RUN"} cutoff=${report.cutoff} projects=${report.projects.length} objects=${objects}`,
       report.projects.map((p) => `${p.projectId}:${p.objects}:${JSON.stringify(p.byBucket)}`),
     );
-    return NextResponse.json({ apply, cutoff: report.cutoff, projects: report.projects.map((p) => ({ id: p.projectId, objects: p.objects, by_bucket: p.byBucket })) });
+    return NextResponse.json({ apply, cutoff: report.cutoff, drafts_swept: drafts, projects: report.projects.map((p) => ({ id: p.projectId, objects: p.objects, by_bucket: p.byBucket })) });
   } catch (e) {
     console.error("[cron/projects-purge] failed", e);
     return NextResponse.json({ error: "Purge failed.", code: "purge_failed" }, { status: 500 });

@@ -22,6 +22,13 @@
 // DeleteNowDialog      Recently deleted → "Delete now": the name again.
 // UndoToast            ink toast, role="status", 8 s: "<name> moved to Recently
 //                      deleted · Undo".
+// MoveFirmDialog       K11 #5 "Move to firm…" (76:2981's layout): one of the
+//                      caller's firms or "No firm — personal project"; what
+//                      changes, in two sentences; an option that is not allowed
+//                      says why (the creator rule; who is not in the firm; a
+//                      member of the current firm to detach) — the preview
+//                      (GET …/move-preview) and PATCH { firm_id } share the
+//                      rules (lib/projects/move-firm.ts, assignProjectFirm).
 // Copy rule: archive is never called delete — "hidden from your list, nothing
 // lost".
 // =============================================================================
@@ -290,6 +297,137 @@ export function DeleteDialog({ project, open, onClose, onArchive }: { project: A
   );
 }
 
+// --- Move to firm (K11 #5) ------------------------------------------------------------------
+
+interface MoveOption {
+  firmId: string | null;
+  name: string;
+  current: boolean;
+  allowed: boolean;
+  reason: string | null;
+  outside: string[];
+}
+interface MovePreview {
+  name: string;
+  currentFirm: { id: string; name: string } | null;
+  options: MoveOption[];
+}
+
+export function MoveFirmDialog({ project, open, onClose }: { project: ActionProject; open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const titleId = useId();
+  const reasonId = useId();
+  const groupId = useId();
+  const [preview, setPreview] = useState<MovePreview | null>(null);
+  const [choice, setChoice] = useState<string | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void send(`/api/projects/${project.id}/move-preview`, "GET").then((r) => {
+      if (!live) return;
+      if (!r.ok) return setError(r.error);
+      const p = r.data as unknown as MovePreview;
+      setPreview(p);
+      // Start on the first option that is not where the project is now.
+      setChoice((p.options.find((o) => !o.current) ?? p.options[0])?.firmId);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, project.id]);
+
+  const selected = preview?.options.find((o) => o.firmId === choice) ?? null;
+  const reason = !preview ? "Loading your firms…" : !selected ? "Choose where the project goes" : selected.allowed ? null : (selected.reason ?? "Not allowed");
+  const name = preview?.name ?? project.name;
+
+  async function move() {
+    if (reason || !selected) return;
+    setBusy(true);
+    const r = await send(`/api/projects/${project.id}`, "PATCH", { firm_id: selected.firmId });
+    setBusy(false);
+    if (!r.ok) return setError(r.error);
+    onClose();
+    router.refresh();
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} labelledBy={titleId} testId="move-firm-dialog">
+      <form
+        className="p-8"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void move();
+        }}
+      >
+        <p className="t-label-caps text-bp-ink-tertiary">MOVE PROJECT</p>
+        <h2 id={titleId} className="t-heading-lg mt-3">
+          Move {name} to a firm
+        </h2>
+        <p className="t-body-md mt-4 text-bp-ink-primary">
+          On a firm project everyone works the firm&rsquo;s journey (00&ndash;08), and the next regenerate prices the BoQ from the firm&rsquo;s rate book. Every member of the project must be a member of the firm.
+        </p>
+        {preview?.currentFirm ? (
+          <p className="t-body-sm mt-2 text-bp-ink-secondary" data-current-firm>
+            Now in {preview.currentFirm.name}.
+          </p>
+        ) : null}
+
+        <p id={groupId} className="t-label-caps mt-6 text-bp-ink-tertiary">
+          MOVE TO
+        </p>
+        {preview ? (
+          <div role="radiogroup" aria-labelledby={groupId} className="mt-1" data-move-options>
+            {preview.options.map((o) => (
+              <label key={o.firmId ?? "none"} className={`flex items-start gap-3 border-b border-bp-line-hairline py-3 ${o.current ? "cursor-default" : "cursor-pointer"}`} data-move-option={o.firmId ?? "none"} data-allowed={o.allowed ? "true" : "false"}>
+                <input type="radio" name={`${groupId}-firm`} checked={choice === o.firmId} disabled={o.current} onChange={() => setChoice(o.firmId)} className="mt-1 size-4 accent-bp-ink-primary" />
+                <span className="min-w-0 flex-1">
+                  <span className={`t-nav-item-active block ${o.current ? "text-bp-ink-tertiary" : "text-bp-ink-primary"}`}>
+                    {o.name}
+                    {o.current ? " · now" : ""}
+                  </span>
+                  {o.firmId === null && !o.current ? <span className="t-body-sm block text-bp-ink-secondary">The owner&rsquo;s journey (00&ndash;06); the firm&rsquo;s book no longer prices it.</span> : null}
+                </span>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <p className="t-body-sm mt-2 text-bp-ink-tertiary" aria-live="polite">
+            Loading your firms…
+          </p>
+        )}
+
+        {selected && !selected.allowed && !selected.current ? (
+          <div className="surface-inverse mt-5 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink" role="note" data-move-blocked>
+            {/* The reason names everyone outside the firm (the PATCH refuses with the same sentence). */}
+            <p className="t-body-sm">{selected.reason}</p>
+          </div>
+        ) : null}
+
+        {error ? (
+          <p className="surface-inverse t-body-sm mt-4 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-5">
+          <Button kind="quiet" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button kind="primary" type="submit" testId="move-firm-confirm" disabled={reason || busy ? { reason: busy ? "Moving…" : reason!, reasonId, showReason: false } : false}>
+            {busy ? "Moving…" : selected?.firmId === null ? "Make it personal" : "Move project"}
+          </Button>
+        </div>
+        <p id={reasonId} className="sr-only">
+          {busy ? "Moving…" : (reason ?? "")}
+        </p>
+      </form>
+    </Dialog>
+  );
+}
+
 // --- Delete now (Recently deleted) ----------------------------------------------------------
 
 export function DeleteNowDialog({ project, open, onClose }: { project: { id: string; name: string }; open: boolean; onClose: () => void }) {
@@ -356,7 +494,7 @@ export function ProjectActionsMenu({ project, size = "row" }: { project: ActionP
   const menuId = useId();
   const reasonId = useId();
   const [open, setOpen] = useState(false);
-  const [dialog, setDialog] = useState<null | "rename" | "delete">(null);
+  const [dialog, setDialog] = useState<null | "rename" | "delete" | "move">(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -473,6 +611,20 @@ export function ProjectActionsMenu({ project, size = "row" }: { project: ActionP
             <Icon name={project.archived ? "unarchive" : "archive"} size={20} />
             {project.archived ? "Unarchive" : "Archive"}
           </button>
+          <button
+            role="menuitem"
+            tabIndex={-1}
+            type="button"
+            className={itemCls}
+            onClick={() => {
+              close(false);
+              setDialog("move");
+            }}
+            data-testid="project-move-firm"
+          >
+            <Icon name="domain" size={20} />
+            Move to firm…
+          </button>
           <div role="separator" className="my-1 border-t border-bp-line-hairline" />
           <button
             role="menuitem"
@@ -504,6 +656,7 @@ export function ProjectActionsMenu({ project, size = "row" }: { project: ActionP
         </p>
       ) : null}
       {dialog === "rename" ? <RenameDialog project={project} open onClose={() => setDialog(null)} /> : null}
+      {dialog === "move" ? <MoveFirmDialog project={project} open onClose={() => setDialog(null)} /> : null}
       {dialog === "delete" ? <DeleteDialog project={project} open onClose={() => setDialog(null)} onArchive={() => (project.archived ? undefined : void archive())} /> : null}
     </div>
   );

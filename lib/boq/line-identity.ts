@@ -33,6 +33,8 @@ export interface IdentityLine {
   description: string;
   rule_id?: string;
   item_key?: string;
+  /** K11: a line priced per room carries its room — the room is part of its identity. */
+  room_id?: string | null;
 }
 
 const RULE_ITEM = new Map<string, string>(Object.entries(RATE_RULES).map(([k, r]) => [r.rule_id, k]));
@@ -61,7 +63,10 @@ export function stableRuleId(ruleId: string | undefined): string | null {
 
 /** The identity of one line, before repeat numbering. */
 export function lineIdentity(line: IdentityLine): string {
-  return lineItemKey(line) ?? stableRuleId(line.rule_id) ?? line.description;
+  const base = lineItemKey(line) ?? stableRuleId(line.rule_id) ?? line.description;
+  // Today every line is aggregated per section (no room); a per-room line keys on its room too,
+  // so a price added to one room's line can never land on another room's.
+  return line.room_id ? `${base}@${line.room_id}` : base;
 }
 
 /**

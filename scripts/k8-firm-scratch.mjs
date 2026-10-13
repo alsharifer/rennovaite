@@ -55,6 +55,8 @@ if (cmd === "seed") {
   const pipeline = u.users.find((x) => x.email === "dev-scripts+pipeline@rennovaite.local");
   if (!pipeline) throw new Error("pipeline account missing");
   await grantProjectMembership(pipeline.id, [projectId], { script: "k8-firm-scratch" });
+  // K11 #5: attaching a firm is the project creator's act — the pipeline account made this scratch project.
+  await sb.from("projects").update({ created_by: pipeline.id }).eq("id", projectId);
   const a = await f(`${base}/api/projects/${projectId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ firm_id: firm.id }) });
   if (!a.ok) throw new Error(`attach: ${a.status} ${await a.text()}`);
   const P = `/project/${projectId}`;

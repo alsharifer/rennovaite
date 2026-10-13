@@ -17,6 +17,25 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** K11 #5: attaching (or moving) a project to a firm is its creator's act. */
+export const NOT_CREATOR_REASON = "Only the person who created this project can move it to a firm.";
+
+/** "2 people on this project are not in Studio X: a@x.test, b@y.test. Add them to the firm first …" */
+export function outsideReason(firmName: string, outside: readonly string[]): string {
+  const n = outside.length;
+  return `${n === 1 ? "1 person" : `${n} people`} on this project ${n === 1 ? "is" : "are"} not in ${firmName}: ${outside.join(", ")}. Add them to the firm first — on a firm project everyone works the firm's journey.`;
+}
+
+/** A member's e-mail, as the refusal lists them (they share the caller's project). */
+export async function emailOf(db: SupabaseClient, userId: string): Promise<string> {
+  try {
+    const { data } = await db.auth.admin.getUserById(userId);
+    return data.user?.email ?? `member ${userId.slice(0, 8)}`;
+  } catch {
+    return `member ${userId.slice(0, 8)}`;
+  }
+}
+
 /** The project members who are not members of the firm (pure). */
 export function membersOutsideFirm(projectMemberIds: readonly string[], firmMemberIds: readonly string[]): string[] {
   const firm = new Set(firmMemberIds);

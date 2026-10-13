@@ -29,6 +29,7 @@ import { listFirms } from "@/lib/firms/store";
 import { firmStepStatuses, ownerStepStatuses, type JourneyFacts, type PlanBlock, type RailContext, type RailFirm, type RailProject, type StepStatus } from "@/lib/journey-state";
 import type { JourneyPersona } from "@/lib/journey";
 import { memberProjectIds } from "@/lib/projects/access";
+import { withoutDrafts } from "@/lib/projects/intake";
 import { renderLockProgress } from "@/lib/render-lock-progress";
 
 const PLAN_CODES = new Set(["no_plan", "no_area", "no_rooms", "plan_has_overlaps", "not_priceable"]);
@@ -63,7 +64,8 @@ async function unpricedLineCount(db: SupabaseClient, boqId: string): Promise<num
 /** The caller's projects (H5 membership) with each one's latest revision — the project switcher. */
 async function loadRailProjects(db: SupabaseClient, caller: Caller): Promise<RailProject[]> {
   return safe([], async () => {
-    const ids = await memberProjectIds(db, caller.id);
+    // K11 #1: drafts (abandoned intake uploads) are not in the switcher.
+    const ids = await withoutDrafts(db, await memberProjectIds(db, caller.id));
     if (ids.length === 0) return [];
     const [{ data: projects }, { data: boqs }] = await Promise.all([
       db.from("projects").select("id, name, display_name, created_at").in("id", ids),

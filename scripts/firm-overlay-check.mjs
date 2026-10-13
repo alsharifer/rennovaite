@@ -76,8 +76,11 @@ check("sessions minted for two distinct accounts", !!userA.token && !!userB.toke
 const refBefore = await rateBookSnapshot();
 const refUnchanged = async (step) => check(`rate_book unchanged after ${step}`, (await rateBookSnapshot()) === refBefore);
 
-const { data: standIn } = await sb.from("projects").select("id, firm_id").eq("id", STAND_IN).single();
+const { data: standIn } = await sb.from("projects").select("id, firm_id, created_by").eq("id", STAND_IN).single();
 const priorFirm = standIn.firm_id ?? null;
+// K11 #5: attaching a firm is the project CREATOR's act — user A is the stand-in's creator for this run (restored after).
+const priorCreator = standIn.created_by ?? null;
+await sb.from("projects").update({ created_by: userA.userId }).eq("id", STAND_IN);
 // The stand-in accumulates pilot events from other verification runs; the
 // cleanup check is that THIS run leaves the count where it found it.
 const { count: evBefore } = await sb.from("pilot_events").select("id", { count: "exact", head: true }).eq("project_id", STAND_IN);
@@ -193,7 +196,7 @@ try {
 } finally {
   for (const m of memberships) await m.revoke();
   console.log("\ncleanup");
-  await sb.from("projects").update({ firm_id: priorFirm }).eq("id", STAND_IN);
+  await sb.from("projects").update({ firm_id: priorFirm, created_by: priorCreator }).eq("id", STAND_IN);
   if (created.correction) {
     await sb.from("pilot_events").delete().eq("project_id", STAND_IN).eq("kind", "correction").contains("detail", { correction_id: created.correction });
     await sb.from("boq_corrections").delete().eq("id", created.correction);

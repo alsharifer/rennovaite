@@ -12,6 +12,7 @@
 //
 // Mapping (spec §1.4 + the 12 Oct ruling):
 //   firm_private, firm_correction           → measured ("Own basis")
+//   own_price (K11: priced on review, 057)   → measured ("Own basis")
 //   reference / module_reference            → validated iff rate_book.qs_validated, else market
 //   selection                               → market when priced, else derived — NEVER validated
 //   catalog, allowance, labour_book, p4_constant, overlay_default,
@@ -25,6 +26,7 @@
 // =============================================================================
 
 import { isUnpricedLine } from "@/lib/documents/boq-derived";
+import { OWN_PRICE_TIER } from "@/lib/boq/own-basis-vocab";
 import { lineItemKey, lineTierKey, type ProvLine } from "@/lib/provenance/boq";
 
 import { weaker, type LineTiers, type PricedTier } from "./tier-vocab";
@@ -62,7 +64,7 @@ export function tierOf(line: ProvLine, workSection: string, ctx: TierContext = {
   const key = lineTierKey(line, workSection);
   let rate: PricedTier;
   let rateWhy: string | null = null;
-  if (key === "firm_private" || key === "firm_correction") rate = "measured";
+  if (key === "firm_private" || key === "firm_correction" || key === OWN_PRICE_TIER) rate = "measured";
   else if (key === "reference" || key === "module_reference") {
     const item = lineItemKey(line);
     rate = item && ctx.qsValidated?.[item] === true ? "validated" : "market";
