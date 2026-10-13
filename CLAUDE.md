@@ -230,10 +230,12 @@ except `design-refs/r7-handoff/`.
   four sensitivity modifiers, whose engine is an illustrative ±% of the
   PROJECT TOTAL — so (K0.4) the copy says that and there are no chain rows.
   Optional furniture joins a scenario, never the headline.
-- **Corrections** are recorded, never applied. "Promote to our rate book after
-  review" attributes a RATE correction to the project's firm (`firm_id`) —
-  the candidate list a member promotes from. `/api/boq-corrections` is no
-  longer behind `GARDEN_PILOT_ENABLED`.
+- **Corrections** (K3: recorded, never applied — SUPERSEDED by K11 #4: a rate or
+  quantity correction can "Apply to this BoQ now", see K11). "Promote to our
+  rate book after review" attributes a RATE correction to the project's firm
+  (`firm_id`) — the candidate list a member promotes from.
+  `/api/boq-corrections` (= "Save for review only") is no longer behind
+  `GARDEN_PILOT_ENABLED`.
 - **"Add to my book"** links to `/project/[id]/rates?add=<item_key>&rate=<n>#new-entry`;
   the book's add form prefills and saves nothing until the member does.
 - **Regenerate**: blocked = `regenerateReadiness`; ready / unchanged =
@@ -515,6 +517,73 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
 - **Project files on the Overview body grid** (`components/blueprint/hub/HubFiles.tsx`, client): the screens' `files` slot puts it in the main column (owner: under Your design; firm hub: under Documents) instead of a full-width block below the page — the first 5 (`FILES_SHOWN`) and "Show all N" / "Show fewer". Kept on the Overview, not moved to 06 Documents: the owner's uploads are the project's, not the tender's. Live: `scripts/k10-hub-files-shots.mjs`.
 - **Duplicate-component notice, owner copy** (`components/blueprint/boq/Notices.tsx`): the owner reads "N items may be counted twice — we'll confirm before tender" with the item names only; the firm keeps "N components priced twice" with the mechanism and the QS-ruling sentence. Engine resolution is in K_BACKLOG → K10.
 - **A BoQ with no plan** (`lib/boq/regenerate.ts PLAN_MISSING_REASON`): when a revision exists and the plan does not, the refusal the rail, the hub's Next ("The plan is missing") and the BoQ top bar show is "BoQ exists; the plan is missing." with "Add the plan" — not "no plan to price yet".
+
+### K11 — product fixes from Abdallah's pilot walkthrough (13–14 Oct)
+
+Spec §7 (J7, Figma "J7 · Product fixes (13 Oct)"; dark twins 82:1304 …). One
+commit per item; shots in `screenshots/k11/` (light + dark).
+
+- **The uploaded project keeps its typed name** (#1, migration **056**
+  `projects.draft_since`, `lib/projects/intake.ts`). The intake's plan upload
+  creates the project (the parse needs a row) — now with the name and city
+  typed so far (`insertIntakeProject`) and as a DRAFT. Continue posts
+  `POST /api/projects/:id/intake { name, city }` (members) — the name the form
+  holds at that moment, the draft ends — before "Reading your plan". Drafts are
+  left out of Projects, the switcher and Recently deleted (`withoutDrafts`); the
+  daily purge job soft-deletes drafts older than 24 h (`sweepIntakeDrafts`,
+  always applied — reversible; the 30-day purge and `PROJECT_PURGE_APPLY`
+  decide the rest). Live: `scripts/k11-intake-name-check.mjs`.
+- **Step footer** (#2, component 80:944, `shell/StepFooter.tsx`): ShellFrame
+  draws "← PREVIOUS <step>" · "NEXT <step>" + Secondary "Continue to <step>"
+  under every project step page (owner 00–06, firm 00–08; not a side surface,
+  not the intake). A Blocked next step disables Continue with the RAIL's reason
+  and fix (the same StepStatus). 05 Timeline's top-bar Continue gives the same
+  answer. Live: `scripts/k11-step-footer-shots.mjs`.
+- **Issues navigator** (#3, 80:49): `lib/boq/issues.ts` (pure) builds the list
+  from the BoQ & Review model and the rail's StepStatus — NOT PRICED — LEFT OUT
+  OF THE TOTAL (every isUnpricedLine line, the rail's own count), POSSIBLY
+  COUNTED TWICE (dedupe findings carry their row keys), DERIVED — CONFIRM ON SITE
+  (one row), RATE BASIS (gate open), the step's own attention/blocked reason.
+  `shell/IssuesNavigator.tsx` = the top-bar "⚑ N TO FIX" + 400 px popover
+  (hidden at 0). On the BoQ page a row scrolls to its line, selects it and opens
+  the inspector on the right action (Add a price); "Show only these lines"
+  filters the grid; J / Shift+J cycle (also "Next issue J" in the inspector).
+  Other step pages get the shell's one-row version (`stepIssues`). Live:
+  `scripts/k11-issues-shots.mjs`.
+- **Add a price + corrections that apply** (#4, 80:9042 · 80:9088, migration
+  **057**). SUPERSEDES "a correction never changes this BoQ". `boq_corrections`
+  gains origin (correction | add_price), basis_kind (supplier_quote |
+  contractor_price | own_estimate), `line_key` (the STABLE line identity), the
+  application record (applied_boq_id / applied_from_boq_id / applied_at /
+  applied_by / applied_by_name) and the revert record. `lib/boq/own-basis.ts`
+  `applyOwnBasis` (pure) lays every applied, un-reverted correction over a
+  document: a rate makes the line YOUR PRICE (`rate_tier: "own_price"` → tierOf
+  measured / "own basis", rate_status priced, `price_basis`), a quantity sets it
+  as measured (`qty_basis`); then `rechain` — the subtotal moves by exactly the
+  line's change, the chain to the fil. A QS aside leaves the description only
+  when the line keeps its identity without it. `POST /api/projects/:id/boq-apply`
+  (new or saved correction; 409 `stale_revision` unless `boq_id` is the latest)
+  stores the NEXT revision; `POST /api/projects/:id/boq-revert { to_boq_id }`
+  stores an earlier revision's figures as the next one and marks later
+  corrections reverted (kept). **Every regeneration re-applies the applied
+  corrections** (`lib/boq/assemble.ts`, before OH&P) — a price is never silently
+  dropped. Own price counts as the project's own basis in the reference-basis
+  gate. Inspector: Add a price on an unpriced line; Capture correction opens in
+  the Line tab with "Apply to this BoQ now" (owner default) / "Save for review
+  only" (firm default); a saved one applies later from the Corrections tab. The
+  diff's causes: "Price added by <name>" / "Correction by <name>" / reverted
+  (`line_keys` match exactly); Revisions offers "Revert to rev N". Live:
+  `scripts/k11-add-price-shots.mjs`.
+- **Move to firm…** (#5): in the project ⋯ menu (home row + Overview / hub),
+  the Delete dialog's layout. `assignProjectFirm` holds the rules: attach / move
+  = the project's CREATOR (403 `not_project_creator`) who is in the target firm;
+  every project member in it (409 names who is not); detach = a member of the
+  current firm. `GET /api/projects/:id/move-preview` (`lib/projects/move-firm.ts`)
+  answers the same per option. Dev checks that attach a firm act as the
+  project's creator. Live: `scripts/k11-move-firm-shots.mjs`.
+- **Walkthrough**: `scripts/k11-walkthrough.mjs` (Cost → navigator → Add a price
+  → total updates → Continue to timeline). Scratch fixture for all K11 checks:
+  `scripts/lib/k11-scratch.mjs` (Arabella stage 7, H7: ≈ 116,679.56, 3 TBP).
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 
