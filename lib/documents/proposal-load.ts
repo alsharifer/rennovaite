@@ -6,6 +6,10 @@
 // brand, logo and terms are the firm's; the setup (053) adds client, validity,
 // payment terms, cover note and the line-rate choice. Every page built from it
 // is scanned for withheld identities by `proposalLeaks` before it is served.
+//
+// K9: `issue: true` (the gated document route ONLY) assigns the proposal's
+// reference on its first issue (054); the preview reads the one already
+// issued, if any, and never assigns.
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -14,12 +18,13 @@ import type { BoqPdfInput } from "@/lib/documents/boq-pdf";
 import { loadDocumentProject } from "@/lib/documents/project-name";
 import type { ProposalInput, ProposalScopeRoom } from "@/lib/documents/proposal";
 import type { ProposalGate } from "@/lib/documents/proposal-gate";
+import { assignProposalReference, loadProposalReference } from "@/lib/documents/proposal-reference";
 import { loadProposalSetup, validityText } from "@/lib/documents/proposal-setup";
 import { loadLogoDataUri } from "@/lib/firms/branding";
 import { INTERNAL_REF } from "@/lib/ground-truth/villa94-garden";
 import { curateBoq, findWithheldIdentities, loadWithheldNames } from "@/lib/identity/curation";
 
-export async function loadProposalInput(sb: SupabaseClient, projectId: string, gate: ProposalGate, opts: { preview?: boolean } = {}): Promise<{ input: ProposalInput; boqId: string; withheld: string[] } | null> {
+export async function loadProposalInput(sb: SupabaseClient, projectId: string, gate: ProposalGate, opts: { preview?: boolean; issue?: boolean } = {}): Promise<{ input: ProposalInput; boqId: string; withheld: string[] } | null> {
   if (!gate.firm || !gate.boq) return null;
   const withheld = await loadWithheldNames(sb, projectId);
   const [project, boqRow, logo, plan, setup, revs] = await Promise.all([
@@ -32,6 +37,8 @@ export async function loadProposalInput(sb: SupabaseClient, projectId: string, g
     sb.from("boqs").select("id").eq("project_id", projectId).order("created_at", { ascending: true }).then((r) => (r.data ?? []) as { id: string }[], () => [] as { id: string }[]),
   ]);
   if (!boqRow.data) return null;
+  const firm = gate.firm;
+  const reference = opts.issue && !opts.preview ? await assignProposalReference(sb, projectId, firm.firm_id, firm.brand) : await loadProposalReference(sb, projectId, firm.firm_id);
   const { data: roomRows } = plan.data ? await sb.from("rooms").select("name_en, room_type, area_m2").eq("plan_id", plan.data.id).order("name_en") : { data: [] };
   const rooms: ProposalScopeRoom[] = ((roomRows ?? []) as { name_en: string | null; room_type: string | null; area_m2: number | null }[]).map((r) => ({
     name: r.name_en ?? "Area",
@@ -51,6 +58,7 @@ export async function loadProposalInput(sb: SupabaseClient, projectId: string, g
       dateISO,
       rooms,
       boq: curateBoq(boqRow.data.sections, withheld),
+      reference,
       revision: revs.findIndex((r) => r.id === boqRow.data!.id) + 1 || null,
       clientLabel: setup?.clientLabel ?? null,
       validity: validityText(setup?.validityDays ?? null, dateISO),

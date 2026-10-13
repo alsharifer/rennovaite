@@ -9,6 +9,7 @@ import type { BoqPdfInput } from "../boq-pdf";
 import { printedChecks } from "../pack-export/checks";
 import { proposalChecklistItems } from "../pack-export/checklist";
 import { buildProposalPages, type ProposalInput } from "../proposal";
+import { defaultProposalPrefix, formatProposalReference } from "../proposal-reference";
 import { PREPARED_WITH_MARK } from "../reference-basis-types";
 
 // L4 — the firm's client proposal: the firm is the brand, the BoQ prints at the
@@ -30,6 +31,7 @@ const input = (over: Partial<ProposalInput> = {}): ProposalInput => ({
   dateISO: "2026-09-27",
   rooms: [{ name: "Rear lawn", kind: "artificial_grass", area_m2: 47.8 }, { name: "Entrance paving", kind: "paving", area_m2: 12.3 }],
   boq: arabella,
+  reference: "SL-P-0001",
   ...over,
 });
 
@@ -107,7 +109,7 @@ describe("buildProposalPages", () => {
 
   it("the printed-content checks accept it and refuse a proposal that prints provenance", () => {
     const base = { scope: "garden" as const, draftStatement: (arabella.garden!.draft!.statement ?? null) as string | null, boq: arabella as never, sheets: [], packPages: [], packPageKinds: [], boqPages: null, boqHtml: "", planHtml: null, parity: null, identityTokens: [], withheldNames: ["Newspace"], publicSourceLabel: "market reference — Dubai garden 2026", renders: null, pairsWithAdds: [] };
-    const ok = printedChecks({ ...base, proposal: { pages, brand: "Scratch Landscapes & Co.", terms: true, basis: "accepted" } }).filter((c) => /proposal/.test(c.label));
+    const ok = printedChecks({ ...base, proposal: { pages, brand: "Scratch Landscapes & Co.", terms: true, basis: "accepted", reference: "SL-P-0001" } }).filter((c) => /proposal/.test(c.label));
     expect(ok.length).toBeGreaterThanOrEqual(8);
     expect(ok.filter((c) => !c.ok).map((c) => `${c.label}: ${c.detail}`)).toEqual([]);
     const leaky = pages.map((p, i) => (i === 1 ? p.replace("SCHEDULE OF WORKS", "SCHEDULE OF WORKS (market reference)") : p));
@@ -182,5 +184,56 @@ describe("buildProposalPages — K4 setup", () => {
     const pv = buildProposalPages(input({ ...setup, showLineRates: false, preview: true }));
     expect(pv.every((p) => p.includes('data-preview="true"') && p.includes("PREVIEW · NOT ISSUED"))).toBe(true);
     expect(buildProposalPages(input({ ...setup, showLineRates: false })).some((p) => p.includes("data-preview"))).toBe(false);
+  });
+});
+
+// K9 (K8 review): the proposal reference — a per-firm sequence on the proposal row (054).
+describe("proposal reference", () => {
+  it("the prefix is the brand's initials, skipping legal forms; one word gives three letters", () => {
+    expect(defaultProposalPrefix("Scratch Landscapes & Co.")).toBe("SL");
+    expect(defaultProposalPrefix("Al Futtaim Interiors L.L.C.")).toBe("AFI");
+    expect(defaultProposalPrefix("Marina Fit-Out Office")).toBe("MFOO");
+    expect(defaultProposalPrefix("Newspace")).toBe("NEW");
+    expect(defaultProposalPrefix("مكتب")).toBe("PR");
+    for (const b of ["Scratch Landscapes & Co.", "X", "The Co.", "Ålborg Design"]) expect(defaultProposalPrefix(b)).toMatch(/^[A-Z0-9]{2,6}$/);
+  });
+
+  it("the number is four digits, never truncated past 9999 (the SQL function's format)", () => {
+    expect(formatProposalReference("MFO", 1)).toBe("MFO-P-0001");
+    expect(formatProposalReference("MFO", 42)).toBe("MFO-P-0042");
+    expect(formatProposalReference("MFO", 12345)).toBe("MFO-P-12345");
+    const sql = fs.readFileSync(path.join(ROOT, "supabase/migrations/20260101005400_proposal_reference.sql"), "utf8");
+    expect(sql).toContain("case when v_seq < 10000 then lpad(v_seq::text, 4, '0') else v_seq::text end");
+    expect(sql).toContain("v_prefix || '-P-' ||");
+  });
+
+  it("is printed top right on the cover, as a cover fact and in every page header", () => {
+    const pages = buildProposalPages(input({ reference: "MFO-P-0007" }));
+    expect(pages[0]).toContain('data-proposal-ref="cover"');
+    expect(pages[0]).toContain('data-proposal-ref="fact"');
+    for (const p of pages.slice(1)) expect(p).toMatch(/data-proposal-ref="header"[^>]*>MFO-P-0007 · page \d+ of/);
+  });
+
+  it("a preview before the first issue says it is assigned on issue; the document without one prints none", () => {
+    const pv = buildProposalPages(input({ reference: null, preview: true }));
+    expect(pv[0]).toContain("Reference assigned on issue");
+    expect(pv.join("")).not.toContain('data-proposal-ref="header"');
+    expect(buildProposalPages(input({ reference: null })).join("")).not.toContain("data-proposal-ref");
+  });
+
+  it("the printed checks refuse a proposal with no reference", () => {
+    const base = { scope: "garden" as const, draftStatement: (arabella.garden!.draft!.statement ?? null) as string | null, boq: arabella as never, sheets: [], packPages: [], packPageKinds: [], boqPages: null, boqHtml: "", planHtml: null, parity: null, identityTokens: [], withheldNames: [], publicSourceLabel: "market reference — Dubai garden 2026", renders: null, pairsWithAdds: [] };
+    const label = "the proposal carries its reference on the cover and every page";
+    const run = (reference: string | null) => printedChecks({ ...base, proposal: { pages: buildProposalPages(input({ reference })), brand: "Scratch Landscapes & Co.", terms: true, basis: "accepted", reference } }).find((c) => c.label === label)!;
+    expect(run("SL-P-0001").ok).toBe(true);
+    expect(run(null).ok).toBe(false);
+  });
+
+  it("only the gated document route issues (assigns); the preview reads", () => {
+    const route = fs.readFileSync(path.join(ROOT, "app/api/projects/[id]/proposal/route.ts"), "utf8");
+    const preview = fs.readFileSync(path.join(ROOT, "app/api/projects/[id]/proposal-preview/route.ts"), "utf8");
+    expect(route).toContain("loadProposalInput(sb, projectId, gate, { issue: true })");
+    expect(preview).not.toContain("issue: true");
+    expect(preview).toContain("{ preview: true }");
   });
 });

@@ -320,6 +320,12 @@
       "version": "20260101005300",
       "name": "proposals",
       "sha256": "fb71bd0b6559ddc7c518b4fd6a3487ee9ecfe0d0160417b48371cb3ed9be538f"
+    },
+    {
+      "legacy": null,
+      "version": "20260101005400",
+      "name": "proposal_reference",
+      "sha256": "e2344953f7272b49cbb3592e3ed45c99bd93afdea183230a78439109994fc44e"
     }
   ]
 }

@@ -411,6 +411,51 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
   `k8-firm-scratch.mjs` / `k8-firms-scratch.mjs`; `k-page-check.mjs` gained
   `--sizes=laptop` (1280).
 
+### K9 — the K8 review's follow-ups (13 Oct)
+
+- **Document fonts** (`lib/documents/doc-fonts.ts`, `lib/documents/fonts/`):
+  IBM Plex Sans (300–600), JetBrains Mono (400–600) and EB Garamond (400–500)
+  as TTF — resvg reads TTF/OTF only — with their OFL licences and
+  `SOURCES.json` (url + sha256 per file; `.gitattributes` keeps them
+  byte-exact). EVERY `new Resvg(` passes `font: documentFontOptions()` (a test
+  greps for it); `next.config.ts` `outputFileTracingIncludes` ships the folder
+  into the five document routes' functions.
+- **Garden timeline** (`lib/timeline/garden.ts`): a project whose every room
+  is an outdoor zone (balcony / terrace are interior) never runs the interior
+  phase model — 05 Timeline and the Overview show the BoQ's stored
+  `programme` (re-derived for an older revision), "≈ N days" with the derived
+  mark and `GARDEN_TIMELINE_BASIS` ("Scaled from one real Dubai garden project
+  (~90 days) …"). No week conversion (the reference days are mobilisation →
+  handover). Interior unchanged.
+- **Drawings are ink only** (`lib/drawings/*` and the render pack): no brass,
+  terracotta or hue. Demolition = dashed ink; an estimated zone
+  (`isEstimatedZone`: `dims_derived` or a derived area) = the `pat-derived`
+  hatch (`HATCH_DEFS`) + the derived ring (`derivedRing`) beside its ref;
+  notes carry `DERIVED_GLYPH` (○); the draft stamp / L-000 cover / pack cover
+  are the inverse band; runs are `RUN_INK` tones told apart by their code —
+  `LINEAR_ELEMENT_META.color` is the EDITOR's hue and never reaches paper.
+  `lib/drawings/__tests__/ink-only.test.ts` scans every sheet module's source
+  AND the printed Villa 94 sheets (measured + all-derived draft) against the
+  ink / paper / grey list. Shots: `scripts/k9-sheet-shots.ts`.
+- **Sheet REV = the BoQ revision** the set was generated from (`sheetRev`:
+  rev N = the project's N-th BoQ, 0 before the first) — never "—".
+  `SheetMeta.rev` is REQUIRED. A pack export regenerates the BoQ before it
+  asks for the drawings, so the latest revision is the pack's.
+- **Proposal reference** (migration **054**, `lib/documents/proposal-reference.ts`):
+  a per-firm sequence `<PREFIX>-P-0001` on `project_proposals.reference`
+  (+ `reference_firm_id`, `reference_assigned_at`), assigned ONCE by
+  `assign_proposal_reference()` (one transaction; the firm row's update
+  serialises concurrent issues) when the gated `/proposal` route issues
+  (`loadProposalInput(…, { issue: true })`), reused by every later export of
+  that project. The prefix is derived from the brand at the first issue
+  (`defaultProposalPrefix`: initials, legal forms skipped) and kept on
+  `firms.proposal_prefix`; `proposal_seq` is the last number. The preview
+  never assigns ("Reference assigned on issue"). Printed top right on the
+  cover, as a cover fact and in every page header; the pack's printed checks
+  require it. Without 054 the route answers 500 `migration_required`.
+  Live: `node --env-file=.env.local scripts/k9-proposal-ref-check.mjs`
+  (scratch firms + projects, deleted after).
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic
