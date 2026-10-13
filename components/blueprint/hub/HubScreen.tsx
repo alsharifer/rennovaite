@@ -11,6 +11,7 @@
 // estimate slot. Tablet: one column; the revisions table drops Date + Total.
 // =============================================================================
 
+import type { ReactNode } from "react";
 import { formatAED, formatDelta, headlineSpokenText } from "@/lib/format/aed";
 import type { HubView } from "@/lib/hub/hub-view";
 import { tierLabel } from "@/lib/provenance/tier-vocab";
@@ -20,7 +21,7 @@ import { Icon } from "../Icon";
 import { ProvenanceMark } from "../ProvenanceMark";
 import { StateBlock } from "../StateBlock";
 
-export function HubScreen({ view }: { view: HubView }) {
+export function HubScreen({ view, files }: { view: HubView; /** K10 #9: the project's files, under Documents in the page's column. */ files?: ReactNode }) {
   const e = view.estimate;
   return (
     <div className="mx-auto max-w-[1344px] px-6 py-10 pb-16 lg:px-16" data-hub>
@@ -223,6 +224,7 @@ export function HubScreen({ view }: { view: HubView }) {
           </ul>
         </section>
       ) : null}
+      {files}
     </div>
   );
 }

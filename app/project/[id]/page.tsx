@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 //          owner's words, Your design, Next, Timeline, Documents — never a
 //          firm-only item.
 // The rail facts are shared with the shell (loadProjectRail is memoised per
-// request). The project's files are listed below (HubFiles). The [id] layout
+// request). The project's files sit on the page's body grid (HubFiles, K10 #9: 5 + "Show all N"). The [id] layout
 // has authorised the caller already. K10 (§6.12): the top bar carries the
 // project's "⋯" menu — Open · Rename · Archive · Delete project….
 export default async function ProjectHubPage({ params }: { params: Promise<{ id: string }> }) {
@@ -45,18 +45,16 @@ export default async function ProjectHubPage({ params }: { params: Promise<{ id:
     const [view, files] = await Promise.all([loadOverviewView(sb, projectId, rail), assets]);
     return (
       <ProjectShell projectId={projectId}>
-        <OwnerOverview view={view} />
+        <OwnerOverview view={view} files={<HubFiles assets={files} />} />
         {actions}
-        <HubFiles assets={files} />
       </ProjectShell>
     );
   }
   const [view, files] = await Promise.all([loadHubView(sb, projectId, rail), assets]);
   return (
     <ProjectShell projectId={projectId}>
-      <HubScreen view={view} />
+      <HubScreen view={view} files={<HubFiles assets={files} className="mt-14" />} />
       {actions}
-      <HubFiles assets={files} />
     </ProjectShell>
   );
 }

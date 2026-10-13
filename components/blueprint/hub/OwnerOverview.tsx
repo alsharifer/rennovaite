@@ -11,6 +11,7 @@
 // 05 Timeline, Documents.
 // =============================================================================
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { formatAED, headlineSpokenText } from "@/lib/format/aed";
@@ -25,7 +26,7 @@ import { TopBarActions } from "../shell/TopBar";
 
 const list = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
-export function OwnerOverview({ view }: { view: OverviewView }) {
+export function OwnerOverview({ view, files }: { view: OverviewView; /** K10 #9: the project's files, on the body grid's main column. */ files?: ReactNode }) {
   const e = view.estimate;
   // One Primary per view: the first action that isn't blocked; the rest Secondary; blocked ones Quiet.
   const firstOpen = view.next.findIndex((a) => !a.blocked);
@@ -166,6 +167,7 @@ export function OwnerOverview({ view }: { view: OverviewView }) {
               </p>
             )}
           </section>
+          {files}
         </div>
 
         <aside aria-label="Next and documents" className="min-w-0">
