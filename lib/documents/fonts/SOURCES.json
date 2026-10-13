@@ -1,0 +1,65 @@
+{
+  "_note": "K9: TTFs for the server-side document rasteriser (resvg reads TTF/OTF only; the app self-hosts woff2 in app/fonts). All SIL Open Font License 1.1 — the licence files sit beside the fonts. Fetched 2026-10-13.",
+  "files": {
+    "IBMPlexSans-Light.ttf": {
+      "url": "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Light.ttf",
+      "sha256": "2218b5f3f1fc9d3a793343f45c3be5ee7eae9584a7a52391bb8cf2d37622b3e0",
+      "bytes": 203240
+    },
+    "IBMPlexSans-Regular.ttf": {
+      "url": "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf",
+      "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
+      "bytes": 200500
+    },
+    "IBMPlexSans-Medium.ttf": {
+      "url": "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Medium.ttf",
+      "sha256": "331c8639d7598b2cde62a911a71db195e30cb655cd6bdf2e324a7e984955f907",
+      "bytes": 202460
+    },
+    "IBMPlexSans-SemiBold.ttf": {
+      "url": "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-SemiBold.ttf",
+      "sha256": "a20caf8286023a6a7a85e40b1d2a4ae9fc3e3b1f9eda8f4c542dd4986af67bb1",
+      "bytes": 202632
+    },
+    "IBMPlexSans-LICENSE.txt": {
+      "url": "https://raw.githubusercontent.com/IBM/plex/master/packages/plex-sans/LICENSE.txt",
+      "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+      "bytes": 4456
+    },
+    "JetBrainsMono-Regular.ttf": {
+      "url": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/fonts/ttf/JetBrainsMono-Regular.ttf",
+      "sha256": "e6fd0d7e91550b3ed2b735d4312474362c4716edc4fc0577a0f61ed782d5aed1",
+      "bytes": 270224
+    },
+    "JetBrainsMono-Medium.ttf": {
+      "url": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/fonts/ttf/JetBrainsMono-Medium.ttf",
+      "sha256": "d16e6dc99672734698d629705f617c79f6eb6040f5113efe3a145204dc988109",
+      "bytes": 270316
+    },
+    "JetBrainsMono-SemiBold.ttf": {
+      "url": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/fonts/ttf/JetBrainsMono-SemiBold.ttf",
+      "sha256": "12d4b18fe6e1af528e4bea69cb0997aeff22f9e52fccffcf66342dd88aa32ab8",
+      "bytes": 273504
+    },
+    "JetBrainsMono-OFL.txt": {
+      "url": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/OFL.txt",
+      "sha256": "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697",
+      "bytes": 4399
+    },
+    "EBGaramond-Regular.ttf": {
+      "url": "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/master/fonts/ttf/EBGaramond-Regular.ttf",
+      "sha256": "2028dc06d3c130b4761693481436a32a8e35ed500bf58c25c53de004106125b8",
+      "bytes": 627304
+    },
+    "EBGaramond-Medium.ttf": {
+      "url": "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/master/fonts/ttf/EBGaramond-Medium.ttf",
+      "sha256": "57f9e2a5881ac1a3a7bf02935ceb604ba0ca21961fb161d7a535bae4f74a52b1",
+      "bytes": 680636
+    },
+    "EBGaramond-OFL.txt": {
+      "url": "https://raw.githubusercontent.com/octaviopardo/EBGaramond12/master/OFL.txt",
+      "sha256": "058611bd968817d532cedeab6acaa055e882d365a88523df00e7917ad7a0f704",
+      "bytes": 4454
+    }
+  }
+}

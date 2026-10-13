@@ -11,6 +11,7 @@
 //   TODO(P-later): DXF via dxf-writer
 // =============================================================================
 
+import { documentFontOptions } from "@/lib/documents/doc-fonts";
 import { stampPdfDay } from "@/lib/documents/pdf-date";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -431,7 +432,7 @@ export async function renderSetPdf(svgs: readonly string[]): Promise<Uint8Array>
   const pdf = stampPdfDay(await PDFDocument.create());
   for (const svg of svgs) {
     // 250 dpi keeps a 20-sheet set openable while text stays crisp.
-    const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4134 } });
+    const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4134 }, font: documentFontOptions() });
     const png = resvg.render().asPng();
     const page = pdf.addPage([420 * MM_TO_PT, 297 * MM_TO_PT]);
     const img = await pdf.embedPng(png);
@@ -452,7 +453,7 @@ export async function renderSheetPdf(svg: string): Promise<Uint8Array> {
   const { PDFDocument } = await import("pdf-lib");
 
   // A3 landscape width 420 mm ≈ 16.54 in → 4961 px at 300 dpi.
-  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4961 } });
+  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 4961 }, font: documentFontOptions() });
   const png = resvg.render().asPng();
 
   const pdf = stampPdfDay(await PDFDocument.create());

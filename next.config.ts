@@ -12,6 +12,16 @@ const nextConfig: NextConfig = {
   // file any more — uploads go straight to Storage on a signed URL — so there is
   // no upload body for the proxy to buffer or truncate.)
 
+  // K9: the document TTFs (lib/documents/doc-fonts.ts) are read from disk by resvg
+  // at render time, so the routes that rasterise a document must ship them.
+  outputFileTracingIncludes: {
+    "/api/projects/[id]/boq-pdf": ["./lib/documents/fonts/**"],
+    "/api/projects/[id]/proposal": ["./lib/documents/fonts/**"],
+    "/api/projects/[id]/boq-diff": ["./lib/documents/fonts/**"],
+    "/api/projects/[id]/drawings": ["./lib/documents/fonts/**"],
+    "/api/projects/[id]/render-pack": ["./lib/documents/fonts/**"],
+  },
+
   // K8 (spec §6.0): 02 Design is one route. The old step routes are gone for
   // good, so these are permanent (308; query strings pass through). They run
   // before proxy.ts, which then checks membership on /design itself.

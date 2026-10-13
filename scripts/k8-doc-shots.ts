@@ -9,6 +9,7 @@
 // terms, cover note), proposal-preview-1.png, and boq-<n>.png.
 // =============================================================================
 
+import { documentFontOptions } from "@/lib/documents/doc-fonts";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -25,7 +26,7 @@ const fx = JSON.parse(fs.readFileSync("lib/boq/__fixtures__/arabella-g5d-revisio
 const boq = fx.boqs[fx.stages[7]!.boq_id]!;
 
 const png = (svg: string, file: string) => {
-  const r = new Resvg(svg, { fitTo: { mode: "width", value: svg.includes('width="297mm"') ? 1754 : 1240 }, font: { loadSystemFonts: true } });
+  const r = new Resvg(svg, { fitTo: { mode: "width", value: svg.includes('width="297mm"') ? 1754 : 1240 }, font: documentFontOptions() });
   fs.writeFileSync(path.join(out, file), r.render().asPng());
 };
 
@@ -60,7 +61,7 @@ const sheet = (draft: string | null) =>
     body: room(40, 30, 110, 80, "REAR LAWN 47.8 m²") + room(150, 30, 70, 80, "PERGOLA 12.3 m²"),
   });
 fs.writeFileSync(path.join(out, "sheet.svg"), sheet(null));
-const r2 = (svg: string, file: string) => fs.writeFileSync(path.join(out, file), new Resvg(svg, { fitTo: { mode: "width", value: 1754 }, font: { loadSystemFonts: true } }).render().asPng());
+const r2 = (svg: string, file: string) => fs.writeFileSync(path.join(out, file), new Resvg(svg, { fitTo: { mode: "width", value: 1754 }, font: documentFontOptions() }).render().asPng());
 r2(sheet(null), "sheet-L-100.png");
 r2(sheet("DRAFT FOR REVIEW — quantities derived from reference layout; firm after site verification."), "sheet-L-100-draft.png");
 console.log(`${proposal.length} proposal pages, ${boqPages.length} BoQ pages → ${out}`);

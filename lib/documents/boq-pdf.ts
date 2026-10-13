@@ -15,6 +15,7 @@
 // what was printed.
 // =============================================================================
 
+import { documentFontOptions } from "./doc-fonts";
 import { stampPdfDay } from "@/lib/documents/pdf-date";
 import { esc } from "@/lib/drawings/sheet";
 
@@ -124,7 +125,7 @@ export async function rasteriseA4Pages(pages: readonly string[], title: string, 
   const MM_TO_PT = 72 / 25.4;
   for (const svg of pages) {
     // 300 dpi across the page width, whichever way it is turned.
-    const png = new Resvg(svg, { fitTo: { mode: "width", value: Math.round((size.w / 25.4) * 300) } }).render().asPng();
+    const png = new Resvg(svg, { fitTo: { mode: "width", value: Math.round((size.w / 25.4) * 300) }, font: documentFontOptions() }).render().asPng();
     const p = pdf.addPage([size.w * MM_TO_PT, size.h * MM_TO_PT]);
     p.drawImage(await pdf.embedPng(png), { x: 0, y: 0, width: size.w * MM_TO_PT, height: size.h * MM_TO_PT });
   }
