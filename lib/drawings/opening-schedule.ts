@@ -190,14 +190,14 @@ export function renderOpeningSchedule(
       openingAreaM2(r).toFixed(2),
       r.source,
       // The honesty column: never let a defaulted size read as measured.
-      r.derived ? "DERIVED — default" : "Measured",
+      r.derived ? "○ DERIVED — default" : "Measured",
     ];
     COLS.forEach((c, i) => {
       const val = cells[i]!;
       if (!val) return;
       const tx = c.align === "end" ? xs[i]! + c.w - 2 : xs[i]! + 1;
       const fill =
-        c.key === "mark" ? INK_900 : c.key === "derived" && r.derived ? "#92400E" : INK_700;
+        c.key === "mark" || (c.key === "derived" && r.derived) ? INK_900 : INK_700; // K9: ink only — the ring marks a defaulted size
       const weight = c.key === "mark" || (c.key === "derived" && r.derived) ? "600" : "400";
       const clipped = clip(val, c.w, c.font === FONT_MONO ? 1.9 : 1.7);
       body += `<text x="${tx.toFixed(2)}" y="${y.toFixed(2)}" text-anchor="${c.align}" font-size="2.9" fill="${fill}" style="font-family:${c.font};font-weight:${weight}">${esc(clipped)}</text>`;

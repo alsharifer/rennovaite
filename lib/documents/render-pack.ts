@@ -20,7 +20,6 @@
 import { LIGHTING_SOURCE_STATEMENT, gardenZones, toMetres, type GardenFixture } from "@/lib/drawings/garden-sheets";
 import {
   BONE,
-  BRASS,
   FONT_DISPLAY,
   FONT_MONO,
   FONT_UI,
@@ -28,8 +27,8 @@ import {
   INK_500,
   INK_700,
   INK_900,
+  ON_INK,
   PAPER,
-  TERRACOTTA,
   esc,
 } from "@/lib/drawings/sheet";
 import type { GardenStyle } from "@/lib/garden-styles";
@@ -349,13 +348,13 @@ function paragraph(x: number, y: number, s: string, maxChars: number, lineH: num
 }
 
 function page(body: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W}mm" height="${PAGE_H}mm" viewBox="0 0 ${PAGE_W} ${PAGE_H}"><rect width="${PAGE_W}" height="${PAGE_H}" fill="#F7F3EC"/>${body}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W}mm" height="${PAGE_H}mm" viewBox="0 0 ${PAGE_W} ${PAGE_H}"><rect width="${PAGE_W}" height="${PAGE_H}" fill="#F5F2EA"/>${body}</svg>`;
 }
 
 function chrome(input: RenderPackInput, title: string, n: number, total: number): string {
   return (
-    text(M, 14, "RenovAIte", { size: 5, fill: BRASS, font: FONT_DISPLAY }) +
-    text(PAGE_W - M, 14, `${input.projectName} · Garden render pack${input.draft ? " · DRAFT FOR REVIEW" : ""}`, { size: 3, fill: input.draft ? TERRACOTTA : INK_500, anchor: "end" }) +
+    text(M, 14, "RenovAIte", { size: 5, fill: INK_900, font: FONT_DISPLAY }) +
+    text(PAGE_W - M, 14, `${input.projectName} · Garden render pack${input.draft ? " · DRAFT FOR REVIEW" : ""}`, { size: 3, fill: input.draft ? INK_900 : INK_500, anchor: "end" }) +
     `<line x1="${M}" y1="18" x2="${PAGE_W - M}" y2="18" stroke="${BONE}" stroke-width="0.4"/>` +
     `<line x1="${M}" y1="${PAGE_H - 14}" x2="${PAGE_W - M}" y2="${PAGE_H - 14}" stroke="${BONE}" stroke-width="0.4"/>` +
     text(M, PAGE_H - 8, `${title} — concept visualisation, not a construction document. Dimensions are on the drawing set.`, {
@@ -458,13 +457,13 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
   if (input.draft) {
     // G5: the draft statement, verbatim, on the cover.
     const [head, ...rest] = input.draft.split(" — ");
-    const r = paragraph(M + 4, y + 8.5, rest.join(" — "), 58, 4, { size: 3, fill: TERRACOTTA });
+    const r = paragraph(M + 4, y + 8.5, rest.join(" — "), 58, 4, { size: 3, fill: ON_INK });
     const noteY = y + 8.5 + r.height + 2;
-    const note = input.draftNote ? paragraph(M + 4, noteY, `Source: ${input.draftNote}`, 62, 3.6, { size: 2.6, fill: INK_700 }) : null;
+    const note = input.draftNote ? paragraph(M + 4, noteY, `Source: ${input.draftNote}`, 62, 3.6, { size: 2.6, fill: ON_INK }) : null;
     const bottom = (note ? noteY + note.height : y + 8.5 + r.height) + 2;
     const h = bottom - (y - 6);
-    body += `<rect x="${M}" y="${f1(y - 6)}" width="${hx - M - 8}" height="${f1(h)}" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.6" data-draft-cover="true" data-draft-statement="${esc(input.draft)}"/>`;
-    body += text(M + 4, y + 2, head ?? input.draft, { size: 5.2, fill: TERRACOTTA, weight: 700, spacing: "0.04em" });
+    body += `<rect x="${M}" y="${f1(y - 6)}" width="${hx - M - 8}" height="${f1(h)}" fill="${INK_900}" data-draft-cover="true" data-draft-statement="${esc(input.draft)}"/>`;
+    body += text(M + 4, y + 2, head ?? input.draft, { size: 5.2, fill: ON_INK, weight: 700, spacing: "0.04em" });
     body += r.svg;
     if (note) body += note.svg;
     y = bottom + 8;
@@ -489,7 +488,7 @@ function coverPage(input: RenderPackInput, zones: PackZone[], total: number): Pa
   body += text(M, y + 22, `${mix.design_views_by_choice + mix.design_views_after_gate} 3D design views · ${mix.styled_renders} styled renders (faithfulness check passed)`, { size: 3, fill: INK_700, font: FONT_MONO });
   body += text(M, y + 15, `${rendered} of ${zones.length} zones rendered · dated ${input.dateISO}`, {
     size: 3.4,
-    fill: rendered < zones.length ? TERRACOTTA : INK_700,
+    fill: rendered < zones.length ? INK_900 : INK_700,
     font: FONT_MONO,
   });
 
@@ -573,7 +572,7 @@ function designInset(r: PackRender, x: number, y: number, w: number, h: number):
 function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number): PackPage {
   const images: ImageSlot[] = [];
   let body = chrome(input, `${z.ref} ${z.room.name_en}`, n, total);
-  body += text(M, 31, z.ref, { size: 5, fill: BRASS, font: FONT_MONO });
+  body += text(M, 31, z.ref, { size: 5, fill: INK_500, font: FONT_MONO });
   body += text(M + 18, 31, z.room.name_en, { size: 10, fill: INK_900, font: FONT_DISPLAY });
   body += text(PAGE_W - M, 31, `${z.typeLabel} · ${areaText(z.room)}`, { size: 4, fill: INK_700, font: FONT_MONO, anchor: "end" });
 
@@ -625,7 +624,7 @@ function zonePage(input: RenderPackInput, z: PackZone, n: number, total: number)
   if (z.room.area_derived_m2 && z.room.derived_note) {
     body += paragraph(col(0), fy + 21, `* Derived area: ${z.room.derived_note}`, 62, 3.6, {
       size: 2.5,
-      fill: TERRACOTTA,
+      fill: INK_900,
     }).svg;
   }
 
@@ -663,7 +662,7 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
   body += `<line x1="${tx}" y1="${y + 2}" x2="${cols[4]! + 18}" y2="${y + 2}" stroke="${INK_100}" stroke-width="0.3"/>`;
   y += 8;
   for (const z of zones) {
-    body += text(cols[0]!, y, z.ref, { size: 3, fill: BRASS, font: FONT_MONO });
+    body += text(cols[0]!, y, z.ref, { size: 3, fill: INK_500, font: FONT_MONO });
     body += text(cols[1]!, y, z.room.name_en, { size: 3, fill: INK_900 });
     body += text(cols[2]!, y, z.typeLabel, { size: 3, fill: INK_700 });
     body += text(cols[3]!, y, z.surface, { size: 3, fill: INK_700 });
@@ -684,7 +683,7 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
   for (const z of derived) {
     const p = paragraph(tx, y, `* ${z.ref} derived area: ${z.room.derived_note}`, 105, 4, {
       size: 2.6,
-      fill: TERRACOTTA,
+      fill: INK_900,
     });
     body += p.svg;
     y += p.height + 2;
@@ -697,7 +696,7 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
   for (const el of input.graph.elements.filter((e) => e.kind !== "boundary_wall" && isInDesign(e))) {
     body += text(tx, y, runLabel(el.kind, input.elementVariants?.[el.id]), {
       size: 3,
-      fill: el.kind === "counter_run" && !input.elementVariants?.[el.id] ? TERRACOTTA : INK_900,
+      fill: INK_900,
     });
     body += text(cols[4]! + 18, y, `${el.length_m.toFixed(2)} m`, { size: 3, fill: INK_900, font: FONT_MONO, anchor: "end" });
     y += 5.5;
@@ -729,7 +728,7 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
     ry += 19;
     for (const line of input.style.what_changes) {
       const p = paragraph(rx + 4, ry, line, 58, 4.4, { size: 3, fill: INK_700 });
-      body += `<circle cx="${rx + 1}" cy="${f1(ry - 1)}" r="0.7" fill="${BRASS}"/>` + p.svg;
+      body += `<circle cx="${rx + 1}" cy="${f1(ry - 1)}" r="0.7" fill="${INK_900}"/>` + p.svg;
       ry += p.height + 2;
     }
     ry += 6;
@@ -755,7 +754,7 @@ function materialsPage(input: RenderPackInput, zones: PackZone[], n: number, tot
       ry += 5.5;
     }
   }
-  const src = paragraph(rx, ry + 3, LIGHTING_SOURCE_STATEMENT, 66, 4, { size: 2.6, fill: TERRACOTTA });
+  const src = paragraph(rx, ry + 3, LIGHTING_SOURCE_STATEMENT, 66, 4, { size: 2.6, fill: INK_900 });
   body += src.svg;
 
   return { kind: "materials", title: "Materials & finishes", svg: page(body), images: [] };
@@ -799,7 +798,7 @@ function photoPairPage(input: RenderPackInput, pair: PackPhotoPair, n: number, t
   body += frame(M + w + gap, y, w, h);
   images.push({ renderId: after.id, x: M + w + gap + 3, y: y + 3, w: w - 6, h: h - 6 });
   body += text(M, y + h + 7, "BEFORE — CLIENT SITE PHOTO", { size: 2.8, fill: INK_500, spacing: "0.06em" });
-  body += text(M + w + gap, y + h + 7, "AFTER — PHOTO RESTYLE · FAITHFULNESS CHECK PASSED", { size: 2.8, fill: BRASS, spacing: "0.06em" });
+  body += text(M + w + gap, y + h + 7, "AFTER — PHOTO RESTYLE · FAITHFULNESS CHECK PASSED", { size: 2.8, fill: INK_700, spacing: "0.06em" });
   body += paragraph(M, y + h + 13, pair.caption, 150, 4, { size: 2.8, fill: INK_700 }).svg;
   return { kind: "photo_pair", title: `Before & after — ${pair.zoneName}`, svg: page(body), images };
 }
@@ -829,7 +828,7 @@ function assumptionsPage(input: RenderPackInput, n: number, total: number): Pack
   ["EXISTING ON SITE", "TYPE", "PROPOSAL", "BECOMES / NOTE"].forEach((h, i) => (body += text(cols[i]!, y, h, { size: 2.6, fill: INK_500, spacing: "0.08em" })));
   body += `<line x1="${M}" y1="${y + 2}" x2="${PAGE_W - M}" y2="${y + 2}" stroke="${INK_100}" stroke-width="0.3"/>`;
   y += 8;
-  const tone = { KEEP: INK_700, REMOVE: TERRACOTTA, REPLACE: BRASS, UNDECIDED: TERRACOTTA } as const;
+  const tone = { KEEP: INK_700, REMOVE: INK_900, REPLACE: INK_900, UNDECIDED: INK_900 } as const;
   for (const d of a.decisions.slice(0, 30)) {
     body += text(cols[0]!, y, d.item.slice(0, 70), { size: 3, fill: INK_900 });
     body += text(cols[1]!, y, d.kind.slice(0, 26), { size: 2.8, fill: INK_500 });

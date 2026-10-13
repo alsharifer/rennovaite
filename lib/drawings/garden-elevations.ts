@@ -42,7 +42,7 @@ import {
   SHEET_H,
   SHEET_MARGIN,
   SHEET_W,
-  TERRACOTTA,
+  DERIVED_GLYPH,
   type SheetMeta,
 } from "./sheet";
 
@@ -439,8 +439,8 @@ function runSheet(graph: PlanGraph, el: LinearElement, meta: SheetMeta, number: 
     if (v) facts.push([k.replace("_mm", "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()), String(v)]);
   }
   const notes: { text: string; color?: string }[] = [{ text: `Source: ${String(s.source ?? "not sourced")}.` }];
-  if (!base.stated) notes.push({ text: "The plan states no level for the ground under this run; heights are shown from an assumed ±000.", color: TERRACOTTA });
-  if (el.derived) notes.push({ text: "Cross-section defaulted, not measured.", color: TERRACOTTA });
+  if (!base.stated) notes.push({ text: `${DERIVED_GLYPH} The plan states no level for the ground under this run; heights are shown from an assumed ±000.`, color: INK_900 });
+  if (el.derived) notes.push({ text: `${DERIVED_GLYPH} Cross-section defaulted, not measured.`, color: INK_900 });
   const panel = notesPanel(name, facts, notes);
 
   const nViews = segs.length;
@@ -497,7 +497,7 @@ function runSheet(graph: PlanGraph, el: LinearElement, meta: SheetMeta, number: 
     if (planter) {
       const ps = spec(planter);
       const kb = Array.isArray(ps.kerb_band_mm) ? (ps.kerb_band_mm as number[]).map((v) => v / 1000) : [p1 - 0.1, p1];
-      body += rectU(f, p0, kb[0]!, lv, lv + pH - 0.05, "#E8E1CF", INK_500, 0.2);
+      body += rectU(f, p0, kb[0]!, lv, lv + pH - 0.05, BONE, INK_500, 0.2);
       body += `<text x="${f2(f.px((p0 + kb[0]!) / 2))}" y="${f2(f.pz(lv + pH / 2))}" text-anchor="middle" font-size="2.1" fill="${INK_500}" style="font-family:${FONT_UI}">${esc(String(ps.soil ?? "planting"))}</text>`;
       body += rectU(f, kb[0]!, kb[1]!, lv, lv + pH, BONE, INK_900, 0.35);
       body += vDim(f, kb[1]!, lv + H, lv + pH, 10, "bench-back", sub(`el:${planter.id}:height_mm`, E("height_mm")));
@@ -506,12 +506,12 @@ function runSheet(graph: PlanGraph, el: LinearElement, meta: SheetMeta, number: 
     body += rectU(f, o0, o1, lv, lv + H, BONE, INK_900, 0.4);
     const clad = num(s.cladding_mm);
     if (clad) {
-      body += rectU(f, o1 - clad / 1000, o1, lv, lv + H, "#D9D2C3", INK_900, 0.3);
+      body += rectU(f, o1 - clad / 1000, o1, lv, lv + H, INK_100, INK_900, 0.3);
       body += hDim(f, o1 - clad / 1000, o1, lv + H, -5, "counter-cladding", E("spec.cladding_mm"));
     }
     if (el.kind === "planter_run" && num(s.kerb_mm)) {
       const kb = Array.isArray(s.kerb_band_mm) ? (s.kerb_band_mm as number[]).map((v) => v / 1000) : [o1 - 0.1, o1];
-      body += rectU(f, o0, kb[0]!, lv, lv + H - 0.05, "#E8E1CF", INK_500, 0.2);
+      body += rectU(f, o0, kb[0]!, lv, lv + H - 0.05, BONE, INK_500, 0.2);
       body += hDim(f, kb[0]!, kb[1]!, lv + H, -5, "planter-kerb", E("spec.kerb_mm"));
     }
     body += hDim(f, o0, o1, lv, 7, `${el.kind}-width`, E("width_mm"));
@@ -537,7 +537,7 @@ function unitSheet(graph: PlanGraph, u: GardenFixture, meta: SheetMeta, number: 
   const H = num(s.height_mm)! / 1000;
   const name = u.type === "wall_feature" ? "Wall feature with bench" : "Planter box";
   const notes: { text: string; color?: string }[] = [{ text: `Source: ${String(s.source ?? "not sourced")}.` }];
-  if (!base.stated) notes.push({ text: "The plan states no level for the ground here; heights are shown from an assumed ±000.", color: TERRACOTTA });
+  if (!base.stated) notes.push({ text: `${DERIVED_GLYPH} The plan states no level for the ground here; heights are shown from an assumed ±000.`, color: INK_900 });
   const facts: [string, string][] = [["Width", String(mmOf(W))], ["Depth", String(mmOf(D))], ["Height", String(mmOf(H))]];
   const arch = (s.arch ?? {}) as Record<string, number>;
   const bench = (s.bench ?? {}) as Record<string, number>;
@@ -612,7 +612,7 @@ function unitSheet(graph: PlanGraph, u: GardenFixture, meta: SheetMeta, number: 
     body += ground(g, -0.3, D + 0.3, lv);
     body += rectU(g, 0, wall, lv, lv + H, BONE, INK_900, 0.4);
     body += rectU(g, D - wall, D, lv, lv + H, BONE, INK_900, 0.4);
-    body += rectU(g, wall, D - wall, lv + 0.05, lv + H - 0.08, "#E8E1CF", INK_500, 0.2);
+    body += rectU(g, wall, D - wall, lv + 0.05, lv + H - 0.08, BONE, INK_500, 0.2);
     body += hDim(g, 0, D, lv, 7, "planter-box-depth", U("spec.depth_mm"));
     body += viewTitle(botBox, "Section B", g.denom);
   }
@@ -664,7 +664,7 @@ function stripProfiles(graph: PlanGraph, fixtures: readonly GardenFixture[], axi
       base: c.base_mm / 1000,
       top: (c.base_mm + c.height_mm) / 1000,
       depth: viewerFar(centre(c.polygon)),
-      fill: c.kind === "existing_building" ? "#E6E6E6" : c.kind === "boundary_wall" ? "#D9D2C3" : PAPER,
+      fill: c.kind === "existing_building" ? "#E6E6E6" : c.kind === "boundary_wall" ? INK_100 : PAPER,
       derived: c.derived,
       srcTop: `ctx:${c.id}:height_mm`,
       kind,
@@ -775,7 +775,7 @@ function gardenStripSheet(graph: PlanGraph, fixtures: readonly GardenFixture[], 
       stagger = Math.abs(y - lastY) < 3.2 ? stagger + 1 : 0;
       lastY = y;
       body += levelTag(f, st.u1 + 0.1 + (stagger * 22) / f.k, p.top, p.code, p.srcTop, { right: true, derived: p.derived });
-      if (p.derived) notes.push({ text: `${p.label}: ${fmtLevel(mm)} is assumed or scaled, not dimensioned.`, color: TERRACOTTA });
+      if (p.derived) notes.push({ text: `${DERIVED_GLYPH} ${p.label}: ${fmtLevel(mm)} is assumed or scaled, not dimensioned.`, color: INK_900 });
       if (++row >= 6) break;
     }
     const wall = st.profiles.find((p) => p.kind === "wall" && p.u1 - p.u0 > (st.u1 - st.u0) * 0.5);

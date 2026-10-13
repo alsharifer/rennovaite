@@ -3,7 +3,7 @@
 //
 // Diffs the as-built graph against the proposed graph (both from lib/plan):
 //   - walls in as-built but NOT proposed  → demolition: dashed + cross-hatch,
-//     `tertiary` terracotta.
+//     ink (K9: drawings are ink only — dashed with hatch ticks).
 //   - walls in proposed but NOT as-built  → new work: solid ink-900 + NEW tag.
 // Deterministic; no LLM. When proposed === as-built (no locked design yet) the
 // diff is empty and the legend says so.
@@ -19,7 +19,6 @@ import {
   PAPER,
   renderSheet,
   SHEET_MARGIN,
-  TERRACOTTA,
   type SheetMeta,
 } from "./sheet";
 
@@ -50,7 +49,7 @@ function demolishedSvg(w: Wall, pl: Placement): string {
     ay = pl.py(a[1]),
     bx = pl.px(b[0]),
     by = pl.py(b[1]);
-  const line = `<line x1="${ax.toFixed(2)}" y1="${ay.toFixed(2)}" x2="${bx.toFixed(2)}" y2="${by.toFixed(2)}" stroke="${TERRACOTTA}" stroke-width="0.7" stroke-dasharray="1.6 1.2"/>`;
+  const line = `<line x1="${ax.toFixed(2)}" y1="${ay.toFixed(2)}" x2="${bx.toFixed(2)}" y2="${by.toFixed(2)}" stroke="${INK_900}" stroke-width="0.7" stroke-dasharray="1.6 1.2"/>`;
   // cross-hatch ticks along the wall
   const len = Math.hypot(bx - ax, by - ay) || 1;
   const ux = (bx - ax) / len,
@@ -61,7 +60,7 @@ function demolishedSvg(w: Wall, pl: Placement): string {
   for (let d = 1.5; d < len; d += 3) {
     const cx = ax + ux * d,
       cy = ay + uy * d;
-    hatch += `<line x1="${(cx - nx - ux).toFixed(2)}" y1="${(cy - ny - uy).toFixed(2)}" x2="${(cx + nx + ux).toFixed(2)}" y2="${(cy + ny + uy).toFixed(2)}" stroke="${TERRACOTTA}" stroke-width="0.3"/>`;
+    hatch += `<line x1="${(cx - nx - ux).toFixed(2)}" y1="${(cy - ny - uy).toFixed(2)}" x2="${(cx + nx + ux).toFixed(2)}" y2="${(cy + ny + uy).toFixed(2)}" stroke="${INK_900}" stroke-width="0.3"/>`;
   }
   return line + hatch;
 }
@@ -91,7 +90,7 @@ function legend(demolishedCount: number, addedCount: number): string {
     ${
       none
         ? `<text x="${x}" y="${y + 6}" font-size="2.7" fill="${INK_900}" style="font-family:${FONT_UI}">No changes — proposed matches as-built.</text>`
-        : `<line x1="${x}" y1="${y + 5}" x2="${x + 8}" y2="${y + 5}" stroke="${TERRACOTTA}" stroke-width="0.7" stroke-dasharray="1.6 1.2"/>` +
+        : `<line x1="${x}" y1="${y + 5}" x2="${x + 8}" y2="${y + 5}" stroke="${INK_900}" stroke-width="0.7" stroke-dasharray="1.6 1.2"/>` +
           `<text x="${x + 10}" y="${y + 6}" font-size="2.7" fill="${INK_900}" style="font-family:${FONT_UI}">Demolish (${demolishedCount})</text>` +
           `<line x1="${x}" y1="${y + 10}" x2="${x + 8}" y2="${y + 10}" stroke="${INK_900}" stroke-width="0.8"/>` +
           `<text x="${x + 10}" y="${y + 11}" font-size="2.7" fill="${INK_900}" style="font-family:${FONT_UI}">New wall (${addedCount})</text>`
