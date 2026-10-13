@@ -56,7 +56,8 @@ describe("buildProposalPages", () => {
     expect(summary).toContain(`data-grand-total="${arabella.grand_total_aed}"`);
     expect(summary).toMatch(/≈ AED [\d,]+\.\d\d\*/); // derived, and to the fil so the column adds up
     expect(summary).toContain('data-headline-excludes="true"'); // D4: the QS-to-price lines are named
-    expect((summary.match(/data-section-total="/g) ?? []).length).toBe(arabella.sections.length);
+    // K10 #8: a client document shows no zero-value section (Plumbing here: every line to be priced).
+    expect((summary.match(/data-section-total="/g) ?? []).length).toBe(arabella.sections.filter((s) => s.section_total_aed !== 0).length);
     for (const k of ["subtotal", "contingency", "vat"]) expect(summary).toContain(`data-summary="${k}"`);
   });
 
@@ -77,7 +78,8 @@ describe("buildProposalPages", () => {
   });
 
   it("the BoQ at the firm's rates: every line with its REF, no source, no tier, no QS mark", () => {
-    const lines = arabella.sections.reduce((n, s) => n + s.lines.length, 0);
+    // K10 #8: the lines of a zero-value section are named under Exclusions & to be priced, not scheduled.
+    const lines = arabella.sections.filter((s) => s.section_total_aed !== 0).reduce((n, s) => n + s.lines.length, 0);
     expect((all.match(/data-ref="/g) ?? []).length).toBe(lines);
     expect(text(pages)).not.toMatch(/market reference|contractor rate book|indicative rate|QS to price|actual_transaction|Source:/i);
     // Derived quantities keep their honesty flag.

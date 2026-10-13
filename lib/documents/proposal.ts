@@ -79,6 +79,15 @@ export interface ProposalInput {
   preview?: boolean;
 }
 
+/**
+ * K10 #8 — the sections a CLIENT document shows: canonical order, none worth 0. A section is 0
+ * only when every line in it is still to be priced; those lines are named under Exclusions & to
+ * be priced and in the total's sentence. The 08 Proposal screen's preview uses the same list.
+ */
+export function clientSections<S extends { work_section: string; section_total_aed: number }>(sections: readonly S[]): S[] {
+  return sortSections([...sections]).filter((s) => s.section_total_aed !== 0);
+}
+
 /** The preview's mark: it is on every page, so a preview can never pass for the proposal. */
 export const PREVIEW_MARK = "PREVIEW · NOT ISSUED";
 
@@ -115,7 +124,10 @@ export function buildProposalPages(input: ProposalInput): string[] {
   const refs = assignRefs(boq.sections);
   const showRates = input.showLineRates !== false;
   const setup = input.showLineRates !== undefined;
-  const sections = sortSections(boq.sections);
+  // K10 #8: a client document shows no zero-value section. A section totals 0 only when every
+  // line in it is still to be priced — those lines are named under Exclusions & to be priced and
+  // in the total's sentence, so nothing is lost; the price summary still adds up to the subtotal.
+  const sections = clientSections(boq.sections);
   const prog = boq.programme && boq.programme.phases.length ? boq.programme : null;
   const hasTerms = !!(input.termsText && input.termsText.trim()) || !!input.validity || !!input.paymentTerms;
 
