@@ -70,7 +70,7 @@ export default async function AuthPage({ searchParams }: { searchParams: Promise
             <br />
             Re-imagined
           </h1>
-          <p className="t-body-md mt-5 max-w-[420px] text-bp-ink-secondary">Sign in with your email. We send a one-time link. No password to remember.</p>
+          <p className="t-body-md mt-5 max-w-[420px] text-bp-ink-secondary">Sign in with your email. We send a one-time link and a code. No password to remember.</p>
           <div className="mt-8 max-w-[420px]">
             <SignInForm next={safeNextPath(next) ? next : undefined} linkError={authErrorMessage(error)} />
           </div>

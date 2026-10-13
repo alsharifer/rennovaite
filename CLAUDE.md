@@ -487,6 +487,18 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
   (synthetic files, live), the isolation sweep's phase 6 (every route + page
   404 for a deleted project, restore round-trip byte-identical),
   `scripts/k10-actions-shots.mjs` (keyboard, axe, light + dark).
+- **Sign in with the e-mailed code** (`app/_actions/verify-email-code.ts`,
+  `lib/auth/email-code.ts`; docs/AUTH.md → "Sign-in reliability"). The
+  magic-link e-mail shows `{{ .Token }}` under its button; `/auth` takes it
+  under the sent state or via "I have a code from the email" and verifies it
+  server-side (`verifyOtp({ email, token, type: "email" })`) — any device,
+  survives mail scanners and the PKCE same-browser rule. One answer for wrong /
+  expired / replaced / no account (no enumeration). 6–10 digits accepted, no
+  number stated on screen (dev issues 8 until "Email OTP Length" is set to 6).
+  The hosted projects need the template pasted and the URL settings in the
+  dashboard — dev's Site URL is `http://localhost:3000`
+  (`scripts/auth-url-probe.mjs`, dev only); prod is read in the dashboard.
+  Live: `scripts/k10-signin-code-check.mjs`.
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 

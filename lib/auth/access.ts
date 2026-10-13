@@ -34,6 +34,8 @@ export const PUBLIC_ROUTE_FILES: Readonly<Record<string, string>> = {
  */
 export const PUBLIC_SERVER_ACTION_FILES: Readonly<Record<string, string>> = {
   "app/_actions/sign-in-with-email.ts": "sign-in: how a visitor gets a session",
+  // K10: the e-mailed code — the second way a signed-out visitor gets a session (verifyOtp, server-side).
+  "app/_actions/verify-email-code.ts": "sign-in: verifies the e-mailed 6-digit code for a session",
   "app/_actions/sign-out.ts": "sign-out: clearing a session needs none",
 };
 

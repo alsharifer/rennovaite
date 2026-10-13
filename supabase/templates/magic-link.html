@@ -1,7 +1,10 @@
 <!doctype html>
 <!--
   RenovAIte — magic-link sign-in e-mail (K8 #18, Figma 69:1422, spec §6.9).
-  Supabase Auth template (Go templates): {{ .ConfirmationURL }}, {{ .Email }}.
+  Supabase Auth template (Go templates): {{ .ConfirmationURL }}, {{ .Token }}, {{ .Email }}.
+  K10: the one-time {{ .Token }} (Email OTP Length: 6) under the button — typed on /auth ("Or enter the
+  code from the email") it signs in on ANY device, so it survives mail
+  scanners that open links and the PKCE link's same-browser rule.
   Subject: "Your sign-in link" (supabase/config.toml; set the same on the hosted projects).
 
   Rules: 600 px table layout, inline styles only, IBM Plex Sans → Arial,
@@ -34,7 +37,7 @@
             <tr>
               <td style="padding:28px 40px 0 40px;">
                 <h1 style="margin:0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:22px; line-height:30px; font-weight:600; color:#1A1D1F;">Sign in to RenovAIte</h1>
-                <p style="margin:16px 0 0 0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#1A1D1F;">Use the button below to sign in. The link works once and expires in 60 minutes.</p>
+                <p style="margin:16px 0 0 0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#1A1D1F;">Use the button below to sign in, or enter the code on the sign-in page. Both work once and expire in 60 minutes.</p>
               </td>
             </tr>
             <tr>
@@ -50,6 +53,12 @@
             </tr>
             <tr>
               <td style="padding:24px 40px 0 40px;">
+                <p style="margin:0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#4A5054;">Or enter this code on the sign-in page — it works on any device:</p>
+                <p style="margin:8px 0 0 0; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:28px; line-height:36px; font-weight:600; letter-spacing:6px; color:#1A1D1F;" data-otp="true">{{ .Token }}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 40px 0 40px;">
                 <p style="margin:0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#4A5054;">Or paste this link into your browser:</p>
                 <p style="margin:8px 0 0 0; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:12px; line-height:18px; color:#1A1D1F; word-break:break-all;">{{ .ConfirmationURL }}</p>
               </td>
@@ -57,7 +66,7 @@
             <tr>
               <td style="padding:20px 40px 32px 40px;">
                 <div style="height:1px; line-height:1px; font-size:1px; background-color:#D6D1C5;">&nbsp;</div>
-                <p style="margin:16px 0 0 0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#4A5054;">Didn’t ask for this? You can ignore this email — nobody can sign in without the link.</p>
+                <p style="margin:16px 0 0 0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#4A5054;">Didn’t ask for this? You can ignore this email — nobody can sign in without the link or the code.</p>
                 <p style="margin:6px 0 0 0; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:12px; line-height:18px; color:#62676B;">RenovAIte · Dubai · sent to {{ .Email }}</p>
               </td>
             </tr>
