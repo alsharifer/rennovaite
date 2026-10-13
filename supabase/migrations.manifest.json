@@ -344,6 +344,12 @@
       "version": "20260101005700",
       "name": "applied_corrections",
       "sha256": "c8e81172a73ff5663a8fc02a072f2b06ac1eae9c5f40690da54d44b7e24c18c4"
+    },
+    {
+      "legacy": null,
+      "version": "20260101005800",
+      "name": "rooms_in_scope",
+      "sha256": "bf9e663602f0da4c5c1356f7d5707619f31bc997d4a1c146b3c9b82b3d2a9e30"
     }
   ]
 }

@@ -4,6 +4,23 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## K12 (2026-10-14) — rooms in this renovation
+
+- **058 before deploy** (prod): `rooms.in_scope`. Every reader tolerates its
+  absence (nothing is out of scope); the 01 Plan checklist answers 500
+  `migration_required` until it runs.
+- **Ruling: Q-11 staircase renovation** is a per-project allowance (qty 1)
+  emitted even when the plan has no stairs room — so leaving the stairs out of
+  scope does not remove it. Make it conditional on an in-scope stairs room?
+  (Changes every regenerated BoQ without a stairs room.)
+- **Ruling: the aluminium & glazing allowance** (S6, whole-unit list) stays
+  whatever the scope. Scale it, or drop items by room type?
+- **Timeline reads rooms across every plan** of the project (pre-existing,
+  `lib/timeline/load.ts`), not just the latest; scope is applied to the latest
+  plan's rooms.
+- **Scope on the phone**: the checklist sits under the canvas (the page's
+  one-column layout); no separate phone design.
+
 ## K11 (2026-10-14) — from the pilot walkthrough
 
 - **056 and 057 before deploy** (prod): `projects.draft_since` (the intake

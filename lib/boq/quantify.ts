@@ -144,8 +144,14 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
     }
   }
 
+  // K12 (058): a room NOT in this renovation contributes no room-level quantity.
+  // It stays on the graph (scale, walls); its floor, ceiling and tiling go, and a
+  // wall goes only when no room on either side of it is in scope.
+  const inScope = (id: string | null | undefined) => !id || graph.rooms.find((r) => r.id === id)?.in_scope !== false;
+
   // --- Rooms: floor + ceiling (+ wet tiling) ---
   for (const room of graph.rooms) {
+    if (room.in_scope === false) continue;
     // G3: an outdoor zone has no interior floor to finish. Its surface is priced
     // by the landscape take-off (PCC + paving install + tile supply, or grass),
     // and emitting an interior floor_finish line here charged for the same
@@ -196,7 +202,9 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
     const gross = length * h;
     const ded = byWall.get(w.id);
     const net = r2(Math.max(0, gross - (ded?.area ?? 0)));
-    const roomId = w.room_ids[0] ?? null;
+    // K12: priced while any room it bounds is in scope, attributed to the first such room.
+    if (w.room_ids.length > 0 && !w.room_ids.some((id) => inScope(id))) continue;
+    const roomId = w.room_ids.find((id) => inScope(id)) ?? w.room_ids[0] ?? null;
     const prov =
       ded && ded.ids.length > 0
         ? { opening_refs: ded.ids, gross_qty: r2(gross) }

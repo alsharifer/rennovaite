@@ -57,6 +57,13 @@ export interface Room {
    */
   unroofed: boolean;
   /**
+   * K12 (058): false = not in this renovation. The room stays on the graph (the
+   * metric scale and the overlap check need every room); the take-offs skip it
+   * (lib/plan/scope.ts). Absent = in scope — so a graph without the column, and
+   * every existing snapshot, reads exactly as before.
+   */
+  in_scope?: false;
+  /**
    * G4: how much of `area_m2` was APPROXIMATED rather than read off the drawing
    * (e.g. a curved edge traced as a quadrant), and why. null when nothing was.
    * A drawing that prints the area has to be able to say this, so it lives on
@@ -286,6 +293,8 @@ export interface RawRoom {
   polygon: unknown; // expected number[][] in normalised space
   /** G1: null/absent falls back to the type's default (outdoor ⇒ unroofed). */
   unroofed?: boolean | null;
+  /** K12 (migration 058): false = not in this renovation. */
+  in_scope?: boolean | null;
   /** G4: approximated share of the area and its reason (migration 035). */
   area_derived_m2?: number | null;
   derived_note?: string | null;
@@ -658,6 +667,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       // would believe it.
       ceiling_h_m: unroofed ? 0 : DEFAULT_CEILING_H_M,
       unroofed,
+      ...(raw.in_scope === false ? { in_scope: false as const } : {}),
       area_derived_m2:
         typeof raw.area_derived_m2 === "number" && raw.area_derived_m2 > 0
           ? Number(raw.area_derived_m2)

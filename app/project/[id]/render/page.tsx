@@ -16,6 +16,7 @@ import { Button } from "@/components/blueprint/Button";
 import { StateBlock } from "@/components/blueprint/StateBlock";
 import { RendersStudio } from "@/components/blueprint/renders/RendersStudio";
 import { journeyFlagsFromEnv, ownerStepHref } from "@/lib/journey";
+import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 
 export const dynamic = "force-dynamic";
 
@@ -161,7 +162,10 @@ export default async function RenderPage({
     .eq("plan_id", plan.id)
     .order("name_en");
 
-  const roomList = rooms ?? [];
+  // K12 (058): only the rooms in this renovation are rendered; the rest sit behind "N not in this renovation".
+  const outOfScope = await outOfScopeRoomIds(supabase as unknown as import("@supabase/supabase-js").SupabaseClient, projectId);
+  const roomList = (rooms ?? []).filter((r) => !outOfScope.has(r.id));
+  const notInScope = (rooms ?? []).filter((r) => outOfScope.has(r.id)).map((r) => r.name_en ?? "Room");
 
   // Latest uploaded photo per room, so the room card rehydrates on load.
   const roomIds = roomList.map((r) => r.id);
@@ -235,7 +239,8 @@ export default async function RenderPage({
         .eq("project_id", projectId)
         .eq("mode", "scene");
       batchJobs = planSceneBatch(
-        ctx.cameras.map((c) => ({ id: c.id, label: c.label, zone_id: c.zoneId, lit: c.lit })),
+        // K12: a camera on a zone left out of the renovation is not rendered (whole-garden views stay).
+        ctx.cameras.filter((c) => !c.zoneId || !outOfScope.has(c.zoneId)).map((c) => ({ id: c.id, label: c.label, zone_id: c.zoneId, lit: c.lit })),
         (sceneRows ?? []) as SceneRenderRow[],
       );
     } catch {
@@ -258,6 +263,7 @@ export default async function RenderPage({
     ),
   );
 
+  if (roomList.length === 0 && notInScope.length > 0) return <NotReady projectId={projectId} title="No room is in this renovation" body="Choose the rooms this renovation covers on your plan — each one gets a view here." />;
   if (roomList.length === 0) return <NotReady projectId={projectId} title="No rooms on the plan yet" body="Confirm the rooms on your plan — every room gets a view here." />;
 
   // P4: per-room element-mapped BoQ totals for the "This room on your BoQ" chip.
@@ -341,6 +347,8 @@ export default async function RenderPage({
       renderInfo={renderInfo}
       viewerHref={process.env.VIEWER_3D_ENABLED === "true" ? `/project/${projectId}/viewer?from=render` : null}
       costHref={ownerStepHref("cost", projectId, flags)}
+      notInScope={notInScope}
+      planHref={`/project/${projectId}/plan`}
     />
   );
 }

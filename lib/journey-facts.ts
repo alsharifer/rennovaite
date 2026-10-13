@@ -31,6 +31,7 @@ import type { JourneyPersona } from "@/lib/journey";
 import { memberProjectIds } from "@/lib/projects/access";
 import { withoutDrafts } from "@/lib/projects/intake";
 import { renderLockProgress } from "@/lib/render-lock-progress";
+import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 
 const PLAN_CODES = new Set(["no_plan", "no_area", "no_rooms", "plan_has_overlaps", "not_priceable"]);
 
@@ -180,7 +181,9 @@ export async function loadProjectJourney(db: SupabaseClient, projectId: string, 
           db.from("rooms").select("id, room_type").eq("plan_id", plan.id),
           db.from("approved_designs").select("room_id").eq("project_id", projectId),
         ]);
-        return renderLockProgress((rooms ?? []) as { id: string; room_type: string | null }[], ((approved ?? []) as { room_id: string | null }[]).map((a) => a.room_id).filter((x): x is string => !!x));
+        // K12: only the rooms in this renovation are views to lock.
+        const out = await outOfScopeRoomIds(db, projectId);
+        return renderLockProgress(((rooms ?? []) as { id: string; room_type: string | null }[]).filter((r) => !out.has(r.id)), ((approved ?? []) as { room_id: string | null }[]).map((a) => a.room_id).filter((x): x is string => !!x));
       }),
     ]);
     facts.owner = { brief: brief > 0, moodboardItems, renders, renderViews, unpricedLines };

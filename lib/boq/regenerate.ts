@@ -69,7 +69,8 @@ function planBlock(refusal: { status: number; body: Record<string, unknown> }, p
     case "no_area":
       return { code, reason: "The plan has no total area, so nothing can be measured.", fix: toPlan };
     case "no_rooms":
-      return { code, reason: "The plan has no rooms to price.", fix: toPlan };
+      // K12: every room left out of the renovation.
+      return refusal.body.scope ? { code, reason: "No room is in this renovation.", fix: { label: "Choose rooms on the plan", href: `/project/${projectId}/plan` } } : { code, reason: "The plan has no rooms to price.", fix: toPlan };
     case "project_not_found":
       return { code, reason: "Project not found." };
     default:

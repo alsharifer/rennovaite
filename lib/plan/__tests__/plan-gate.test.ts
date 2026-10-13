@@ -26,7 +26,8 @@ describe("plan page gate", () => {
   it("the page gates on the same list its header counts — no parse record required", () => {
     const src = readFileSync(path.join(ROOT, "app/project/[id]/plan/page.tsx"), "utf8");
     expect(src).toContain("planGate({ authored, roomCount: roomList.length })");
-    expect(src).toMatch(/\{roomList\.length\} \{authored \? "ZONES DRAWN" : "ROOMS DETECTED"\}/);
+    // K12: the room list is the "Rooms in this renovation" checklist over the same roomList.
+    expect(src).toMatch(/<RoomsInScope planId=\{plan\.id\} zones=\{authored\} rooms=\{roomList\.map\(/);
     expect(src).not.toMatch(/planReady = .*parsed_json/);
   });
 });

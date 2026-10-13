@@ -186,7 +186,20 @@ export async function loadPriceablePlan(
       overlap_room_names: overlaps.room_names,
     });
   }
-  return { project, plan, rooms };
+  // K12 (058): only the rooms in this renovation are priced. Out-of-scope rooms
+  // stayed in the overlap check above (they still occupy floor) and stay on the
+  // plan graph (its scale); the take-offs below never see them. Read
+  // best-effort: before 058 every room is in scope.
+  let outOfScope = new Set<string>();
+  try {
+    const { data: out, error: outErr } = await supabase.from("rooms").select("id").eq("plan_id", plan.id).eq("in_scope", false).returns<{ id: string }[]>();
+    if (!outErr) outOfScope = new Set((out ?? []).map((r) => r.id));
+  } catch {
+    /* pre-058 */
+  }
+  const scoped = rooms.filter((r) => !outOfScope.has(r.id));
+  if (scoped.length === 0) return no(400, { error: "No room is in this renovation — choose the rooms on the plan.", code: "no_rooms", scope: true });
+  return { project, plan, rooms: scoped };
 }
 
 /** Everything a BoQ is priced from, loaded from the project's stored state. */
