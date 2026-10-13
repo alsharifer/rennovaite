@@ -8,7 +8,7 @@
 // =============================================================================
 
 export type DiffClass = "quantity" | "rate" | "both" | "total" | "added" | "removed";
-export type CauseKind = "correction" | "firm_rate" | "plan_edit" | "session_decision" | "regeneration" | "engine_rounding";
+export type CauseKind = "correction" | "applied_correction" | "reverted_correction" | "firm_rate" | "plan_edit" | "session_decision" | "regeneration" | "engine_rounding";
 
 /** Human label for a class, shared by the view and the PDF. */
 export const DIFF_CLASS_LABEL: Record<DiffClass, string> = {
@@ -23,6 +23,9 @@ export const DIFF_CLASS_LABEL: Record<DiffClass, string> = {
 
 export const CAUSE_KIND_LABEL: Record<CauseKind, string> = {
   correction: "Correction recorded",
+  // K11 #4 (057): a price added on review / a correction applied to the BoQ — and undone by a revert.
+  applied_correction: "Applied to the BoQ",
+  reverted_correction: "Reverted",
   firm_rate: "Contractor rate book",
   plan_edit: "Plan edited",
   session_decision: "Session decision",

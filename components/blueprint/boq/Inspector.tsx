@@ -13,6 +13,10 @@
 // the QUANTITY and RATE blocks from the curated provenance, and — for a firm —
 // whether its own book has an entry ("Add to my book" opens the book's add
 // form PREFILLED; nothing is saved until the member saves it there).
+//
+// K11 #4 (spec §7.3, 80:9042 · 80:9088): an unpriced line offers "Add a
+// price", and "Capture correction" opens the capture form IN the Line tab
+// (./CorrectionsTab CaptureForm); applying either creates the next revision.
 // =============================================================================
 
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
@@ -26,7 +30,7 @@ import { Button } from "../Button";
 import { Icon } from "../Icon";
 import { ProvenanceMark } from "../ProvenanceMark";
 import { TierLabel } from "../TierLabel";
-import { CorrectionsTab, type Correction } from "./CorrectionsTab";
+import { CaptureForm, CorrectionsList, type Applied, type Correction } from "./CorrectionsTab";
 import { displayUnit } from "./format";
 import { weakerSentence } from "./ProvenancePopover";
 import { WhatIfTab, type WhatIfEngine } from "./WhatIfTab";
@@ -42,6 +46,8 @@ export interface InspectorProps {
   capturing: boolean;
   setCapturing: (v: boolean) => void;
   onCorrectionSaved: (c: Correction) => void;
+  /** K11 #4: a price / correction applied — the next revision exists. */
+  onApplied: (a: Applied) => void;
   engine: WhatIfEngine | null;
   furniture: number | null;
   onClose: () => void;
@@ -135,7 +141,24 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
           {line.description}
         </h2>
 
-        {p.tab === "line" ? (
+        {p.tab === "line" && p.capturing ? (
+          <div className="mt-5">
+            <CaptureForm
+              line={line}
+              model={model}
+              onCancel={() => p.setCapturing(false)}
+              onSaved={(c) => {
+                p.onCorrectionSaved(c);
+                p.setCapturing(false);
+                p.setTab("corrections");
+              }}
+              onApplied={(a) => {
+                p.setCapturing(false);
+                p.onApplied(a);
+              }}
+            />
+          </div>
+        ) : p.tab === "line" ? (
           <>
             <Block>
               <p className="flex items-center gap-2">
@@ -143,7 +166,14 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
                 <TierLabel tier={line.tiers.amount} persona={model.persona} />
               </p>
               {line.unpriced ? (
-                <p className="t-body-sm mt-2 text-bp-ink-secondary">Not in any total — {line.unpricedReason}.</p>
+                <>
+                  <p className="t-body-sm mt-2 text-bp-ink-secondary">Not in any total — {line.unpricedReason}.</p>
+                  <div className="mt-3">
+                    <Button kind="primary" onClick={() => p.setCapturing(true)} testId="add-a-price">
+                      Add a price
+                    </Button>
+                  </div>
+                </>
               ) : (
                 <>
                   <p className="t-num-sm mt-2 flex flex-wrap items-center gap-1.5">
@@ -212,13 +242,7 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
 
             <Block>
               <div className="flex flex-wrap items-center gap-6">
-                <Button
-                  kind="secondary"
-                  onClick={() => {
-                    p.setCapturing(true);
-                    p.setTab("corrections");
-                  }}
-                >
+                <Button kind="secondary" onClick={() => p.setCapturing(true)}>
                   Capture correction
                 </Button>
                 <Button kind="quiet" href={`/project/${model.projectId}/boq/revisions`}>
@@ -233,7 +257,16 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
           </div>
         ) : (
           <div className="mt-5">
-            <CorrectionsTab line={line} model={model} corrections={lineCorrections} capturing={p.capturing} setCapturing={p.setCapturing} onSaved={p.onCorrectionSaved} />
+            <CorrectionsList
+              line={line}
+              model={model}
+              corrections={lineCorrections}
+              onCapture={() => {
+                p.setCapturing(true);
+                p.setTab("line");
+              }}
+              onApplied={p.onApplied}
+            />
           </div>
         )}
       </div>

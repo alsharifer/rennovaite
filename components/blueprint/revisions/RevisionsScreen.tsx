@@ -11,6 +11,10 @@
 // the client's approval is an event the firm records) and the window events no
 // line names. "Link causes to lines" has no record behind it yet: it is shown
 // disabled, with that reason.
+//
+// K11 #4 (spec §7.3): "Revert to rev N" — undo for a price added on review or
+// an applied correction. It stores rev N's figures as the next revision
+// (nothing is deleted) and the corrections applied after rev N stop applying.
 // =============================================================================
 
 import Link from "next/link";
@@ -90,11 +94,56 @@ export function RevisionsScreen({ view, eyebrow, canApprove, approveBlock }: { v
         </div>
 
         <aside className="min-w-0 space-y-8" aria-label="Approvals and events">
+          <RevertPanel view={view} />
           <ApprovalTrail view={view} canApprove={canApprove} approveBlock={approveBlock} onDone={() => router.refresh()} />
           <WindowEvents view={view} />
         </aside>
       </div>
     </div>
+  );
+}
+
+/** Revert to the FROM revision — offered while it is older than the current BoQ. */
+function RevertPanel({ view }: { view: RevisionsView }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const latest = view.revisions[0];
+  if (!latest || view.from.rev >= latest.rev) return null;
+  const next = latest.rev + 1;
+  async function revert() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${view.projectId}/boq-revert`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ to_boq_id: view.from.boqId }) });
+      const out = (await res.json().catch(() => ({}))) as { error?: string; boq_id?: string; previous_boq_id?: string };
+      if (!res.ok || !out.boq_id) throw new Error(out.error ?? `Not reverted (${res.status}).`);
+      router.push(`/project/${view.projectId}/boq/revisions?from=${out.previous_boq_id}&to=${out.boq_id}`);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Not reverted.");
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="border border-bp-line-hairline p-5" aria-labelledby="revert-h" data-testid="revert-panel">
+      <h2 id="revert-h" className="t-heading-sm text-bp-ink-primary">
+        Revert to rev {view.from.rev}
+      </h2>
+      <p className="t-body-sm mt-2 text-bp-ink-secondary">
+        Makes rev {view.from.rev}&rsquo;s figures the current BoQ again, as rev {next} (<span className="t-num-sm">{formatAED(view.from.total)}</span>). Prices and corrections applied after rev {view.from.rev} stop applying — they stay on record. Nothing is deleted.
+      </p>
+      <div className="mt-4">
+        <Button kind="secondary" onClick={busy ? undefined : () => void revert()} testId="revert-button" disabled={busy ? { reason: "Reverting…", reasonId: "revert-why", showReason: true } : false}>
+          Revert to rev {view.from.rev}
+        </Button>
+      </div>
+      {error ? (
+        <p role="alert" className="t-body-sm mt-3 text-bp-ink-primary">
+          {error}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

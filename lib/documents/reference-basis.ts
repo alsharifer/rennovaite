@@ -24,6 +24,7 @@ import { createHash } from "node:crypto";
 
 import { isUnpricedLine } from "@/lib/documents/boq-derived";
 import { lineTierKey, type ProvLine } from "@/lib/provenance/boq";
+import { OWN_PRICE_TIER } from "@/lib/boq/own-basis-vocab";
 import { isFirmTier, type RateTier } from "@/lib/rates/tiers";
 
 import type { PricingBasis, ProposalGateVerdict, ReferenceBasis } from "./reference-basis-types";
@@ -51,7 +52,8 @@ export function referenceBasisOf(boq: BasisBoq | null | undefined): ReferenceBas
       // A selected product (D1) is laid over whichever tier answered; the stored
       // rate_tier is the underlying one, so `selection` never reaches here. A
       // line whose tier cannot be named is NOT the firm's.
-      if (isFirmTier(tier as RateTier)) firm++;
+      // K11 #4: a price a member added on review is the project's own basis, like a firm rate.
+      if (isFirmTier(tier as RateTier) || tier === OWN_PRICE_TIER) firm++;
       else {
         reference++;
         referenceAed += Number(l.total_aed) || 0;

@@ -6,6 +6,8 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { StoreError, findOrCreateFirmByName, requireFirm } from "@/lib/firms/store";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { projectAccess } from "@/lib/projects/http";
+import { lineKeyAt } from "@/lib/boq/own-basis";
+import { BASIS_KINDS } from "@/lib/boq/own-basis-vocab";
 import { isMissingSchema } from "@/lib/rates/firm";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -27,6 +29,11 @@ export const dynamic = "force-dynamic";
 // firm by name. `attributed_to` is still written, for the records that predate
 // 041. A correction still changes no rate: only an explicit promotion
 // (POST /api/firms/:firmId/promote) puts it into that firm's private book.
+//
+// K11 #4 (057): this route is "Save for review only". A rate or quantity
+// correction saved here can be applied later (POST /api/projects/:id/boq-apply
+// { correction_id }); so it records the line's STABLE key (from the BoQ view's
+// `row_key` on `boq_id`) and its basis. Applying now is the boq-apply route.
 
 function db(): SupabaseClient {
   return getSupabaseAdmin() as unknown as SupabaseClient;
@@ -51,6 +58,10 @@ const PostSchema = z.object({
   firm_id: z.string().uuid().nullable().optional(),
   confidence: z.enum(["firm", "estimate"]).nullable().optional(),
   session_ref: z.string().trim().max(200).nullable().optional(),
+  /** K11 #4 (057): the BoQ view's row key on `boq_id` → the line's stable key; the basis; the REF. */
+  row_key: z.string().max(300).nullable().optional(),
+  basis_kind: z.enum(BASIS_KINDS as [string, ...string[]]).nullable().optional(),
+  line_ref: z.string().max(40).nullable().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -82,11 +93,29 @@ export async function POST(request: NextRequest) {
     if (!(e instanceof StoreError && /firms/.test(e.message))) throw e;
     firmId = null;
   }
-  const row = { ...b, attributed_to: attributedTo, firm_id: firmId, provenance: "market_fair" };
+  const { row_key: rowKey, basis_kind: basisKind, line_ref: lineRef, ...fields } = b;
+  let lineKey: string | null = null;
+  if (rowKey && b.boq_id) {
+    const { data: boq } = await db().from("boqs").select("sections").eq("id", b.boq_id).maybeSingle<{ sections: Parameters<typeof lineKeyAt>[0] | null }>();
+    lineKey = boq?.sections ? lineKeyAt(boq.sections, rowKey) : null;
+  }
+  const k11 = { line_key: lineKey, basis_kind: basisKind ?? null, line_ref: lineRef ?? null };
+  const row = { ...fields, attributed_to: attributedTo, firm_id: firmId, provenance: "market_fair", ...k11 };
   const cols = "id, correction_type, line_description, old_value, new_value, note, attributed_to, confidence, session_ref, recorded_at";
-  let res = await db().from("boq_corrections").insert(row).select(`${cols}, firm_id`).single();
+  let res = await db().from("boq_corrections").insert(row).select(`${cols}, firm_id, line_key, basis_kind`).single();
   if (res.error && isMissingSchema(res.error)) {
-    const { firm_id: _drop, ...pre041 } = row;
+    // Pre-057: no line key / basis columns.
+    const { line_key: _l, basis_kind: _b, line_ref: _r, ...pre057 } = row;
+    void _l;
+    void _b;
+    void _r;
+    res = await db().from("boq_corrections").insert(pre057).select(`${cols}, firm_id`).single();
+  }
+  if (res.error && isMissingSchema(res.error)) {
+    const { firm_id: _drop, line_key: _l, basis_kind: _b, line_ref: _r, ...pre041 } = row;
+    void _l;
+    void _b;
+    void _r;
     void _drop;
     res = await db().from("boq_corrections").insert(pre041).select(cols).single();
   }

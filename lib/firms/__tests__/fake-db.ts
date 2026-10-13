@@ -42,6 +42,9 @@ const DEFAULTS: Record<string, (r: Row) => Row> = {
   firm_rate_books: (r) => ({ ohp_pct: 0, status: "draft", reviewed_at: null, ...r }),
   // 046: created_by / retired_by / retire_reason; created_at drives the loader's order.
   firm_rate_entries: (r) => ({ grade: null, origin: "firm_entry", correction_id: null, note: null, quote_id: null, quote_line_id: null, superseded_at: null, superseded_by: null, created_by: null, retired_by: null, retire_reason: null, created_at: stamp(), ...r }),
+  // K11 #4: revisions are ordered by created_at (the database's default now()).
+  boqs: (r) => ({ created_at: stamp(), locked_at: null, ...r }),
+  boq_corrections: (r) => ({ recorded_at: stamp(), origin: "correction", applied_boq_id: null, reverted_at: null, ...r }),
   boq_approvals: (r) => ({ firm_id: null, approved_by: null, client_name: null, client_date: null, note: null, created_at: stamp(), ...r }),
   // 045: quotes and their lines.
   firm_quotes: (r) => ({ supplier_role: "supplier", quote_ref: null, quote_date: null, valid_until: null, currency: "AED", vat_treatment: "excl", rates_are: "net", discount_pct: 0, source_filename: null, source_sha256: null, status: "review", version: 1, supersedes_quote_id: null, created_by: null, created_at: new Date().toISOString(), accepted_at: null, ...r }),

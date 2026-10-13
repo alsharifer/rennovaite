@@ -24,6 +24,7 @@
 
 import { UNPRICED_SOURCE_LABEL } from "@/lib/boq/garden-takeoff";
 import { lineItemKey } from "@/lib/boq/line-identity";
+import { appliedHeadline, basisText, type BasisKind, type CorrectionOrigin } from "@/lib/boq/own-basis-vocab";
 import { chainTotals } from "@/lib/boq/totals";
 import { PUBLIC_SOURCE_LABEL } from "@/lib/ground-truth/villa94-garden";
 import { curateText } from "@/lib/identity/curation";
@@ -49,6 +50,25 @@ export interface ProvLine {
   rate_tier?: string;
   qty_derived?: boolean;
   element_refs?: string[] | null;
+  /** K11 #4 (057): a price added on review / an applied rate correction — its basis and who added it. */
+  price_basis?: OwnBasis;
+  /** K11 #4: an applied quantity correction. */
+  qty_basis?: OwnBasis;
+}
+
+interface OwnBasis {
+  origin: CorrectionOrigin;
+  kind: BasisKind | null;
+  note: string | null;
+  by: string | null;
+  at: string;
+}
+
+/** "Quote from a supplier — Oct 2026 · Price added by Abdallah, 13 Oct 2026". */
+function ownBasisDetail(b: OwnBasis): string {
+  const basis = basisText(b.kind, b.note) ?? "no basis given";
+  const day = b.at ? new Date(b.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dubai" }) : null;
+  return `${basis} · ${appliedHeadline(b.origin, b.by)}${day ? `, ${day}` : ""}`;
 }
 
 export interface ProvBoq {
@@ -92,6 +112,7 @@ interface TierDisplay {
 }
 
 export const TIER_DISPLAY: Record<string, TierDisplay> = {
+  own_price: { name: "Your price", detail: "Priced on review by a member of this project and entered into this revision with its basis — not a rate book.", qs: "Not QS-reviewed by the platform." },
   firm_private: { name: "Private", detail: "The contractor's own rate book — shadows the market reference for this project only.", qs: "Contractor's own rate — not QS-reviewed by the platform." },
   firm_correction: { name: "market_fair", detail: "A market_fair correction by this project's contractor, explicitly promoted into its rate book.", qs: "A reviewed correction — not a QS validation." },
   reference: { name: "actual_transaction", detail: "Calibrated market reference — a rate actually paid on a comparable Dubai project.", qs: "QS validation not recorded." },
@@ -195,7 +216,8 @@ function lineProvenance(line: ProvLine, workSection: string, ctx: ProvenanceCont
   const lump = (line.unit === "project" || line.unit === "lump") && refs.length === 0;
   if (lump && !takeoff) qSteps.push({ kind: "geometry", label: "Project lump", detail: "Priced per project — not measured from a plan element." });
   if (line.qty_derived) flags.add(line.notes?.includes(DERIVED_QTY_NOTE) ? "derived from reference layout" : "quantity inferred");
-  const qTraceable = refs.length > 0 || !!takeoff || lump;
+  if (line.qty_basis) qSteps.push({ kind: "rule", label: "Quantity basis", detail: cur(ownBasisDetail(line.qty_basis)) });
+  const qTraceable = refs.length > 0 || !!takeoff || lump || !!line.qty_basis;
   if (!qTraceable) gaps.push(`${figureRef} quantity: no plan element, take-off derivation or rule on the line`);
 
   // ---- tier → rate
@@ -205,7 +227,9 @@ function lineProvenance(line: ProvLine, workSection: string, ctx: ProvenanceCont
   if (tier) rSteps.push({ kind: "tier", label: tier.name, detail: tier.detail });
   else gaps.push(`${figureRef} rate: resolution tier cannot be established (rule ${line.rule_id ?? "none"}, band ${line.rate_band ?? "none"})`);
   if (line.vendor_or_source) rSteps.push({ kind: "source", label: "Source", detail: cur(line.vendor_or_source) });
-  if (basis) rSteps.push({ kind: "rule", label: "Rate basis", detail: cur(basis) });
+  // A price added on review replaces whatever basis the engine's note gave.
+  if (basis && !line.price_basis) rSteps.push({ kind: "rule", label: "Rate basis", detail: cur(basis) });
+  if (line.price_basis) rSteps.push({ kind: "rule", label: "Rate basis", detail: cur(ownBasisDetail(line.price_basis)) });
   const itemKey = lineItemKey(line);
   let qs = tier?.qs ?? "";
   if (itemKey && (tierKey === "reference" || tierKey === "indicative") && itemKey in ctx.qsValidated) {
