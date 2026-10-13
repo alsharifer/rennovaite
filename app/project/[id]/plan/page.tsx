@@ -18,6 +18,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { GardenSitePanel } from "./_components/garden-site-panel";
 import { PlanLayers } from "./_components/plan-layers";
 import { PlanNotAnalysed } from "./_components/plan-not-analysed";
+import { planGate } from "@/lib/plan/plan-gate";
 
 /** Plan columns this page reads. `source` and the plot dimensions arrive with
  *  migration 031 and are absent (undefined) before it. */
@@ -182,7 +183,10 @@ export default async function PlanPage({
     authored && plan.plot_width_m && plan.plot_depth_m
       ? { width_m: Number(plan.plot_width_m), depth_m: Number(plan.plot_depth_m) }
       : null;
-  const planReady = authored || (plan.parsed_json !== null && roomList.length > 0);
+  // K10 #4: the editor opens whenever the plan has rooms — the SAME list the header counts
+  // (roomList) — or is authored. A parse record is not required: the Demo villa has 13 rooms
+  // and no parsed_json, and used to read "No drawing attached".
+  const planReady = planGate({ authored, roomCount: roomList.length }) === "editor";
   const parsedComplete = planReady;
   const gardenPilot = process.env.GARDEN_PILOT_ENABLED === "true";
 
@@ -240,7 +244,8 @@ export default async function PlanPage({
   const unit = authored ? "zones" : "rooms";
   const meta = [
     `${roomList.length} ${unit} · ${formatM2(totalArea)}`,
-    authored ? (plot ? `drawn on a ${plot.width_m} × ${plot.depth_m} m plot` : "drawn by you") : "parsed from the drawing",
+    // K10: say where the rooms came from — never "parsed from the drawing" when there is no drawing.
+    authored ? (plot ? `drawn on a ${plot.width_m} × ${plot.depth_m} m plot` : "drawn by you") : plan.pdf_url ? "parsed from the drawing" : "no drawing attached",
     meanConfidencePct != null ? `${meanConfidencePct}% avg confidence` : null,
     correctionsTotal != null && correctionsTotal > 0 ? `${correctionsTotal} correction${correctionsTotal === 1 ? "" : "s"}` : null,
   ].filter(Boolean) as string[];
