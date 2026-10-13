@@ -74,10 +74,8 @@ export function TermsPlaceholder() {
           title: "2. The commercial substance",
           body: (
             <ul className="list-disc space-y-1.5 pl-6">
-              <li>
-                The project fee is <strong className="font-semibold">AED 1,000</strong>, charged once when you lock a bill of quantities. It is not a subscription.
-              </li>
-              <li>It is credited in full against your project if you execute through the platform.</li>
+              {/* K8 review (13 Oct): no fee figure is stated until counsel finalises the terms. */}
+              <li>Any fee is shown and agreed before you are charged.</li>
               <li>RenovAIte produces a tender-ready package — designs, an itemised BoQ, drawings and a permit check. It does not carry out construction, and it is not a party to any contract you sign with a contractor.</li>
               <li>Rates are estimates drawn from supplier catalogues and real project quotations. Lines awaiting a quantity surveyor’s review are flagged as such in the BoQ itself.</li>
             </ul>

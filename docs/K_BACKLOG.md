@@ -6,33 +6,36 @@ says where it is and why it waits. Newest first.
 
 ## Found in K8 (2026-10-13) — everything on Blueprint, Dark open
 
-**Decisions for the design owner / Abdallah**
+**Ruled in the K8 review (13 Oct) — #100 approved for squash-merge**
 
-- **PDF typefaces.** resvg (every server-rendered document) reads TTF/OTF
-  only; the app self-hosts woff2, so documents print in Arial / Consolas /
-  Georgia, not Plex / JetBrains Mono / EB Garamond. Fix: commit the OFL TTFs
-  (e.g. `lib/documents/fonts/`) and pass them to resvg (`font.fontFiles`) in
-  `rasteriseA4Pages`, `lib/drawings/export.ts` and the render pack. Needs an
-  OK to add the font files.
-- **Terms placeholder states "project fee AED 1,000"** (`components/blueprint/legal/LegalPlaceholders.tsx`,
-  H6's words) while K8 removed "Project fee" from the UI. Confirm or replace.
-- **Garden timeline.** `lib/timeline` is the interior phase model (82-day
-  reference refit); a garden-only project (Arabella) shows 1–3 weeks while its
-  BoQ carries the G5d programme (90 days scaled). Show the BoQ programme on
-  garden projects, or build a garden phase model.
-- **Supplier choices are a scenario.** `vendor_selections` are saved and the
-  Tender page's live total follows them, but `generate-boq` never reads them.
-  Should chosen suppliers price into the BoQ?
-- **Status hues inside drawings.** Brass / terracotta are still used ~33×
-  inside sheet bodies (demolition marking, derived flags, overlay symbols in
-  `lib/drawings/plan-sheet|demo-sheet|garden-sheets|garden-elevations.ts`).
-  The frame, title block, strip and stamp are ink; the drawing conventions
-  are a separate call.
-- **Headline basis.** Frames print "excl. VAT" beside headline totals; every
-  K8 surface prints the stored grand total "incl. contingency and VAT" (the
-  figure the BoQ pins) and says so. Confirm.
-- **/community and /marketplace** redirect to the projects home (out of every
-  navigation since K2). Delete the routes or keep the redirects.
+- **PDF typefaces → K9.** Add IBM Plex Sans, JetBrains Mono and EB Garamond
+  (OFL) as TTF/OTF with their licence files; every server-rendered document
+  uses them (resvg reads TTF/OTF only — today they print in Arial / Consolas /
+  Georgia).
+- **Terms placeholder → done in #100.** The "project fee is AED 1,000" line
+  (and the line crediting that fee) is replaced by "Any fee is shown and
+  agreed before you are charged." Counsel finalises. The parked, unrouted
+  `components/marketing/home-landing.tsx` still prints "Project fee AED
+  1,000" — fix it if that landing ever returns.
+- **Garden timeline → K9.** Never the interior model for a garden project:
+  show the BoQ programme duration with the derived mark and the basis note
+  "scaled from one real Dubai garden project (~90 days)". Interior unchanged.
+- **Supplier choices into the BoQ → not this cycle.** `vendor_selections` are
+  saved and the Tender page's live total follows them, but `generate-boq`
+  never reads them; the page keeps its "scenario" label. Revisit after the
+  pilot.
+- **Drawings → K9, ink only.** No brass / terracotta inside sheets
+  (`lib/drawings/plan-sheet|demo-sheet|garden-sheets|garden-elevations.ts`,
+  ~33 uses): demolition = dashed, estimated items = hatch + the derived glyph,
+  symbols in ink.
+- **/community and /marketplace → done in #100.** The stub pages are deleted;
+  the 307 redirects to the projects home live in `next.config.ts`.
+- **Also K9**: the proposal reference = a per-firm sequence (e.g.
+  `MFO-P-0001`) stored on the proposal row; the drawing sheet's REV = the BoQ
+  revision the pack was generated from (never "—").
+- **Still open — headline basis.** Frames print "excl. VAT" beside headline
+  totals; every K8 surface prints the stored grand total "incl. contingency
+  and VAT" (the figure the BoQ pins) and says so. Not ruled; unchanged.
 
 **Not built (shown honestly, or left out, with the reason)**
 

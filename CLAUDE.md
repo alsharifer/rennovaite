@@ -188,7 +188,7 @@ except `design-refs/r7-handoff/`.
   `<StateBlock kind>` (empty / loading / error / gate / pending) +
   `SkeletonRows`, and the `<RegenerateControl>` shell (wired in K3).
 - **Route triage (spec §3.10)**: Marketplace and Community are out of every
-  navigation (routes remain); `/firms` goes straight to the book when the
+  navigation and have no page (K8 review: 307s to `/projects` in `next.config.ts`); `/firms` goes straight to the book when the
   caller has one firm; `/settings` is Account · Appearance · Firm.
 
 ### BoQ & Review (K3)

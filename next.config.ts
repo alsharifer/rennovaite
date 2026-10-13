@@ -20,6 +20,11 @@ const nextConfig: NextConfig = {
       { source: "/project/:id/ideation", destination: "/project/:id/design", permanent: true },
       { source: "/project/:id/style", destination: "/project/:id/design", permanent: true },
       { source: "/project/:id/moodboard", destination: "/project/:id/design?view=references", permanent: true },
+      // K8 review (13 Oct): Marketplace and Community have no page — cut from
+      // navigation since K2, no frame in J6. Temporary (307), so either can come
+      // back; the destination is SIGNED_IN_HOME (lib/auth/link-error.ts).
+      { source: "/marketplace", destination: "/projects", permanent: false },
+      { source: "/community", destination: "/projects", permanent: false },
     ];
   },
 };

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { createElement } from "react";
@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { StepList, stepAccessibleName, type RailStep } from "@/components/blueprint/shell/StepList";
 import { summarizeChanges } from "@/lib/boq/changes-since";
+import { SIGNED_IN_HOME } from "@/lib/auth/link-error";
 import { FIRM_STEPS, OWNER_STEPS, activeStepKey } from "@/lib/journey";
 import { firmStepStatuses, ownerStepStatuses, type JourneyFacts, type PlanBlock } from "@/lib/journey-state";
 
@@ -261,10 +262,13 @@ describe("chrome wiring + route triage (spec §3.10)", () => {
     expect(read("app/project/[id]/loading.tsx")).toContain("ShellSkeleton");
   });
 
-  it("Marketplace and Community are cut from navigation and (K8, no frame) redirect to the Projects home", () => {
+  it("Marketplace and Community are cut from navigation, have no page, and redirect (307) to the Projects home", () => {
     expect(read("components/blueprint/shell/JourneyRail.tsx")).not.toMatch(/\/(marketplace|community)/);
     expect(read("components/marketing/TopNav.tsx")).not.toContain('"/marketplace"');
-    for (const f of ["app/marketplace/page.tsx", "app/community/page.tsx"]) expect(read(f), f).toContain("redirect(SIGNED_IN_HOME)");
+    for (const r of ["marketplace", "community"]) {
+      expect(existsSync(path.join(process.cwd(), "app", r, "page.tsx")), r).toBe(false);
+      expect(read("next.config.ts")).toContain(`{ source: "/${r}", destination: "${SIGNED_IN_HOME}", permanent: false }`);
+    }
   });
 
   it("/support opens the help drawer; /firms goes straight to a single firm's book", () => {
