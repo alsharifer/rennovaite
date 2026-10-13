@@ -37,7 +37,7 @@ try {
   check("overlap list: 12 pairs, largest first", (await q(`document.querySelectorAll('[data-testid="overlap-list"] li').length`)) === 12);
   check("canvas: 12 shapes of floor counted twice, and the legend", (await q(`document.querySelectorAll('[data-overlap-fill] polygon').length`)) >= 12 && (await q(`!!document.querySelector('[data-overlap-legend]')`)));
   const blocked = await q(`[...document.querySelectorAll('[data-step][data-state="blocked"]')].map((a) => a.getAttribute('data-step')).join(",")`);
-  check("rail: downstream blocked by the plan", /costing|boq_review/.test(blocked), blocked);
+  check("rail: downstream blocked by the plan", /\b(cost|tender|boq_review)\b/.test(blocked), blocked);
   check("the mock 'Worth a second look' card is gone", !(await q(`document.body.textContent.includes("Worth a second look")`)));
   check("Save changes is disabled with its reason until something changes", (await q(`document.querySelector('[data-testid="plan-save"]')?.getAttribute('aria-disabled')`)) === "true");
   if (SHOTS) await b.screenshot(`${SHOTS}/k5-plan-overlaps.png`);
@@ -52,7 +52,7 @@ try {
   check("saved → the panel reads 'can be priced'", await b.until(`document.querySelector('[data-plan-check]')?.getAttribute('data-plan-check') === "clean"`, 60000), await q(`document.querySelector('[data-plan-check]')?.textContent.slice(0, 160)`));
   await b.goto(url, "[data-plan-check]");
   const after = await q(`[...document.querySelectorAll('[data-step][data-state="blocked"]')].map((a) => a.getAttribute('data-step')).join(",")`);
-  check("rail: costing no longer blocked by the plan", !/costing|boq_review/.test(after), after || "none blocked");
+  check("rail: costing no longer blocked by the plan", !/\b(cost|tender|boq_review)\b/.test(after), after || "none blocked");
   if (SHOTS) await b.screenshot(`${SHOTS}/k5-plan-clean.png`);
 } finally {
   await b.close();

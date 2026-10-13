@@ -24,11 +24,25 @@ import {
   type RawRoomInput,
 } from "@/lib/overlays/viewbox";
 
-const BONE = "#EDE6D8";
-const OPEN_ZONE = "#DCE3D2";
-const INK_900 = "#0F1B2D";
-const INK_500 = "#64748b";
-const BRASS = "#A4793A";
+import { Icon } from "@/components/blueprint/Icon";
+
+import {
+  CANVAS_FRAME,
+  CAPTION,
+  CHIP_BTN,
+  chipState,
+  INSPECTOR_BAR,
+  LABEL,
+  NUM_FIELD,
+  SMALL_BTN,
+  SVG,
+  TAG,
+  TOOL_BTN,
+} from "./editor-chrome";
+
+// K8 (Blueprint): runs draw in ink on the canvas — the kind is told by its code
+// label and line weight, a selection by the brass line. (The per-kind colours in
+// LINEAR_ELEMENT_META stay the drawing sheets' own; the editor is chrome.)
 
 /** G5: an existing footprint drawn under the plan (house, garage, boundary wall). */
 export interface ContextOutline {
@@ -278,7 +292,7 @@ export function ElementsEditor({
     <div className="space-y-3">
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="label-caps mr-1 text-bp-ink-secondary">Draw:</span>
+          <span className={`${LABEL} mr-1`}>Draw</span>
           {LINEAR_ELEMENT_KINDS.map((k) => {
             const meta = LINEAR_ELEMENT_META[k];
             const active = kind === k;
@@ -291,24 +305,20 @@ export function ElementsEditor({
                   setCursor(null);
                   setKind((cur) => (cur === k ? null : k));
                 }}
-                className={
-                  "focus-ring inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[12px] transition-colors " +
-                  (active
-                    ? "border-brass-600 bg-primary-fixed/40 text-ink-900"
-                    : "border-ink-100 bg-paper text-ink-700 hover:bg-surface-container")
-                }
+                aria-pressed={active}
+                className={`${CHIP_BTN} ${chipState(active)}`}
                 title={meta.boqDescription}
               >
-                <span className="font-mono font-semibold" style={{ color: meta.color }}>
+                <span className="t-num-sm text-bp-ink-primary">
                   {meta.code}
                 </span>
                 {meta.label}
               </button>
             );
           })}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
             {kind && (
-              <span className="text-[12px] text-brass-600">
+              <span className="t-label-md text-bp-ink-primary" aria-live="polite">
                 Click to add points · Enter to finish · Esc to cancel
               </span>
             )}
@@ -316,7 +326,7 @@ export function ElementsEditor({
               type="button"
               onClick={deleteSelected}
               disabled={!selectedId}
-              className="focus-ring rounded-lg border border-ink-100 bg-paper px-3 py-1 text-[12px] text-ink-900 transition-colors hover:bg-surface-container disabled:opacity-40"
+              className={TOOL_BTN}
             >
               Delete selected
             </button>
@@ -339,8 +349,8 @@ export function ElementsEditor({
       {/* Properties for the selected run. Today the only property that changes
           a price is the counter variant, so that is what this holds. */}
       {!readOnly && selected?.kind === "counter_run" && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-ink-100 bg-canvas px-md py-sm">
-          <span className="label-caps text-bp-ink-secondary">Counter type:</span>
+        <div className={INSPECTOR_BAR}>
+          <span className={LABEL}>Counter type</span>
           {COUNTER_VARIANTS.map((v) => {
             const active = selected.variant === v.value;
             return (
@@ -350,27 +360,22 @@ export function ElementsEditor({
                 onClick={() => setVariant(selected.id, v.value)}
                 aria-pressed={active}
                 title={v.hint}
-                className={
-                  "focus-ring rounded-lg border px-2 py-1 text-[12px] transition-colors " +
-                  (active
-                    ? "border-brass-600 bg-primary-fixed/40 font-semibold text-ink-900"
-                    : "border-ink-100 bg-paper text-ink-700 hover:bg-surface-container")
-                }
+                className={`${CHIP_BTN} ${chipState(active)}`}
               >
                 {v.label}
               </button>
             );
           })}
           {needsVariant(selected) && (
-            <span className="flex items-center gap-1 text-[12px] text-[#9A3412]">
-              <span className="inline-block h-2 w-2 rounded-full bg-[#C2410C]" aria-hidden="true" />
+            <span className="flex items-center gap-1.5 t-body-sm text-bp-ink-primary">
+              <Icon name="flag" className="text-[16px] text-bp-ink-secondary" />
               Not chosen — priced as a bar counter and flagged on the BoQ.
             </span>
           )}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-ink-100 bg-paper">
+      <div className={CANVAS_FRAME}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
@@ -389,9 +394,9 @@ export function ElementsEditor({
                 key={`ctx-${c.id}`}
                 pointerEvents="none"
                 points={pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
-                fill={c.kind === "existing_building" ? "#D9D6CF" : "#8A8F98"}
-                fillOpacity={c.kind === "existing_building" ? 0.7 : 0.9}
-                stroke="#6B7280"
+                fill={c.kind === "existing_building" ? SVG.contextBuilding : SVG.contextWall}
+                fillOpacity={c.kind === "existing_building" ? 0.5 : 0.6}
+                stroke={SVG.inkTertiary}
                 strokeWidth={1}
               />
             );
@@ -407,9 +412,9 @@ export function ElementsEditor({
               <g key={r.id} pointerEvents="none">
                 <polygon
                   points={r.pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
-                  fill={open ? OPEN_ZONE : BONE}
+                  fill={open ? SVG.openFill : SVG.roomFill}
                   fillOpacity={0.35}
-                  stroke={INK_900}
+                  stroke={SVG.ink}
                   strokeOpacity={open ? 0.4 : 0.5}
                   strokeDasharray={open ? "6 4" : undefined}
                   strokeWidth={1}
@@ -419,8 +424,8 @@ export function ElementsEditor({
                   y={cy}
                   textAnchor="middle"
                   fontSize="12"
-                  fill={INK_500}
-                  style={{ fontFamily: "var(--font-inter), sans-serif" }}
+                  fill={SVG.inkTertiary}
+                  style={{ fontFamily: SVG.sans }}
                 >
                   {r.name_en}
                 </text>
@@ -450,7 +455,7 @@ export function ElementsEditor({
                 <polyline
                   points={pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
                   fill="none"
-                  stroke={selected ? BRASS : meta.color}
+                  stroke={selected ? SVG.brass : SVG.ink}
                   strokeWidth={el.kind === "boundary_wall" ? 6 : 4}
                   strokeOpacity={el.site_reference && (el.disposition === "remove" || typeof el.spec?.replaced_by === "string") ? 0.3 : selected ? 1 : 0.85}
                   strokeDasharray={el.site_reference ? "5 4" : undefined}
@@ -463,9 +468,9 @@ export function ElementsEditor({
                   textAnchor="middle"
                   fontSize="11"
                   fontWeight={600}
-                  fill={selected ? BRASS : meta.color}
+                  fill={SVG.ink}
                   pointerEvents="none"
-                  style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}
+                  style={{ fontFamily: SVG.mono }}
                 >
                   {meta.code} {el.dims_derived ? "≈ " : ""}{lengthLabel(el.polyline)}{el.site_reference ? " · existing" : ""}
                 </text>
@@ -482,7 +487,7 @@ export function ElementsEditor({
                   .map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`)
                   .join(" ")}
                 fill="none"
-                stroke={LINEAR_ELEMENT_META[kind].color}
+                stroke={SVG.ink}
                 strokeWidth={3}
                 strokeDasharray="6 4"
               />
@@ -492,7 +497,7 @@ export function ElementsEditor({
                   cx={p[0]}
                   cy={p[1]}
                   r={4}
-                  fill={LINEAR_ELEMENT_META[kind].color}
+                  fill={SVG.ink}
                 />
               ))}
             </g>
@@ -500,7 +505,7 @@ export function ElementsEditor({
         </svg>
       </div>
 
-      <p className="text-xs text-bp-ink-secondary">
+      <p className={CAPTION} {...(error ? { role: "alert" } : {})}>
         {loading
           ? "Loading elements…"
           : error
@@ -543,33 +548,33 @@ function RunInspector({
   const [h, setH] = useState(el.height_mm ?? meta.defaultHeightMm);
   const [w, setW] = useState(el.width_mm ?? meta.defaultWidthMm);
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-ink-100 bg-canvas px-md py-sm text-[12px] text-ink-700">
-      <span className="font-semibold text-ink-900">{name}</span>
-      <span className="font-mono tabular-nums">{length}</span>
+    <div className={INSPECTOR_BAR}>
+      <span className="t-nav-item-active text-bp-ink-primary">{name}</span>
+      <span className="t-num-sm text-bp-ink-primary">{length}</span>
       {readOnly ? (
-        <span className="font-mono tabular-nums">
+        <span className="t-num-sm">
           H {el.height_mm ?? "—"} · W {el.width_mm ?? "—"} mm
         </span>
       ) : (
         <>
-          <label className="flex items-center gap-1">
-            <span className="text-bp-ink-secondary">H</span>
-            <input type="number" step={10} value={h} onChange={(e) => setH(Number(e.target.value))} className="focus-ring w-[70px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums" />
+          <label className="flex items-center gap-1.5">
+            <span className="t-label-md text-bp-ink-tertiary">H</span>
+            <input type="number" step={10} value={h} onChange={(e) => setH(Number(e.target.value))} className={NUM_FIELD} />
           </label>
-          <label className="flex items-center gap-1">
-            <span className="text-bp-ink-secondary">W</span>
-            <input type="number" step={10} value={w} onChange={(e) => setW(Number(e.target.value))} className="focus-ring w-[70px] rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-right font-mono tabular-nums" />
+          <label className="flex items-center gap-1.5">
+            <span className="t-label-md text-bp-ink-tertiary">W</span>
+            <input type="number" step={10} value={w} onChange={(e) => setW(Number(e.target.value))} className={NUM_FIELD} />
           </label>
-          <span className="text-bp-ink-secondary">mm</span>
-          <button type="button" onClick={() => onSection(h, w)} className="focus-ring rounded border border-ink-100 bg-paper px-2 py-0.5 font-medium text-ink-900 hover:bg-surface-container">
+          <span className="t-label-md text-bp-ink-tertiary">mm</span>
+          <button type="button" onClick={() => onSection(h, w)} className={SMALL_BTN}>
             Set section
           </button>
         </>
       )}
-      {el.derived && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Section assumed</span>}
-      {el.dims_derived && <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]">Position derived</span>}
+      {el.derived && <span className={TAG}>Section assumed</span>}
+      {el.dims_derived && <span className={TAG}>Position derived</span>}
       {el.site_reference && (
-        <span className="rounded-full border border-brass-600 px-2 py-0.5 font-medium text-brass-600">
+        <span className={TAG}>
           Existing · {el.disposition ?? "undecided"}
         </span>
       )}

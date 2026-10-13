@@ -100,6 +100,8 @@ export type JobProgress = "queued" | "running" | "done" | "failed" | "blocked";
 
 export interface BatchEvent {
   room_id: string;
+  /** G4b scene jobs: the camera — a garden zone can have several (K8: the studio keys rows by it). */
+  camera_id?: string;
   view: RenderView;
   state: JobProgress;
   error?: string;
@@ -149,13 +151,14 @@ async function runPool(
   const queue = [...jobs];
   const worker = async () => {
     for (let job = queue.shift(); job; job = queue.shift()) {
-      onEvent({ room_id: job.room_id, view: job.view, state: "running" });
+      onEvent({ room_id: job.room_id, camera_id: job.camera_id, view: job.view, state: "running" });
       try {
         const result = await runJob(projectId, job);
-        onEvent({ room_id: job.room_id, view: job.view, state: "done", result });
+        onEvent({ room_id: job.room_id, camera_id: job.camera_id, view: job.view, state: "done", result });
       } catch (e) {
         onEvent({
           room_id: job.room_id,
+          camera_id: job.camera_id,
           view: job.view,
           state: "failed",
           error: e instanceof Error ? e.message : String(e),
@@ -186,7 +189,7 @@ export async function runBatch(
   const second = await fetchBatchPlan(projectId);
   onPlan(second);
   for (const j of second.jobs.filter((x) => x.view === "evening" && x.status === "blocked")) {
-    onEvent({ room_id: j.room_id, view: "evening", state: "blocked", error: j.reason ?? undefined });
+    onEvent({ room_id: j.room_id, camera_id: j.camera_id, view: "evening", state: "blocked", error: j.reason ?? undefined });
   }
   await runPool(projectId, second.jobs.filter((j) => j.view === "evening" && j.status === "queued"), second.cap, onEvent);
 }

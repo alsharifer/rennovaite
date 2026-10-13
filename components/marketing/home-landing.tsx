@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { WatchDemoButton } from "@/app/_components/watch-demo";
-import { journeyFlagsFromEnv, journeySteps } from "@/lib/journey";
+import { OWNER_STEPS } from "@/lib/journey";
 import { Footer } from "@/components/marketing/Footer";
 import { TopNav } from "@/components/marketing/TopNav";
 
@@ -39,7 +39,7 @@ const STATS = [
 export function HomeLanding() {
   // Flag-aware: journeySteps() drops any step this deployment does not have and
   // renumbers what remains, so the count below is always what a user will meet.
-  const steps = journeySteps(journeyFlagsFromEnv());
+  const steps = OWNER_STEPS;
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -130,13 +130,7 @@ export function HomeLanding() {
               >
                 <div className="flex items-center gap-sm">
                   <span className="font-mono text-body-sm tabular-nums text-brass-600">
-                    {String(step.number).padStart(2, "0")}
-                  </span>
-                  <span
-                    className="material-symbols-outlined text-[22px] text-brass-600"
-                    aria-hidden="true"
-                  >
-                    {step.glyph}
+                    {step.number}
                   </span>
                 </div>
                 <h3 className="font-display text-headline-md text-ink-900">

@@ -19,7 +19,8 @@ import { useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { RailContext } from "@/lib/journey-state";
 
 import { Icon } from "../Icon";
-import { openHelp, revLine } from "./JourneyRail";
+import { openHelp } from "./JourneyRail";
+import { revLine } from "./rev-line";
 import { StepList, type RailStep } from "./StepList";
 
 const ACTIONS_ID = "bp-topbar-actions";
@@ -37,7 +38,8 @@ export function TopBarActions({ children }: { children: ReactNode }) {
 export function TopBar({ ctx, steps, activeKey, pageTitle }: { ctx: RailContext; steps: RailStep[]; activeKey: string | null; pageTitle: string | null }) {
   const drawer = useRef<HTMLDialogElement>(null);
   const active = steps.find((s) => s.key === activeKey) ?? null;
-  const here = active ? `${active.number} ${active.label}` : (pageTitle ?? "");
+  // A page title names a page that is not a step (a side surface keeps the rail's step lit).
+  const here = pageTitle ?? (active ? `${active.number} ${active.label}` : "");
   const crumbs = [ctx.persona === "firm" ? ctx.firm?.name : null, ctx.project?.name, here].filter((c): c is string => !!c);
 
   return (

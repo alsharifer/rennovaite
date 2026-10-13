@@ -26,9 +26,8 @@ if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 
 const PAGES = [
   ["specification", `/project/${id}/accessories`],
-  ["ideation", `/project/${id}/ideation`],
-  ["moodboard", `/project/${id}/moodboard`],
-  ["style", `/project/${id}/style`],
+  ["design", `/project/${id}/design`],
+  ["references", `/project/${id}/design?view=references`],
   ["render", `/project/${id}/render`],
   ["scope-timeline", `/project/${id}/timeline`],
   ["vendors", `/project/${id}/vendors`],

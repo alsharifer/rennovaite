@@ -53,8 +53,8 @@ export function codeLandingRedirect(url: URL): string | null {
   return `/auth/callback?code=${encodeURIComponent(code)}`;
 }
 
-/** Where a signed-in visitor to `/` or `/auth` goes — the auth callback's default too. */
-export const SIGNED_IN_HOME = "/project";
+/** The Projects home (K8 §6.1): where a signed-in visitor to `/` or `/auth` goes — the auth callback's default too. */
+export const SIGNED_IN_HOME = "/projects";
 
 /**
  * THE post-sign-in destination — the one rule the auth callback, /auth, `/`

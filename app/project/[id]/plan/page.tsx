@@ -5,9 +5,9 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/blueprint/Button";
 import { Icon } from "@/components/blueprint/Icon";
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
+import { PlanRoomFocus } from "@/components/blueprint/plan/PlanRoomFocus";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
-import { AtelierCanvas } from "@/components/blueprint/shell/ShellFrame";
-import { FIRM_STEPS, journeyFlagsFromEnv, journeySteps } from "@/lib/journey";
+import { FIRM_STEPS, OWNER_STEPS } from "@/lib/journey";
 import { stepEyebrow } from "@/lib/journey-eyebrow";
 import { disputesFromParsedJson, resolveDisputes } from "@/lib/parse/disputes";
 import { planCheck, planCheckSentence } from "@/lib/plan/plan-check";
@@ -64,10 +64,13 @@ function formatM2(n: number | null | undefined): string {
 
 export default async function PlanPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ room?: string }>;
 }) {
   const { id: projectId } = await params;
+  const { room: focusRoomId } = await searchParams;
   const supabase = getSupabaseAdmin();
 
   const { data: project, error: projectErr } = await supabase
@@ -228,15 +231,11 @@ export default async function PlanPage({
   const check = planCheck(roomList.filter((r) => !removedIds.has(r.id)).map((r) => ({ id: r.id, name: r.name_en ?? "Room", polygon: r.polygon })));
   const rail = await loadProjectRail(projectId);
   const persona = rail?.persona ?? "owner";
-  const flags = journeyFlagsFromEnv();
-  const stepDefs =
-    persona === "firm"
-      ? FIRM_STEPS.map((s) => ({ key: s.key as string, name: `${s.number} ${s.label}` }))
-      : journeySteps(flags).map((s) => ({ key: s.key as string, name: `${String(s.number).padStart(2, "0")} ${s.label}` }));
+  const stepDefs = (persona === "firm" ? FIRM_STEPS : OWNER_STEPS).map((s) => ({ key: s.key as string, name: `${s.number} ${s.label}` }));
   const blocked = check.pairs.length
     ? stepDefs.filter((s) => rail?.statuses[s.key]?.state === "blocked" && /overlap/i.test(rail?.statuses[s.key]?.reason ?? "")).map((s) => ({ step: s.name, reason: rail!.statuses[s.key]!.reason! }))
     : [];
-  const eyebrow = stepEyebrow(persona, "scope", "layout", flags, "Plan");
+  const eyebrow = stepEyebrow(persona, "scope", "plan", "Plan");
   const totalArea = plan.total_area_m2 ?? null;
   const unit = authored ? "zones" : "rooms";
   const meta = [
@@ -248,10 +247,11 @@ export default async function PlanPage({
   const next =
     persona === "firm"
       ? { label: "Continue to 03 Specification", href: `/project/${projectId}/accessories` }
-      : { label: "Continue to style", href: `/project/${projectId}/style` };
+      : { label: "Continue to design", href: `/project/${projectId}/design` };
 
   return (
     <div className="mx-auto max-w-[1600px] px-6 py-8 pb-16 lg:px-10" data-plan-page>
+      {focusRoomId ? <PlanRoomFocus roomId={focusRoomId} /> : null}
       <p className="t-label-caps text-bp-brass-text">{eyebrow}</p>
       <h1 className="t-heading-lg mt-2 text-bp-ink-primary">{authored ? "Your plan, as you draw it" : "The plan, as parsed"}</h1>
       <p className="t-label-md mt-2 font-bp-mono text-bp-ink-secondary">{meta.join(" · ")}</p>
@@ -277,9 +277,7 @@ export default async function PlanPage({
             </div>
             {gardenSite ? (
               <div className="mt-6">
-                <AtelierCanvas>
-                  <GardenSitePanel projectId={projectId} planId={plan.id} draft={gardenSite.draft} items={gardenSite.items} zones={gardenSite.zones} untypedCounters={gardenSite.untypedCounters} />
-                </AtelierCanvas>
+                <GardenSitePanel projectId={projectId} planId={plan.id} draft={gardenSite.draft} items={gardenSite.items} zones={gardenSite.zones} untypedCounters={gardenSite.untypedCounters} />
               </div>
             ) : null}
           </section>
@@ -340,15 +338,13 @@ export default async function PlanPage({
         </div>
       ) : (
         <div className="mt-6">
-          <AtelierCanvas>
-            <PlanNotAnalysed planId={plan.id} hasDrawing={Boolean(plan.pdf_url)} parseRan={plan.parsed_json !== null} canDraw={gardenPilot} />
-          </AtelierCanvas>
+          <PlanNotAnalysed planId={plan.id} hasDrawing={Boolean(plan.pdf_url)} parseRan={plan.parsed_json !== null} canDraw={gardenPilot} />
         </div>
       )}
 
       {parsedComplete ? (
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-bp-line-hairline pt-5">
-          <Button kind="secondary" href={authored ? "/my-projects" : "/project/new"}>
+          <Button kind="secondary" href={authored ? "/projects" : "/project/new"}>
             {authored ? "Back to projects" : "Back to upload"}
           </Button>
           <Button kind="primary" href={next.href}>

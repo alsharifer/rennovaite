@@ -6,7 +6,10 @@
 // Firm persona: wordmark · firm switcher · project switcher (rev + date) ·
 // FIRM JOURNEY 00–08 · footer (Firm rate book, Settings, Support, Theme,
 // account). Owner persona: wordmark · MY HOME switcher · YOUR RENOVATION ·
-// footer (Support, Theme, Account). Width / compact / phone are CSS (the
+// footer (Support, Theme, Account). No project (K8, "Rail · No project" 52:278
+// — the Projects home, settings, rate books): wordmark · firm switcher (firm
+// users only) · "Projects" · footer; the page's own footer item is the active
+// one (brass left rule + raised wash, like a step). Width / compact / phone are CSS (the
 // .bp-shell rules in app/globals.css): compact hides every .bp-rail-x element
 // and shows .bp-rail-c, and hover / focus expands it as an overlay.
 //
@@ -18,22 +21,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { signOut } from "@/app/_actions/sign-out";
-import type { RailContext, RailProject } from "@/lib/journey-state";
+import { SIGNED_IN_HOME } from "@/lib/auth/link-error";
+import type { RailContext } from "@/lib/journey-state";
 
 import { Icon } from "../Icon";
 import { THEME_LABEL, ThemeSwitch, useThemePref } from "../ThemeSwitch";
+import { revLine } from "./rev-line";
 import { StepList, type RailStep } from "./StepList";
 
 export const HELP_EVENT = "bp:help";
 export const openHelp = () => window.dispatchEvent(new Event(HELP_EVENT));
 
-const revDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dubai" });
-export const revLine = (p: RailProject | null) => (p?.rev && p.revAt ? `rev ${p.rev} · ${revDate(p.revAt)}` : "no BoQ yet");
 
 /** The same page on another project, when the path is project-scoped. */
 function onProject(pathname: string, from: string | null, to: string): string {
   if (from && pathname.startsWith(`/project/${from}`)) return `/project/${to}${pathname.slice(`/project/${from}`.length)}`;
   return `/project/${to}`;
+}
+
+/** A rail link; the current one wears the step's active treatment (brass 2 px left rule + raised wash). */
+function railItem(active: boolean, base: string): string {
+  return `${base} relative ${active ? "t-nav-item-active bg-bp-surface-raised text-bp-ink-primary before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-bp-brass" : "t-nav-item text-bp-ink-secondary hover:bg-bp-surface-raised hover:text-bp-ink-primary"}`;
 }
 
 function Switcher({ eyebrow, title, sub, icon, children }: { eyebrow: string; title: string; sub?: string; icon: string; children: React.ReactNode }) {
@@ -64,7 +72,7 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
   return (
     <aside className="bp-rail flex flex-col overflow-y-auto overflow-x-hidden border-r border-bp-line-strong bg-bp-surface-base" aria-label="Navigation">
       <div className="flex h-16 shrink-0 items-center border-b border-bp-line-hairline px-6">
-        <Link href={ctx.project ? `/project/${ctx.project.id}` : "/dashboard"} className="t-heading-md font-bp-mono text-bp-ink-primary" aria-label="RenovAIte — home">
+        <Link href={ctx.project ? `/project/${ctx.project.id}` : SIGNED_IN_HOME} className="t-heading-md font-bp-mono text-bp-ink-primary" aria-label="RenovAIte — home">
           <span className="bp-rail-x">RenovAIte</span>
           <span className="bp-rail-c -ml-2">AI</span>
         </Link>
@@ -81,7 +89,7 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
         </Switcher>
       ) : null}
 
-      {ctx.projects.length > 0 || ctx.project ? (
+      {ctx.project ? (
         <Switcher eyebrow={firm ? "Project" : "My home"} title={ctx.project?.name ?? "Choose a project"} sub={ctx.project ? revLine(ctx.project) : undefined} icon="unfold_more">
           <p className="t-label-caps px-4 pb-1 pt-1 text-bp-ink-tertiary">{firm ? "Projects" : "Your homes"}</p>
           {ctx.projects.map((p) => (
@@ -97,7 +105,14 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
         </Switcher>
       ) : null}
 
-      {steps.length > 0 ? (
+      {!ctx.project && pathname !== "/project/new" ? (
+        <nav aria-label="Projects" className="flex-1 py-2">
+          <Link href={SIGNED_IN_HOME} aria-label="Projects" aria-current={pathname === SIGNED_IN_HOME ? "page" : undefined} className={railItem(pathname === SIGNED_IN_HOME, "flex items-center gap-3 px-6 py-2.5")}>
+            <Icon name="folder_open" className="bp-rail-c text-[18px]" />
+            <span className="bp-rail-x">Projects</span>
+          </Link>
+        </nav>
+      ) : steps.length > 0 ? (
         <nav aria-label={firm ? "Firm journey" : "Your renovation"} className="flex-1 py-2">
           <p className="t-label-caps bp-rail-x px-6 pb-2 pt-3 text-bp-ink-tertiary">{firm ? "Firm journey" : "Your renovation"}</p>
           <StepList steps={steps} activeKey={activeKey} />
@@ -108,12 +123,12 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
 
       <div className="border-t border-bp-line-hairline py-2">
         {firm && ctx.firm ? (
-          <Link href={`/firms/${ctx.firm.id}`} className="t-nav-item flex items-center gap-3 px-6 py-2 text-bp-ink-secondary hover:bg-bp-surface-raised hover:text-bp-ink-primary" aria-label="Firm rate book">
+          <Link href={`/firms/${ctx.firm.id}`} aria-current={!ctx.project && pathname.startsWith("/firms") ? "page" : undefined} className={railItem(!ctx.project && pathname.startsWith("/firms"), "flex items-center gap-3 px-6 py-2")} aria-label="Firm rate book">
             <Icon name="menu_book" className="text-[18px]" />
             <span className="bp-rail-x">Firm rate book</span>
           </Link>
         ) : null}
-        <Link href="/settings" className="t-nav-item flex items-center gap-3 px-6 py-2 text-bp-ink-secondary hover:bg-bp-surface-raised hover:text-bp-ink-primary" aria-label="Settings">
+        <Link href="/settings" aria-current={pathname.startsWith("/settings") ? "page" : undefined} className={railItem(pathname.startsWith("/settings"), "flex items-center gap-3 px-6 py-2")} aria-label="Settings">
           <Icon name="settings" className="text-[18px]" />
           <span className="bp-rail-x">Settings</span>
         </Link>

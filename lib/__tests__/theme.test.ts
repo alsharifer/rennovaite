@@ -32,13 +32,14 @@ describe("theme preference", () => {
   });
 });
 
-describe("the K5 gate — everyone gets Light until the page bodies are converted", () => {
-  it("is closed: the inlined script ignores a stored Dark / System, and only Light is offered", () => {
-    expect(THEME_CHOICES_OPEN).toBe(false); // K5 flips this
-    expect(OFFERED_THEME_PREFS).toEqual(["light"]);
-    expect(THEME_NO_FLASH_SCRIPT).toBe(themeNoFlashScript(false));
-    expect(runScript(`${THEME_COOKIE}=dark`, false, THEME_NO_FLASH_SCRIPT).attrs).toEqual({ "data-theme": "light", "data-theme-pref": "light" });
-    expect(runScript(`${THEME_COOKIE}=system`, true, THEME_NO_FLASH_SCRIPT).attrs["data-theme"]).toBe("light");
+describe("the gate — open since K8 Part 3 (no Atelier page left)", () => {
+  it("is open: the inlined script honours a stored Dark / System, and all three are offered", () => {
+    expect(THEME_CHOICES_OPEN).toBe(true);
+    expect(OFFERED_THEME_PREFS).toEqual(["light", "dark", "system"]);
+    expect(THEME_NO_FLASH_SCRIPT).toBe(themeNoFlashScript(true));
+    expect(runScript(`${THEME_COOKIE}=dark`, false, THEME_NO_FLASH_SCRIPT).attrs).toEqual({ "data-theme": "dark", "data-theme-pref": "dark" });
+    expect(runScript(`${THEME_COOKIE}=system`, true, THEME_NO_FLASH_SCRIPT).attrs["data-theme"]).toBe("dark");
+    expect(runScript("", true, THEME_NO_FLASH_SCRIPT).attrs["data-theme"]).toBe("light"); // no cookie: Light, not the OS
   });
 });
 

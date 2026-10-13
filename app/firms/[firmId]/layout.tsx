@@ -8,7 +8,7 @@ import { AccountShell } from "@/components/blueprint/shell/ProjectShell";
 export default async function Layout({ children, params }: { children: ReactNode; params: Promise<{ firmId: string }> }) {
   const { firmId } = await params;
   return (
-    <AccountShell firmId={firmId} content="blueprint">
+    <AccountShell firmId={firmId}>
       {children}
     </AccountShell>
   );

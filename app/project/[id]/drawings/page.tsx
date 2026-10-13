@@ -11,7 +11,7 @@ import { preflightChecklist } from "@/lib/documents/pack-export/preflight";
 import { generateDrawingSet } from "@/lib/drawings/export";
 import { loadBookAttention } from "@/lib/firms/book-view";
 import { curateBoq, loadWithheldNames } from "@/lib/identity/curation";
-import { journeyFlagsFromEnv } from "@/lib/journey";
+import { StepTabs } from "@/components/blueprint/shell/StepTabs";
 import { stepEyebrow } from "@/lib/journey-eyebrow";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import { derivePlanGraph } from "@/lib/plan/derive";
@@ -149,7 +149,7 @@ export default async function DrawingsPage({
   }
 
   const isGardenSet = !!set?.sheets.some((s) => s.kind === "site_plan");
-  const eyebrow = stepEyebrow(persona, "documents", "downloads", journeyFlagsFromEnv(), "Documents");
+  const eyebrow = stepEyebrow(persona, "documents", "tender", "Documents");
   const checkedAt = new Date()
     .toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Dubai" })
     .replace(",", "")
@@ -164,6 +164,10 @@ export default async function DrawingsPage({
           ? `Every document leaves through one gate. Drawings, renders and BoQ are checked together${rev ? ` against rev ${rev}` : ""}; nothing downloads until its checks pass.`
           : "Deterministic, dimensioned drawings derived from your plan geometry — no AI in this output."}
       </p>
+      {/* K8 §6.0: owner 06 Tender = Documents | Contractors & suppliers. */}
+      <div className="mt-6">
+        <StepTabs step="tender" projectId={projectId} active="documents" persona={persona} meta={{ documents: "drawings · cost · tender pack" }} />
+      </div>
 
       {error || !set || set.sheets.length === 0 ? (
         <div className="mt-8 max-w-[720px]">

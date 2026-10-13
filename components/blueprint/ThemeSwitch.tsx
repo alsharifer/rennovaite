@@ -34,7 +34,7 @@ export function ThemeSwitch({ className }: { className?: string }) {
   return (
     <fieldset className={`flex items-center gap-3 border-0 p-0${className ? ` ${className}` : ""}`}>
       <legend className="t-label-caps float-left mr-2 text-bp-ink-tertiary">Theme</legend>
-      {/* Dark and System are hidden until K5 (lib/theme.ts THEME_CHOICES_OPEN). */}
+      {/* Light / Dark / System (lib/theme.ts OFFERED_THEME_PREFS; the gate opened in K8 Part 3). */}
       {OFFERED_THEME_PREFS.map((p) => (
         <label key={p} className="t-nav-item flex cursor-pointer items-center gap-1 text-bp-ink-secondary has-[:checked]:font-semibold has-[:checked]:text-bp-ink-primary">
           <input

@@ -1,54 +1,23 @@
 // =============================================================================
-// lib/journey.ts — the Phase-1 Target Workflow, in one place.
+// lib/journey.ts — the two journeys, in one place.
 //
-// The nine canonical steps a villa moves through. Before this module every page
-// hard-coded its own "Step 03 of 05" string, render/drawings/viewer sat off the
-// numbered path entirely, and adding a step meant editing five files that could
-// disagree. Now each page asks for its own step and the label is derived.
+// The OWNER journey (K8, spec §6.0 — "rethought", 13 Oct): 00 Overview · 01 Plan
+// · 02 Design · 03 Renders · 04 Cost · 05 Timeline · 06 Tender. Seven steps with
+// FIXED numbers, like the firm journey: a step never drops out of the numbering.
+// What a deployment lacks moves inside a step instead (06 Tender opens on its
+// Contractors & suppliers tab when DRAWINGS_ENABLED is off).
 //
-// AVAILABILITY is the important part. A step that is flag-disabled or not yet
-// built DROPS OUT of the numbering rather than becoming a dead end: the journey
-// renumbers around it, so a user never sees a step they cannot reach and the
-// denominator always matches what is actually navigable. Today that means
-// `scope_timeline` (T4) is absent and `downloads` follows DRAWINGS_ENABLED.
+// Two steps own two routes each, drawn as sub-tabs (text tabs, brass 2 px
+// underline, each a real link) — 04 Cost: /boq | /accessories; 06 Tender:
+// /drawings | /vendors — and the rail lights the step on both. 02 Design is one
+// route with two views (?view=direction | references); the old /ideation,
+// /style and /moodboard routes 308 to it.
 //
-// Style selection is NOT its own step — it folds into step 3 (Ideation), which
-// recommends a direction from the questionnaire. `/style` is a second surface
-// on that same step, not a step of its own.
+// The intake (/project/new) is part of 01 Plan. The 3D viewer is a side
+// surface, never a numbered stop: the rail keeps the step you came from.
 //
-// The 3D viewer is deliberately absent: it is a view-only side surface reached
-// from the layout and render steps, never a numbered stop.
+// The FIRM journey (K2) follows, unchanged.
 // =============================================================================
-
-export type JourneyStepKey =
-  | "intake"
-  | "layout"
-  | "ideation"
-  | "moodboard"
-  | "render"
-  | "costing"
-  | "scope_timeline"
-  | "downloads"
-  | "marketplace";
-
-export interface JourneyStepDef {
-  key: JourneyStepKey;
-  /** Short label for the step chrome + hub. */
-  label: string;
-  /** One line describing what the step is for (empty states, hub cards). */
-  blurb: string;
-  /** Material Symbols glyph. */
-  glyph: string;
-  /** Path for a project, or null for the pre-project intake step. */
-  href: (projectId: string) => string;
-  /**
-   * Whether the step exists for this deployment. `false` removes it from the
-   * numbering entirely — no dead ends, no "coming soon" stops.
-   */
-  available: (flags: JourneyFlags) => boolean;
-  /** Steps that are only partly built, so the UI can say so honestly. */
-  partial?: boolean;
-}
 
 export interface JourneyFlags {
   drawingsEnabled: boolean;
@@ -59,152 +28,109 @@ export function journeyFlagsFromEnv(): JourneyFlags {
   return { drawingsEnabled: process.env.DRAWINGS_ENABLED === "true" };
 }
 
-const STEPS: JourneyStepDef[] = [
+export type OwnerStepKey = "overview" | "plan" | "design" | "renders" | "cost" | "timeline" | "tender";
+
+/** One sub-tab of an owner step: a route of its own, a real link. */
+export interface OwnerSubTab {
+  key: string;
+  label: string;
+  /** Project-relative path, e.g. "/boq". */
+  path: string;
+  available: (flags: JourneyFlags) => boolean;
+}
+
+export interface OwnerStepDef {
+  key: OwnerStepKey;
+  /** Fixed two-digit number, "00"–"06". */
+  number: string;
+  label: string;
+  /** One line on what the step is for (empty states, Next). */
+  blurb: string;
+  /** The project-relative paths on which this step is the active one ("" = the overview). */
+  activeOn: readonly string[];
+  /** Sub-tabs, in order; the step opens on the first available one. */
+  tabs?: readonly OwnerSubTab[];
+  /** The step's own path when it has no tabs. */
+  path?: string;
+}
+
+const ALWAYS = () => true;
+
+export const OWNER_STEPS: readonly OwnerStepDef[] = [
+  { key: "overview", number: "00", label: "Overview", blurb: "Where your renovation stands.", activeOn: [""], path: "" },
+  { key: "plan", number: "01", label: "Plan", blurb: "Your floor plan, read and checked.", activeOn: ["/plan"], path: "/plan" },
   {
-    key: "intake",
-    label: "Intake",
-    blurb: "Floor plans, existing drawings and site photos.",
-    glyph: "upload_file",
-    href: () => "/project/new",
-    available: () => true,
+    key: "design",
+    number: "02",
+    label: "Design",
+    blurb: "A direction for the villa and the references every render follows.",
+    activeOn: ["/design", "/ideation", "/style", "/moodboard"],
+    path: "/design",
   },
+  { key: "renders", number: "03", label: "Renders", blurb: "Each room in your chosen direction.", activeOn: ["/render"], path: "/render" },
   {
-    key: "layout",
-    label: "Layout",
-    blurb: "Confirm the parsed rooms, then place doors and windows.",
-    glyph: "grid_on",
-    href: (id) => `/project/${id}/plan`,
-    available: () => true,
+    key: "cost",
+    number: "04",
+    label: "Cost",
+    blurb: "A priced bill of quantities and the products you choose.",
+    activeOn: ["/boq", "/boq/revisions", "/accessories"],
+    tabs: [
+      { key: "boq", label: "Bill of quantities", path: "/boq", available: ALWAYS },
+      { key: "specification", label: "Specification", path: "/accessories", available: ALWAYS },
+    ],
   },
+  { key: "timeline", number: "05", label: "Timeline", blurb: "How long the work should take.", activeOn: ["/timeline"], path: "/timeline" },
   {
-    key: "ideation",
-    label: "Ideation",
-    blurb: "A few questions, then a recommended direction with samples.",
-    glyph: "auto_awesome",
-    href: (id) => `/project/${id}/ideation`,
-    available: () => true,
-  },
-  {
-    key: "moodboard",
-    label: "Moodboard",
-    blurb: "Gather the references that will steer every render.",
-    glyph: "gallery_thumbnail",
-    href: (id) => `/project/${id}/moodboard`,
-    available: () => true,
-  },
-  {
-    key: "render",
-    label: "Renders",
-    blurb: "See each room in your chosen direction.",
-    glyph: "auto_fix_high",
-    href: (id) => `/project/${id}/render`,
-    available: () => true,
-  },
-  {
-    key: "costing",
-    label: "Costing & BoQ",
-    blurb: "A priced bill of quantities with accessory and spec selection.",
-    glyph: "receipt_long",
-    href: (id) => `/project/${id}/boq`,
-    available: () => true,
-  },
-  {
-    key: "scope_timeline",
-    label: "Scope & timeline",
-    blurb: "Phase durations and a dated programme.",
-    glyph: "calendar_month",
-    href: (id) => `/project/${id}/timeline`,
-    available: () => true,
-  },
-  {
-    key: "downloads",
-    label: "Downloads",
-    blurb: "Drawing suite and the render pack, ready to send.",
-    glyph: "download",
-    href: (id) => `/project/${id}/drawings`,
-    available: (f) => f.drawingsEnabled,
-    // Dimensioned plans + overlays today; the render PDF pack is still to come.
-    partial: true,
-  },
-  {
-    key: "marketplace",
-    label: "Vendors",
-    blurb: "Match every line to a supplier and lock your basket.",
-    glyph: "storefront",
-    href: (id) => `/project/${id}/vendors`,
-    available: () => true,
+    key: "tender",
+    number: "06",
+    label: "Tender",
+    blurb: "Documents for contractors and the suppliers for every line.",
+    activeOn: ["/drawings", "/vendors"],
+    tabs: [
+      { key: "documents", label: "Documents", path: "/drawings", available: (f) => f.drawingsEnabled },
+      { key: "suppliers", label: "Contractors & suppliers", path: "/vendors", available: ALWAYS },
+    ],
   },
 ];
 
-export interface JourneyStep extends JourneyStepDef {
-  /** 1-based position among the AVAILABLE steps. */
-  number: number;
+/** The project-relative path a step opens on (its first available tab). */
+function ownerStepPath(s: OwnerStepDef, flags: JourneyFlags): string {
+  if (s.tabs) return (s.tabs.find((t) => t.available(flags)) ?? s.tabs[s.tabs.length - 1]!).path;
+  return s.path ?? "";
 }
 
-/** The navigable steps, renumbered so the count reflects what exists. */
-export function journeySteps(flags: JourneyFlags): JourneyStep[] {
-  return STEPS.filter((s) => s.available(flags)).map((s, i) => ({
-    ...s,
-    number: i + 1,
-  }));
+export function ownerStep(key: OwnerStepKey): OwnerStepDef {
+  return OWNER_STEPS.find((s) => s.key === key)!;
 }
 
-/** Total navigable steps — the denominator in "Step 3 of 8". */
-export function journeyLength(flags: JourneyFlags): number {
-  return journeySteps(flags).length;
+/** Where an owner step opens for a project. */
+export function ownerStepHref(key: OwnerStepKey, projectId: string, flags: JourneyFlags): string {
+  return `/project/${projectId}${ownerStepPath(ownerStep(key), flags)}`;
 }
 
-/** One step by key, or null when it is unavailable in this deployment. */
-export function journeyStep(
-  key: JourneyStepKey,
-  flags: JourneyFlags,
-): JourneyStep | null {
-  return journeySteps(flags).find((s) => s.key === key) ?? null;
+/** A step's available sub-tabs for a project, with hrefs — what the tab strip draws. */
+export function ownerSubTabs(key: OwnerStepKey, projectId: string, flags: JourneyFlags): { key: string; label: string; href: string; path: string }[] {
+  return (ownerStep(key).tabs ?? []).filter((t) => t.available(flags)).map((t) => ({ key: t.key, label: t.label, path: t.path, href: `/project/${projectId}${t.path}` }));
 }
 
-/** "Step 03 of 08" — zero-padded to match the existing step chrome. */
-export function stepLabel(key: JourneyStepKey, flags: JourneyFlags): string {
-  const step = journeyStep(key, flags);
-  const total = journeyLength(flags);
-  if (!step) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `Step ${pad(step.number)} of ${pad(total)}`;
-}
-
-/** The step after `key` among available steps (null at the end). */
-export function nextStep(
-  key: JourneyStepKey,
-  flags: JourneyFlags,
-): JourneyStep | null {
-  const steps = journeySteps(flags);
-  const i = steps.findIndex((s) => s.key === key);
-  return i >= 0 && i + 1 < steps.length ? steps[i + 1]! : null;
-}
-
-/** The step before `key` among available steps (null at the start). */
-export function prevStep(
-  key: JourneyStepKey,
-  flags: JourneyFlags,
-): JourneyStep | null {
-  const steps = journeySteps(flags);
-  const i = steps.findIndex((s) => s.key === key);
-  return i > 0 ? steps[i - 1]! : null;
+/** The step after `key` (null after 06 Tender) — a page's "Continue to …". */
+export function nextOwnerStep(key: OwnerStepKey): OwnerStepDef | null {
+  const i = OWNER_STEPS.findIndex((s) => s.key === key);
+  return i >= 0 && i + 1 < OWNER_STEPS.length ? OWNER_STEPS[i + 1]! : null;
 }
 
 // =============================================================================
 // The FIRM journey (K2) — Blueprint v0.4 §7, R7 rail frame 9:361.
 //
-// A separate definition beside the owner list above (which is untouched): the
-// persona decides which one a page's rail renders — a member of the firm a
-// project is attached to sees this one, everyone else the owner journey
+// The persona decides which journey a page's rail renders — a member of the
+// firm a project is attached to sees this one, everyone else the owner journey
 // (lib/journey-state.ts). Numbering is FIXED, 00–08: a firm step never drops
 // out; when it cannot be used yet it is Blocked and says why.
 //
 // Every step maps to a route that exists. 01 Project & Plan is the intake
 // (v0.4 §7) — for an existing project there is no per-project intake page, so
 // it opens the plan, whose source and parse state it covers; 02 Scope owns
-// that route's active state (spec §3.8). 08 Proposal opens a gate page until
-// K4 builds the proposal screen there.
+// that route's active state (spec §3.8).
 // =============================================================================
 
 export type JourneyPersona = "firm" | "owner";
@@ -242,30 +168,16 @@ export const FIRM_STEPS: readonly FirmStepDef[] = [
   { key: "proposal", number: "08", label: "Proposal", href: (id) => `/project/${id}/proposal`, activeOn: ["/proposal"] },
 ];
 
-/** Owner steps' extra surfaces that light the same step (style folds into ideation). */
-const OWNER_ACTIVE_ALIASES: Partial<Record<JourneyStepKey, readonly string[]>> = {
-  ideation: ["/ideation", "/style"],
-  costing: ["/boq", "/boq/revisions", "/accessories"],
-};
-
 /**
  * Which step a pathname lights, for either persona. Exact project-relative
- * match first (so /boq/revisions is 07, not 05); null when the page is not a
+ * match (so a firm's /boq/revisions is 07, not 05); null when the page is not a
  * step (the 3D viewer, settings).
  */
-export function activeStepKey(persona: JourneyPersona, pathname: string, projectId: string | null, flags: JourneyFlags): string | null {
+export function activeStepKey(persona: JourneyPersona, pathname: string, projectId: string | null): string | null {
+  if (persona === "owner" && pathname === "/project/new") return "plan";
   const prefix = projectId ? `/project/${projectId}` : null;
-  if (persona === "firm") {
-    if (!prefix || !(pathname === prefix || pathname.startsWith(`${prefix}/`))) return null;
-    const rel = pathname.slice(prefix.length).replace(/\/$/, "");
-    return FIRM_STEPS.find((s) => s.activeOn.includes(rel))?.key ?? null;
-  }
-  if (pathname === "/project/new") return "intake";
-  if (!prefix || !pathname.startsWith(prefix)) return null;
+  if (!prefix || !(pathname === prefix || pathname.startsWith(`${prefix}/`))) return null;
   const rel = pathname.slice(prefix.length).replace(/\/$/, "");
-  for (const s of journeySteps(flags)) {
-    const own = s.key === "intake" ? null : s.href(projectId!).slice(prefix.length);
-    if ((OWNER_ACTIVE_ALIASES[s.key] ?? (own ? [own] : [])).includes(rel)) return s.key;
-  }
-  return null;
+  const steps: readonly { key: string; activeOn: readonly string[] }[] = persona === "firm" ? FIRM_STEPS : OWNER_STEPS;
+  return steps.find((s) => s.activeOn.includes(rel))?.key ?? null;
 }

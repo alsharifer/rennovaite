@@ -1,8 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
-import { AppShell } from "@/components/app/AppShell";
-import { JourneyProgress } from "@/components/app/JourneyChrome";
 import { loadProjectPhotoAssets } from "@/lib/assets/load";
 import { roomRollup } from "@/lib/boq/elements";
 import type { TakeoffItem, WorkItemKey } from "@/lib/boq/quantify";
@@ -14,7 +12,10 @@ import { loadGardenSceneContext } from "@/lib/scene-render/pipeline";
 import { getStyleByKey } from "@/lib/styles";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-import { RenderInteractive } from "./_components/render-interactive";
+import { Button } from "@/components/blueprint/Button";
+import { StateBlock } from "@/components/blueprint/StateBlock";
+import { RendersStudio } from "@/components/blueprint/renders/RendersStudio";
+import { journeyFlagsFromEnv, ownerStepHref } from "@/lib/journey";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,17 @@ type RenderItem = {
   qa?: "passed" | "failed" | null;
   qaReason?: string | null;
 };
+
+// K8 #5 (spec §6.4, Figma 57:612 · phone 66:1443): the renders studio, Blueprint.
+function NotReady({ projectId, title, body }: { projectId: string; title: string; body: string }) {
+  return (
+    <div className="mx-auto max-w-[720px] px-6 py-10">
+      <StateBlock kind="empty" icon="photo_camera" title={title} actions={<Button kind="primary" href={`/project/${projectId}/plan`}>Open the plan</Button>}>
+        {body}
+      </StateBlock>
+    </div>
+  );
+}
 
 // The stored qa jsonb is {passed, reason, ...} (or null). Flatten it to the
 // compact shape the render UI consumes so a QA-flagged render still shows its
@@ -100,10 +112,13 @@ function buildInitialChains(
 
 export default async function RenderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ room?: string }>;
 }) {
   const { id: projectId } = await params;
+  const { room: initialRoomId } = await searchParams;
   const supabase = getSupabaseAdmin();
 
   const { data: project } = await supabase
@@ -138,17 +153,7 @@ export default async function RenderPage({
   // not: the project exists and the user simply has not confirmed a layout yet,
   // which is a step in the journey rather than a broken link.
   if (!project) notFound();
-  if (!plan) {
-    return (
-      <AppShell pageName="AI Designer">
-        <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-          <p className="text-on-surface-variant">
-            No plan attached to this project yet.
-          </p>
-        </main>
-      </AppShell>
-    );
-  }
+  if (!plan) return <NotReady projectId={projectId} title="No plan yet" body="Renders are made room by room from your plan. Add your floor plan first." />;
 
   const { data: rooms } = await supabase
     .from("rooms")
@@ -253,17 +258,7 @@ export default async function RenderPage({
     ),
   );
 
-  if (roomList.length === 0) {
-    return (
-      <AppShell pageName="AI Designer">
-        <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-6">
-          <p className="text-on-surface-variant">
-            No rooms found on this plan. Go back and confirm the plan first.
-          </p>
-        </main>
-      </AppShell>
-    );
-  }
+  if (roomList.length === 0) return <NotReady projectId={projectId} title="No rooms on the plan yet" body="Confirm the rooms on your plan — every room gets a view here." />;
 
   // P4: per-room element-mapped BoQ totals for the "This room on your BoQ" chip.
   const roomBoqTotals: Record<string, number> = {};
@@ -313,23 +308,39 @@ export default async function RenderPage({
     }
   }
 
+  // Every finished render's image and check verdict, by id: a garden camera or an
+  // evening view shows its own render, with the gate's outcome (G4b) or the QA verdict.
+  const renderInfo: Record<string, { id: string; imageUrl: string; prompt: string; qa: "passed" | "failed" | null; qaReason: string | null; outcome: "passed" | "substituted" | null }> = {};
+  try {
+    const { data: infoRows } = await sbAny.from("renders").select("id, image_url, prompt, qa, gate").eq("project_id", projectId).not("image_url", "is", null);
+    for (const r of (infoRows ?? []) as { id: string; image_url: string; prompt: string | null; qa: unknown; gate: { outcome?: string } | null }[]) {
+      const outcome = r.gate?.outcome === "passed" || r.gate?.outcome === "substituted" ? r.gate.outcome : null;
+      const q = qaFrom(r.qa);
+      renderInfo[r.id] = { id: r.id, imageUrl: r.image_url, prompt: r.prompt ?? "", qa: q.qa ?? null, qaReason: q.qaReason ?? null, outcome };
+    }
+  } catch {
+    /* a pre-G4b table: chains and evenings still show */
+  }
+
+  const flags = journeyFlagsFromEnv();
   return (
-    <AppShell pageName="AI Designer" noPadding>
-      <RenderInteractive
-        projectId={project.id}
-        rooms={roomList}
-        style={style}
-        initialChains={initialChains}
-        initialLockedRoomIds={initialLockedRoomIds}
-        initialPhotosByRoom={initialPhotosByRoom}
-        initialPhotoAssets={initialPhotoAssets}
-        roomBoqTotals={roomBoqTotals}
-        stagingEnabled={stagingEnabled}
-        initialFurnitureOptIns={initialFurnitureOptIns}
-        batchJobs={batchJobs}
-        initialEvenings={initialEvenings}
-        journeySlot={<JourneyProgress stepKey="render" projectId={project.id} />}
-      />
-    </AppShell>
+    <RendersStudio
+      initialRoomId={initialRoomId ?? null}
+      projectId={project.id}
+      rooms={roomList.map((r) => ({ id: r.id, name_en: r.name_en, room_type: r.room_type }))}
+      style={style}
+      initialChains={initialChains}
+      initialLockedRoomIds={initialLockedRoomIds}
+      initialPhotosByRoom={initialPhotosByRoom}
+      initialPhotoAssets={initialPhotoAssets}
+      roomCost={roomBoqTotals}
+      stagingEnabled={stagingEnabled}
+      initialFurnitureOptIns={initialFurnitureOptIns}
+      batchJobs={batchJobs}
+      initialEvenings={initialEvenings}
+      renderInfo={renderInfo}
+      viewerHref={process.env.VIEWER_3D_ENABLED === "true" ? `/project/${projectId}/viewer?from=render` : null}
+      costHref={ownerStepHref("cost", projectId, flags)}
+    />
   );
 }

@@ -34,24 +34,20 @@ than months.
 
 ## Two design systems — which rules apply where (K-series)
 
-The app is mid-migration from **Atelier Precise** to **Blueprint** (R7). Which
-rules apply is decided by ONE thing: whether the page's root carries
-`data-system="blueprint"`.
+**Since K8 (13 Oct) every routed page is Blueprint** — the route scan
+(`lib/__tests__/route-scan.test.ts`) walks every page's UI module graph and
+finds no Atelier class, shell or canvas; `ATELIER_PENDING` is empty and must
+stay empty. Blueprint pages carry `data-system="blueprint"` on their root and
+follow the R7 spec — `design-refs/r7-handoff/R7_Handoff_Specs.md` (tracked) —
+and the sections below. Dark, System, IBM Plex Sans and Material Symbols Sharp
+300 are live.
 
-- **Blueprint pages** (`[data-system="blueprint"]`) follow the R7 spec —
-  `design-refs/r7-handoff/R7_Handoff_Specs.md` (tracked) — and the section
-  below. Dark mode, IBM Plex Sans and Material Symbols Sharp 300 are signed off
-  for them (R7 + Gate 3, 11 Oct; K0 rulings 12 Oct).
-- **Atelier pages** (everything else) follow the Atelier section further down,
-  unchanged. Out of scope this cycle and must not regress: 03 Specification
-  (`/accessories`), owner Ideation · Moodboard · Style · Render · Scope &
-  timeline · Vendors · Viewer, and `/rennovaite`. (`/project/[id]/drawings` is
-  firm step 06 Documents and goes Blueprint in K4; the owner "Downloads" step
-  lands on it.)
-
-Never mix the two on one surface, and never restyle a shared component for one
-system — fork it (a Blueprint component under `components/blueprint/`, the
-Atelier one untouched).
+Atelier Precise survives only in the PARKED marketing components
+(`components/marketing/*`, `app/_components/*`, unrouted — the scan skips
+them) and in `tailwind.config.ts` tokens they use. Do not add Atelier to a
+routed page; a new page frames itself in `ProjectShell` / `AccountShell`.
+Never restyle a shared component for one surface — fork it under
+`components/blueprint/`.
 
 ## Brand — Blueprint (R7; K-series)
 
@@ -175,26 +171,24 @@ except `design-refs/r7-handoff/`.
   `settings`) frame themselves in a `layout.tsx`, so their `loading.tsx` /
   `error.tsx` / `not-found.tsx` render INSIDE the shell (`SegmentLoading`,
   `SegmentError`, `SegmentNotFound`). The hub sits at the `[id]` level and
-  frames itself in its page; `[id]/loading.tsx` draws `ShellSkeleton`. Atelier
-  pages keep `AppShell`. Share a page body as a component (the firm book is
+  frames itself in its page; `[id]/loading.tsx` draws `ShellSkeleton`. (The
+  Atelier `AppShell` is gone since K8.) Share a page body as a component (the firm book is
   `app/firms/[firmId]/_components/firm-book.tsx`, rendered by both book
   routes), not by importing another route's `page.tsx`. **If every child of a
   route segment suddenly 404s in dev, restart `next dev` before debugging** —
   K2 saw a dev server answer HTML 404s for whole route trees
   (`/project/[id]/*`, `/api/projects/[id]/*`) that a fresh server served fine.
-- **Theme gate**: Dark and System are hidden until K5 (`THEME_CHOICES_OPEN =
-  false` in `lib/theme.ts`): the pre-paint script gives everyone Light and the
-  switcher offers Light only. K5 flips it.
-- **Transition**: until K3–K5 restyle them (the hub body is K5a, spec §3.1 /
-  11:48), page bodies are still Atelier and
-  render on their own light canvas (`ShellFrame content="atelier"`) inside the
-  Blueprint chrome — the chrome follows the theme, the body does not yet.
+- **Theme gate**: OPEN since K8 Part 3 (`THEME_CHOICES_OPEN = true` in
+  `lib/theme.ts`): the pre-paint script honours a stored Dark / System (System
+  follows the OS, live) and Settings + the rail footer offer all three.
+  `scripts/k8-dark-check.mjs` proves no flash on a cold load. Client documents
+  and e-mails stay light.
 - **Primitives added**: `<Button>` (Primary / Secondary / Quiet, `tone="inverse"`
   inside an error or gate block; disabled = `aria-disabled` + a visible reason),
   `<StateBlock kind>` (empty / loading / error / gate / pending) +
   `SkeletonRows`, and the `<RegenerateControl>` shell (wired in K3).
 - **Route triage (spec §3.10)**: Marketplace and Community are out of every
-  navigation (routes remain); `/firms` goes straight to the book when the
+  navigation and have no page (K8 review: 307s to `/projects` in `next.config.ts`); `/firms` goes straight to the book when the
   caller has one firm; `/settings` is Account · Appearance · Firm.
 
 ### BoQ & Review (K3)
@@ -367,7 +361,57 @@ from the journey (`lib/journey-eyebrow.ts`), never a literal.
   **If a dev server starts 404ing whole route trees mid-session (it did in KV,
   after many edits and a second server), restart it** — K2's note holds.
 
-## Brand — Atelier Precise (pages not yet redesigned)
+### Everything on Blueprint (K8 · 13 Oct)
+
+Every screen of the J6 / J2–J4 frames (Figma `vgibM0F9SdEQErBaTxjUqH`; spec
+§5/§6) is built; screenshots beside their frames in `screenshots/k8/` (light),
+`screenshots/k8/dark/` (dark), `screenshots/k8/before/` (the old bodies). Open
+items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
+
+- **Owner journey 00–06** (K8.1, above) with computed states:
+  02 Design attention "Add references" (< 3 pinned), 04 Cost attention
+  "N items not priced", 06 Tender blocked "Price N items first" or by the
+  plan check (`lib/journey-state.ts ownerStepStatuses`).
+- **One shell** (K8.2): Sidebar / old TopBar / JourneyChrome / AppShell /
+  AtelierCanvas are deleted; `/projects` is the signed-in home
+  (`SIGNED_IN_HOME`); `/dashboard`, `/my-projects`, `/project` redirect there.
+- **Screens**: Projects home (`components/blueprint/home`), owner Overview
+  (`hub/OwnerOverview` over `lib/hub/overview-view.ts`; the firm keeps
+  `HubScreen`), Design (`design/`), Renders studio (`renders/`),
+  Specification (`spec/`), Timeline (`timeline/`), Contractors & suppliers
+  (`tender/Suppliers` — a scenario on the stored BoQ, distances dropped),
+  3D view (`viewer/`: token colours read at runtime, room labels are buttons,
+  inspector over `lib/viewer/room-facts.ts`), Rate books list
+  (`book/RateBooksList`), Not found / error (`shell/PageMessage` — ONE
+  message for missing and no-access), Reading your plan
+  (`intake/ReadingPlan`; `/api/parse-plan` returns rooms / stated_areas /
+  overlap_pairs; sandbox `/dev/reading-plan`), Help drawer
+  (`shell/HelpDrawer` + `lib/help/articles.ts`; the `?` key), Legal
+  (`legal/LegalTemplate` — H6's draft rule unchanged), the plan editor's
+  internals (`app/project/[id]/plan/_components/editor-chrome.ts`,
+  `plan/PlanInspector`).
+- **Client documents on Blueprint paper** (`lib/documents/doc-style.ts`,
+  always light): the proposal (cover + numbered sections + price summary to
+  the fil — no marks, no line rates unless ticked), the BoQ PDF (A4 LANDSCAPE,
+  `boq-pdf-pages.ts`: Q/R marks per line from `tierOf()`, section weakest mark,
+  legend in every footer), the drawing sheet frame + title block + inverse
+  "FOR REVIEW — NOT FOR CONSTRUCTION" strip (`lib/drawings/sheet.ts`). The
+  draft statement is the inverse band everywhere (no terracotta).
+  `scripts/k8-doc-shots.ts` renders them from the Arabella fixture.
+- **E-mails**: `supabase/templates/magic-link.html` / `invite.html` (wired in
+  `supabase/config.toml` locally; the hosted projects take them in the
+  dashboard). A test pins their rules.
+- **Type gotcha**: `.t-*` classes are unlayered and beat utilities on the same
+  element — `t-body-sm font-semibold` is NOT bold; strong 14 px text is
+  `t-nav-item-active`. Variant prefixes (`md:t-…`) do not work.
+- **Checks**: `scripts/k8-dark-check.mjs` (cookie-driven dark, no flash, axe
+  in dark, System), `k8-keyboard-walk.mjs` (home → tender by keyboard, both
+  themes), `k8-tender-check.mjs`, `k8-viewer-check.mjs`, `k8-help-check.mjs`,
+  `k8-design-check.mjs`, `k8-journey-check.mjs`; scratch state via
+  `k8-firm-scratch.mjs` / `k8-firms-scratch.mjs`; `k-page-check.mjs` gained
+  `--sizes=laptop` (1280).
+
+## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic
 for the luxury Dubai market. Calm, exclusive, meticulous — a private
@@ -2267,27 +2311,19 @@ parked, unrouted; the TopNav / Footer / legal back links point at `/auth`;
 - **Stage 2 is H5** (below): project ownership and invite-only sign-up. RLS is
   still off.
 
-## The journey — nine steps, one definition (B1/B2/B3)
+## The journey — one definition (B1/B2/B3; renumbered in K8)
 
-`lib/journey.ts` is the single source of truth for the Phase-1 Target Workflow.
-Every page derives its own "Step N of M" from it via
-`components/app/JourneyChrome` (`JourneyProgress` for pages that own their
-heading, `JourneyChrome` for the full header) — **never hard-code a step
-number**. A step that is flag-disabled or not yet built **drops out of the
-numbering**, so the denominator always matches what is actually navigable and
-there are no dead ends.
-
-(This is the OWNER journey. The firm journey, 00–08, is `FIRM_STEPS` in the
-same file — see "Shell + journey rail (K2)".)
-
-1 Intake · 2 Layout · 3 **Ideation** · 4 **Moodboard** · 5 Renders ·
-6 Costing & BoQ · 7 Scope & timeline *(T4 — unbuilt, currently absent)* ·
-8 Downloads *(`DRAWINGS_ENABLED`)* · 9 Vendors → **8 steps today**.
-
-**Style selection folds into step 3** — the questionnaire recommends a
-direction; `/project/[id]/style` is a second surface on that same step, not a
-step of its own. The **3D viewer is deliberately off the numbered path** (a
-view-only side surface reached from the layout and render steps).
+`lib/journey.ts` is the single source of truth. **Since K8 the owner journey
+is `OWNER_STEPS`, fixed numbers 00–06** — 00 Overview · 01 Plan (incl. the
+intake) · 02 Design (`/design?view=direction|references`) · 03 Renders ·
+04 Cost (tabs: Bill of quantities `/boq` | Specification `/accessories`) ·
+05 Timeline · 06 Tender (tabs: Documents `/drawings` | Contractors &
+suppliers `/vendors`). The rail draws them; a page's eyebrow comes from
+`lib/journey-eyebrow.ts` — **never hard-code a step number**. The firm journey,
+00–08, is `FIRM_STEPS` (see "Shell + journey rail (K2)"). `/ideation`,
+`/style` → `/design` and `/moodboard` → `/design?view=references` are 308s
+(`next.config.ts`). The **3D viewer is off the numbered path** (a side
+surface: the rail keeps the step you came from, `shell/step-memory.ts`).
 
 - **B1 questionnaire** (`lib/ideation/questionnaire.ts`, `project_briefs`):
   six weighted questions scored by a plain weighted sum. **No LLM** — a

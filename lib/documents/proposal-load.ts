@@ -22,12 +22,14 @@ import { curateBoq, findWithheldIdentities, loadWithheldNames } from "@/lib/iden
 export async function loadProposalInput(sb: SupabaseClient, projectId: string, gate: ProposalGate, opts: { preview?: boolean } = {}): Promise<{ input: ProposalInput; boqId: string; withheld: string[] } | null> {
   if (!gate.firm || !gate.boq) return null;
   const withheld = await loadWithheldNames(sb, projectId);
-  const [project, boqRow, logo, plan, setup] = await Promise.all([
+  const [project, boqRow, logo, plan, setup, revs] = await Promise.all([
     loadDocumentProject(sb, projectId, "Untitled project"),
     sb.from("boqs").select("id, sections").eq("id", gate.boq.id).maybeSingle<{ id: string; sections: BoqPdfInput["boq"] }>(),
     loadLogoDataUri(sb, gate.firm.logo_path),
     sb.from("plans").select("id").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string }>(),
     loadProposalSetup(sb, projectId),
+    // K8: "Based on — Bill of quantities, revision N" (oldest = rev 1, as 07 Revisions numbers them).
+    sb.from("boqs").select("id").eq("project_id", projectId).order("created_at", { ascending: true }).then((r) => (r.data ?? []) as { id: string }[], () => [] as { id: string }[]),
   ]);
   if (!boqRow.data) return null;
   const { data: roomRows } = plan.data ? await sb.from("rooms").select("name_en, room_type, area_m2").eq("plan_id", plan.data.id).order("name_en") : { data: [] };
@@ -49,6 +51,7 @@ export async function loadProposalInput(sb: SupabaseClient, projectId: string, g
       dateISO,
       rooms,
       boq: curateBoq(boqRow.data.sections, withheld),
+      revision: revs.findIndex((r) => r.id === boqRow.data!.id) + 1 || null,
       clientLabel: setup?.clientLabel ?? null,
       validity: validityText(setup?.validityDays ?? null, dateISO),
       paymentTerms: setup?.paymentTerms ?? null,

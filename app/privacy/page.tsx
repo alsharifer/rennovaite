@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { LegalPage, legalMetadata } from "@/components/legal/LegalPage";
-import { PrivacyPlaceholder, PRIVACY_PLACEHOLDER_METADATA } from "@/components/legal/LegalPlaceholders";
+import { LegalDocumentPage, legalMetadata } from "@/components/blueprint/legal/LegalTemplate";
+import { PrivacyPlaceholder, PRIVACY_PLACEHOLDER_METADATA } from "@/components/blueprint/legal/LegalPlaceholders";
 import { loadLegalDocument } from "@/lib/legal/load";
 
 // H6: the text is content/legal/privacy.md. It renders only once that file says
@@ -17,5 +17,5 @@ export const metadata: Metadata = published
   : PRIVACY_PLACEHOLDER_METADATA;
 
 export default function PrivacyPage() {
-  return published ? <LegalPage doc={doc} /> : <PrivacyPlaceholder />;
+  return published ? <LegalDocumentPage doc={doc} /> : <PrivacyPlaceholder />;
 }

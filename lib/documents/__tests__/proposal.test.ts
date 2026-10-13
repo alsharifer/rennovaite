@@ -39,14 +39,32 @@ describe("buildProposalPages", () => {
   const pages = buildProposalPages(input());
   const all = pages.join("\n");
 
-  it("cover: the firm's brand and logo, the project, the contract sum in the derived convention", () => {
+  it("cover (67:1396): the firm's brand and logo, the project, what is inside — the sum is on the price summary", () => {
     expect(pages[0]).toContain('data-proposal-cover="true"');
     expect(pages[0]).toContain('data-logo="present"');
     expect(pages[0]).toContain("<image ");
     expect(pages[0]).toContain(">Scratch Landscapes &amp; Co.<");
-    expect(pages[0]).toContain(`data-grand-total="${arabella.grand_total_aed}"`);
-    expect(pages[0]).toMatch(/≈ AED [\d,]+\*/); // derived total, never a bare number
-    expect(pages[0]).toContain('data-headline-excludes="true"'); // D4: the QS-to-price lines are named
+    expect(text([pages[0]!])).toMatch(/WHAT’S INSIDE/);
+    expect(text([pages[0]!])).toMatch(/2 +Price summary/);
+    expect(pages[0]).not.toContain("data-grand-total");
+  });
+
+  it("price summary (67:1436): section totals, the chain, the total in the derived convention, the lines to be priced named", () => {
+    const summary = pages.find((p) => p.includes("data-grand-total"))!;
+    expect(summary).toContain(`data-grand-total="${arabella.grand_total_aed}"`);
+    expect(summary).toMatch(/≈ AED [\d,]+\.\d\d\*/); // derived, and to the fil so the column adds up
+    expect(summary).toContain('data-headline-excludes="true"'); // D4: the QS-to-price lines are named
+    expect((summary.match(/data-section-total="/g) ?? []).length).toBe(arabella.sections.length);
+    for (const k of ["subtotal", "contingency", "vat"]) expect(summary).toContain(`data-summary="${k}"`);
+  });
+
+  it("every page after the cover says which page of how many", () => {
+    pages.slice(1).forEach((p, i) => expect(p).toContain(`page ${i + 2} of ${pages.length}`));
+    expect(pages.join("")).not.toContain("@@PAGES@@");
+  });
+
+  it("no status hues and no brass fill on a client document", () => {
+    expect(all).not.toMatch(/#9d3e1d|#FDF3EE|#A4793A/i);
   });
 
   it("the firm is the brand: no RenovAIte heading; only the discreet mark, on every page", () => {
@@ -92,7 +110,7 @@ describe("buildProposalPages", () => {
     const ok = printedChecks({ ...base, proposal: { pages, brand: "Scratch Landscapes & Co.", terms: true, basis: "accepted" } }).filter((c) => /proposal/.test(c.label));
     expect(ok.length).toBeGreaterThanOrEqual(8);
     expect(ok.filter((c) => !c.ok).map((c) => `${c.label}: ${c.detail}`)).toEqual([]);
-    const leaky = pages.map((p, i) => (i === 1 ? p.replace("PRICED SCHEDULE", "PRICED SCHEDULE (market reference)") : p));
+    const leaky = pages.map((p, i) => (i === 1 ? p.replace("SCHEDULE OF WORKS", "SCHEDULE OF WORKS (market reference)") : p));
     const bad = printedChecks({ ...base, proposal: { pages: leaky, brand: "Scratch Landscapes & Co.", terms: true, basis: null } }).filter((c) => !c.ok);
     expect(bad.map((c) => c.label)).toEqual(expect.arrayContaining(["the proposal prints no rate provenance (sources, tiers, QS marks)", "the proposal's pricing basis was a stated choice"]));
   });
@@ -147,7 +165,7 @@ describe("buildProposalPages — K4 setup", () => {
   it("prints the client on the cover, the validity on cover and terms, payment terms and the cover note", () => {
     const pp = buildProposalPages(input({ ...setup, showLineRates: false }));
     expect(pp[0]).toContain('data-client="true"');
-    expect(pp[0]).toContain("Prepared for Private homeowner — Villa garden");
+    expect(text([pp[0]!])).toMatch(/Prepared for +Private homeowner — Villa garden/);
     expect(pp.filter((p) => p.includes('data-validity="true"')).length).toBeGreaterThanOrEqual(2);
     expect(pp.join("")).toContain('data-payment-terms="true"');
     expect(pp.join("")).toContain('data-cover-note="true"');

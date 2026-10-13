@@ -1,0 +1,73 @@
+<!doctype html>
+<!--
+  RenovAIte — "you've been added to a project" e-mail (K8 #18, Figma 69:1438,
+  spec §6.9). Supabase Auth INVITE template (Go templates):
+  {{ .ConfirmationURL }}, {{ .Email }}, and the invite's data —
+  {{ .Data.invited_by }}, {{ .Data.firm }}, {{ .Data.project_name }} — each
+  optional (a sentence without them still reads). Subject: "You've been added
+  to a project on RenovAIte" (supabase/config.toml).
+
+  NOTE: nothing in the app sends an invite yet — project membership is granted
+  by the operator (scripts/project-member-add.mjs) and an invited address's
+  account is created by the sign-in action (H5). This is the template the
+  invite flow uses when it is built (auth.admin.inviteUserByEmail with that
+  data). Same rules as magic-link.html; HTML only (no plain-text part on this
+  channel).
+-->
+<html lang="en" style="color-scheme: light; supported-color-schemes: light;">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>You’ve been added to a project</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet" />
+  </head>
+  <body style="margin:0; padding:0; background-color:#F5F2EA; color:#1A1D1F;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F5F2EA;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:100%; background-color:#FBFAF6; border:1px solid #D6D1C5;">
+            <tr>
+              <td style="padding:40px 40px 0 40px;">
+                <p style="margin:0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:17px; line-height:24px; font-weight:600; color:#1A1D1F;">RenovAIte</p>
+                <div style="height:1px; line-height:1px; font-size:1px; background-color:#A8A294; margin-top:20px;">&nbsp;</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 40px 0 40px;">
+                <h1 style="margin:0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:22px; line-height:30px; font-weight:600; color:#1A1D1F;">You’ve been added to a project</h1>
+                <p style="margin:16px 0 0 0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#1A1D1F;">{{ if .Data.invited_by }}{{ .Data.invited_by }}{{ if .Data.firm }} from {{ .Data.firm }}{{ end }} added you{{ else }}You have been added{{ end }} to {{ if .Data.project_name }}{{ .Data.project_name }}{{ else }}a project{{ end }} as a member.</p>
+                <p style="margin:16px 0 0 0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#1A1D1F;">RenovAIte is invite-only during the pilot. Signing in with this email address gives you access — no password needed.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 40px 0 40px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td bgcolor="#1A1D1F" style="background-color:#1A1D1F; border-radius:0;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block; padding:12px 16px; height:20px; line-height:20px; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:14px; font-weight:600; color:#F5F2EA; text-decoration:none; border-radius:0;">Accept and sign in</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 40px 0 40px;">
+                <p style="margin:0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#4A5054;">Or paste this link into your browser:</p>
+                <p style="margin:8px 0 0 0; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:12px; line-height:18px; color:#1A1D1F; word-break:break-all;">{{ .ConfirmationURL }}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 40px 32px 40px;">
+                <div style="height:1px; line-height:1px; font-size:1px; background-color:#D6D1C5;">&nbsp;</div>
+                <p style="margin:16px 0 0 0; font-family:'IBM Plex Sans', Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#4A5054;">Not expecting this? Ignore it and you won’t be added to anything else.</p>
+                <p style="margin:6px 0 0 0; font-family:'JetBrains Mono', 'Courier New', monospace; font-size:12px; line-height:18px; color:#62676B;">RenovAIte · Dubai · sent to {{ .Email }}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

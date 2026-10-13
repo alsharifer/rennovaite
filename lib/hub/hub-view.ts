@@ -15,28 +15,19 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { sumMoney } from "@/lib/boq/money";
-import { assignRefs } from "@/lib/boq/refs";
 import { loadRecordedCauses } from "@/lib/boq/revision-causes";
 import { CAUSE_KIND_LABEL, diffRevisions, snapshotRevision, type RevisionBoq } from "@/lib/boq/revision-diff";
 import { listRevisions } from "@/lib/boq/revisions";
-import { sortSections } from "@/lib/boq/section-order";
-import { boqDerivedInfo, isUnpricedLine } from "@/lib/documents/boq-derived";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { loadProposalSetup } from "@/lib/documents/proposal-setup";
-import { curateBoq } from "@/lib/identity/curation";
-import { FIRM_STEPS, journeyFlagsFromEnv, journeySteps, type JourneyFlags } from "@/lib/journey";
+import { FIRM_STEPS, OWNER_STEPS, journeyFlagsFromEnv, ownerStepHref, type JourneyFlags } from "@/lib/journey";
 import type { RailContext } from "@/lib/journey-state";
 import { loadProvenanceContext } from "@/lib/provenance/load";
-import type { ProvLine } from "@/lib/provenance/boq";
-import { tierOf, weakest, type ProvTier } from "@/lib/provenance/tier";
+import type { ProvTier } from "@/lib/provenance/tier";
 
-export interface HubBasisRow {
-  tier: ProvTier;
-  lines: number;
-  amount: number | null;
-  share: number | null;
-}
+import { estimateOf, type BasisRow } from "./estimate";
+
+export type HubBasisRow = BasisRow;
 
 export interface HubNext {
   step: string;
@@ -99,9 +90,7 @@ export function nextFromRail(projectId: string, rail: Pick<RailContext, "persona
   const steps =
     rail.persona === "firm"
       ? FIRM_STEPS.filter((s) => s.key !== "hub").map((s) => ({ key: s.key as string, number: s.number, label: s.label, href: s.href(projectId) }))
-      : journeySteps(flags)
-          .filter((s) => s.key !== "intake" && s.key !== "marketplace")
-          .map((s) => ({ key: s.key as string, number: String(s.number).padStart(2, "0"), label: s.label, href: s.href(projectId) }));
+      : OWNER_STEPS.filter((s) => s.key !== "overview").map((s) => ({ key: s.key as string, number: s.number, label: s.label, href: ownerStepHref(s.key, projectId, flags) }));
   const out: HubNext[] = [];
   for (const s of steps) {
     const st = statuses[s.key];
@@ -118,8 +107,10 @@ export function nextFromRail(projectId: string, rail: Pick<RailContext, "persona
       secondary = { label: "Open revision", href: `/project/${projectId}/boq/revisions` };
     } else if (s.key === "boq_review") title = "BoQ out of date";
     else if (s.key === "proposal") title = "Proposal locked";
-    else if (s.key === "scope" || s.key === "layout") title = "Plan can't be priced yet";
-    else if (s.key === "costing") title = "Costing is blocked";
+    else if (s.key === "scope" || s.key === "plan") title = "Plan can't be priced yet";
+    else if (s.key === "cost") title = st.state === "blocked" ? "Cost is blocked" : "Some items are not priced";
+    else if (s.key === "design") title = "Add references";
+    else if (s.key === "tender") title = "Tender is blocked";
     out.push({ step: eyebrow, title, sentence: reason, primary: st.fix ?? { label: `Open ${s.label}`, href: s.href }, secondary });
     if (out.length === 3) break;
   }
@@ -158,46 +149,23 @@ export async function loadHubView(db: SupabaseClient, projectId: string, rail: R
   if (project?.city) meta.push(project.city);
 
   if (latestDoc) {
-    const boq = curateBoq(latestDoc.sections, ctx.withheldNames) as RevisionBoq & { programme?: { total_days: number } | null };
-    const counted: { tier: ProvTier; amount: number }[] = [];
-    const excluded: { ref: string; description: string }[] = [];
-    const tiers: ProvTier[] = [];
-    const sorted = sortSections(boq.sections);
-    const refs = assignRefs(sorted);
-    for (const s of sorted) {
-      s.lines.forEach((l, idx) => {
-        const t = tierOf(l as ProvLine, s.work_section, { qsValidated: ctx.qsValidated });
-        tiers.push(t.amount);
-        if (isUnpricedLine(l)) excluded.push({ ref: refs[`${s.work_section}-${idx}`] ?? s.work_section, description: l.description.replace(/\s*\([^)]*\)\s*$/, "") });
-        else counted.push({ tier: t.amount, amount: l.total_aed });
-      });
-    }
-    const countedTotal = sumMoney(counted.map((c) => c.amount));
-    const ORDER: ProvTier[] = ["measured", "validated", "market", "derived"];
-    const basis: HubBasisRow[] = ORDER.map((tier) => {
-      const rows = counted.filter((c) => c.tier === tier);
-      const amount = sumMoney(rows.map((r) => r.amount));
-      return { tier, lines: rows.length, amount, share: countedTotal ? Math.round((amount / countedTotal) * 1000) / 10 : null };
-    }).filter((b) => b.lines > 0);
-    if (excluded.length) basis.push({ tier: "unpriced", lines: excluded.length, amount: null, share: null });
-    const info = boqDerivedInfo(boq as Parameters<typeof boqDerivedInfo>[0]);
-    const head = tiers.length ? weakest(tiers) : null;
+    const e = estimateOf(latestDoc.sections, ctx);
     estimate = {
       rev: n,
       revDate: day(latestDoc.created_at),
-      counted: countedTotal,
-      estimate: head === "derived" || info.draft,
-      tier: head,
-      excluded,
-      grand: boq.grand_total_aed,
-      contingencyPct: boq.contingency_pct,
-      vatPct: boq.vat_pct,
-      chain: { subtotal: boq.subtotal_aed, ohp: boq.ohp_aed ?? 0, contingency: boq.contingency_aed, vat: boq.vat_aed },
+      counted: e.counted,
+      estimate: e.estimate,
+      tier: e.tier,
+      excluded: e.excluded,
+      grand: e.grand,
+      contingencyPct: e.contingencyPct,
+      vatPct: e.vatPct,
+      chain: e.chain,
       budget: !project?.firm_id && project?.budget_aed ? Number(project.budget_aed) : null,
-      basis,
-      countedLines: counted.length,
+      basis: e.basis,
+      countedLines: e.countedLines,
     };
-    if (boq.programme?.total_days) meta.push(`indicative programme ${boq.programme.total_days} days`);
+    if (e.programmeDays) meta.push(`indicative programme ${e.programmeDays} days`);
   }
 
   // Revisions: the diff's own counts and RECORDED causes between consecutive revisions — never a story.

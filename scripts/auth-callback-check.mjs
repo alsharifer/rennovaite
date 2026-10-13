@@ -50,7 +50,7 @@ if (error) throw error;
 const link = `${base}/auth/callback?token_hash=${data.properties.hashed_token}&type=magiclink`;
 const first = await fetch(link, { headers: { cookie: stale }, redirect: "manual" });
 const signedIn = first.headers.getSetCookie().some((c) => c.startsWith(key) && !c.includes("code-verifier") && !/max-age=0/i.test(c));
-check("token hash: signs in with a stale session present and lands on /project", first.status === 307 && first.headers.get("location") === `${base}/project` && signedIn, `${first.status} → ${first.headers.get("location")}`);
+check("token hash: signs in with a stale session present and lands on /projects", first.status === 307 && first.headers.get("location") === `${base}/projects` && signedIn, `${first.status} → ${first.headers.get("location")}`);
 const second = await fetch(link, { redirect: "manual" });
 check("token hash: the same link twice answers link_expired", second.headers.get("location") === `${base}/auth?error=link_expired`, String(second.headers.get("location")));
 

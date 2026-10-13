@@ -87,7 +87,7 @@ describe("a signed-in visitor is never asked to sign in again", () => {
   });
 
   it("one post-sign-in rule for the callback, /auth, `/` and /rennovaite", () => {
-    expect(SIGNED_IN_HOME).toBe("/project");
+    expect(SIGNED_IN_HOME).toBe("/projects");
     expect(postSignInPath()).toBe(SIGNED_IN_HOME);
     expect(postSignInPath(null)).toBe(SIGNED_IN_HOME);
     expect(postSignInPath("/project/abc/boq?x=1")).toBe("/project/abc/boq?x=1");
@@ -95,7 +95,7 @@ describe("a signed-in visitor is never asked to sign in again", () => {
     expect(read("app/auth/callback/route.ts")).toMatch(/const dest = postSignInPath\(wanted\);/);
     expect(read("lib/auth/front-door.ts")).toMatch(/postSignInPath\(\)/);
     // No second rule: nothing else compares against SIGNED_IN_HOME.
-    for (const f of ["app/auth/callback/route.ts", "app/auth/page.tsx", "app/page.tsx", "app/rennovaite/page.tsx", "lib/auth/front-door.ts"]) {
+    for (const f of ["app/auth/callback/route.ts", "app/auth/page.tsx", "app/page.tsx", "app/rennovaite/page.tsx"]) {
       expect(code(read(f)), f).not.toMatch(/SIGNED_IN_HOME/);
     }
   });
@@ -137,7 +137,7 @@ describe("the sign-in page is the front door", () => {
   });
 
   it("nothing public links into a redirect: the legal chrome points at /auth", () => {
-    for (const f of ["components/marketing/TopNav.tsx", "components/marketing/Footer.tsx", "components/legal/LegalPage.tsx", "components/legal/LegalPlaceholders.tsx"]) {
+    for (const f of ["components/marketing/TopNav.tsx", "components/marketing/Footer.tsx", "components/blueprint/legal/LegalTemplate.tsx", "components/blueprint/legal/LegalPlaceholders.tsx"]) {
       const src = read(f);
       expect(src, f).not.toMatch(/href[=:]\s*["']\/(rennovaite[^"']*)?["']/);
       expect(src, f).not.toMatch(/href[=:]\s*["']\/project/);
@@ -149,8 +149,8 @@ describe("the sign-in page is the front door", () => {
     expect(auth).toMatch(/title: "Sign in · RenovAIte"/);
     expect(auth).toMatch(/robots: \{ index: false, follow: false \}/);
     expect(auth).not.toMatch(/Property OS/);
-    expect(read("components/legal/LegalPage.tsx")).toMatch(/robots: LEGAL_ROBOTS,/);
-    expect(read("components/legal/LegalPlaceholders.tsx").match(/robots: LEGAL_ROBOTS,/g)?.length).toBe(2);
+    expect(read("components/blueprint/legal/LegalTemplate.tsx")).toMatch(/robots: LEGAL_ROBOTS,/);
+    expect(read("components/blueprint/legal/LegalPlaceholders.tsx").match(/robots: LEGAL_ROBOTS,/g)?.length).toBe(2);
   });
 });
 

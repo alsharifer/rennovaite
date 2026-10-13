@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { InspectPanel } from "@/components/viewer/InspectPanel";
+import { PlanInspector } from "@/components/blueprint/plan/PlanInspector";
 import type { RoomAreaDispute } from "@/lib/parse/disputes";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
 import {
@@ -106,7 +106,7 @@ export function PlanLayers({
 
   const panel =
     mode === "read" && inspect && target ? (
-      <InspectPanel
+      <PlanInspector
         target={target}
         boq={inspect.boq}
         projectId={inspect.projectId}

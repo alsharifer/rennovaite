@@ -4,6 +4,74 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## Found in K8 (2026-10-13) — everything on Blueprint, Dark open
+
+**Ruled in the K8 review (13 Oct) — #100 approved for squash-merge**
+
+- **PDF typefaces → K9.** Add IBM Plex Sans, JetBrains Mono and EB Garamond
+  (OFL) as TTF/OTF with their licence files; every server-rendered document
+  uses them (resvg reads TTF/OTF only — today they print in Arial / Consolas /
+  Georgia).
+- **Terms placeholder → done in #100.** The "project fee is AED 1,000" line
+  (and the line crediting that fee) is replaced by "Any fee is shown and
+  agreed before you are charged." Counsel finalises. The parked, unrouted
+  `components/marketing/home-landing.tsx` still prints "Project fee AED
+  1,000" — fix it if that landing ever returns.
+- **Garden timeline → K9.** Never the interior model for a garden project:
+  show the BoQ programme duration with the derived mark and the basis note
+  "scaled from one real Dubai garden project (~90 days)". Interior unchanged.
+- **Supplier choices into the BoQ → not this cycle.** `vendor_selections` are
+  saved and the Tender page's live total follows them, but `generate-boq`
+  never reads them; the page keeps its "scenario" label. Revisit after the
+  pilot.
+- **Drawings → K9, ink only.** No brass / terracotta inside sheets
+  (`lib/drawings/plan-sheet|demo-sheet|garden-sheets|garden-elevations.ts`,
+  ~33 uses): demolition = dashed, estimated items = hatch + the derived glyph,
+  symbols in ink.
+- **/community and /marketplace → done in #100.** The stub pages are deleted;
+  the 307 redirects to the projects home live in `next.config.ts`.
+- **Also K9**: the proposal reference = a per-firm sequence (e.g.
+  `MFO-P-0001`) stored on the proposal row; the drawing sheet's REV = the BoQ
+  revision the pack was generated from (never "—").
+- **Still open — headline basis.** Frames print "excl. VAT" beside headline
+  totals; every K8 surface prints the stored grand total "incl. contingency
+  and VAT" (the figure the BoQ pins) and says so. Not ruled; unchanged.
+
+**Not built (shown honestly, or left out, with the reason)**
+
+- No proposal reference number, firm contact line, "Design" or "Acceptance"
+  sections in the proposal (67:1396); no plan revision numbers (the 3D view's
+  "from plan rev N", the sheet's REV prints "—").
+- Supplier distance (60:913): the catalogue has none — the old page printed a
+  hard-coded per-brand table; dropped. "Send scope to contractors" has no
+  in-app sending: it explains the hand-over and links to Documents.
+- Reading your plan (63:4510): "Cancel upload" (the project exists before the
+  reading starts) and "you can leave this page" (a parse is tied to its
+  request); "Re-run parse" past 3 min would race the first reading — the
+  slow state opens the plan instead.
+- Help drawer (65:1247): no reply-time promise; no in-app way to add someone
+  to a project (operator script) — the article says to ask.
+- E-mails (69:1422 / 69:1438): templates are in `supabase/templates/` and the
+  local `config.toml`; the hosted dev + prod projects need the subject + HTML
+  pasted in Auth → Email Templates (check their OTP expiry is 3600 s — the copy
+  says 60 minutes). Supabase sends HTML only (no plain-text part). Nothing in
+  the app sends the invite yet (membership is granted by
+  `scripts/project-member-add.mjs`).
+- The rate-books list (63:1094) has no "Your role" column: firms have no roles.
+- The 2D plan inspector and the 3D view list a line's REF / description / qty
+  but no amount — an amount needs its mark; the BoQ row carries it.
+
+**Housekeeping**
+
+- `29cb63d` (#15) and `f2d9e5d` (#16) each picked up staged deletions from
+  the plan-editor restyle (`plot-size-fields`, `InspectPanel`,
+  `AtelierCanvas`); `f8966f0` restores a building tree. Squash on merge if a
+  bisectable history matters.
+- `app/globals.css` K7 hit-area rule still names `[data-atelier]` (matches
+  nothing now); `components/marketing/*` remain parked.
+- `scripts/k6-front-door-check.mjs` and `scripts/k5-plan-check.mjs` read the
+  K8 step keys now (`plan`, `cost` / `tender`).
+
 ## Front door (13 Oct, Abdallah)
 
 No public landing during the invite-only pilot: `/` and `/rennovaite` 307 to
@@ -19,7 +87,7 @@ No public landing during the invite-only pilot: `/` and `/rennovaite` 307 to
   deleted. `PropertyOsLanding` still links to `/rennovaite` and HomeLanding's
   CTAs into `/project/new`; fix those if either comes back.
 - **Lift the noindex** on `/auth`, `/privacy` and `/terms` (`robots` in
-  `app/auth/page.tsx`, `LEGAL_ROBOTS` in `components/legal/LegalPage.tsx`)
+  `app/auth/page.tsx`, `LEGAL_ROBOTS` in `components/blueprint/legal/LegalTemplate.tsx`)
   when a public landing returns; restore the TopNav / Footer product links
   then too.
 - **Supabase Site URL** still points at the root: a fallen-back magic link

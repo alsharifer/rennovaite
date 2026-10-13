@@ -65,7 +65,7 @@ describe("the branding panel (L4)", () => {
 });
 
 describe("the firm list", () => {
-  const src = read("app/firms/_components/firm-list.tsx");
+  const src = read("components/blueprint/book/RateBooksList.tsx");
   it("only calls /api/firms (which answers with the caller's firms)", () => {
     const urls = [...src.matchAll(/fetch\(\s*(`[^`]*`|"[^"]*"|'[^']*')/g)].map((m) => m[1]!.slice(1, -1));
     expect(urls).toEqual(["/api/firms"]);

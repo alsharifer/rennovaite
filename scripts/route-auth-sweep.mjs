@@ -177,7 +177,7 @@ const page = await call("GET", `${BASE}/project`, me.headers);
 check("a gated page renders for a signed-in caller", page.status === 200, `${page.status}`);
 for (const p of FRONT_DOOR_PAGES) {
   const r = await call("GET", BASE + p, me.headers);
-  check(`${p} (signed in) → 307 the post-sign-in home`, r.status === 307 && /\/project$/.test(r.location ?? ""), `${r.status} ${r.location}`);
+  check(`${p} (signed in) → 307 the post-sign-in home`, r.status === 307 && /\/projects$/.test(r.location ?? ""), `${r.status} ${r.location}`);
 }
 
 console.log(rows.join("\n"));

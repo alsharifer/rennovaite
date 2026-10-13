@@ -1,9 +1,5 @@
-import { PageSkeleton } from "@/components/app/boundaries";
+import { SegmentLoading } from "@/components/blueprint/shell/SegmentStates";
 
 export default function Loading() {
-  return (
-    <div className="p-12">
-      <PageSkeleton hero rows={2} />
-    </div>
-  );
+  return <SegmentLoading what="the renders studio" rows={4} />;
 }

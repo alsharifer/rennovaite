@@ -5,6 +5,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { LOW_CONFIDENCE_FLAG } from "@/lib/parse/constants";
 import { getParseProvider, type ParseAsset } from "@/lib/parse/providers";
 import { repairOverlaps, toRepairInput } from "@/lib/parse/repair";
+import { planCheck } from "@/lib/plan/plan-check";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -170,7 +171,11 @@ export async function POST(request: NextRequest) {
       /* parse_metrics not applied yet — non-fatal */
     }
 
-    return NextResponse.json({ success: true });
+    // K8 #12: the reading's real stages, for "Reading your plan" — rooms found,
+    // areas the drawing states, overlap pairs left after the repair (the plan
+    // check the plan page runs on the same rooms).
+    const check = planCheck(repaired.map((r, i) => ({ id: String(i), name: r.name_en ?? `Room ${i + 1}`, polygon: r.polygon })));
+    return NextResponse.json({ success: true, rooms: repaired.length, stated_areas: summary.stated_area_room_ids.length, overlap_pairs: check.pairs.length });
   } catch (err) {
     console.error("[api/parse-plan] error", err);
     const message = err instanceof Error ? err.message : "Parse failed.";

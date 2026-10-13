@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { BoqReview } from "@/components/blueprint/boq/BoqReview";
 import type { FurnitureView, RoomRollup } from "@/components/blueprint/boq/Extras";
 import { GenerateFirst } from "@/components/blueprint/boq/GenerateFirst";
+import { StepTabs } from "@/components/blueprint/shell/StepTabs";
+import { formatAED } from "@/lib/format/aed";
 import { getPageCaller } from "@/lib/auth/caller";
 import { findComponentDuplicates } from "@/lib/boq/component-dedupe";
 import { roomRollup } from "@/lib/boq/elements";
@@ -80,6 +82,9 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
     return (
       <div className="bp-boq px-6 py-8 md:px-8">
         <h1 className="sr-only">BoQ &amp; Review</h1>
+        <div className="mb-6">
+          <StepTabs step="cost" projectId={id} active="boq" persona={project.firm_id ? "firm" : "owner"} />
+        </div>
         <GenerateFirst projectId={id} />
       </div>
     );
@@ -206,6 +211,18 @@ export default async function BoqPage({ params, searchParams }: { params: Promis
   return (
     <>
       <h1 className="sr-only">BoQ &amp; Review</h1>
+      {/* K8 §6.0: owner 04 Cost = Bill of quantities | Specification (the firm journey has no tabs). */}
+      {persona === "owner" ? (
+        <div className="px-6 pt-6 md:px-8">
+          <StepTabs
+            step="cost"
+            projectId={id}
+            active="boq"
+            persona={persona}
+            meta={{ boq: `${model.headline.estimate ? "≈ " : ""}${formatAED(model.headline.total)}${model.headline.excluded.length ? "*" : ""}` }}
+          />
+        </div>
+      ) : null}
       <BoqReview
         model={model}
         rooms={rooms}

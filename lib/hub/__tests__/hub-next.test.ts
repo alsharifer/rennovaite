@@ -32,8 +32,8 @@ describe("nextFromRail", () => {
   });
 
   it("owner: nothing needs attention → the first step not yet done", () => {
-    const next = nextFromRail(P, { persona: "owner", statuses: { layout: { state: "done" }, ideation: { state: "available" }, moodboard: { state: "available" } } }, flags);
+    const next = nextFromRail(P, { persona: "owner", statuses: { plan: { state: "done" }, design: { state: "available" }, renders: { state: "available" } } }, flags);
     expect(next).toHaveLength(1);
-    expect(next[0]).toMatchObject({ step: "03 · IDEATION", title: "Next: Ideation", primary: { label: "Open Ideation" } });
+    expect(next[0]).toMatchObject({ step: "02 · DESIGN", title: "Next: Design", primary: { label: "Open Design", href: `/project/${P}/design` } });
   });
 });

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { createElement } from "react";
@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 
 import { StepList, stepAccessibleName, type RailStep } from "@/components/blueprint/shell/StepList";
 import { summarizeChanges } from "@/lib/boq/changes-since";
-import { FIRM_STEPS, activeStepKey } from "@/lib/journey";
+import { SIGNED_IN_HOME } from "@/lib/auth/link-error";
+import { FIRM_STEPS, OWNER_STEPS, activeStepKey } from "@/lib/journey";
 import { firmStepStatuses, ownerStepStatuses, type JourneyFacts, type PlanBlock } from "@/lib/journey-state";
 
 // =============================================================================
@@ -27,7 +28,7 @@ function facts(over: Partial<JourneyFacts> = {}, firm: Partial<NonNullable<Journ
     planBlock: null,
     boq: { rev: 4, createdAt: "2026-10-01T10:00:00Z" },
     specSelections: 2,
-    owner: { brief: true, moodboardItems: 3, renders: 5 },
+    owner: { brief: true, moodboardItems: 3, renders: 5, unpricedLines: 0 },
     firm: {
       bookStatus: "reviewed",
       basis: { referenceLines: 0, totalLines: 18 },
@@ -125,37 +126,64 @@ describe("firm journey — the state matrix", () => {
   });
 });
 
-describe("owner journey", () => {
-  it("done where the owner's work exists; the plan check blocks costing", () => {
-    const s = ownerStepStatuses(facts({ firm: null }));
-    expect(s.intake?.state).toBe("done");
-    expect(s.layout?.state).toBe("done");
-    expect(s.render?.state).toBe("done");
-    expect(s.costing?.state).toBe("done");
-    expect(ownerStepStatuses(facts({ firm: null, planBlock: OVERLAPS })).costing).toMatchObject({ state: "blocked", reason: OVERLAPS.reason });
+describe("owner journey (K8, spec §6.0)", () => {
+  const owner = (o: Partial<JourneyFacts["owner"]> = {}, over: Partial<JourneyFacts> = {}) => facts({ firm: null, ...over, owner: { brief: true, moodboardItems: 3, renders: 5, unpricedLines: 0, ...o } });
+
+  it("one status per owner step, in the step list's keys", () => {
+    expect(Object.keys(ownerStepStatuses(owner())).sort()).toEqual(OWNER_STEPS.map((s) => s.key).sort());
+  });
+
+  it("done where the owner's work exists; the plan check blocks cost and tender", () => {
+    const s = ownerStepStatuses(owner());
+    expect(s.plan.state).toBe("done");
+    expect(s.design.state).toBe("done");
+    expect(s.renders.state).toBe("done");
+    expect(s.cost.state).toBe("done");
+    expect(s.tender.state).toBe("available");
+    const blocked = ownerStepStatuses(owner({}, { planBlock: OVERLAPS }));
+    expect(blocked.cost).toMatchObject({ state: "blocked", reason: OVERLAPS.reason });
+    expect(blocked.tender).toMatchObject({ state: "blocked", reason: OVERLAPS.reason });
+    expect(blocked.plan).toMatchObject({ state: "attention", reason: OVERLAPS.reason });
+  });
+
+  it("02 Design wants attention until 3 references are pinned", () => {
+    for (const n of [0, 1, 2]) expect(ownerStepStatuses(owner({ moodboardItems: n })).design).toMatchObject({ state: "attention", reason: "Add references", fix: { href: `/project/${P}/design?view=references` } });
+    expect(ownerStepStatuses(owner({ moodboardItems: 3 })).design.state).toBe("done");
+  });
+
+  it("unpriced lines: 04 Cost needs attention, 06 Tender is blocked until they are priced", () => {
+    const s = ownerStepStatuses(owner({ unpricedLines: 2 }));
+    expect(s.cost).toMatchObject({ state: "attention", reason: "2 items not priced" });
+    expect(s.tender).toMatchObject({ state: "blocked", reason: "Price 2 items first" });
+    expect(ownerStepStatuses(owner({ unpricedLines: 1 })).tender.reason).toBe("Price 1 item first");
   });
 });
 
 describe("which step a page lights", () => {
-  const F = { drawingsEnabled: true };
   it("firm: exact project-relative match (07 is not 05)", () => {
-    expect(activeStepKey("firm", `/project/${P}`, P, F)).toBe("hub");
-    expect(activeStepKey("firm", `/project/${P}/plan`, P, F)).toBe("scope");
-    expect(activeStepKey("firm", `/project/${P}/rates`, P, F)).toBe("rates_basis");
-    expect(activeStepKey("firm", `/project/${P}/boq`, P, F)).toBe("boq_review");
-    expect(activeStepKey("firm", `/project/${P}/boq/revisions`, P, F)).toBe("revisions");
-    expect(activeStepKey("firm", `/project/${P}/drawings`, P, F)).toBe("documents");
-    expect(activeStepKey("firm", `/project/${P}/proposal`, P, F)).toBe("proposal");
-    expect(activeStepKey("firm", `/project/${P}/viewer`, P, F)).toBeNull();
-    expect(activeStepKey("firm", "/settings", null, F)).toBeNull();
+    expect(activeStepKey("firm", `/project/${P}`, P)).toBe("hub");
+    expect(activeStepKey("firm", `/project/${P}/plan`, P)).toBe("scope");
+    expect(activeStepKey("firm", `/project/${P}/rates`, P)).toBe("rates_basis");
+    expect(activeStepKey("firm", `/project/${P}/boq`, P)).toBe("boq_review");
+    expect(activeStepKey("firm", `/project/${P}/boq/revisions`, P)).toBe("revisions");
+    expect(activeStepKey("firm", `/project/${P}/drawings`, P)).toBe("documents");
+    expect(activeStepKey("firm", `/project/${P}/proposal`, P)).toBe("proposal");
+    expect(activeStepKey("firm", `/project/${P}/viewer`, P)).toBeNull();
+    expect(activeStepKey("firm", "/settings", null)).toBeNull();
   });
 
-  it("owner: the existing steps, style folding into ideation", () => {
-    expect(activeStepKey("owner", "/project/new", null, F)).toBe("intake");
-    expect(activeStepKey("owner", `/project/${P}/plan`, P, F)).toBe("layout");
-    expect(activeStepKey("owner", `/project/${P}/style`, P, F)).toBe("ideation");
-    expect(activeStepKey("owner", `/project/${P}/boq`, P, F)).toBe("costing");
-    expect(activeStepKey("owner", `/project/${P}/drawings`, P, F)).toBe("downloads");
+  it("owner: seven steps; two-route steps light on both routes; the intake is 01 Plan", () => {
+    expect(activeStepKey("owner", "/project/new", null)).toBe("plan");
+    expect(activeStepKey("owner", `/project/${P}`, P)).toBe("overview");
+    expect(activeStepKey("owner", `/project/${P}/plan`, P)).toBe("plan");
+    expect(activeStepKey("owner", `/project/${P}/design`, P)).toBe("design");
+    expect(activeStepKey("owner", `/project/${P}/render`, P)).toBe("renders");
+    expect(activeStepKey("owner", `/project/${P}/boq`, P)).toBe("cost");
+    expect(activeStepKey("owner", `/project/${P}/accessories`, P)).toBe("cost");
+    expect(activeStepKey("owner", `/project/${P}/timeline`, P)).toBe("timeline");
+    expect(activeStepKey("owner", `/project/${P}/drawings`, P)).toBe("tender");
+    expect(activeStepKey("owner", `/project/${P}/vendors`, P)).toBe("tender");
+    expect(activeStepKey("owner", `/project/${P}/viewer`, P)).toBeNull();
   });
 });
 
@@ -217,7 +245,7 @@ describe("chrome wiring + route triage (spec §3.10)", () => {
   };
 
   it("every redesigned segment frames itself in a layout and has its own loading / error / not-found inside the shell", () => {
-    for (const seg of ["boq", "plan", "drawings", "rates", "proposal"]) {
+    for (const seg of ["boq", "plan", "drawings", "rates", "proposal", "design", "render", "accessories", "timeline", "vendors", "viewer"]) {
       const dir = `app/project/[id]/${seg}`;
       expect(read(`${dir}/layout.tsx`), seg).toContain("<ProjectShell");
       expect(read(`${dir}/loading.tsx`), seg).toContain("SegmentLoading");
@@ -226,24 +254,21 @@ describe("chrome wiring + route triage (spec §3.10)", () => {
     }
     expect(read("app/firms/[firmId]/layout.tsx")).toContain("<AccountShell");
     expect(read("app/settings/layout.tsx")).toContain("<AccountShell");
+    expect(read("app/projects/layout.tsx")).toContain("<AccountShell");
     // The hub sits at the [id] level and frames itself; its loading draws the chrome.
-    expect(read("app/project/[id]/page.tsx")).toContain(`<ProjectShell projectId={projectId} content="blueprint">`);
+    expect(read("app/project/[id]/page.tsx")).toContain(`<ProjectShell projectId={projectId}>`);
     // K6: the intake is Blueprint too (warm skin), framed without a project.
-    expect(read("app/project/new/page.tsx")).toContain(`<AccountShell content="blueprint" skin="warm">`);
+    expect(read("app/project/new/page.tsx")).toContain(`<AccountShell skin="warm">`);
     expect(read("app/project/[id]/loading.tsx")).toContain("ShellSkeleton");
   });
 
-  it("the firm surfaces no longer carry the old chrome (Atelier pages keep theirs)", () => {
-    for (const f of ["app/project/[id]/boq/page.tsx", "app/project/[id]/boq/revisions/page.tsx", "app/project/[id]/drawings/page.tsx", "app/project/[id]/plan/page.tsx", "app/project/[id]/page.tsx", "app/firms/[firmId]/page.tsx", "app/firms/page.tsx"]) {
-      expect(read(f), f).not.toMatch(/AppShell|JourneyProgress|JourneyChrome/);
-    }
-    for (const f of ["app/project/[id]/render/page.tsx", "app/project/[id]/ideation/page.tsx", "app/project/[id]/accessories/page.tsx"]) expect(read(f), f).toContain("AppShell");
-  });
-
-  it("Marketplace and Community are cut from navigation; the routes remain", () => {
-    expect(read("components/app/Sidebar.tsx")).not.toMatch(/href: "\/(marketplace|community)"/);
+  it("Marketplace and Community are cut from navigation, have no page, and redirect (307) to the Projects home", () => {
+    expect(read("components/blueprint/shell/JourneyRail.tsx")).not.toMatch(/\/(marketplace|community)/);
     expect(read("components/marketing/TopNav.tsx")).not.toContain('"/marketplace"');
-    expect(exists("app/marketplace/page.tsx") && exists("app/community/page.tsx")).toBe(true);
+    for (const r of ["marketplace", "community"]) {
+      expect(existsSync(path.join(process.cwd(), "app", r, "page.tsx")), r).toBe(false);
+      expect(read("next.config.ts")).toContain(`{ source: "/${r}", destination: "${SIGNED_IN_HOME}", permanent: false }`);
+    }
   });
 
   it("/support opens the help drawer; /firms goes straight to a single firm's book", () => {

@@ -3,13 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  EMPTY_PLOT,
-  parsePlot,
-  PlotSizeFields,
-  type PlotDraft,
-} from "@/components/plan/plot-size-fields";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/blueprint/Button";
+import { Icon } from "@/components/blueprint/Icon";
+import { PlotSizeFields } from "@/components/blueprint/plan/PlotSizeFields";
+import { EMPTY_PLOT, parsePlot, type PlotDraft } from "@/lib/plan/plot";
 
 /**
  * What the plan page shows when it has no rooms to edit.
@@ -22,6 +19,8 @@ import { Button } from "@/components/ui/button";
  * could reach with no way out of it.
  *
  * So: say which of those happened, and offer the two things that actually help.
+ * Blueprint (K8, the parse-failure state of 24:814): a dashed-hairline empty
+ * state, a failed action is the inverse block, a disabled action says why.
  */
 export function PlanNotAnalysed({
   planId,
@@ -103,79 +102,62 @@ export function PlanNotAnalysed({
       ? "The upload finished but the analysis never ran, or it didn't complete."
       : "There is nothing here to read, so the layout has to be drawn by hand.";
 
-  return (
-    <div className="rounded-xl border border-ink-100 bg-paper p-12">
-      <div className="mx-auto max-w-[620px] text-center">
-        <span
-          className="material-symbols-outlined mb-md text-[32px] text-brass-600"
-          aria-hidden="true"
-        >
-          {parseRan ? "search_off" : "draft"}
-        </span>
-        <h2 className="mb-sm font-display text-headline-md text-ink-900">{headline}</h2>
-        <p className="mb-lg font-body text-body-md text-on-surface-variant">{body}</p>
+  // Disabled controls name their reason (K7): the busy line below is the reason.
+  const busyReason = busy === "parse" ? "The analysis is running." : busy === "draw" ? "Switching to drawing…" : "";
+  const busyOff = busy !== null ? { reason: busyReason, reasonId: "plan-not-analysed-busy" } : false;
+  const plotReady = parsePlot(plot) !== null;
+  const startOff = busy !== null ? busyOff : !plotReady ? { reason: "Enter the plot's width and depth first.", reasonId: "takeover-needs-plot", showReason: true } : false;
 
-        {error && (
-          <p className="mb-md font-body-sm text-body-sm text-status-error">{error}</p>
-        )}
+  return (
+    <section aria-labelledby="plan-not-analysed-h" className="border border-dashed border-bp-line-strong bg-bp-surface-raised p-6 md:p-10" data-plan-not-analysed>
+      <div className="max-w-[620px]">
+        <Icon name={parseRan ? "search_off" : "draft"} className="mb-3 text-[28px] text-bp-ink-secondary" />
+        <h2 id="plan-not-analysed-h" className="t-heading-md text-bp-ink-primary">
+          {headline}
+        </h2>
+        <p className="t-body-md mt-2 text-bp-ink-secondary">{body}</p>
+
+        {error ? (
+          <div role="alert" className="surface-inverse mt-4 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink">
+            <p className="t-body-sm">{error}</p>
+          </div>
+        ) : null}
+        <p id="plan-not-analysed-busy" className="sr-only" aria-live="polite">
+          {busyReason}
+        </p>
 
         {drawing ? (
-          <div className="mx-auto max-w-[440px] rounded-lg border border-ink-100 bg-canvas p-lg text-left">
-            <p className="mb-md font-body-sm text-body-sm text-ink-700">
+          <div className="mt-6 max-w-[480px] border border-bp-line-hairline bg-bp-surface-base p-5">
+            <p className="t-body-sm mb-4 text-bp-ink-secondary">
               Drawing by hand keeps this project, the uploaded file and anything
               already attached to it. All it needs is the one thing the analysis
               could not give us — a scale.
             </p>
-            <PlotSizeFields
-              value={plot}
-              onChange={setPlot}
-              idPrefix="takeover"
-              disabled={busy === "draw"}
-            />
-            <div className="mt-lg flex items-center gap-md">
-              <Button
-                type="button"
-                onClick={takeOver}
-                disabled={!parsePlot(plot) || busy === "draw"}
-              >
+            <PlotSizeFields value={plot} onChange={setPlot} idPrefix="takeover" disabled={busy === "draw"} />
+            <div className="mt-5 flex flex-wrap items-center gap-4">
+              <Button kind="primary" onClick={takeOver} disabled={startOff}>
                 {busy === "draw" ? "Switching…" : "Start drawing"}
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setDrawing(false)}
-                disabled={busy === "draw"}
-                className="text-on-surface-variant hover:text-ink-900"
-              >
+              <Button kind="quiet" onClick={() => setDrawing(false)} disabled={busy === "draw" ? busyOff : false}>
                 Cancel
               </Button>
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center justify-center gap-md">
+          <div className="mt-6 flex flex-wrap items-center gap-4">
             {hasDrawing && (
-              <Button type="button" onClick={analyse} disabled={busy !== null}>
-                {busy === "parse"
-                  ? "Analysing…"
-                  : parseRan
-                    ? "Run the analysis again"
-                    : "Run the analysis"}
+              <Button kind="primary" onClick={analyse} disabled={busyOff}>
+                {busy === "parse" ? "Analysing…" : parseRan ? "Run the analysis again" : "Run the analysis"}
               </Button>
             )}
             {canDraw && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDrawing(true)}
-                disabled={busy !== null}
-                className="border-ink-100 bg-paper text-ink-900 hover:bg-surface-container"
-              >
+              <Button kind={hasDrawing ? "secondary" : "primary"} onClick={() => setDrawing(true)} disabled={busyOff}>
                 Draw the layout by hand
               </Button>
             )}
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }

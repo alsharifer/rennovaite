@@ -39,13 +39,20 @@ import {
   type Pt,
   type RawRoomInput,
 } from "@/lib/overlays/viewbox";
-import { cn } from "@/lib/utils";
+import { Icon } from "@/components/blueprint/Icon";
 
-const BONE = "#EDE6D8";
-const INK_900 = "#0F1B2D";
-const INK_500 = "#64748b";
-const BRASS = "#A4793A";
-const AMBER = "#92400E";
+import {
+  CANVAS_FRAME,
+  chipState,
+  CHIP_BTN,
+  FIELD,
+  LABEL,
+  NUM_FIELD_BASE,
+  SMALL_BTN,
+  SVG,
+  TAG,
+  TOOL_BTN,
+} from "./editor-chrome";
 
 export type OpeningKind = "door" | "window" | "archway";
 
@@ -452,23 +459,19 @@ export function OpeningsEditor({
     <div className="space-y-3">
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-bp-ink-secondary">
-            {selectedWall ? "Add to selected wall:" : "Select a wall to add an opening"}
+          <span id="openings-add-hint" className={`${LABEL} mr-1`}>
+            {selectedWall ? "Add to selected wall" : "Select a wall to add an opening"}
           </span>
           {KINDS.map((k) => (
             <button
               key={k.key}
               type="button"
               disabled={!selectedWall || busy}
+              aria-describedby={!selectedWall ? "openings-add-hint" : undefined}
               onClick={() => void addOpening(k.key)}
-              className={cn(
-                "flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors",
-                selectedWall && !busy
-                  ? "border-ink-100 bg-paper text-ink-900 hover:bg-surface-container"
-                  : "cursor-not-allowed border-ink-100 bg-paper text-bp-ink-secondary opacity-50",
-              )}
+              className={`${CHIP_BTN} ${chipState(false)}`}
             >
-              <span className="material-symbols-outlined text-sm">{k.glyph}</span>
+              <Icon name={k.glyph} className="text-[16px]" />
               {k.label}
             </button>
           ))}
@@ -481,26 +484,21 @@ export function OpeningsEditor({
                 ? `Undo: ${undoStack[undoStack.length - 1]!.label}`
                 : "Nothing to undo"
             }
-            className={cn(
-              "flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs transition-colors",
-              undoStack.length > 0 && !busy
-                ? "text-ink-700 hover:bg-surface-container hover:text-ink-900"
-                : "cursor-not-allowed text-bp-ink-secondary opacity-50",
-            )}
+            className={TOOL_BTN}
           >
-            <span className="material-symbols-outlined text-sm">undo</span>
+            <Icon name="undo" className="text-[16px]" />
             Undo
             {undoStack.length > 0 && (
-              <span className="text-bp-ink-secondary">({undoStack.length})</span>
+              <span className="t-num-sm text-bp-ink-secondary">({undoStack.length})</span>
             )}
           </button>
-          <span className="ml-auto flex items-center gap-2 text-xs text-bp-ink-secondary">
+          <span className="ml-auto flex items-center gap-2 t-label-md text-bp-ink-secondary">
             <span>
               {openings.length} opening{openings.length === 1 ? "" : "s"}
             </span>
             {derivedCount > 0 && (
               <span
-                className="rounded-full bg-[#FEF3C7] px-2 py-0.5 font-medium text-[#92400E]"
+                className={TAG}
                 title="Dimensions were defaulted, not measured — these never read as measured quantities."
               >
                 {derivedCount} derived
@@ -511,12 +509,12 @@ export function OpeningsEditor({
       )}
 
       {error && (
-        <p className="rounded border border-status-error/40 bg-status-error/5 px-2 py-1 text-xs text-status-error">
-          {error}
-        </p>
+        <div role="alert" className="surface-inverse bg-bp-alert-surface px-4 py-3 text-bp-alert-ink">
+          <p className="t-body-sm">{error}</p>
+        </div>
       )}
 
-      <div className="relative overflow-hidden rounded-md border border-ink-100 bg-paper">
+      <div className={`relative ${CANVAS_FRAME}`}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
@@ -535,7 +533,7 @@ export function OpeningsEditor({
             <g key={r.id}>
               <polygon
                 points={r.pts.map((p) => p.join(",")).join(" ")}
-                fill={BONE}
+                fill={SVG.roomFill}
                 fillOpacity={0.5}
                 stroke="none"
               />
@@ -544,8 +542,8 @@ export function OpeningsEditor({
                 y={r.pts.reduce((s, p) => s + p[1], 0) / r.pts.length}
                 textAnchor="middle"
                 fontSize={13}
-                fill={INK_500}
-                style={{ fontFamily: "Inter, sans-serif", fontWeight: 500 }}
+                fill={SVG.inkTertiary}
+                style={{ fontFamily: SVG.sans, fontWeight: 500 }}
                 pointerEvents="none"
               >
                 {r.name_en}
@@ -566,7 +564,7 @@ export function OpeningsEditor({
                   y1={a[1]}
                   x2={b[0]}
                   y2={b[1]}
-                  stroke={isSel ? BRASS : INK_900}
+                  stroke={isSel ? SVG.brass : SVG.ink}
                   strokeWidth={isSel ? 4 : 1.5}
                   strokeLinecap="round"
                 />
@@ -612,10 +610,10 @@ export function OpeningsEditor({
         </svg>
 
         {loading && (
-          <p className="absolute left-3 top-3 text-xs text-bp-ink-secondary">Loading openings…</p>
+          <p className="absolute left-3 top-3 t-label-md text-bp-ink-secondary">Loading openings…</p>
         )}
         {!loading && walls.length === 0 && (
-          <p className="absolute left-3 top-3 text-xs text-bp-ink-secondary">
+          <p className="absolute left-3 top-3 t-body-sm text-bp-ink-secondary">
             No walls derived from this plan — confirm the room geometry first.
           </p>
         )}
@@ -667,8 +665,9 @@ export function OpeningsEditor({
  *             swing arc from the leaf tip back to the far jamb.
  *   window  — the jamb gap plus a double line across it.
  *   archway — the jamb gap with open (unstopped) jambs, no leaf and no glazing.
- * A derived (defaulted-dimension) opening is drawn in amber and dashed so it
- * reads as provisional at a glance.
+ * A derived (defaulted-dimension) opening is drawn dashed in the secondary ink
+ * so it reads as provisional at a glance (Blueprint: no status hue — the dash
+ * says it).
  */
 function OpeningGlyph({
   opening: o,
@@ -703,8 +702,8 @@ function OpeningGlyph({
   const p0: Pt = [centre[0] - ux * halfPx, centre[1] - uy * halfPx];
   const p1: Pt = [centre[0] + ux * halfPx, centre[1] + uy * halfPx];
 
-  const stroke = o.derived ? AMBER : INK_900;
-  const accent = selected ? BRASS : stroke;
+  const stroke = o.derived ? SVG.inkSecondary : SVG.ink;
+  const accent = selected ? SVG.brass : stroke;
   const dash = o.derived ? "3 2" : undefined;
 
   // Leaf length = opening width (a door leaf is as long as its clear opening).
@@ -722,7 +721,7 @@ function OpeningGlyph({
         y1={p0[1]}
         x2={p1[0]}
         y2={p1[1]}
-        stroke="#FFFFFF"
+        stroke={SVG.surface}
         strokeWidth={6}
         strokeLinecap="butt"
       />
@@ -789,7 +788,7 @@ function OpeningGlyph({
       )}
 
       {selected && (
-        <circle cx={centre[0]} cy={centre[1]} r={3.5} fill={BRASS} stroke="#FFFFFF" strokeWidth={1} />
+        <circle cx={centre[0]} cy={centre[1]} r={3.5} fill={SVG.brass} stroke={SVG.surface} strokeWidth={1} />
       )}
     </g>
   );
@@ -829,15 +828,14 @@ function OpeningProperties({
   const areaM2 = ((o.width_mm / 1000) * (o.height_mm / 1000)).toFixed(2);
 
   return (
-    <div className="rounded-md border border-ink-100 bg-paper p-3">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="material-symbols-outlined text-base text-ink-700">
-          {o.kind === "door" ? "door_front" : o.kind === "window" ? "window" : "meeting_room"}
-        </span>
+    <div className="border border-bp-line-hairline bg-bp-surface-raised p-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Icon name={o.kind === "door" ? "door_front" : o.kind === "window" ? "window" : "meeting_room"} className="text-[18px] text-bp-ink-secondary" />
         <select
           value={o.kind}
+          aria-label="Opening type"
           onChange={(e) => onChange({ kind: e.target.value })}
-          className="rounded border border-ink-100 bg-paper px-1.5 py-0.5 text-xs text-ink-900"
+          className={FIELD}
         >
           {KINDS.map((k) => (
             <option key={k.key} value={k.key}>
@@ -845,25 +843,26 @@ function OpeningProperties({
             </option>
           ))}
         </select>
-        <span className="rounded-full border border-ink-100 px-2 py-0.5 text-[11px] text-bp-ink-secondary">
+        <span className={TAG}>
           {o.source === "parsed" ? "From parse" : "User drawn"}
         </span>
         {o.derived && (
           <span
-            className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[11px] font-medium text-[#92400E]"
+            className={TAG}
             title="Dimensions defaulted, not measured. Enter a width and height to record a measurement."
           >
             derived — defaulted size
           </span>
         )}
-        <span className="ml-auto font-mono text-xs tabular-nums text-bp-ink-secondary">
+        <span className="ml-auto t-num-sm text-bp-ink-secondary">
           {areaM2} m²
         </span>
         <button
           type="button"
           onClick={onDelete}
-          className="rounded border border-ink-100 px-1.5 py-0.5 text-xs text-status-error hover:bg-status-error/10"
+          className={SMALL_BTN}
         >
+          <Icon name="delete" className="text-[16px]" />
           Delete
         </button>
       </div>
@@ -876,7 +875,7 @@ function OpeningProperties({
           ] as const
         ).map(([label, val, set]) => (
           <label key={label} className="flex flex-col gap-1">
-            <span className="text-[11px] uppercase tracking-wider text-bp-ink-secondary">{label}</span>
+            <span className="t-label-caps text-bp-ink-tertiary">{label}</span>
             <input
               type="number"
               value={val}
@@ -888,11 +887,11 @@ function OpeningProperties({
                   commitDims();
                 }
               }}
-              className="w-24 rounded border border-ink-100 bg-paper px-2 py-1 font-mono text-xs tabular-nums text-ink-900 focus-ring"
+              className={`${NUM_FIELD_BASE} w-24`}
             />
           </label>
         ))}
-        <p className="text-[11px] text-bp-ink-secondary">
+        <p className="t-body-sm text-bp-ink-secondary">
           Entering a width <em>and</em> height records a measurement and clears the
           derived flag.
         </p>

@@ -7,21 +7,16 @@
 // with the derived convention (lib/documents/boq-derived.ts), and every rate's
 // source shown by its public label — never a contractor.
 //
-// Pure page builder (SVG, A4 portrait) + a server wrapper that rasterises each
-// page through resvg into pdf-lib, like the drawing set. The SVGs are returned
-// alongside the PDF so the identity assertion can scan exactly what was printed.
+// K8 #16: the pages are built in ./boq-pdf-pages (A4 landscape, Blueprint
+// paper, marks per line — Figma 68:1396). This module keeps the shared input
+// type, the A4 portrait primitives the revision-diff PDF still uses, and the
+// server wrapper that rasterises pages through resvg into pdf-lib. The SVGs
+// are returned alongside the PDF so the identity assertion can scan exactly
+// what was printed.
 // =============================================================================
 
 import { stampPdfDay } from "@/lib/documents/pdf-date";
 import { esc } from "@/lib/drawings/sheet";
-
-import { OHP_LINE_LABEL } from "@/lib/rates/ohp";
-
-import { assignRefs, refMigration } from "@/lib/boq/refs";
-import { sortSections } from "@/lib/boq/section-order";
-
-import { boqDerivedInfo, derivedLineNote, derivedTotal } from "./boq-derived";
-import { formatAed } from "@/lib/format/aed";
 
 export const BOQ_PAGE_W = 210;
 export const BOQ_PAGE_H = 297;
@@ -76,18 +71,6 @@ export interface BoqPdfInput {
   };
 }
 
-const STATUS_MARK: Record<string, { mark: string; label: string }> = {
-  actual_transaction: { mark: "A", label: "rate from a completed comparable project" },
-  site_assessment: { mark: "S", label: "allowance — confirm against this site" },
-  needs_qs: { mark: "Q", label: "no reference rate — QS to price (rate 0)" },
-  needs_selection: { mark: "C", label: "a choice is still open — priced at the cheaper default" },
-  indicative: { mark: "I", label: "indicative" },
-  priced: { mark: "P", label: "catalogue price" },
-};
-
-// H7: every BoQ figure on paper to the fils, so 12.25 × 1,366.69 = 16,741.95
-// can be checked with a calculator — whole dirhams never multiplied out.
-const aed = (n: number) => formatAed(n, "money");
 const f1 = (n: number) => (Math.round(n * 10) / 10).toString();
 
 /**
@@ -115,247 +98,9 @@ function wrap(text: string, max: number): string[] {
   return out;
 }
 
-type Row =
-  | { kind: "section"; title: string }
-  | { kind: "line"; line: BoqPdfLine; desc: string[]; sub: string[]; ref: string }
-  | { kind: "section_total"; title: string; total: number };
-
-/** Build the BoQ pages. Deterministic. */
-export function buildBoqPdfPages(input: BoqPdfInput): string[] {
-  const { boq } = input;
-  const info = boqDerivedInfo(boq);
-  const total = derivedTotal(boq.grand_total_aed, info);
-  const statement = info.draft ? info.statement : null;
-
-  // D5: the same unique REF the screen shows — screen and paper reconcile line by line.
-  const refs = assignRefs(boq.sections);
-  const rows: Row[] = [];
-  // H7: THE canonical section order, for any stored revision (REFs are per
-  // section, so the order cannot move one).
-  for (const s of sortSections(boq.sections)) {
-    rows.push({ kind: "section", title: s.work_section });
-    s.lines.forEach((l, idx) => {
-      const sub = [derivedLineNote(l), l.vendor_or_source ? `Source: ${l.vendor_or_source}` : null].filter((x): x is string => !!x).flatMap((x) => wrap(x, 64));
-      rows.push({ kind: "line", line: l, desc: wrap(l.description, 42).slice(0, 4), sub, ref: refs[`${s.work_section}-${idx}`]! });
-    });
-    rows.push({ kind: "section_total", title: s.work_section, total: s.section_total_aed });
-  }
-  const DESC_H = 3.4 * K;
-  const SUB_H = 3 * K;
-  const rowH = (r: Row) => (r.kind === "section" ? 9 : r.kind === "section_total" ? 8 : DESC_H * r.desc.length + SUB_H * r.sub.length + 2.6);
-
-  const header = (n: number) => {
-    let s = t(M, 14, "RenovAIte", { size: 4.4, fill: BRASS, font: FONT_DISPLAY });
-    s += t(BOQ_PAGE_W - M, 14, `${input.projectName} · Bill of Quantities`, { size: 2.6, fill: INK_500, anchor: "end" });
-    let y = 18;
-    if (statement) {
-      s += `<rect x="${M}" y="${y}" width="${BOQ_PAGE_W - 2 * M}" height="9" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.45" data-boq-draft="true"/>`;
-      s += t(M + 3, y + 5.8, statement, { size: 2.7, fill: TERRACOTTA, weight: 700 });
-      y += 11;
-    } else {
-      s += `<line x1="${M}" y1="${y}" x2="${BOQ_PAGE_W - M}" y2="${y}" stroke="${INK_100}" stroke-width="0.3"/>`;
-      y += 3;
-    }
-    s += t(BOQ_PAGE_W - M, BOQ_PAGE_H - 8, `${n}`, { size: 2.4, fill: INK_500, font: FONT_MONO, anchor: "end" });
-    s += t(M, BOQ_PAGE_H - 8, `POMI work sections · AED · dated ${input.dateISO}`, { size: 2.2, fill: INK_500 });
-    return { svg: s, y };
-  };
-
-  const colHead = (y: number) =>
-    t(M + 4, y, "REF", { size: 2.1, fill: INK_500, spacing: "0.06em" }) +
-    t(M + 18, y, "DESCRIPTION", { size: 2.1, fill: INK_500, spacing: "0.06em" }) +
-    t(128, y, "QTY", { size: 2.1, fill: INK_500, anchor: "end" }) +
-    t(131, y, "UNIT", { size: 2.1, fill: INK_500 }) +
-    t(162, y, "RATE", { size: 2.1, fill: INK_500, anchor: "end" }) +
-    t(BOQ_PAGE_W - M, y, "TOTAL", { size: 2.1, fill: INK_500, anchor: "end" }) +
-    `<line x1="${M}" y1="${f1(y + 1.6)}" x2="${BOQ_PAGE_W - M}" y2="${f1(y + 1.6)}" stroke="${INK_100}" stroke-width="0.3"/>`;
-
-  const pages: string[] = [];
-  let n = 1;
-  let { svg, y } = header(n);
-
-  // Title block on page 1.
-  svg += t(M, y + 12, "Bill of Quantities", { size: 9, font: FONT_DISPLAY });
-  svg += t(M, y + 19, `${input.projectName} · ${input.community}`, { size: 3.2, fill: INK_700 });
-  svg += t(BOQ_PAGE_W - M, y + 12, total.text, { size: 7.5, font: FONT_MONO, anchor: "end" });
-  svg += t(BOQ_PAGE_W - M, y + 19, "grand total incl. contingency and VAT", { size: 2.4, fill: INK_500, anchor: "end" });
-  // D4: a total never silently counts a to-be-priced line at zero.
-  if (total.excludes) svg += t(BOQ_PAGE_W - M, y + 23, total.excludes, { size: 2.6, fill: TERRACOTTA, anchor: "end", weight: 700 }).replace("<text ", '<text data-headline-excludes="true" ');
-  y += total.excludes ? 28 : 24;
-  if (total.footnote) {
-    for (const line of wrap(total.footnote, 88)) {
-      svg += t(M, y, line, { size: 2.4, fill: TERRACOTTA });
-      y += 3.2 * K;
-    }
-    y += 1;
-  }
-  const g = boq.garden;
-  if (g && ((g.kept?.length ?? 0) > 0 || (g.removals?.length ?? 0) > 0 || (g.undecided?.length ?? 0) > 0)) {
-    const lines = [
-      g.kept?.length ? `Existing on site, kept and excluded from demolition and new work: ${g.kept.map((k) => k.name).join(", ")}.` : null,
-      g.removals?.length ? `Existing on site, taken out (in the demolition line): ${g.removals.map((r) => `${r.name} (${r.disposition})`).join(", ")}.` : null,
-      g.undecided?.length ? `Not yet decided (in no quantity): ${g.undecided.map((u) => u.name).join(", ")}.` : null,
-    ].filter((x): x is string => !!x);
-    for (const para of lines) {
-      for (const line of wrap(para, 90)) {
-        svg += t(M, y, line, { size: 2.3, fill: INK_700 });
-        y += 3.1 * K;
-      }
-    }
-    y += 2;
-  }
-  y += 4;
-  svg += colHead(y);
-  y += 6;
-
-  const bottom = BOQ_PAGE_H - 30;
-  const flush = () => {
-    pages.push(page(svg));
-    n += 1;
-    const h = header(n);
-    svg = h.svg + colHead(h.y + 6);
-    y = h.y + 12;
-  };
-
-  for (const r of rows) {
-    if (y + rowH(r) > bottom) flush();
-    if (r.kind === "section") {
-      svg += t(M, y + 4, r.title.toUpperCase(), { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
-      y += 8;
-    } else if (r.kind === "section_total") {
-      svg += `<line x1="120" y1="${f1(y)}" x2="${BOQ_PAGE_W - M}" y2="${f1(y)}" stroke="${INK_100}" stroke-width="0.3"/>`;
-      svg += t(162, y + 4, `${r.title} total`, { size: 2.4, fill: INK_500, anchor: "end" });
-      svg += t(BOQ_PAGE_W - M, y + 4, aed(r.total), { size: 2.6, font: FONT_MONO, anchor: "end", weight: 700 });
-      y += 7;
-    } else {
-      const l = r.line;
-      const status = STATUS_MARK[l.rate_status ?? ""];
-      svg += t(M + 4, y + 2.6, r.ref, { size: 2.2, fill: INK_500, font: FONT_MONO }).replace("<text ", `<text data-ref="${esc(r.ref)}" `);
-      r.desc.forEach((d, i) => {
-        svg += t(M + 18, y + 2.6 + i * DESC_H, d, { size: 2.55 });
-      });
-      if (status) svg += t(M, y + 2.6, status.mark, { size: 2.2, fill: status.mark === "A" ? BRASS : TERRACOTTA, font: FONT_MONO, weight: 700 });
-      const qty = `${l.qty_derived ? "≈ " : ""}${l.quantity}`;
-      svg += t(128, y + 2.6, qty, { size: 2.55, font: FONT_MONO, anchor: "end", fill: l.qty_derived ? TERRACOTTA : INK_900 });
-      svg += t(131, y + 2.6, l.unit, { size: 2.4, fill: INK_700 });
-      svg += t(162, y + 2.6, aed(l.rate_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
-      svg += t(BOQ_PAGE_W - M, y + 2.6, aed(l.total_aed), { size: 2.55, font: FONT_MONO, anchor: "end" });
-      let sy = y + 2.6 + r.desc.length * DESC_H;
-      for (const s of r.sub) {
-        svg += t(M + 18, sy - 0.4, s, { size: 2.1, fill: s.startsWith("≈") || s.startsWith("Quantity") ? TERRACOTTA : INK_500 });
-        sy += SUB_H;
-      }
-      y += rowH(r);
-    }
-  }
-
-  // Totals + legend.
-  if (y + 58 > bottom) flush();
-  y += 4;
-  const sumRow = (label: string, value: string, bold = false) => {
-    svg += t(162, y, label, { size: 2.7, fill: bold ? INK_900 : INK_700, anchor: "end", weight: bold ? 700 : undefined });
-    svg += t(BOQ_PAGE_W - M, y, value, { size: bold ? 3.4 : 2.7, font: FONT_MONO, anchor: "end", weight: bold ? 700 : undefined });
-    y += bold ? 7 : 5;
-  };
-  svg += `<line x1="110" y1="${f1(y - 3)}" x2="${BOQ_PAGE_W - M}" y2="${f1(y - 3)}" stroke="${INK_900}" stroke-width="0.35"/>`;
-  sumRow("Subtotal", aed(boq.subtotal_aed));
-  if (boq.ohp_aed && boq.ohp_aed > 0) sumRow(`${OHP_LINE_LABEL} ${boq.ohp_pct}%`, aed(boq.ohp_aed));
-  sumRow(`Contingency ${boq.contingency_pct}%`, aed(boq.contingency_aed));
-  sumRow(`VAT ${boq.vat_pct}%`, aed(boq.vat_aed));
-  sumRow("Grand total", total.derived ? total.text : `AED ${aed(boq.grand_total_aed)}`, true);
-  // A draft prints its labelled "≈" headline; the exact chain is printed under it.
-  if (total.derived) sumRow("Chain total (exact)", `AED ${aed(boq.grand_total_aed)}`);
-  // D4: excluded lines, named, directly under the figure they are not in.
-  if (total.excludes) {
-    svg += t(BOQ_PAGE_W - M, y - 1.5, total.excludes, { size: 2.5, fill: TERRACOTTA, anchor: "end", weight: 700 });
-    y += 3;
-    const named = total.excluded.map((x) => `${x.description} (${x.work_section})`).join(" · ");
-    for (const line of wrap(`Not in the total — to be priced: ${named}`, 88)) {
-      svg += t(M, y, line, { size: 2.3, fill: TERRACOTTA });
-      y += 3.2 * K;
-    }
-    y += 1.5;
-  }
-  if (total.footnote) {
-    for (const line of wrap(total.footnote, 88)) {
-      svg += t(M, y, line, { size: 2.4, fill: TERRACOTTA });
-      y += 3.2 * K;
-    }
-  }
-  y += 4;
-  svg += t(M, y, "RATE STATUS", { size: 2.2, fill: INK_500, spacing: "0.06em" });
-  y += 4.6;
-  for (const [, v] of Object.entries(STATUS_MARK).filter(([k]) => boq.sections.some((s) => s.lines.some((l) => l.rate_status === k)))) {
-    svg += t(M, y, v.mark, { size: 2.3, fill: v.mark === "A" ? BRASS : TERRACOTTA, font: FONT_MONO, weight: 700 });
-    svg += t(M + 5, y, v.label, { size: 2.3, fill: INK_700 });
-    y += 3.4 * K;
-  }
-  svg += t(M, y + 2, "≈ quantity derived from the reference layout or inferred — see the note under the line.", { size: 2.3, fill: INK_700 });
-  y += 8;
-
-  // G5d (Newspace session ask #5): an INDICATIVE delivery programme, never a line.
-  const prog = boq.programme;
-  if (prog && prog.phases.length) {
-    const basis = wrap(prog.basis, 92);
-    const need = 16 + prog.phases.length * 6.5 + basis.length * 3.2 * K;
-    if (y + need > bottom) flush();
-    svg += t(M, y + 2, "INDICATIVE DELIVERY PROGRAMME", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" });
-    svg += t(BOQ_PAGE_W - M, y + 2, `≈ ${prog.total_days} days · indicative · derived`, { size: 2.6, fill: TERRACOTTA, font: FONT_MONO, anchor: "end" });
-    y += 7;
-    const barX = 92;
-    const barW = BOQ_PAGE_W - M - barX;
-    for (const ph of prog.phases) {
-      svg += t(M, y + 3, ph.name, { size: 2.5, fill: INK_900 });
-      svg += t(barX - 3, y + 3, `${ph.days} d`, { size: 2.5, fill: INK_700, font: FONT_MONO, anchor: "end" });
-      const x0 = barX + ((ph.start_day - 1) / prog.total_days) * barW;
-      const w = Math.max(0.8, (ph.days / prog.total_days) * barW);
-      svg += `<rect x="${f1(x0)}" y="${f1(y + 0.6)}" width="${f1(w)}" height="3.2" rx="0.6" fill="${BRASS}" fill-opacity="0.75" data-programme-phase="${esc(ph.name)}"/>`;
-      y += 6.5;
-    }
-    svg += t(barX, y + 1.5, "day 1", { size: 2.1, fill: INK_500, font: FONT_MONO });
-    svg += t(BOQ_PAGE_W - M, y + 1.5, `day ${prog.total_days}`, { size: 2.1, fill: INK_500, font: FONT_MONO, anchor: "end" });
-    y += 6;
-    for (const line of basis) {
-      svg += t(M, y, line, { size: 2.2, fill: INK_700 });
-      y += 3.2 * K;
-    }
-  }
-  pages.push(page(svg));
-
-  // D5: REF changes — so a partner holding a screen reference in the old scheme
-  // ("P-01", ambiguous across Plaster / Plumbing / Preliminaries) can find the
-  // line. The old code is only meaningful with its section, so both are printed.
-  const migration = refMigration(boq.sections).filter((m) => m.legacy_ref !== m.ref);
-  if (migration.length > 0) {
-    n += 1;
-    let { svg: s2, y: y2 } = header(n);
-    const head = (yy: number) =>
-      t(M, yy, "REF CHANGES — OLD CODE → NEW CODE", { size: 2.7, fill: BRASS, weight: 700, spacing: "0.05em" }) +
-      t(M, yy + 5, "Before 22 Sep 2026 a REF was its section's initials + line number, so different sections could share a code. Read the old code together with its section.", { size: 2.2, fill: INK_700 }) +
-      t(M, yy + 11, "SECTION", { size: 2.1, fill: INK_500 }) +
-      t(76, yy + 11, "OLD", { size: 2.1, fill: INK_500 }) +
-      t(96, yy + 11, "NEW", { size: 2.1, fill: INK_500 }) +
-      t(118, yy + 11, "LINE", { size: 2.1, fill: INK_500 });
-    s2 += head(y2 + 4);
-    y2 += 19;
-    for (const m of migration) {
-      if (y2 + 5 > bottom) {
-        pages.push(page(s2));
-        n += 1;
-        ({ svg: s2, y: y2 } = header(n));
-        s2 += head(y2 + 4);
-        y2 += 19;
-      }
-      s2 += t(M, y2, m.work_section, { size: 2.3, fill: INK_700 });
-      s2 += t(76, y2, m.legacy_ref, { size: 2.3, font: FONT_MONO, fill: INK_500 });
-      s2 += t(96, y2, m.ref, { size: 2.3, font: FONT_MONO, fill: INK_900 }).replace("<text ", `<text data-ref-map="${esc(m.legacy_ref)}→${esc(m.ref)}" `);
-      s2 += t(118, y2, m.description.length > 60 ? `${m.description.slice(0, 59)}…` : m.description, { size: 2.3, fill: INK_900 });
-      y2 += 4.4;
-    }
-    pages.push(page(s2));
-  }
-  return pages;
-}
+/** The BoQ PDF pages — K8 #16 (68:1396): A4 landscape, lib/documents/boq-pdf-pages. */
+export { buildBoqPdfPages } from "./boq-pdf-pages";
+import { BOQ_LAND_H, BOQ_LAND_W, buildBoqPdfPages } from "./boq-pdf-pages";
 
 function page(body: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${BOQ_PAGE_W}mm" height="${BOQ_PAGE_H}mm" viewBox="0 0 ${BOQ_PAGE_W} ${BOQ_PAGE_H}"><rect x="0" y="0" width="${BOQ_PAGE_W}" height="${BOQ_PAGE_H}" fill="#FFFFFF"/>${body}</svg>`;
@@ -367,8 +112,8 @@ function page(body: string): string {
 export const A4_PDF = { M, INK_900, INK_700, INK_500, INK_100, BRASS, TERRACOTTA, FONT_UI, FONT_MONO, FONT_DISPLAY, K } as const;
 export { t as a4Text, wrap as a4Wrap, page as a4Page, f1 as a4Num };
 
-/** Rasterise A4 SVG pages into a PDF (resvg → pdf-lib), dated to the UTC day. Server-only. */
-export async function rasteriseA4Pages(pages: readonly string[], title: string): Promise<Uint8Array> {
+/** Rasterise A4 SVG pages into a PDF (resvg → pdf-lib), dated to the UTC day. Server-only. Portrait unless a size is given (mm). */
+export async function rasteriseA4Pages(pages: readonly string[], title: string, size: { w: number; h: number } = { w: BOQ_PAGE_W, h: BOQ_PAGE_H }): Promise<Uint8Array> {
   const { Resvg } = await import("@resvg/resvg-js");
   const { PDFDocument } = await import("pdf-lib");
   const pdf = stampPdfDay(await PDFDocument.create());
@@ -378,15 +123,16 @@ export async function rasteriseA4Pages(pages: readonly string[], title: string):
   pdf.setProducer("RenovAIte");
   const MM_TO_PT = 72 / 25.4;
   for (const svg of pages) {
-    const png = new Resvg(svg, { fitTo: { mode: "width", value: 2480 } }).render().asPng();
-    const p = pdf.addPage([BOQ_PAGE_W * MM_TO_PT, BOQ_PAGE_H * MM_TO_PT]);
-    p.drawImage(await pdf.embedPng(png), { x: 0, y: 0, width: BOQ_PAGE_W * MM_TO_PT, height: BOQ_PAGE_H * MM_TO_PT });
+    // 300 dpi across the page width, whichever way it is turned.
+    const png = new Resvg(svg, { fitTo: { mode: "width", value: Math.round((size.w / 25.4) * 300) } }).render().asPng();
+    const p = pdf.addPage([size.w * MM_TO_PT, size.h * MM_TO_PT]);
+    p.drawImage(await pdf.embedPng(png), { x: 0, y: 0, width: size.w * MM_TO_PT, height: size.h * MM_TO_PT });
   }
   return pdf.save();
 }
 
 /** Rasterise the pages into an A4 PDF. Server-only (resvg + pdf-lib). */
-export async function renderBoqPdf(input: BoqPdfInput): Promise<{ pdf: Uint8Array; pages: string[] }> {
+export async function renderBoqPdf(input: BoqPdfInput & { revision?: number | null; qsValidated?: Record<string, boolean> }): Promise<{ pdf: Uint8Array; pages: string[] }> {
   const pages = buildBoqPdfPages(input);
-  return { pdf: await rasteriseA4Pages(pages, `${input.projectName} — Bill of Quantities`), pages };
+  return { pdf: await rasteriseA4Pages(pages, `${input.projectName} — Bill of Quantities`, { w: BOQ_LAND_W, h: BOQ_LAND_H }), pages };
 }

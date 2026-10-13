@@ -24,12 +24,14 @@ export type Theme = "light" | "dark";
 export const DEFAULT_THEME_PREF: ThemePref = "light";
 
 /**
- * THE GATE (K2 review): Dark and System stay hidden until K5 has converted the
- * page bodies — a dark rail around light Atelier content is not a theme.
- * Everyone gets Light: the pre-paint script ignores a stored dark / system
- * choice and the switcher offers Light only. K5 flips this to true.
+ * THE GATE (K2 review): Dark and System stayed hidden until every page body
+ * was Blueprint — a dark rail around light Atelier content is not a theme.
+ * K8 Part 3 opened it once the route scan found no Atelier page
+ * (lib/__tests__/route-scan.test.ts): the pre-paint script honours a stored
+ * Dark / System and the switcher offers all three. Client documents and
+ * e-mails stay light regardless (spec §6.11).
  */
-export const THEME_CHOICES_OPEN = false;
+export const THEME_CHOICES_OPEN = true;
 
 /** The preferences the switcher offers right now. */
 export const OFFERED_THEME_PREFS: readonly ThemePref[] = THEME_CHOICES_OPEN ? THEME_PREFS : ["light"];

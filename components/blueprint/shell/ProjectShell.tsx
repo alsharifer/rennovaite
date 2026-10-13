@@ -32,23 +32,24 @@ export const loadProjectRail = cache(async (projectId: string): Promise<RailCont
   return caller ? loadRailContext(db(), projectId, caller) : null;
 });
 
-export async function ProjectShell({ projectId, content = "atelier", children }: { projectId: string; content?: "atelier" | "blueprint"; children: ReactNode }) {
+export async function ProjectShell({ projectId, children }: { projectId: string; children: ReactNode }) {
   const ctx = await loadProjectRail(projectId);
   if (!ctx) return <>{children}</>;
   return (
-    <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()} content={content}>
+    <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()}>
       {children}
     </ShellFrame>
   );
 }
 
 /** Settings, the firm book and quote review: the chrome without a project. */
-export async function AccountShell({ firmId, content = "atelier", skin, children }: { firmId?: string; content?: "atelier" | "blueprint"; skin?: "warm"; children: ReactNode }) {
+/** `title` names a page the pathname cannot (a not-found page, K8 #11). */
+export async function AccountShell({ firmId, skin, title, children }: { firmId?: string; skin?: "warm"; title?: string; children: ReactNode }) {
   const caller = await getPageCaller();
   if (!caller) return <>{children}</>;
   const ctx = await loadRailContextWithoutProject(db(), caller, { firmId });
   return (
-    <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()} content={content} skin={skin}>
+    <ShellFrame ctx={ctx} flags={journeyFlagsFromEnv()} skin={skin} title={title}>
       {children}
     </ShellFrame>
   );

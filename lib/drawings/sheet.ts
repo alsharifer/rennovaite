@@ -1,14 +1,17 @@
 // =============================================================================
-// lib/drawings/sheet.ts — A3 landscape sheet template (Prompt P1, Atelier).
+// lib/drawings/sheet.ts — A3 landscape sheet template (Prompt P1; the frame,
+// title block, status strip, north arrow and scale bar are K8 #17 Blueprint
+// paper, Figma 68:1542, spec §6.9).
 //
 // Deterministic SVG. Units are MILLIMETRES: the sheet is authored at true A3
 // size (420 × 297 mm) so it prints 1:1 on paper, and plan geometry is placed at
 // 10 mm per metre (1:100). No LLM, no DOM.
 //
-// Typography follows the Atelier system: title-block/labels in Inter,
-// dimensions & numerics in JetBrains Mono, headings in EB Garamond. Families
-// are referenced via the app's CSS variables (resolved when the SVG is inlined
-// in-page) with plain-name fallbacks (used by the server-side PDF rasteriser).
+// Typography: labels in IBM Plex Sans, dimensions & numerics in JetBrains Mono,
+// display in EB Garamond. Families are referenced via the app's CSS variables
+// (resolved when the SVG is inlined in-page) with plain-name fallbacks (used by
+// the server-side PDF rasteriser, which reads TTF/OTF only — Arial / Consolas /
+// Georgia there). Drawings are always light (spec §6.11).
 // =============================================================================
 
 export const SHEET_W = 420; // mm (A3 landscape)
@@ -20,19 +23,21 @@ export const MM_PER_M = 10; // 1:100
 export const TITLE_W = 132;
 export const TITLE_H = 54;
 
-// Atelier ink palette (hex, matches tailwind tokens).
-export const INK_900 = "#0F1B2D";
-export const INK_700 = "#334155";
-export const INK_500 = "#64748b";
-export const INK_100 = "#e2e8f0";
+// Blueprint light ink (design-refs/r7-handoff/tokens.css primitives).
+export const INK_900 = "#1A1D1F";
+export const INK_700 = "#4A5054";
+export const INK_500 = "#62676B";
+export const INK_100 = "#D6D1C5";
+/** Inverse text on ink (the status strip, the draft stamp). */
+export const ON_INK = "#F5F2EA";
 export const BONE = "#EDE6D8";
 export const BRASS = "#A4793A";
 export const TERRACOTTA = "#9d3e1d"; // `tertiary`
 export const PAPER = "#FFFFFF";
 
-export const FONT_UI = "var(--font-inter), 'Inter', system-ui, sans-serif";
+export const FONT_UI = "var(--font-plex-sans), 'IBM Plex Sans', Arial, Helvetica, sans-serif";
 export const FONT_MONO =
-  "var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace";
+  "var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace";
 export const FONT_DISPLAY =
   "var(--font-eb-garamond), 'EB Garamond', Georgia, serif";
 
@@ -54,7 +59,14 @@ export interface SheetMeta {
    * built before G5, which therefore renders unchanged.
    */
   draft?: string | null;
+  /** K8: who prepared the set — the project's firm (its own project only), else omitted. */
+  preparedBy?: string | null;
+  /** K8: the drawing revision, when one is kept. Plans have none today: "—". */
+  rev?: string | null;
 }
+
+/** The status every sheet carries until a construction issue exists (68:1542). */
+export const SHEET_STATUS = "FOR REVIEW — NOT FOR CONSTRUCTION";
 
 /** Region available for drawing content (inside margins, above the title block). */
 export interface DrawRegion {
@@ -82,40 +94,60 @@ export function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "4 Oct 2026" — deterministic, no locale or timezone. */
 function fmtDate(iso: string): string {
-  // Keep it deterministic — no locale/timezone dependence.
-  return iso;
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return y && m && d ? `${d} ${MONTHS[m - 1]} ${y}` : iso;
 }
 
+const tl = (x: number, y: number, s: string) => `<text x="${x}" y="${y}" font-size="2.3" fill="${INK_500}" style="font-family:${FONT_MONO};letter-spacing:0.08em">${esc(s.toUpperCase())}</text>`;
+const tv = (x: number, y: number, s: string, size = 3.4, font = FONT_UI) => `<text x="${x}" y="${y}" font-size="${size}" fill="${INK_900}" style="font-family:${font}">${esc(s)}</text>`;
+
+/**
+ * The title block (68:1542): client / project · sheet title · sheet, scale,
+ * rev, date · prepared by, drawn with · the inverse status strip. The same
+ * 132 × 54 mm the sheets lay out around (TITLE_W / TITLE_H). No supplier or
+ * contractor name — "prepared by" is the project's own firm or nobody.
+ */
 function titleBlock(meta: SheetMeta, sheetNumber: string, sheetTitle: string): string {
   const x = SHEET_W - SHEET_MARGIN - TITLE_W;
   const y = SHEET_H - SHEET_MARGIN - TITLE_H;
-  const rowH = TITLE_H / 3;
+  const r = [0, 13.5, 27, 38.5, 48, TITLE_H].map((d) => y + d); // row edges
   const arName = meta.projectNameAr?.trim();
+  const cols = [x, x + 26, x + 62, x + 78];
+  const hl = (yy: number) => `<line x1="${x}" y1="${yy}" x2="${x + TITLE_W}" y2="${yy}" stroke="${INK_900}" stroke-width="0.25"/>`;
+  const vl = (xx: number, y1: number, y2: number) => `<line x1="${xx}" y1="${y1}" x2="${xx}" y2="${y2}" stroke="${INK_900}" stroke-width="0.25"/>`;
   return `
-  <g>
+  <g data-title-block="true">
     <rect x="${x}" y="${y}" width="${TITLE_W}" height="${TITLE_H}" fill="${PAPER}" stroke="${INK_900}" stroke-width="0.4"/>
-    <line x1="${x}" y1="${y + rowH}" x2="${x + TITLE_W}" y2="${y + rowH}" stroke="${INK_100}" stroke-width="0.3"/>
-    <line x1="${x}" y1="${y + 2 * rowH}" x2="${x + TITLE_W}" y2="${y + 2 * rowH}" stroke="${INK_100}" stroke-width="0.3"/>
-    <text x="${x + 3}" y="${y + 7}" font-size="6.2" fill="${INK_900}" style="font-family:${FONT_DISPLAY}">${esc(meta.projectNameEn)}</text>
-    ${arName ? `<text x="${x + TITLE_W - 3}" y="${y + 7}" text-anchor="end" font-size="5.5" fill="${INK_700}" style="font-family:${FONT_DISPLAY};direction:rtl">${esc(arName)}</text>` : ""}
-    <text x="${x + 3}" y="${y + 12}" font-size="3.2" fill="${INK_500}" style="font-family:${FONT_UI}">${esc(meta.community)}</text>
-
-    <text x="${x + 3}" y="${y + rowH + 7}" font-size="3.4" fill="${INK_900}" style="font-family:${FONT_UI};letter-spacing:0.04em">${esc(sheetTitle.toUpperCase())}</text>
-    <text x="${x + 3}" y="${y + rowH + 13}" font-size="3" fill="${INK_500}" style="font-family:${FONT_UI}">Level: ${esc(meta.level)}</text>
-
-    <text x="${x + 3}" y="${y + 2 * rowH + 6.5}" font-size="3" fill="${INK_500}" style="font-family:${FONT_UI}">SCALE</text>
-    <text x="${x + 3}" y="${y + 2 * rowH + 12}" font-size="4.2" fill="${INK_900}" style="font-family:${FONT_MONO}">${esc(meta.scale)}</text>
-    <text x="${x + 42}" y="${y + 2 * rowH + 6.5}" font-size="3" fill="${INK_500}" style="font-family:${FONT_UI}">DATE</text>
-    <text x="${x + 42}" y="${y + 2 * rowH + 12}" font-size="4.2" fill="${INK_900}" style="font-family:${FONT_MONO}">${esc(fmtDate(meta.dateISO))}</text>
-    <text x="${x + TITLE_W - 3}" y="${y + 2 * rowH + 6.5}" text-anchor="end" font-size="3" fill="${INK_500}" style="font-family:${FONT_UI}">SHEET</text>
-    <text x="${x + TITLE_W - 3}" y="${y + 2 * rowH + 12}" text-anchor="end" font-size="4.6" fill="${BRASS}" style="font-family:${FONT_MONO}">${esc(sheetNumber)}</text>
-
-    <text x="${x + TITLE_W - 3}" y="${y + 12}" text-anchor="end" font-size="4.4" fill="${BRASS}" style="font-family:${FONT_DISPLAY};letter-spacing:0.02em">RenovAIte</text>
+    ${hl(r[1]!)}${hl(r[2]!)}${hl(r[3]!)}${hl(r[4]!)}
+    ${vl(cols[1]!, r[2]!, r[3]!)}${vl(cols[2]!, r[2]!, r[3]!)}${vl(cols[3]!, r[2]!, r[3]!)}${vl(x + TITLE_W / 2, r[3]!, r[4]!)}
+    ${tl(x + 2.5, r[0]! + 3.6, "Client / project")}
+    ${tv(x + 2.5, r[0]! + 8.4, meta.projectNameEn, 3.8)}
+    ${arName ? `<text x="${x + TITLE_W - 2.5}" y="${r[0]! + 8.4}" text-anchor="end" font-size="3.6" fill="${INK_700}" style="font-family:${FONT_DISPLAY};direction:rtl">${esc(arName)}</text>` : ""}
+    ${tv(x + 2.5, r[0]! + 12.2, meta.community, 2.8)}
+    ${tl(x + 2.5, r[1]! + 3.6, "Sheet title")}
+    ${tv(x + 2.5, r[1]! + 8.4, sheetTitle, 3.8)}
+    ${tv(x + 2.5, r[1]! + 12.2, `Level: ${meta.level}`, 2.8)}
+    ${tl(cols[0]! + 2.5, r[2]! + 3.6, "Sheet")}
+    <text x="${cols[0]! + 2.5}" y="${r[2]! + 9}" font-size="4.6" fill="${INK_900}" style="font-family:${FONT_MONO};font-weight:600">${esc(sheetNumber)}</text>
+    ${tl(cols[1]! + 2.5, r[2]! + 3.6, "Scale")}
+    ${tv(cols[1]! + 2.5, r[2]! + 9, `${meta.scale} @ A3`, 3.2, FONT_MONO)}
+    ${tl(cols[2]! + 2.5, r[2]! + 3.6, "Rev")}
+    ${tv(cols[2]! + 2.5, r[2]! + 9, meta.rev?.trim() || "—", 3.2, FONT_MONO)}
+    ${tl(cols[3]! + 2.5, r[2]! + 3.6, "Date")}
+    ${tv(cols[3]! + 2.5, r[2]! + 9, fmtDate(meta.dateISO), 3.2, FONT_MONO)}
+    ${tl(x + 2.5, r[3]! + 3.4, "Prepared by")}
+    ${tv(x + 2.5, r[3]! + 7.9, meta.preparedBy?.trim() || "—", 3)}
+    ${tl(x + TITLE_W / 2 + 2.5, r[3]! + 3.4, "Drawn with")}
+    ${tv(x + TITLE_W / 2 + 2.5, r[3]! + 7.9, "RenovAIte · from your plan", 3)}
+    <rect x="${x}" y="${r[4]}" width="${TITLE_W}" height="${TITLE_H - 48}" fill="${INK_900}" data-sheet-status="true"/>
+    <text x="${x + 2.5}" y="${r[4]! + 4.1}" font-size="2.6" fill="${ON_INK}" style="font-family:${FONT_MONO};letter-spacing:0.08em">${esc(SHEET_STATUS)}</text>
   </g>`;
 }
 
-/** G5: the draft stamp — terracotta, directly above the title block, on every sheet. */
+/** G5: the draft stamp — the inverse block, directly above the title block, on every sheet. */
 export const DRAFT_STAMP_BOX = { h: 13, gap: 2 };
 function draftStamp(statement: string): string {
   const x = SHEET_W - SHEET_MARGIN - TITLE_W;
@@ -123,9 +155,9 @@ function draftStamp(statement: string): string {
   const [head, ...rest] = statement.split(" — ");
   return `
   <g data-draft-stamp="true" data-draft-statement="${esc(statement)}">
-    <rect x="${x}" y="${y}" width="${TITLE_W}" height="${DRAFT_STAMP_BOX.h}" fill="#FDF3EE" stroke="${TERRACOTTA}" stroke-width="0.6"/>
-    <text x="${x + 3}" y="${y + 5.4}" font-size="4.2" fill="${TERRACOTTA}" style="font-family:${FONT_UI};font-weight:700;letter-spacing:0.06em">${esc(head ?? statement)}</text>
-    <text x="${x + 3}" y="${y + 10.2}" font-size="2.55" fill="${TERRACOTTA}" style="font-family:${FONT_UI}">${esc(rest.join(" — "))}</text>
+    <rect x="${x}" y="${y}" width="${TITLE_W}" height="${DRAFT_STAMP_BOX.h}" fill="${INK_900}"/>
+    <text x="${x + 3}" y="${y + 5.4}" font-size="3.6" fill="${ON_INK}" style="font-family:${FONT_MONO};font-weight:600;letter-spacing:0.08em">${esc(head ?? statement)}</text>
+    <text x="${x + 3}" y="${y + 10.2}" font-size="2.6" fill="${ON_INK}" style="font-family:${FONT_UI}">${esc(rest.join(" — "))}</text>
   </g>`;
 }
 
@@ -134,7 +166,7 @@ function northArrow(cx: number, cy: number, northDeg: number): string {
   return `
   <g transform="translate(${cx} ${cy}) rotate(${northDeg})">
     <polygon points="0,-9 3.2,4 0,1.4 -3.2,4" fill="${INK_900}"/>
-    <text x="0" y="-11" text-anchor="middle" font-size="4" fill="${INK_900}" style="font-family:${FONT_UI};font-weight:600">N</text>
+    <text x="0" y="-11" text-anchor="middle" font-size="3.6" fill="${INK_900}" style="font-family:${FONT_MONO};font-weight:600">N</text>
   </g>`;
 }
 
@@ -150,7 +182,7 @@ function scaleBar(x: number, y: number, mmPerM: number = MM_PER_M, cells = 5, st
   for (let i = 0; i <= cells; i++) {
     ticks += `<text x="${x + i * cell}" y="${y + 5.5}" text-anchor="middle" font-size="3" fill="${INK_700}" style="font-family:${FONT_MONO}">${i * stepM}</text>`;
   }
-  return `<g>${bars}${ticks}<text x="${x + cells * cell + 3}" y="${y + 2}" font-size="3" fill="${INK_500}" style="font-family:${FONT_UI}">m</text></g>`;
+  return `<g>${bars}${ticks}<text x="${x + cells * cell + 3}" y="${y + 2}" font-size="3" fill="${INK_500}" style="font-family:${FONT_MONO}">m</text></g>`;
 }
 
 export interface RenderSheetOptions {
