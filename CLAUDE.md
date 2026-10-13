@@ -499,6 +499,7 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
   dashboard — dev's Site URL is `http://localhost:3000`
   (`scripts/auth-url-probe.mjs`, dev only); prod is read in the dashboard.
   Live: `scripts/k10-signin-code-check.mjs`.
+- **The proposal reconciles to the fil** (`lib/boq/totals.ts summaryChainOf`, `lib/documents/__tests__/proposal-chain.test.ts`). QA saw the proposal at 102,892.07 / 8,231.00 / 5,556.00 / 116,679.07 beside a BoQ page at 102,892.03 / 8,231.36 / 5,556.17 / 116,679.56: two revisions of one project — a pre-H7 one (engine 0.2.0, whole-dirham contingency and VAT; every Arabella fixture revision, which the doc shots rendered) and the regenerated H7 one. Now the proposal and the BoQ page's review model read ONE chain (`summaryChainOf`) of the same revision, and the proposal gate refuses a pre-H7 revision first — `predatesRounding(engine.version)` → "Regenerate first — this revision predates the rounding fix." (`PRE_ROUNDING_REFUSAL`; 08 Proposal shows it with Open BoQ & Review; the export checklist item `proposal_rounding`). `reroundRevision` reproduces H7 regeneration on a stored revision for fixtures and shots (stage 7 → 116,679.56). Live: `scripts/k10-proposal-chain-shots.mjs`.
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 

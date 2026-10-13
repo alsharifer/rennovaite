@@ -15,6 +15,7 @@ import type { PackReadiness } from "@/lib/documents/pack-readiness";
 import type { ParityResult } from "@/lib/documents/parity";
 
 import type { ChecklistItem } from "./types";
+import { PRE_ROUNDING_REFUSAL } from "@/lib/documents/reference-basis-types";
 
 /** A name that is a working label, not something to print on a client's cover. */
 export function isWorkingName(name: string | null | undefined): boolean {
@@ -114,6 +115,7 @@ export function proposalChecklistItems(
     boq: { id: string; basis: { basis: string; reference_lines: number; firm_lines: number; total_lines: number } } | null;
     acceptance: { created_at: string } | null;
     verdict: { ok: boolean; reason: string | null; refusal: string | null };
+    preRounding?: boolean;
   },
 ): ChecklistItem[] {
   const boqPage = { label: "Open the BoQ", href: `/project/${projectId}/boq#reference-basis` };
@@ -127,6 +129,17 @@ export function proposalChecklistItems(
       fix: null,
     },
   ];
+  if (gate.firm && gate.preRounding) {
+    // K10: before the basis — a revision priced before H7 is regenerated first.
+    items.push({
+      key: "proposal_rounding",
+      ok: false,
+      title: "The revision prices to the fil",
+      detail: PRE_ROUNDING_REFUSAL,
+      items: [],
+      fix: { label: "Regenerate on the BoQ page", href: `/project/${projectId}/boq` },
+    });
+  }
   if (gate.firm) {
     const b = gate.boq?.basis;
     const reasonText =

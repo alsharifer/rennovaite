@@ -17,13 +17,16 @@ import { Resvg } from "@resvg/resvg-js";
 
 import type { BoqPdfInput } from "@/lib/documents/boq-pdf";
 import { buildBoqPdfPages } from "@/lib/documents/boq-pdf";
+import { reroundRevision } from "@/lib/boq/totals";
 import { buildProposalPages } from "@/lib/documents/proposal";
 import { renderSheet } from "@/lib/drawings/sheet";
 
 const out = process.argv[2] ?? "screenshots/k8/docs";
 fs.mkdirSync(out, { recursive: true });
 const fx = JSON.parse(fs.readFileSync("lib/boq/__fixtures__/arabella-g5d-revisions.json", "utf8")) as { stages: { boq_id: string }[]; boqs: Record<string, BoqPdfInput["boq"]> };
-const boq = fx.boqs[fx.stages[7]!.boq_id]!;
+// K10: the fixture holds pre-H7 revisions (engine 0.2.0); a proposal is issued only from a regenerated
+// one, so the documents are drawn from stage 7 as H7 regeneration prices it (116,679.56 — the BoQ page's figure).
+const boq = reroundRevision(fx.boqs[fx.stages[7]!.boq_id]!);
 
 const png = (svg: string, file: string) => {
   const r = new Resvg(svg, { fitTo: { mode: "width", value: svg.includes('width="297mm"') ? 1754 : 1240 }, font: documentFontOptions() });

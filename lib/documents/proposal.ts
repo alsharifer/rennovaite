@@ -33,6 +33,7 @@ import { boqDerivedInfo, derivedLineNote, derivedTotal } from "./boq-derived";
 import { BOQ_PAGE_H as H, BOQ_PAGE_W as W, type BoqPdfInput } from "./boq-pdf";
 import { DOC, PAGE_COUNT_TOKEN, docPage, hline, inverseBand, label, longDate, n1, text, wrapWords } from "./doc-style";
 import { PREPARED_WITH_MARK } from "./reference-basis-types";
+import { summaryChainOf } from "@/lib/boq/totals";
 
 export interface ProposalScopeRoom {
   name: string;
@@ -320,16 +321,18 @@ export function buildProposalPages(input: ProposalInput): string[] {
     svg += hline(M, R, y);
   };
   for (const s of sections) sumRow(s.work_section, aed(s.section_total_aed), `data-section-total="${esc(s.work_section)}"`);
-  sumRow("Subtotal", aed(boq.subtotal_aed), 'data-summary="subtotal"', true);
-  if (boq.ohp_aed && boq.ohp_aed > 0) sumRow(`${OHP_LINE_LABEL} ${boq.ohp_pct}%`, aed(boq.ohp_aed), `data-ohp="${boq.ohp_aed}"`);
-  sumRow(`Contingency (${boq.contingency_pct}%)`, aed(boq.contingency_aed), 'data-summary="contingency"');
-  sumRow(`VAT (${boq.vat_pct}%)`, aed(boq.vat_aed), 'data-summary="vat"');
+  // K10: the same chain reader as the BoQ page (summaryChainOf) — one revision, one set of figures.
+  const chain = summaryChainOf(boq);
+  sumRow("Subtotal", aed(chain.subtotal), `data-summary="subtotal" data-value="${chain.subtotal}"`, true);
+  if (chain.ohp > 0) sumRow(`${OHP_LINE_LABEL} ${chain.ohpPct}%`, aed(chain.ohp), `data-ohp="${chain.ohp}"`);
+  sumRow(`Contingency (${chain.contingencyPct}%)`, aed(chain.contingency), `data-summary="contingency" data-value="${chain.contingency}"`);
+  sumRow(`VAT (${chain.vatPct}%)`, aed(chain.vat), `data-summary="vat" data-value="${chain.vat}"`);
   svg += hline(M, R, y, DOC.STRONG, 0.5);
   if (y + 14 > BOTTOM) flush();
   svg += text(M, y + 7.6, "Total", { size: 3.1, weight: 600 });
   // To the fil, so the column adds up (spec §6.9); a draft keeps its ≈ and *.
-  const exact = `${total.derived ? "≈ " : ""}AED ${aed(boq.grand_total_aed)}${total.derived ? "*" : ""}`;
-  svg += text(R, y + 8.6, exact, { size: 5.8, font: DOC.MONO, anchor: "end", attrs: `data-grand-total="${boq.grand_total_aed}"` });
+  const exact = `${total.derived ? "≈ " : ""}AED ${aed(chain.grand)}${total.derived ? "*" : ""}`;
+  svg += text(R, y + 8.6, exact, { size: 5.8, font: DOC.MONO, anchor: "end", attrs: `data-grand-total="${chain.grand}"` });
   y += 13;
   svg += hline(M, R, y, DOC.STRONG, 0.5);
   y += 9;

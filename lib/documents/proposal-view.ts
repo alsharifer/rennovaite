@@ -26,7 +26,8 @@ export interface ProposalPriceRow {
 
 export interface ProposalView {
   projectId: string;
-  gate: { ok: boolean; refusal: string | null; reason: string | null; noFirm: boolean; noBoq: boolean };
+  /** K10: preRounding = the revision predates the H7 rounding (regenerate before anything else). */
+  gate: { ok: boolean; refusal: string | null; reason: string | null; noFirm: boolean; noBoq: boolean; preRounding: boolean };
   firm: { id: string; name: string; displayName: string | null; brand: string; logo: boolean; termsSet: boolean; ohpPct: number | null } | null;
   setup: ProposalSetup | null;
   rev: number | null;
@@ -101,7 +102,7 @@ export async function loadProposalView(db: SupabaseClient, projectId: string): P
 
   return {
     projectId,
-    gate: { ok: gate.verdict.ok, refusal: gate.verdict.refusal, reason: gate.verdict.reason, noFirm: !gate.firm, noBoq: !gate.boq },
+    gate: { ok: gate.verdict.ok, refusal: gate.verdict.refusal, reason: gate.verdict.reason, noFirm: !gate.firm, noBoq: !gate.boq, preRounding: !!gate.preRounding },
     firm: gate.firm ? { id: gate.firm.firm_id, name: gate.firm.name, displayName: gate.firm.display_name, brand: gate.firm.brand, logo: !!gate.firm.logo_path, termsSet: !!gate.firm.terms_text, ohpPct } : null,
     setup,
     rev,

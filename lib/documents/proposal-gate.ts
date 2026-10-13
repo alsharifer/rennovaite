@@ -17,8 +17,11 @@ import { isMissingSchema } from "@/lib/rates/firm";
 
 import { boqPricingFingerprint, proposalGateVerdict, referenceBasisOf } from "./reference-basis";
 import type { ProposalGateVerdict, ReferenceBasis, ReferenceBasisAcceptance } from "./reference-basis-types";
+import { predatesRounding } from "@/lib/boq/revision-diff";
 
 export interface ProposalGate {
+  /** K10: the latest revision predates the H7 rounding — regenerate before a proposal is issued. */
+  preRounding?: boolean;
   /** The project's firm, with its branding and book status; null = no firm (no proposal possible). */
   firm: (FirmBranding & { book_status: "draft" | "reviewed" | null }) | null;
   /** The latest BoQ revision and where its rates came from; null = no BoQ. */
@@ -59,6 +62,7 @@ export async function loadProposalGate(db: SupabaseClient, projectId: string): P
     listAcceptances(db, projectId),
   ]);
   const boq = boqRow ? { id: boqRow.id, basis: referenceBasisOf(boqRow.sections) } : null;
+  const preRounding = !!boqRow && predatesRounding((boqRow.sections as { engine?: { version?: string } | null }).engine?.version);
   let firm: ProposalGate["firm"] = null;
   if (proj?.firm_id) {
     const branding = await loadFirmBranding(db, proj.firm_id);
@@ -91,8 +95,8 @@ export async function loadProposalGate(db: SupabaseClient, projectId: string): P
     ? { ok: false, reason: null, refusal: "A client proposal is a firm's document: attach the firm that will send it to this project." }
     : !boq
       ? { ok: false, reason: null, refusal: "No BoQ has been generated yet." }
-      : proposalGateVerdict({ basis: boq.basis, bookStatus: firm.book_status, accepted: !!acceptance });
-  return { firm, boq, acceptance, verdict };
+      : proposalGateVerdict({ basis: boq.basis, bookStatus: firm.book_status, accepted: !!acceptance, preRounding });
+  return { firm, boq, acceptance, verdict, preRounding };
 }
 
 /**

@@ -21,7 +21,7 @@
 // Pure and client-safe.
 // =============================================================================
 
-import { money2, sumMoney } from "./money";
+import { lineTotal, money2, sumMoney } from "./money";
 import { sortSections } from "./section-order";
 
 export interface ChainInput {
@@ -58,6 +58,58 @@ export function chainTotals(i: ChainInput): ChainTotals {
     vat_aed,
     grand_total_aed: sumMoney([subtotal_aed, ohp_aed, contingency_aed, vat_aed]),
   };
+}
+
+/** K10: a stored revision's summary chain, as printed — subtotal, OH&P, contingency, VAT, total. */
+export interface StoredChain {
+  subtotal: number;
+  ohpPct: number;
+  ohp: number;
+  contingencyPct: number;
+  contingency: number;
+  vatPct: number;
+  vat: number;
+  grand: number;
+}
+
+/**
+ * K10 — THE reader of a stored revision's summary chain. The BoQ page (review
+ * model) and the client proposal print exactly these figures, so the two can
+ * never disagree for the same revision. Stored values, never recomputed: a
+ * revision that predates the H7 rounding is refused at the proposal gate
+ * ("Regenerate first"), not silently re-rounded on one surface only.
+ */
+export function summaryChainOf(b: { subtotal_aed: number; ohp_pct?: number | null; ohp_aed?: number | null; contingency_pct: number; contingency_aed: number; vat_pct: number; vat_aed: number; grand_total_aed: number }): StoredChain {
+  const ohp = b.ohp_aed && b.ohp_aed > 0 ? b.ohp_aed : 0;
+  return {
+    subtotal: b.subtotal_aed,
+    ohpPct: ohp > 0 ? (b.ohp_pct ?? 0) : 0,
+    ohp,
+    contingencyPct: b.contingency_pct,
+    contingency: b.contingency_aed,
+    vatPct: b.vat_pct,
+    vat: b.vat_aed,
+    grand: b.grand_total_aed,
+  };
+}
+
+/**
+ * K10 — what regenerating under H7 does to a pre-H7 revision's ARITHMETIC: every
+ * rate to 2 dp, every line total = qty × that rate to the fils, then the chain
+ * (rechain). Quantities, items and sections as stored. For fixtures and
+ * document shots, which hold pre-H7 revisions; the app regenerates through the
+ * real pipeline. Stamps the H7 engine version so the gate reads it as current.
+ */
+export function reroundRevision<T extends ChainedDoc & { sections: { lines: { quantity?: number | null; rate_aed?: number | null; total_aed?: number | null }[] }[]; engine?: { version?: string } | null }>(boq: T, version = "0.3.0"): T {
+  const sections = boq.sections.map((s) => ({
+    ...s,
+    lines: (s.lines as { quantity?: number | null; rate_aed?: number | null; total_aed?: number | null }[]).map((l) => {
+      if (typeof l.quantity !== "number" || typeof l.rate_aed !== "number") return l;
+      const rate_aed = money2(l.rate_aed);
+      return { ...l, rate_aed, total_aed: lineTotal(l.quantity, rate_aed) };
+    }),
+  }));
+  return rechain({ ...boq, sections, engine: { ...(boq.engine ?? {}), version } } as T);
 }
 
 /** The chain of a stored BoQ document, recomputed with a moved subtotal. */

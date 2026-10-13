@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420mm" height="297mm" viewBox="0 0 420 297" role="img" aria-label="Site plan">
+  <rect x="0" y="0" width="420" height="297" fill="#FFFFFF"/>
+  <rect x="6" y="6" width="408" height="285" fill="none" stroke="#1A1D1F" stroke-width="0.5"/>
+  <rect x="40" y="30" width="110" height="80" fill="none" stroke="#1A1D1F" stroke-width="0.7"/><text x="43" y="36" font-size="3" fill="#1A1D1F" style="font-family:Consolas">REAR LAWN 47.8 m²</text><rect x="150" y="30" width="70" height="80" fill="none" stroke="#1A1D1F" stroke-width="0.7"/><text x="153" y="36" font-size="3" fill="#1A1D1F" style="font-family:Consolas">PERGOLA 12.3 m²</text>
+  
+  <g transform="translate(262 269) rotate(0)">
+    <polygon points="0,-9 3.2,4 0,1.4 -3.2,4" fill="#1A1D1F"/>
+    <text x="0" y="-11" text-anchor="middle" font-size="3.6" fill="#1A1D1F" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;font-weight:600">N</text>
+  </g><g><rect x="14" y="280" width="10" height="1.6" fill="#1A1D1F" stroke="#1A1D1F" stroke-width="0.3"/><rect x="24" y="280" width="10" height="1.6" fill="#FFFFFF" stroke="#1A1D1F" stroke-width="0.3"/><rect x="34" y="280" width="10" height="1.6" fill="#1A1D1F" stroke="#1A1D1F" stroke-width="0.3"/><rect x="44" y="280" width="10" height="1.6" fill="#FFFFFF" stroke="#1A1D1F" stroke-width="0.3"/><rect x="54" y="280" width="10" height="1.6" fill="#1A1D1F" stroke="#1A1D1F" stroke-width="0.3"/><text x="14" y="285.5" text-anchor="middle" font-size="3" fill="#4A5054" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">0</text><text x="24" y="285.5" text-anchor="middle" font-size="3" fill="#4A5054" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">1</text><text x="34" y="285.5" text-anchor="middle" font-size="3" fill="#4A5054" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">2</text><text x="44" y="285.5" text-anchor="middle" font-size="3" fill="#4A5054" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">3</text><text x="54" y="285.5" text-anchor="middle" font-size="3" fill="#4A5054" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">4</text><text x="64" y="285.5" text-anchor="middle" font-size="3" fill="#4A5054" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">5</text><text x="67" y="282" font-size="3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">m</text></g>
+  
+  <g data-title-block="true">
+    <rect x="276" y="231" width="132" height="54" fill="#FFFFFF" stroke="#1A1D1F" stroke-width="0.4"/>
+    <line x1="276" y1="244.5" x2="408" y2="244.5" stroke="#1A1D1F" stroke-width="0.25"/><line x1="276" y1="258" x2="408" y2="258" stroke="#1A1D1F" stroke-width="0.25"/><line x1="276" y1="269.5" x2="408" y2="269.5" stroke="#1A1D1F" stroke-width="0.25"/><line x1="276" y1="279" x2="408" y2="279" stroke="#1A1D1F" stroke-width="0.25"/>
+    <line x1="302" y1="258" x2="302" y2="269.5" stroke="#1A1D1F" stroke-width="0.25"/><line x1="338" y1="258" x2="338" y2="269.5" stroke="#1A1D1F" stroke-width="0.25"/><line x1="354" y1="258" x2="354" y2="269.5" stroke="#1A1D1F" stroke-width="0.25"/><line x1="342" y1="269.5" x2="342" y2="279" stroke="#1A1D1F" stroke-width="0.25"/>
+    <text x="278.5" y="234.6" font-size="2.3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">CLIENT / PROJECT</text>
+    <text x="278.5" y="239.4" font-size="3.8" fill="#1A1D1F" style="font-family:var(--font-plex-sans), 'IBM Plex Sans', Arial, Helvetica, sans-serif">Garden — Draft for Review</text>
+    
+    <text x="278.5" y="243.2" font-size="2.8" fill="#1A1D1F" style="font-family:var(--font-plex-sans), 'IBM Plex Sans', Arial, Helvetica, sans-serif">Dubai</text>
+    <text x="278.5" y="248.1" font-size="2.3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">SHEET TITLE</text>
+    <text x="278.5" y="252.9" font-size="3.8" fill="#1A1D1F" style="font-family:var(--font-plex-sans), 'IBM Plex Sans', Arial, Helvetica, sans-serif">Site plan</text>
+    <text x="278.5" y="256.7" font-size="2.8" fill="#1A1D1F" style="font-family:var(--font-plex-sans), 'IBM Plex Sans', Arial, Helvetica, sans-serif">Level: ground</text>
+    <text x="278.5" y="261.6" font-size="2.3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">SHEET</text>
+    <text x="278.5" y="267" font-size="4.6" fill="#1A1D1F" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;font-weight:600">L-100</text>
+    <text x="304.5" y="261.6" font-size="2.3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">SCALE</text>
+    <text x="304.5" y="267" font-size="3.2" fill="#1A1D1F" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">1:50 @ A3</text>
+    <text x="340.5" y="261.6" font-size="2.3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">REV</text>
+    <text x="340.5" y="267" font-size="3.2" fill="#1A1D1F" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">1</text>
+    <text x="356.5" y="261.6" font-size="2.3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">DATE</text>
+    <text x="356.5" y="267" font-size="3.2" fill="#1A1D1F" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace">12 Oct 2026</text>
+    <text x="278.5" y="272.9" font-size="2.3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">PREPARED BY</text>
+    <text x="278.5" y="277.4" font-size="3" fill="#1A1D1F" style="font-family:var(--font-plex-sans), 'IBM Plex Sans', Arial, Helvetica, sans-serif">Scratch Landscapes &amp; Co.</text>
+    <text x="344.5" y="272.9" font-size="2.3" fill="#62676B" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">DRAWN WITH</text>
+    <text x="344.5" y="277.4" font-size="3" fill="#1A1D1F" style="font-family:var(--font-plex-sans), 'IBM Plex Sans', Arial, Helvetica, sans-serif">RenovAIte · from your plan</text>
+    <rect x="276" y="279" width="132" height="6" fill="#1A1D1F" data-sheet-status="true"/>
+    <text x="278.5" y="283.1" font-size="2.6" fill="#F5F2EA" style="font-family:var(--font-jetbrains-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace;letter-spacing:0.08em">FOR REVIEW — NOT FOR CONSTRUCTION</text>
+  </g>
+</svg>

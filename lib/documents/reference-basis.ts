@@ -27,8 +27,9 @@ import { lineTierKey, type ProvLine } from "@/lib/provenance/boq";
 import { isFirmTier, type RateTier } from "@/lib/rates/tiers";
 
 import type { PricingBasis, ProposalGateVerdict, ReferenceBasis } from "./reference-basis-types";
+import { PRE_ROUNDING_REFUSAL } from "./reference-basis-types";
 
-export { REFERENCE_BASIS_BANNER, PREPARED_WITH_MARK } from "./reference-basis-types";
+export { REFERENCE_BASIS_BANNER, PREPARED_WITH_MARK, PRE_ROUNDING_REFUSAL } from "./reference-basis-types";
 export type { PricingBasis, ProposalGateVerdict, ReferenceBasis, ReferenceBasisAcceptance } from "./reference-basis-types";
 
 interface BasisBoq {
@@ -82,8 +83,10 @@ export function boqPricingFingerprint(boq: (BasisBoq & { subtotal_aed?: number; 
 /** True when the in-app banner shows: at least one line below tier 1. */
 export const needsReferenceBanner = (b: ReferenceBasis) => b.reference_lines > 0;
 
-export function proposalGateVerdict(input: { basis: ReferenceBasis; bookStatus: "draft" | "reviewed" | null; accepted: boolean }): ProposalGateVerdict {
+export function proposalGateVerdict(input: { basis: ReferenceBasis; bookStatus: "draft" | "reviewed" | null; accepted: boolean; preRounding?: boolean }): ProposalGateVerdict {
   const { basis, bookStatus, accepted } = input;
+  // K10: first — whatever the basis, a revision that predates the H7 rounding does not reconcile to the fil.
+  if (input.preRounding) return { ok: false, reason: null, refusal: PRE_ROUNDING_REFUSAL };
   if (basis.reference_lines === 0) return { ok: true, reason: "firm_basis", refusal: null };
   if (bookStatus === "reviewed") return { ok: true, reason: "book_reviewed", refusal: null };
   if (accepted) return { ok: true, reason: "accepted", refusal: null };
