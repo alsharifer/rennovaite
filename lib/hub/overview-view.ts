@@ -164,9 +164,12 @@ export async function loadOverviewView(db: SupabaseClient, projectId: string, ra
     estimate: estimate && rev ? { ...estimate, rev, budget } : null,
     design: { locked: perRoom.size, direction, tiles },
     next: overviewNext(projectId, st, { direction, unpriced: (estimate?.excluded ?? []).map((x) => x.description.toLowerCase()) }),
-    timeline: t
-      ? { range: `${t.total_weeks_low}–${t.total_weeks_high} weeks`, note: "Estimated from one calibrated Dubai project — a range, not a promise." }
-      : { range: null, note: timeline?.blocked ?? "Generate your cost first — the phases scale off its quantities." },
+    // K9: a garden project's duration is its BoQ programme (never the interior model).
+    timeline: timeline?.garden
+      ? { range: `≈ ${timeline.garden.totalDays} days`, note: timeline.garden.basis }
+      : t
+        ? { range: `${t.total_weeks_low}–${t.total_weeks_high} weeks`, note: "Estimated from one calibrated Dubai project — a range, not a promise." }
+        : { range: null, note: timeline?.blocked ?? "Generate your cost first — the phases scale off its quantities." },
     documents,
   };
 }

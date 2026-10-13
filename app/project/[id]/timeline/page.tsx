@@ -2,7 +2,7 @@ import { Button } from "@/components/blueprint/Button";
 import { PageHeader } from "@/components/blueprint/PageHeader";
 import { StateBlock } from "@/components/blueprint/StateBlock";
 import { TopBarActions } from "@/components/blueprint/shell/TopBar";
-import { TimelineView } from "@/components/blueprint/timeline/TimelineView";
+import { GardenTimelineView, TimelineView } from "@/components/blueprint/timeline/TimelineView";
 import { journeyFlagsFromEnv, nextOwnerStep, ownerStepHref } from "@/lib/journey";
 import { ownerEyebrow } from "@/lib/journey-eyebrow";
 import { loadTimeline } from "@/lib/timeline/load";
@@ -25,9 +25,12 @@ export default async function TimelinePage({ params }: { params: Promise<{ id: s
           Continue to {next.label.toLowerCase()}
         </Button>
       </TopBarActions>
-      <PageHeader eyebrow={ownerEyebrow("timeline")} title="How long it will take" intro="A phase plan scaled from a real Dubai villa refit. Durations are ranges: one calibrated project earns an honest estimate, not a promise." />
+      <PageHeader eyebrow={ownerEyebrow("timeline")} title="How long it will take" intro={data.garden ? "A programme scaled from a real Dubai garden project. One reference project earns an honest estimate, not a promise." : "A phase plan scaled from a real Dubai villa refit. Durations are ranges: one calibrated project earns an honest estimate, not a promise."} />
       <div className="mt-7">
-        {data.estimate ? (
+        {data.garden ? (
+          // K9: a garden project shows its BoQ programme — never the interior model.
+          <GardenTimelineView timeline={data.garden} />
+        ) : data.estimate ? (
           <TimelineView estimate={data.estimate} />
         ) : (
           <div className="max-w-[720px]">
