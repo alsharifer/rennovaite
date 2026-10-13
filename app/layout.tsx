@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { ICONS_READY_SCRIPT } from "@/lib/icons/ready";
 import { THEME_NO_FLASH_SCRIPT } from "@/lib/theme";
 
 import { Providers } from "./providers";
@@ -8,9 +9,10 @@ import { Providers } from "./providers";
 // Fonts are SELF-HOSTED (app/fonts/, see SOURCES.json): the exact woff2 files
 // next/font/google used to fetch from fonts.gstatic.com at build time, for the
 // same declared subsets (latin / arabic) and weights. Nothing here reaches the
-// network at build time. Google serves EB Garamond, IBM Plex Sans, Inter,
-// JetBrains Mono and Rubik as one variable file per weight range; IBM Plex Sans
-// Arabic is static.
+// network at build time. Google serves EB Garamond, IBM Plex Sans and
+// JetBrains Mono as one variable file per weight range; IBM Plex Sans Arabic is
+// static. K10: Inter and Rubik are gone — nothing routed used them (Plex Sans
+// is the base face, Plex Sans Arabic the Arabic one).
 
 // Display / headings — EB Garamond (latin, 400–700).
 const ebGaramond = localFont({
@@ -29,15 +31,6 @@ const plexSans = localFont({
   weight: "400 600",
   style: "normal",
   variable: "--font-plex-sans",
-  display: "swap",
-});
-
-// Atelier UI / body — Inter (latin, 400–700). Blueprint pages use Plex Sans.
-const inter = localFont({
-  src: "./fonts/inter-latin.woff2",
-  weight: "400 700",
-  style: "normal",
-  variable: "--font-inter",
   display: "swap",
 });
 
@@ -62,14 +55,6 @@ const ibmPlexArabic = localFont({
   display: "swap",
 });
 
-const rubik = localFont({
-  src: "./fonts/rubik-arabic.woff2",
-  weight: "400 700",
-  style: "normal",
-  variable: "--font-rubik",
-  display: "swap",
-});
-
 export const metadata: Metadata = {
   title: "RenovAIte — AI villa renovation, Dubai",
   description:
@@ -90,18 +75,17 @@ export default function RootLayout({
       lang="en"
       // The no-flash script sets data-theme before React hydrates.
       suppressHydrationWarning
-      className={`${ebGaramond.variable} ${plexSans.variable} ${inter.variable} ${jetbrainsMono.variable} ${ibmPlexArabic.variable} ${rubik.variable} h-full antialiased`}
+      className={`${ebGaramond.variable} ${plexSans.variable} ${jetbrainsMono.variable} ${ibmPlexArabic.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_NO_FLASH_SCRIPT }} />
-        {/* Material Symbols SHARP (variable) — the one icon font (R7 §1.6):
-            Atelier's .material-symbols-outlined class at weight 400, Blueprint's
-            <Icon> at 300 / opsz 20 (app/globals.css). */}
-        {/* eslint-disable-next-line @next/next/no-page-custom-font -- the App Router root layout loads on every page (the rule targets pages/_document) */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Sharp:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-        />
+        {/* Material Symbols SHARP — the one icon font (R7 §1.6), self-hosted since K10:
+            a subset of the icons the app draws (public/fonts, lib/icons/subset.json),
+            preloaded; @font-face in app/globals.css with font-display: block. The
+            script marks <html data-icons="ready"> once the font is in, and the icons
+            stay transparent until then — their ligature text is never seen. */}
+        <link rel="preload" href="/fonts/material-symbols-sharp.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <script dangerouslySetInnerHTML={{ __html: ICONS_READY_SCRIPT }} />
       </head>
       <body className="min-h-full font-sans">
         <Providers>{children}</Providers>

@@ -87,10 +87,17 @@ except `design-refs/r7-handoff/`.
 - Fonts are self-hosted `next/font/local` variables on `<html>`:
   `--font-plex-sans` (IBM Plex Sans latin 400–600, Blueprint UI),
   `--font-jetbrains-mono`, `--font-eb-garamond`; tokens.css builds
-  `--font-sans/mono/serif` from them inside the Blueprint scope. Inter stays for
-  Atelier pages; Plex Sans Arabic / Rubik remain the Arabic fallbacks.
-- **One icon font**: Material Symbols **Sharp** (variable), a runtime `<link>`.
-  Blueprint: `<Icon name>` (`components/blueprint/Icon.tsx`, `.bp-icon`:
+  `--font-sans/mono/serif` from them inside the Blueprint scope. Plex Sans is
+  also the base face on `<html>`; Plex Sans Arabic the Arabic one. (Inter and
+  Rubik were removed in K10 — nothing routed used them.)
+- **One icon font**: Material Symbols **Sharp**, SELF-HOSTED since K10 — a subset
+  of the icons the app draws (`public/fonts/material-symbols-sharp.woff2`,
+  `lib/icons/subset.json`; regenerate with `scripts/k10-icon-subset.mjs
+  <codepoints>`), weight 300–400, FILL 0, GRAD 0, opsz 20–24, ~76 KiB,
+  preloaded, `font-display: block`; icons are a 1em clipped box and stay
+  transparent until `<html data-icons="ready">` (`lib/icons/ready.ts`), so a
+  ligature name is never visible. **A new icon name must be in the subset** —
+  `lib/icons/__tests__/subset.test.ts` fails otherwise. Blueprint: `<Icon name>` (`components/blueprint/Icon.tsx`, `.bp-icon`:
   weight 300, grade 0, opsz 20, 20px, layered so size utilities work).
 - **Theme**: `rv_theme` cookie = `light` (default) | `dark` | `system`
   (`lib/theme.ts`). ONLY the pre-paint inline script reads it and sets
@@ -502,6 +509,7 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
 - **The proposal reconciles to the fil** (`lib/boq/totals.ts summaryChainOf`, `lib/documents/__tests__/proposal-chain.test.ts`). QA saw the proposal at 102,892.07 / 8,231.00 / 5,556.00 / 116,679.07 beside a BoQ page at 102,892.03 / 8,231.36 / 5,556.17 / 116,679.56: two revisions of one project — a pre-H7 one (engine 0.2.0, whole-dirham contingency and VAT; every Arabella fixture revision, which the doc shots rendered) and the regenerated H7 one. Now the proposal and the BoQ page's review model read ONE chain (`summaryChainOf`) of the same revision, and the proposal gate refuses a pre-H7 revision first — `predatesRounding(engine.version)` → "Regenerate first — this revision predates the rounding fix." (`PRE_ROUNDING_REFUSAL`; 08 Proposal shows it with Open BoQ & Review; the export checklist item `proposal_rounding`). `reroundRevision` reproduces H7 regeneration on a stored revision for fixtures and shots (stage 7 → 116,679.56). Live: `scripts/k10-proposal-chain-shots.mjs`.
 - **Plan page gate** (`lib/plan/plan-gate.ts planGate`): the editor opens whenever the plan has rooms — counted from the same `roomList` the header counts — or is authored; the not-analysed card ("No drawing attached") only with truly no rooms. A parse record is no longer required: the dev Demo villa (13 rooms, `parsed_json` NULL, no drawing; snapshot `lib/plan/__fixtures__/demo-villa-plan.json`) showed the card under a 13-room header. The header says "no drawing attached" instead of "parsed from the drawing" when there is none. Live: `scripts/k10-plan-gate-shots.mjs` (scratch copies — the Demo villa itself is never opened).
 - **03 Renders = locked, not rendered** (`lib/render-lock-progress.ts`): one lockable view per renderable room or zone (`roomTypeFromDb`; a design is locked per room); the owner step is Done only when all are locked, else Available with "N / M locked" (fix: Open renders). The rail now prints an available step's reason; Projects home `homeNext`, the Overview's `overviewNext` and `nextFromRail` take, in journey order, the first step that is attention, blocked or available-with-a-reason — so all three say "03 · RENDERS — 1 / 3 locked". Live: `scripts/k10-renders-rail-shots.mjs`.
+- **Icon font self-hosted** (see "Fonts, icons, theme"): the Google stylesheet is gone; a cold load on throttled Slow 4G never shows an icon name (`scripts/k10-icons-cold-shots.mjs` samples every 250 ms; light + dark). Inter and Rubik are removed (files, `SOURCES.json`, the Tailwind stacks now point at Plex — an undefined `var()` would void the whole declaration).
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 

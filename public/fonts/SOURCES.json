@@ -1,0 +1,9 @@
+{
+  "material-symbols-sharp.woff2": {
+    "stylesheet": "https://fonts.googleapis.com/css2?family=Material+Symbols+Sharp:opsz,wght,FILL,GRAD@20..24,300..400,0,0&icon_names=<205 names, lib/icons/subset.json>&display=block",
+    "url": "https://fonts.gstatic.com/l/font?kit=gNM_W2J8Roq16WD5tFNRaeLQk6-SHQ_R00k4c2_whPnoY9ruReaU4bHmz74m0ZkGH-VBYe1r3w-dE34heLYdeza6kSGWL-8R8L6hE2IxkmT7eyKLgiuPS42TbVIHnHw-L_l6Y2InB1rxt3D4MDseyr_d1y5I34UiiWmrJBXnA4Lmxf4NQoU9RS_DRuXi2qfMazrJD2ODZZiqQzEOmh-zJUR-k1-SnAPQV07BWK9fw4qPxT_IMrchQc9wLYk_g8_f_p200Tyrq7w3tmOw7gB5qepgrvbju3m1f2WnubKBfM0aA-NDMoMDEupNMYVqQ8OUGJ18E9H3EVeC9DTsaZDTSTQsLjzgsKH9cwZQwGNVluGVJA&skey=b2b11cf3b396438f&v=v374",
+    "bytes": 77776,
+    "sha256": "ec70f40722e450c1fbeea284e4e31b2ecd22055d913407aa1935f2f2a02ea2e8",
+    "license": "Apache-2.0 (Material Symbols)"
+  }
+}

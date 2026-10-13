@@ -102,7 +102,9 @@ describe("Icon — Material Symbols Sharp by ligature", () => {
     expect(block).toContain('font-family: "Material Symbols Sharp"');
     expect(block).toMatch(/"wght" 300,\s*"GRAD" 0,\s*"opsz" 20/);
     const layout = readFileSync(path.join(ROOT, "app/layout.tsx"), "utf8");
-    expect(layout).toContain("family=Material+Symbols+Sharp");
+    // K10: self-hosted (the Sharp subset, preloaded) — never the Google stylesheet, never Outlined.
+    expect(layout).toContain('href="/fonts/material-symbols-sharp.woff2"');
+    expect(layout).not.toContain("fonts.googleapis.com");
     expect(layout).not.toContain("Material+Symbols+Outlined");
   });
 });
