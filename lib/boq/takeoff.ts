@@ -422,7 +422,8 @@ export function computeTakeoff(
             rule_id: "Q-11",
             work_section: "Floor Finishes" as const,
             item_key: "stairs.renovation",
-            description: "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            // Labour only (R-36): the tile SUPPLY is Q-11b's own line, never this one.
+            description: "Staircase renovation — tile fixing labour + LED nosing (excl. handrail; tile supply on its own line)",
             quantity: 1,
             unit: "project",
             measurement: stairsQ11 === "assumed" ? `allowance (R-36); ${STAIRS_ASSUMED_NOTE}` : "allowance (R-36); treads TBC from stair drawing",

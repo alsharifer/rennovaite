@@ -48,9 +48,15 @@ export function applyElementMapping<T extends BoqLike>(boq: T, items: TakeoffIte
   // MAPPED section — so P4 mapping would drop it. Preserve it by re-appending it
   // to the rebuilt Floor Finishes. Its footprint is already excluded from the P4
   // floor_finish (quantify.ts), so there is no double-count.
+  //
+  // K12 follow-up (ruled 14 Oct): the staircase RENOVATION (Q-11, R-36) was
+  // dropped the same way — every plan with an element take-off lost its stair
+  // fixing labour and LED nosing. It is labour only (R-36's note: the material
+  // is Q-11b alone) and the take-off prices nothing on the stairs, so it is kept
+  // too — never a second tile supply.
   const stairTileLines = boq.sections
     .flatMap((s) => s.lines as { rule_id?: string; total_aed?: number }[])
-    .filter((l) => typeof l.rule_id === "string" && l.rule_id.startsWith("Q-11b"));
+    .filter((l) => typeof l.rule_id === "string" && (l.rule_id.startsWith("Q-11b") || l.rule_id.startsWith("Q-11/")));
   if (stairTileLines.length > 0) {
     const ff = mapped.find((m) => m.work_section === "Floor Finishes");
     if (ff) {

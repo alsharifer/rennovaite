@@ -228,9 +228,23 @@
             ],
             "rate_status": "priced",
             "work_item_key": "floor_finish"
+          },
+          {
+            "description": "Staircase renovation — tile fixing labour + LED nosing (excl. handrail; tile supply on its own line)",
+            "quantity": 1,
+            "unit": "project",
+            "rate_aed": 6000,
+            "total_aed": 6000,
+            "vendor_or_source": "allowance",
+            "notes": "R-36: Staircase renovation allowance — LABOUR ONLY: tread/riser preparation, tile fixing labour and LED nosing circuit, excl. handrail (reference project §5: AED 6k). Delta Log G15 (\"Only labor\") confirms the reference project's staircase line carried no material. The tile MATERIAL comes solely from Q-11b/R-44 floor.stair_tile — this note previously read \"tread tiling\", which would have described the same material twice. Rate unchanged. QS to confirm.; allowance (R-36); treads TBC from stair drawing",
+            "rule_id": "Q-11/R-36",
+            "kind": "allowance",
+            "rate_band": "allowance",
+            "wastage_pct": 0,
+            "rate_tier": "allowance"
           }
         ],
-        "section_total_aed": 26315
+        "section_total_aed": 32315
       },
       {
         "work_section": "Wall Finishes",
@@ -698,12 +712,12 @@
         "section_total_aed": 14943.25
       }
     ],
-    "subtotal_aed": 326673.15,
+    "subtotal_aed": 332673.15,
     "contingency_pct": 8,
-    "contingency_aed": 26133.85,
+    "contingency_aed": 26613.85,
     "vat_pct": 5,
-    "vat_aed": 17640.35,
-    "grand_total_aed": 370447.35,
+    "vat_aed": 17964.35,
+    "grand_total_aed": 377251.35,
     "engine": {
       "version": "0.3.0",
       "tier": "mid",
