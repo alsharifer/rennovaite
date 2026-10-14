@@ -4,6 +4,68 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## Plan geometry — ruled 14 Oct (Abdallah); parsing logic NOT changed yet
+
+- **Area reconciliation after parse (backlog).** After a reading, compare Σ room
+  areas with the plan's FOOTPRINT; a residual over **4%** becomes an automatic
+  room **"Circulation (unassigned)"** — in scope, priced like any room,
+  renameable and splittable on 01 Plan. Method, measured read-only on prod
+  (14 Oct): close the rooms' mask by 0.75 m (bridges walls and corridor mouths),
+  fill holes, subtract the rooms, open the remainder by 0.3 m (wall strips drop
+  out) — what is left is unassigned floor. Results (insensitive to a 0.5–1.0 m
+  close):
+  - **Mudon** (prod d09e105d, 13 rooms, 166.1 m²): footprint 175.6 m² = rooms
+    166.1 + wall strips 8.1 + **unassigned 1.3 m² → 0.8%** (one pocket by
+    Bedroom 3 / Passage / Family Area). No printed total on the sheet (its text
+    layer has none) and the reading predates the recorded whole-floor estimate.
+  - **Jumeirah Parks** (prod 1f9ee118, 9 interior rooms, 153.6 m²): footprint
+    156.1 m² = rooms 153.6 + wall strips 1.2 + **unassigned 1.4 m² → 0.9%**
+    (by Maid Room / Bath / Entrance Foyer). BUT the reading's own whole-floor
+    estimate was **185 m²** against 161.0 m² of rooms read (**13%**), 17%
+    against today's 153.6 m².
+  - So: measured against the app's OWN outline both plans are under 4% — the
+    rooms tile what they cover. A missing room at the building's edge is not
+    inside that outline, so **the footprint must come from the drawing** (the
+    outer walls: the vector wall layer on a cropped sheet, a traced outline
+    otherwise; `provider_total_area_m2` is recorded for every reading since the
+    sheet path and is the fallback), not from the rooms. Build it that way.
+- **Concave rooms are kept (checked 14 Oct).** Nothing in reading → repair →
+  save makes a bbox or a hull: repair is a boolean difference (polygon-clipping;
+  it can create concave corners, never removes them) and the editor's save
+  reshapes only rooms that overlap (`repairForSave`). On prod, **10 of 133
+  original readings are concave** (up to 8 vertices — Jumeirah Parks' Kitchen
+  8, Powder Room 7) and 12 of 133 stored rooms (owner edits added two). The two
+  ways a rectangle appears: (a) a room the sheet labels but the model missed is
+  placed as a RECTANGLE of its printed size (`placeholderPolygon`, cropped
+  vector sheets only); (b) the model squares off small steps — Mudon's 13
+  readings are all rectangles while the drawn Dress / Bath share a stepped edge.
+  Most drawn villa rooms are rectangles (119 of 133 readings), so (b) costs
+  little area; a step-aware prompt or the vector wall layer would fix it.
+- **Mudon's stored outlines have drifted east (found 14 Oct).** Mapped onto
+  the drawing, the west rooms (Master Bedroom, Dressing, Master Bath) sit on
+  their walls; Bedroom 3, Bath, Toilet, Bedroom 4, Passage and the terraces sit
+  beside and outside the building, wider than drawn — consistent with "Fix
+  overlaps" moving rooms apart. Areas are unchanged (pricing is area-driven),
+  but cameras and anything positional read the stored geometry. Not fixed —
+  the owner's data. The plan-vs-drawing check (R10b below) would surface it.
+
+## R10c — plan-faithful renders: guards ruled 14 Oct (build into R10c)
+
+- **The camera stands inside its room.** Every default camera's position is
+  asserted INSIDE the room polygon (point-in-polygon, with a ≥ 0.4 m clearance
+  from every wall); a camera that fails is never used — moved inward or
+  dropped, never rendered from. Test: every default camera of every fixture
+  room (rectangles, the J0 L-shapes, Jumeirah Parks' 8- and 10-vertex rooms).
+- **Concave rooms get one default camera per arm.** Split a concave polygon at
+  its reflex vertices into convex arms (an L → 2, a U → 3); each arm gets one
+  default camera looking along it, inside that arm. Rectangles keep the default
+  2 views. The spend estimate (≈ $0.38 per view) then counts arms, not rooms:
+  1 extra view per extra arm.
+- **Spend estimate before the first real renders** (given 14 Oct): ≈ $0.38 per
+  view (1.67 restyles per view and 61% passing, measured on the garden
+  pipeline since 17 Sep; nano-banana-pro ≈ $0.134–0.18; gates on Opus 5) →
+  Jumeirah Parks ≈ $6.80 and Mudon ≈ $7.60 at 2 views / room.
+
 ## R10b (2026-10-14) — openings found on the drawing
 
 - **Widths are rough.** The detector reads coarse fractions of a room's side
