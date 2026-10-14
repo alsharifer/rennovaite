@@ -87,8 +87,12 @@ export interface Proposal {
   start: number;
   end: number;
   floor_to_ceiling?: boolean;
+  /** The width printed on the drawing beside the opening (mm), when there is one. */
+  printed_width_mm?: number | null;
   confidence: number;
   note?: string | null;
+  /** Set by mergeAdjacentProposals: how many readings this one joins (≥ 2). */
+  merged_from?: number;
 }
 
 export interface SnappedOpening {
@@ -130,13 +134,71 @@ export function unitToMetres(rooms: readonly DetectRoom[], totalAreaM2: number |
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const r4 = (n: number) => Math.round(n * 10_000) / 10_000;
 
+/** Two pieces of the same glazing split by a mullion are one opening when the gap is at most this. */
+export const MULLION_GAP_M = 0.4;
+
+const sideExtent = (room: DetectRoom, side: Side) => {
+  const xs = room.polygon.map((q) => q[0]);
+  const ys = room.polygon.map((q) => q[1]);
+  return side === "top" || side === "bottom" ? Math.max(...xs) - Math.min(...xs) : Math.max(...ys) - Math.min(...ys);
+};
+
+/**
+ * Pure: readings of the same kind on the same side of the same room that sit
+ * end to end — a balcony glazing read as two windows either side of a mullion —
+ * become ONE opening spanning both. The gap is measured in metres along the
+ * room's side (≤ MULLION_GAP_M); a door is never merged with a window. A merged
+ * reading has no printed width (the parts' were for the parts).
+ */
+export function mergeAdjacentProposals(proposals: readonly Proposal[], rooms: readonly DetectRoom[], unitToM: number): Proposal[] {
+  const labels = roomLabels(rooms);
+  const out: Proposal[] = [];
+  const groups = new Map<string, Proposal[]>();
+  for (const p of proposals) {
+    const room = labels.get(p.room.trim().toUpperCase());
+    if (!room) {
+      out.push(p);
+      continue;
+    }
+    const k = `${p.room.trim().toUpperCase()}|${p.side}|${p.kind}`;
+    (groups.get(k) ?? groups.set(k, []).get(k)!).push(p);
+  }
+  for (const [k, list] of groups) {
+    const room = labels.get(k.split("|")[0]!)!;
+    const extentM = sideExtent(room, list[0]!.side) * unitToM;
+    const gap = extentM > 0 ? MULLION_GAP_M / extentM : 0;
+    const sorted = list.map((p) => ({ ...p, start: Math.min(p.start, p.end), end: Math.max(p.start, p.end) })).sort((a, b) => a.start - b.start);
+    let cur: Proposal | null = null;
+    for (const p of sorted) {
+      if (cur && p.start - cur.end <= gap) {
+        const prev: Proposal = cur;
+        cur = {
+          ...prev,
+          end: Math.max(prev.end, p.end),
+          floor_to_ceiling: prev.floor_to_ceiling === true || p.floor_to_ceiling === true,
+          confidence: Math.max(prev.confidence, p.confidence),
+          opens_to: prev.opens_to.trim().toLowerCase() === "unknown" ? p.opens_to : prev.opens_to,
+          printed_width_mm: null,
+          note: [prev.note, p.note].filter(Boolean).join("; ") || null,
+          merged_from: (prev.merged_from ?? 1) + 1,
+        };
+        continue;
+      }
+      if (cur) out.push(cur);
+      cur = p;
+    }
+    if (cur) out.push(cur);
+  }
+  return out;
+}
+
 /**
  * Pure: the wall of `room` on the proposal's side, and where along it the
  * opening runs (t0..t1). The side is read off the room's bounding box: the
  * wall must run along that side, cover the point the fractions name, and be
  * the outermost such wall on that side of the room's centre.
  */
-export function sidePlacement(room: DetectRoom, p: Pick<Proposal, "side" | "start" | "end">, walls: readonly RawWallSegment[]): { wall: RawWallSegment; t0: number; t1: number } | { reason: string } {
+export function sidePlacement(room: DetectRoom, p: Pick<Proposal, "side" | "start" | "end">, walls: readonly RawWallSegment[]): { wall: RawWallSegment; t0: number; t1: number; tc: number } | { reason: string } {
   const xs = room.polygon.map((q) => q[0]);
   const ys = room.polygon.map((q) => q[1]);
   const B = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
@@ -170,7 +232,7 @@ export function sidePlacement(room: DetectRoom, p: Pick<Proposal, "side" | "star
   const w = best.wall;
   const wc = (cross(w.a) + cross(w.b)) / 2;
   const pt = (v: number): Pt => (horiz ? [v, wc] : [wc, v]);
-  return { wall: w, t0: projectOntoSegment(pt(s0), w.a, w.b).t, t1: projectOntoSegment(pt(s1), w.a, w.b).t };
+  return { wall: w, t0: projectOntoSegment(pt(s0), w.a, w.b).t, t1: projectOntoSegment(pt(s1), w.a, w.b).t, tc: projectOntoSegment(pt(c), w.a, w.b).t };
 }
 
 /**
@@ -182,9 +244,11 @@ export function snapProposals(
   proposals: readonly Proposal[],
   rooms: readonly DetectRoom[],
   unitToM: number,
-  opts: { model?: string; runAt?: string; existing?: readonly { position: Pt | null; width_mm: number }[] } = {},
+  opts: { model?: string; runAt?: string; existing?: readonly { position: Pt | null; width_mm: number }[]; merge?: boolean } = {},
 ): { openings: SnappedOpening[]; dropped: Dropped[] } {
   const labels = roomLabels(rooms);
+  // Split glazing first (a mullion), then place: one opening per real opening.
+  if (opts.merge !== false) proposals = mergeAdjacentProposals(proposals, rooms, unitToM);
   const walls = deriveWallSegments(rooms.map((r) => ({ id: r.id, polygon: r.polygon, room_type: r.room_type })));
   const dropped: Dropped[] = [];
   const placed: (SnappedOpening & { proposal: Proposal })[] = [];
@@ -204,16 +268,23 @@ export function snapProposals(
     const lenRaw = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
     const lenMm = lenRaw * unitToM * 1000;
     const def = DEFAULT_OPENING_DIMS[p.kind];
-    const measured = Math.abs(place.t1 - place.t0) * lenMm;
     const [lo, hi] = WIDTH_RANGE[p.kind];
-    let width = measured >= 200 ? clamp(measured, lo, hi) : def.width_mm;
-    width = Math.round(Math.min(width, lenMm) / 10) * 10;
+    // The width the reading names: its share of the room's side, at the plan's
+    // scale — not clipped to one wall segment (a side can be several collinear
+    // segments, and a merged glazing spans them). A width printed on the drawing
+    // wins when it is plausible for the kind; only that one is not derived.
+    const sideMm = sideExtent(room, p.side) * unitToM * 1000;
+    const readMm = Math.abs(p.end - p.start) * sideMm;
+    const printed = typeof p.printed_width_mm === "number" && p.printed_width_mm >= lo && p.printed_width_mm <= hi ? p.printed_width_mm : null;
+    let width = printed ?? (readMm >= 200 ? clamp(readMm, lo, hi) : def.width_mm);
+    width = Math.round(Math.min(width, Math.max(sideMm, lenMm)) / 10) * 10;
     if (width <= 0) {
       dropped.push({ proposal: p, reason: "wall too short" });
       continue;
     }
     const half = lenMm > 0 ? width / 2 / lenMm : 0;
-    const t = clamp((place.t0 + place.t1) / 2, half, 1 - half);
+    // An opening longer than its segment (glazing across a split side) centres on it.
+    const t = half >= 0.5 ? clamp(place.tc, 0, 1) : clamp(place.tc, half, 1 - half);
     const position: Pt = [r4(w.a[0] + (w.b[0] - w.a[0]) * t), r4(w.a[1] + (w.b[1] - w.a[1]) * t)];
 
     // What it opens to: the wall's own other room wins; else what the model said. A window
@@ -242,6 +313,8 @@ export function snapProposals(
         confidence: Math.round(clamp(p.confidence, 0, 1) * 100) / 100,
         note: p.note?.trim() ? p.note.trim().slice(0, 300) : null,
         read: { side: p.side, start: Math.round(p.start * 1000) / 1000, end: Math.round(p.end * 1000) / 1000 },
+        width_source: printed ? "printed" : "estimated",
+        ...(p.merged_from ? { merged_from: p.merged_from } : {}),
         ...(opts.model ? { model: opts.model } : {}),
         ...(opts.runAt ? { run_at: opts.runAt } : {}),
       },
@@ -495,6 +568,7 @@ const ProposalSchema = z.object({
   start: z.number(),
   end: z.number(),
   floor_to_ceiling: z.boolean().nullish(),
+  printed_width_mm: z.number().positive().nullish(),
   confidence: z.number().min(0).max(1),
   note: z.string().nullish(),
 });
@@ -521,10 +595,11 @@ For each opening give:
 - side: which side of that room the wall is on, as the image is shown: "top" | "bottom" | "left" | "right"
 - start, end: where the opening begins and ends along that side, as fractions 0–1 of the room's drawn side — left to right on a top or bottom side, top to bottom on a left or right side
 - floor_to_ceiling: true or false (windows only)
+- printed_width_mm: the opening's width in millimetres ONLY when a dimension for it is printed on the drawing (a dimension line or a size tag such as "W1 1800"), else null — never estimate it
 - confidence: 0.0–1.0
 - note: a few words if something is unclear, else null
 
-List each opening once. If there are none, return an empty list.
+List each opening once — one continuous glazing is ONE window even where mullions divide it. If there are none, return an empty list.
 
 Your ENTIRE response is one JSON object, no prose, no fences: {"openings": [ ... ]}`;
 
@@ -613,7 +688,7 @@ export async function detectOpenings(input: {
     parsed = ResponseSchema.safeParse(safeJson(raw));
     if (!parsed.success) throw new Error(`The opening detector's reply did not match the schema after one retry: ${parsed.error.issues[0]?.path.join(".") ?? ""} ${parsed.error.issues[0]?.message ?? ""} — ${raw.slice(0, 160)}`);
   }
-  const proposals = normaliseProposals(parsed.data.openings.map((o) => ({ ...o, floor_to_ceiling: o.floor_to_ceiling === true, note: o.note ?? null })));
+  const proposals = normaliseProposals(parsed.data.openings.map((o) => ({ ...o, floor_to_ceiling: o.floor_to_ceiling === true, printed_width_mm: o.printed_width_mm ?? null, note: o.note ?? null })));
   // Sides are the same in both frames (the editor's fit is a uniform scale, no rotation).
   const snapped = snapProposals(proposals, input.rooms, unitToM, { model: DETECT_MODEL, runAt: input.runAt, existing: input.existing });
   return { ...snapped, proposals };
@@ -749,7 +824,9 @@ export async function runOpeningsDetection(db: SupabaseClient, planId: string, m
           position: o.position,
           along_offset: o.along_offset,
           source: "detected",
-          derived: true,
+          // R10b follow-up: the SIZE is derived unless the drawing printed it; confirming
+          // fixes position and kind, never the width (edit it on the plan to measure it).
+          derived: o.detection.width_source !== "printed",
           detection: o.detection,
         })),
       );

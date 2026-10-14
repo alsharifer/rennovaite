@@ -692,8 +692,14 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
   app's outlines often sit 0.5–1.5 m off the drawn walls and a sheet point would
   miss them. `snapProposals` / `sidePlacement` (pure) put each on the room's
   outermost wall on that side that covers it (`deriveWallSegments` — the take-off's
-  walls), size it at the plan's metre scale, clamp implausible widths, and merge
-  the same opening seen from both rooms. **The frame**: a parsed plan saved from
+  walls), size it as its share of the room's side at the plan's metre scale (not
+  clipped to one wall segment), clamp implausible widths, and merge the same
+  opening seen from both rooms. **Split glazing** (follow-up): readings of the
+  same kind end to end on one side across a ≤ 0.4 m gap (`MULLION_GAP_M`) are
+  ONE opening (`mergeAdjacentProposals`, `detection.merged_from`) — the dev
+  Mudon reading's Bedroom-4 balcony went 0.44 + 0.66 m → 1.53 m. A width
+  PRINTED on the drawing (`printed_width_mm`, plausible for the kind) is the only
+  measured one (`detection.width_source: "printed"`, `derived: false`). **The frame**: a parsed plan saved from
   the editor stores polygons in the 1000 × 600 viewBox; `drawingFrame` relates
   them to the drawing by fitting the editor's uniform scale + offset on the rooms
   the plan and `parsed_json.rooms` share by name (outliers = rooms the owner
@@ -701,7 +707,9 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
 - **When it runs**: once per plan, claimed atomically (`openings_detected_at`) —
   right after the reading (`ReadingPlan` → `startOpeningsDetection`), or lazily
   the first time 01 Plan (`OpeningsCheckPanel`) or Renders (`OpeningsAutoDetect`)
-  opens; no bulk backfill. **Re-detect** on demand replaces only unconfirmed
+  opens; no bulk backfill. Non-blocking: the page renders at once with
+  "Finding windows and doors…" in the panel and fills in when the run ends (the
+  rows are re-read BEFORE the state flips, so "none found" never flashes). **Re-detect** on demand replaces only unconfirmed
   finds; a confirmed or hand-drawn opening is never touched and a find on one is
   dropped. A re-parse resets both (`resetOpeningsDetection`). Routes:
   `GET/POST /api/plan-openings/detect`, `POST /api/plan-openings/confirm
@@ -709,9 +717,14 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
 - **Derived until confirmed.** An unconfirmed find is DERIVED (dashed, "found ·
   to confirm"): `derivePlanGraph` leaves it out by default, so no BoQ, drawing,
   schedule or viewer counts it (`{ includeUnconfirmed: true }` adds it, flagged
-  `unconfirmed`). Confirming (Confirm / Confirm all, or adjusting it on the
-  Openings layer — a drag or a resize confirms) = measured: `derived` clears and
-  a `design_edit` event `layer: "openings_confirmed"` is the revision cause
+  `unconfirmed`). **Confirm = position + kind** (follow-up, ruled 14 Oct):
+  Confirm / Confirm all / adjusting it on the Openings layer sets `confirmed_at`
+  and NEVER clears `derived` — the WIDTH stays derived until entered on the plan
+  (both dimensions → measured, the A5 rule) or printed on the drawing. The panel
+  shows "≈ 1.80 m — check" (`openingWidthLabel`) and a "WIDTHS TO CHECK · N"
+  list (`widthsToCheck`); a wall / paint / wet-tiling line net of a derived
+  opening size carries `qty_derived` (the derived mark) and says so in its notes
+  (`TakeoffItem.derived_opening_refs`). Confirming writes a `design_edit` event `layer: "openings_confirmed"` is the revision cause
   **"Openings confirmed"** (item keys `wall_plaster`, `wall_paint`, `wet_tiling` —
   the lines net of openings); `changesSinceRevision` counts it, so the rail and
   Regenerate say the BoQ moved. Edits to a counted opening are `layer: "openings"`

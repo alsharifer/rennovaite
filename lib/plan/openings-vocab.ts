@@ -24,6 +24,10 @@ export interface DetectionMeta {
   run_at?: string;
   /** What the model read: the side of the room and where along it (0–1), before snapping. */
   read?: { side: string; start: number; end: number };
+  /** "printed" = a dimension on the drawing gave the width (measured); "estimated" = read off the drawing (derived). */
+  width_source?: "printed" | "estimated";
+  /** The opening joins this many readings split by mullions. */
+  merged_from?: number;
 }
 
 /** A plan's detection state (plans.openings_detection). */
@@ -109,6 +113,23 @@ export function openingsSentence(
   return `We found ${joinAnd(parts)} — correct?`;
 }
 
+/**
+ * The width as the panel shows it: "≈ 1.80 m — check" while the size is derived
+ * (estimated off the drawing, or defaulted) — confirming an opening fixes its
+ * position and kind, never its width; "1.80 m" once measured (edited on the plan,
+ * or printed on the drawing).
+ */
+export function openingWidthLabel(o: { width_mm?: number | null; derived?: boolean | null }): { text: string; derived: boolean } | null {
+  if (!o.width_mm) return null;
+  const m = (o.width_mm / 1000).toFixed(2);
+  return o.derived ? { text: `≈ ${m} m — check`, derived: true } : { text: `${m} m`, derived: false };
+}
+
+/** Counted openings (confirmed or drawn) whose size is still derived — "widths to check". */
+export function widthsToCheck<T extends OpeningRowLike & { derived?: boolean | null }>(rows: readonly T[]): T[] {
+  return rows.filter((r) => !isUnconfirmedDetected(r) && r.derived === true && r.kind !== "gate");
+}
+
 /** One row's label in the confirmation list: "Window · Dining room → outside · ~1.80 m". */
 export function openingRowLabel(o: OpeningRowLike & { width_mm?: number | null }, roomName: (id: string) => string | null): { title: string; where: string } {
   const kind = o.kind === "archway" ? "Opening" : o.kind === "window" ? (o.detection?.floor_to_ceiling ? "Floor-to-ceiling window" : "Window") : o.kind === "gate" ? "Gate" : "Door";
@@ -124,7 +145,7 @@ export const CONFIRMED_RENDER_LABEL = "Windows and doors from your confirmed pla
 
 /** What the confirmation panel says about the rule. */
 export const OPENINGS_RULE =
-  "Found openings shape your renders now, labelled as detected. They change the BoQ only once you confirm them — on the next regenerate.";
+  "Found openings shape your renders now, labelled as detected. They change the BoQ only once you confirm them — on the next regenerate. Confirming fixes where an opening is and what it is; its width stays an estimate until you edit it on the plan.";
 
 /** The revision cause when confirmed openings move a regenerated BoQ. */
 export const OPENINGS_CONFIRMED_CAUSE = "Openings confirmed";

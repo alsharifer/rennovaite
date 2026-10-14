@@ -15,7 +15,9 @@ export const dynamic = "force-dynamic";
 //   POST { plan_id, ids: [...] }   confirm these
 //   POST { plan_id, all: true }    "Confirm all"
 //
-// Confirmed = measured: derived clears, confirmed_at / confirmed_by are set, and
+// Confirmed = its POSITION and KIND are the owner's (confirmed_at / confirmed_by);
+// its WIDTH stays derived — "Confirm all" never upgrades an estimated size. Only
+// editing the size on the plan (or a width printed on the drawing) measures it.
 // derivePlanGraph counts the opening from now on — so it takes effect on the
 // next regenerate, under the cause "Openings confirmed" (a design_edit event,
 // layer "openings_confirmed"). Only unconfirmed DETECTED rows of THIS plan are
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
   try {
     let q = db()
       .from("plan_openings")
-      .update({ confirmed_at: new Date().toISOString(), confirmed_by: caller.id, derived: false })
+      .update({ confirmed_at: new Date().toISOString(), confirmed_by: caller.id })
       .eq("plan_id", b.plan_id)
       .eq("source", "detected")
       .is("confirmed_at", null);

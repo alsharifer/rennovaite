@@ -50,7 +50,8 @@ async function dryRun(projectId) {
   const lines = b.boq.sections.flatMap((s) => s.line_items ?? s.lines ?? []);
   const qty = new Map();
   for (const l of lines) qty.set(l.description, Math.round(((qty.get(l.description) ?? 0) + Number(l.quantity ?? 0)) * 100) / 100);
-  return { qty, total: b.grand_total_aed };
+  const derivedWall = lines.filter((l) => ["wall_plaster", "wall_paint", "wet_tiling"].includes(l.work_item_key ?? l.item_key) && l.qty_derived === true).length;
+  return { qty, total: b.grand_total_aed, derivedWall };
 }
 const moved = (a, b) => [...new Set([...a.qty.keys(), ...b.qty.keys()])].filter((k) => a.qty.get(k) !== b.qty.get(k)).map((k) => `${k}: ${a.qty.get(k) ?? "—"} → ${b.qty.get(k) ?? "—"}`);
 
@@ -101,7 +102,9 @@ try {
   const all = await json(await post(owner, "/api/plan-openings/confirm", { plan_id: planId, all: true }));
   check(all?.confirmed?.length === list1.length - 1, "Confirm all confirms the rest", `${all?.confirmed?.length}`);
   const list2 = (await json(await owner(`${BASE}/api/plan-openings?plan_id=${planId}`)))?.openings ?? [];
-  check(list2.every((o) => o.confirmed_at && o.derived === false), "confirmed = measured (derived cleared)");
+  // R10b follow-up: Confirm fixes position + kind; an estimated width stays derived.
+  const printedIds = new Set(list1.filter((o) => o.detection?.width_source === "printed").map((o) => o.id));
+  check(list2.every((o) => o.confirmed_at && o.derived === !printedIds.has(o.id)), "Confirm all keeps every estimated width derived", `${printedIds.size} printed`);
   const { data: ev } = await admin.from("pilot_events").select("detail").eq("project_id", projectId).eq("kind", "design_edit");
   const confirmedEvents = (ev ?? []).filter((e) => e.detail?.layer === "openings_confirmed");
   check(confirmedEvents.reduce((s, e) => s + (e.detail.count ?? 0), 0) === list1.length, "each confirmation is recorded (cause: Openings confirmed)", `${confirmedEvents.length} events`);
@@ -109,10 +112,15 @@ try {
   const lineMoves = moved(before, confirmed);
   check(lineMoves.length > 0 && confirmed.total < before.total, "confirmed openings take effect on the next regenerate — the wall lines are net of them", `total ${before.total} → ${confirmed.total}`);
   for (const m of lineMoves) console.log("      " + m);
+  check(confirmed.derivedWall > 0 || printedIds.size === list1.length, "the wall lines net of an estimated width carry the derived mark", `${confirmed.derivedWall} lines`);
+  // Measuring one width on the plan (both dimensions) makes it measured.
+  const measure = await owner(`${BASE}/api/plan-openings`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: list1[0].id, width_mm: 1500, height_mm: 2100 }) });
+  const measured = (await json(measure))?.opening;
+  check(measure.ok && measured?.derived === false && measured?.width_mm === 1500, "entering a width on the plan measures it", JSON.stringify({ derived: measured?.derived, width: measured?.width_mm }));
 
   // --- 5. Re-detect keeps what was confirmed -----------------------------------------------
   // Un-confirm three rows by hand (as if never confirmed) so a re-detect has something to replace.
-  const stale = list2.slice(-3).map((o) => o.id);
+  const stale = list2.slice(-3).map((o) => o.id).filter((id) => id !== list1[0].id);
   await admin.from("plan_openings").update({ confirmed_at: null, confirmed_by: null, derived: true }).in("id", stale);
   const re = await json(await post(owner, "/api/plan-openings/detect", { plan_id: planId, mode: "redetect" }));
   const list3 = (await json(await owner(`${BASE}/api/plan-openings?plan_id=${planId}`)))?.openings ?? [];

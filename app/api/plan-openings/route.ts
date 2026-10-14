@@ -212,13 +212,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     // R10b: adjusting an opening found on the drawing confirms it — the owner
-    // has looked at it and put it where it is. Confirmed = measured.
+    // has looked at it and put it where it is. That confirms position and kind;
+    // the width is measured only by the rule above (both dimensions supplied).
     const before = await openingState(id);
     const confirming = before?.source === "detected" && !before.confirmed_at && !reset_dims;
     if (confirming) {
       patch.confirmed_at = new Date().toISOString();
       patch.confirmed_by = caller.id;
-      patch.derived = false;
     }
 
     // A string re-sent in its curated form goes back to the stored text.

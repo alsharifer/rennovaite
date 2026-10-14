@@ -709,7 +709,7 @@ export function OpeningsEditor({
                     setError("Could not confirm — try again.");
                     return;
                   }
-                  setOpenings((cur) => cur.map((o) => (o.id === selectedOpening.id ? { ...o, confirmed_at: new Date().toISOString(), derived: false } : o)));
+                  setOpenings((cur) => cur.map((o) => (o.id === selectedOpening.id ? { ...o, confirmed_at: new Date().toISOString() } : o)));
                   announce();
                 }
               : undefined
@@ -765,9 +765,11 @@ function OpeningGlyph({
   const p0: Pt = [centre[0] - ux * halfPx, centre[1] - uy * halfPx];
   const p1: Pt = [centre[0] + ux * halfPx, centre[1] + uy * halfPx];
 
-  const stroke = o.derived ? SVG.inkSecondary : SVG.ink;
+  // R10b: an unconfirmed find is provisional however its size was read.
+  const provisional = o.derived || isUnconfirmedDetected(o);
+  const stroke = provisional ? SVG.inkSecondary : SVG.ink;
   const accent = selected ? SVG.brass : stroke;
-  const dash = o.derived ? "3 2" : undefined;
+  const dash = provisional ? "3 2" : undefined;
 
   // Leaf length = opening width (a door leaf is as long as its clear opening).
   const leafLen = halfPx * 2;
@@ -918,12 +920,12 @@ function OpeningProperties({
             Confirm
           </button>
         )}
-        {o.derived && o.source !== "detected" && (
+        {o.derived && (
           <span
             className={TAG}
             title="Dimensions defaulted, not measured. Enter a width and height to record a measurement."
           >
-            derived — defaulted size
+            {o.source === "detected" ? "≈ width — check" : "derived — defaulted size"}
           </span>
         )}
         <span className="ml-auto t-num-sm text-bp-ink-secondary">

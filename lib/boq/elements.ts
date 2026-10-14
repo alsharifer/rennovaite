@@ -50,6 +50,8 @@ export interface MappedLine {
   work_item_key: WorkItemKey;
   /** T3b: present only when a book tier (the project's firm) answered. */
   rate_tier?: "firm_private" | "firm_correction";
+  /** R10b: the quantity is net of an opening whose size is derived. */
+  qty_derived?: boolean;
 }
 
 export interface MappedSection {
@@ -91,9 +93,11 @@ export function assembleMappedSections(items: TakeoffItem[], price?: ElementPric
       its.reduce((s, i) => s + (i.gross_qty ?? i.qty), 0),
     );
     const deducted = r2(grossTotal - quantity);
+    // R10b: a deduction resting on a derived opening size makes the quantity derived.
+    const derivedOpenings = Array.from(new Set(its.flatMap((i) => i.derived_opening_refs ?? [])));
     const notes =
       openingRefs.length > 0
-        ? `Aggregated from ${its.length} element take-off items. NET of ${openingRefs.length} opening${openingRefs.length === 1 ? "" : "s"}: gross ${grossTotal} m² − ${deducted} m² (doors/windows) = ${quantity} m², floored at 0 per element.`
+        ? `Aggregated from ${its.length} element take-off items. NET of ${openingRefs.length} opening${openingRefs.length === 1 ? "" : "s"}: gross ${grossTotal} m² − ${deducted} m² (doors/windows) = ${quantity} m², floored at 0 per element.${derivedOpenings.length > 0 ? ` ${derivedOpenings.length} of these opening sizes ${derivedOpenings.length === 1 ? "is" : "are"} derived, not measured — check on the plan.` : ""}`
         : `Aggregated from ${its.length} element take-off items.`;
 
     const unit = its[0]!.unit;
@@ -116,6 +120,7 @@ export function assembleMappedSections(items: TakeoffItem[], price?: ElementPric
       rate_status: "priced",
       work_item_key: key,
       ...(book ? { rate_tier: book.rate_tier } : {}),
+      ...(derivedOpenings.length > 0 ? { qty_derived: true } : {}),
     });
   }
 
