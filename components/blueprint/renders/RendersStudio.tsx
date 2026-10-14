@@ -28,7 +28,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import type { AssetLite } from "@/lib/assets/types";
 import { formatAED } from "@/lib/format/aed";
-import { resolveRender, runBatch, type GenerateResponse } from "@/lib/render-batch/client";
+import { resolveRender, runBatch, type GenerateResponse, RenderNotice } from "@/lib/render-batch/client";
 import type { BatchJob, RenderView, SceneOutcome } from "@/lib/render-batch/plan";
 import { roomTypeFromDb } from "@/lib/render-prompts";
 import { getStagingSet, stagingRoomTypeFromDb } from "@/lib/staging/sets";
@@ -125,6 +125,8 @@ export function RendersStudio(props: {
   const [locking, setLocking] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // R10a: "That change didn't come through…" / "Walls and windows come from your plan…" — not failures.
+  const [notice, setNotice] = useState<{ message: string; href: string | null } | null>(null);
   const [ask, setAsk] = useState("");
   const [announce, setAnnounce] = useState("");
   const [elapsed, setElapsed] = useState(0);
@@ -195,6 +197,8 @@ export function RendersStudio(props: {
   async function post(url: string, body: Record<string, unknown>): Promise<GenerateResponse> {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId, ...body }) });
     const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    // R10a: a structural request is answered with the plan, not an error.
+    if (res.status === 422 && json?.code === "structural_change") throw new RenderNotice(String(json.error), typeof json.plan_href === "string" ? json.plan_href : null, "structural_change");
     if (!res.ok) throw new Error((json && typeof json.error === "string" && json.error) || "The render didn't finish. Please try again.");
     return resolveRender(json, res.status);
   }
@@ -231,6 +235,7 @@ export function RendersStudio(props: {
     setAsk("");
     setBusyKey(k);
     setError(null);
+    setNotice(null);
     setRow(k, { state: "rendering" });
     setAnnounce(`Changing ${roomName}: ${tweak}`);
     try {
@@ -240,7 +245,11 @@ export function RendersStudio(props: {
       track(AnalyticsEvent.RenderIterated, { project_id: projectId, room_id: room.id, render_id: result.render_id, parent_render_id: current.id });
     } catch (err) {
       setRow(k, { state: locked.has(room.id) ? "locked" : "ready" });
-      setError(err instanceof Error ? err.message : "The change didn't render.");
+      if (err instanceof RenderNotice) {
+        setNotice({ message: err.message, href: err.href });
+        setAsk(tweak);
+        setAnnounce(err.message);
+      } else setError(err instanceof Error ? err.message : "The change didn't render.");
     } finally {
       setBusyKey((c) => (c === k ? null : c));
     }
@@ -536,6 +545,17 @@ export function RendersStudio(props: {
                   <span className="t-body-sm block text-bp-ink-secondary">{qa.text}</span>
                 </p>
               </div>
+            ) : null}
+
+            {notice ? (
+              <p role="status" className="t-body-sm mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-l-2 border-bp-brass bg-bp-surface-raised px-4 py-3 text-bp-ink-primary" data-render-notice="">
+                <span>{notice.message}</span>
+                {notice.href ? (
+                  <a href={notice.href} className="t-nav-item-active text-bp-ink-primary underline underline-offset-2" data-render-notice-link="">
+                    Open the plan&rsquo;s openings
+                  </a>
+                ) : null}
+              </p>
             ) : null}
 
             {error ? (

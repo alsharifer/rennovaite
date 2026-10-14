@@ -44,9 +44,11 @@ describe("exterior room classification (G1b)", () => {
     expect(roomTypeFromDb("ensuite")).toBe("bathroom");
     expect(roomTypeFromDb("powder")).toBe("bathroom");
     expect(roomTypeFromDb("living")).toBe("living");
-    expect(roomTypeFromDb("majlis")).toBe("living");
-    expect(roomTypeFromDb("dining")).toBe("living");
-    for (const t of ["master-bedroom", "secondary-bedroom", "bathroom", "living"]) {
+    // R10a (ruled 14 Oct): majlis, dining and kitchen are their own prompt types now.
+    expect(roomTypeFromDb("majlis")).toBe("majlis");
+    expect(roomTypeFromDb("dining")).toBe("dining");
+    expect(roomTypeFromDb("kitchen")).toBe("kitchen");
+    for (const t of ["master-bedroom", "secondary-bedroom", "bathroom", "living", "dining", "majlis", "kitchen"]) {
       expect(isExteriorRoomType(t)).toBe(false);
     }
   });

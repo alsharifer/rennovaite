@@ -14,6 +14,7 @@ import {
   IN_FLIGHT_WINDOW_MS,
 } from "@/lib/render-image";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { STRUCTURAL_MESSAGE, classifyChangeRequest, planOpeningsHref } from "@/lib/render/change-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -114,6 +115,17 @@ export async function POST(request: NextRequest) {
     const { project_id, room_id, parent_render_id, tweak } = parsed.data;
     const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id, room_id, render_id: parent_render_id });
     if (access.denied) return access.denied;
+
+    // R10a: an image edit cannot move walls. A request to move / add / remove /
+    // resize a wall, window, door, opening or the kitchen is answered with the
+    // plan — no edit, no model call, no version (lib/render/change-request.ts).
+    const change = classifyChangeRequest(tweak);
+    if (change.kind === "structural") {
+      return NextResponse.json(
+        { error: STRUCTURAL_MESSAGE, code: "structural_change", matched: change.matched, plan_href: planOpeningsHref(project_id) },
+        { status: 422 },
+      );
+    }
 
     const replicateKey = process.env.REPLICATE_API_TOKEN;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;

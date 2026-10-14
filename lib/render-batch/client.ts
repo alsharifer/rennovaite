@@ -28,6 +28,18 @@ export type GenerateResponse = {
 // The render + iterate routes run async: they return a prediction_id and the
 // client polls /api/render/status until the image is ready. A cache hit still
 // returns image_url directly, so both shapes are handled.
+/** R10a: an answer that is not a failure — the edit came back the same, or the request belongs on the plan. */
+export class RenderNotice extends Error {
+  constructor(
+    message: string,
+    readonly href: string | null = null,
+    readonly code: "unchanged" | "structural_change" = "unchanged",
+  ) {
+    super(message);
+    this.name = "RenderNotice";
+  }
+}
+
 export async function pollRenderStatus(predictionId: string): Promise<GenerateResponse> {
   const deadline = Date.now() + 150_000;
   while (Date.now() < deadline) {
@@ -56,6 +68,9 @@ export async function pollRenderStatus(predictionId: string): Promise<GenerateRe
     }
     if (body.status === "failed") {
       throw new Error(body.error || "Render failed.");
+    }
+    if (body.status === "unchanged") {
+      throw new RenderNotice((body as { message?: string }).message || "That change didn’t come through — the image is the same. Try being more specific.");
     }
     // status === "processing" → keep polling.
   }

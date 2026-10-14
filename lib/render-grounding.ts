@@ -26,6 +26,10 @@ const MOODBOARD_ROOM: Record<RoomType, string> = {
   "secondary-bedroom": "secondary-bedroom",
   bathroom: "bathroom",
   living: "living",
+  // R10a: no art of their own yet — the style's living-room board carries its materials and palette.
+  dining: "living",
+  majlis: "living",
+  kitchen: "living",
   // G1b: two more segments, same file naming as the interior 24.
   "garden-zone": "garden",
   "outdoor-structure": "structure",
