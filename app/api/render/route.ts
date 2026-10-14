@@ -44,6 +44,9 @@ import { roomDimensions } from "@/lib/room-geometry";
 import { loadGardenSceneContext, renderGardenCamera } from "@/lib/scene-render/pipeline";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
+import type { OpeningsBasis } from "@/lib/plan/openings-vocab";
+import { loadRoomOpenings } from "@/lib/render/openings-load";
+import { editOpeningsClause } from "@/lib/render/openings-prompt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -270,6 +273,21 @@ export async function POST(request: NextRequest) {
     const photoUrl = photo?.public_url ?? null;
     const mode: "photo" | "offplan" = photoUrl ? "photo" : "offplan";
 
+    // R10b: an off-plan render is told the room’s openings — confirmed ones and
+    // ones found on the drawing alike — and records which (renders.openings_basis)
+    // so a render built from unconfirmed finds is labelled. A room with none
+    // keeps its prompt, and so its cache entry, unchanged.
+    let openingsPhraseText: string | null = null;
+    let openingsBasisRec: OpeningsBasis | null = null;
+    if (mode === "offplan") {
+      const loaded = await loadRoomOpenings(supabase as unknown as SupabaseClient, room_id);
+      openingsPhraseText = loaded.phrase;
+      openingsBasisRec = loaded.basis;
+      if (openingsPhraseText) prompt = `${prompt}
+
+${editOpeningsClause(openingsPhraseText)}`;
+    }
+
     // Cache check: identical prompt AND path for this room → return the prior
     // render instead of paying Replicate again (and, for the off-plan path,
     // skips the base-image generation too). Keying on `mode` stops a stale
@@ -345,6 +363,7 @@ export async function POST(request: NextRequest) {
         roomType: promptRoomType,
         widthM: dims?.widthM,
         depthM: dims?.depthM,
+        openings: openingsPhraseText,
       });
       try {
         const baseOutput = await runWithTimeout(
@@ -417,6 +436,13 @@ export async function POST(request: NextRequest) {
         { error: insertErr?.message ?? "Failed to save render." },
         { status: 500 },
       );
+    }
+
+    // R10b (060): which openings shaped this render — best-effort, so a database
+    // before 060 still renders (the label is then simply absent).
+    if (openingsBasisRec) {
+      const { error: basisErr } = await (supabase as unknown as SupabaseClient).from("renders").update({ openings_basis: openingsBasisRec }).eq("id", renderRow.id);
+      if (basisErr) console.warn("[api/render] openings_basis not recorded:", basisErr.message);
     }
 
     // P7: record which staging set dressed this render — best-effort in a

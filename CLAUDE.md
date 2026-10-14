@@ -675,6 +675,66 @@ left …" came back SSIM 0.992 — the same image — and was saved as a version
 - **Tests**: `lib/__tests__/r10a-ask-for-a-change.test.ts`; live (no model
   call): `scripts/r10a-ask-shots.mjs`.
 
+### R10b — windows, doors and openings found on the drawing (14 Oct)
+
+Spec §7.5. 1 of 10 production plans had any opening (5, drawn by hand) and the
+parser extracts none, so every off-plan render was told "a single window on one
+side wall". Migrations **059** (`plan_openings.source = 'detected'`,
+`confirmed_at` / `confirmed_by`, `detection` jsonb; `plans.openings_detected_at`
+/ `openings_detection`) and **060** (`renders.openings_basis`).
+
+- **The detector** (`lib/plan/openings-detect.ts`, server; one `claude-opus-5`
+  call, thinking off, streamed, ~15–25 s): the drawing is rasterised in the frame
+  its rooms were traced in (the parser's crop, the whole PDF page, or the image),
+  and the model sees it clean AND with the app's rooms outlined + labelled R1…Rn.
+  It answers per opening: room, **side** of the room (top/bottom/left/right as
+  drawn) and start/end along that side (0–1) — relative to the room, because the
+  app's outlines often sit 0.5–1.5 m off the drawn walls and a sheet point would
+  miss them. `snapProposals` / `sidePlacement` (pure) put each on the room's
+  outermost wall on that side that covers it (`deriveWallSegments` — the take-off's
+  walls), size it at the plan's metre scale, clamp implausible widths, and merge
+  the same opening seen from both rooms. **The frame**: a parsed plan saved from
+  the editor stores polygons in the 1000 × 600 viewBox; `drawingFrame` relates
+  them to the drawing by fitting the editor's uniform scale + offset on the rooms
+  the plan and `parsed_json.rooms` share by name (outliers = rooms the owner
+  moved), else the two extents; nothing to relate → `no_frame` (never guessed).
+- **When it runs**: once per plan, claimed atomically (`openings_detected_at`) —
+  right after the reading (`ReadingPlan` → `startOpeningsDetection`), or lazily
+  the first time 01 Plan (`OpeningsCheckPanel`) or Renders (`OpeningsAutoDetect`)
+  opens; no bulk backfill. **Re-detect** on demand replaces only unconfirmed
+  finds; a confirmed or hand-drawn opening is never touched and a find on one is
+  dropped. A re-parse resets both (`resetOpeningsDetection`). Routes:
+  `GET/POST /api/plan-openings/detect`, `POST /api/plan-openings/confirm
+  { plan_id, ids | all }`.
+- **Derived until confirmed.** An unconfirmed find is DERIVED (dashed, "found ·
+  to confirm"): `derivePlanGraph` leaves it out by default, so no BoQ, drawing,
+  schedule or viewer counts it (`{ includeUnconfirmed: true }` adds it, flagged
+  `unconfirmed`). Confirming (Confirm / Confirm all, or adjusting it on the
+  Openings layer — a drag or a resize confirms) = measured: `derived` clears and
+  a `design_edit` event `layer: "openings_confirmed"` is the revision cause
+  **"Openings confirmed"** (item keys `wall_plaster`, `wall_paint`, `wet_tiling` —
+  the lines net of openings); `changesSinceRevision` counts it, so the rail and
+  Regenerate say the BoQ moved. Edits to a counted opening are `layer: "openings"`
+  plan edits. Live on the canonical plan: 16 found → plaster/paint 399.96 →
+  377.38 m², wet tiling 93.4 → 87.39 m², only after confirming.
+- **01 Plan** (`components/blueprint/plan/OpeningsCheckPanel.tsx`, the
+  PlanCheckPanel pattern): "We found 2 windows, a door and an opening to the
+  kitchen — correct?" (`openingsSentence`), the list (derived mark), choosing a
+  row opens the Openings layer on it (`rv:openings-focus`), Confirm / Remove per
+  row, Confirm all, Re-detect; panel and editor keep each other fresh
+  (`rv:openings-changed`).
+- **Renders use them at once, labelled**: an off-plan render's base shell and
+  restyle prompt name the room's openings ("two floor-to-ceiling windows and a
+  wide open passage to the kitchen", `lib/render/openings-prompt.ts`) instead of
+  the invented single window — a room with none keeps its prompt (cache key)
+  byte-identical. `renders.openings_basis` records confirmed vs detected (an edit
+  inherits its parent's); the studio shows "Windows and doors detected from your
+  drawing — not yet confirmed · Check them on the plan".
+- **Checks**: `lib/plan/__tests__/openings-detect.test.ts`; live (dev, scratch
+  project, one parse + detection calls, no renders):
+  `node scripts/r10b-openings-check.mjs [port] [--keep]`; accuracy over a
+  read-only plan dump: `scripts/r10b-detect-accuracy.ts <dump.json> <outDir>`.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

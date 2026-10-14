@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/blueprint/Button";
 import { Icon } from "@/components/blueprint/Icon";
+import { OpeningsCheckPanel } from "@/components/blueprint/plan/OpeningsCheckPanel";
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
+import type { DetectionRun } from "@/lib/plan/openings-vocab";
 import { PlanRoomFocus } from "@/components/blueprint/plan/PlanRoomFocus";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
 import { FIRM_STEPS, OWNER_STEPS } from "@/lib/journey";
@@ -250,6 +252,12 @@ export default async function PlanPage({
     ? stepDefs.filter((s) => rail?.statuses[s.key]?.state === "blocked" && /overlap/i.test(rail?.statuses[s.key]?.reason ?? "")).map((s) => ({ step: s.name, reason: rail!.statuses[s.key]!.reason! }))
     : [];
   const eyebrow = stepEyebrow(persona, "scope", "plan", "Plan");
+
+  // R10b (059): openings found on the drawing — when detection ran, and how it went.
+  // Best-effort: before 059 the panel simply starts no run.
+  const detectRes = await planSb.from("plans").select("openings_detected_at, openings_detection").eq("id", plan.id).maybeSingle<{ openings_detected_at: string | null; openings_detection: DetectionRun | null }>();
+  const detection = detectRes.error ? null : detectRes.data;
+  const canDetect = !authored && Boolean(plan.pdf_url) && !detectRes.error;
   const totalArea = plan.total_area_m2 ?? null;
   const unit = authored ? "zones" : "rooms";
   const meta = [
@@ -307,6 +315,17 @@ export default async function PlanPage({
               blocked={blocked}
               summary={{ rooms: roomList.length, area: formatM2(totalArea), label: unit }}
             />
+
+            {/* R10b (§7.5): "We found 2 windows and an opening to the kitchen — correct?" */}
+            {!authored ? (
+              <OpeningsCheckPanel
+                planId={plan.id}
+                rooms={roomList.map((r) => ({ id: r.id, name: r.name_en ?? "Room" }))}
+                canDetect={canDetect}
+                detectedAt={detection?.openings_detected_at ?? null}
+                run={detection?.openings_detection ?? null}
+              />
+            ) : null}
 
             <section aria-label="This renovation">
               {/* K12 (§7.4, 81:716): which rooms this renovation covers — everything after this step follows it. */}

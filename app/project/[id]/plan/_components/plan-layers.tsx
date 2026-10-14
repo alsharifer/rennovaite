@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { OPENINGS_FOCUS_EVENT } from "@/components/blueprint/plan/OpeningsCheckPanel";
 import { PlanInspector } from "@/components/blueprint/plan/PlanInspector";
 import type { RoomAreaDispute } from "@/lib/parse/disputes";
 import type { RawRoomInput } from "@/lib/overlays/viewbox";
@@ -87,6 +88,18 @@ export function PlanLayers({
   // R10a: "?layer=openings" (the renders' "Walls and windows come from your plan" link) opens on that layer.
   const [layer, setLayer] = useState<Layer>(initialLayer === "openings" ? "openings" : "plan");
   const [target, setTarget] = useState<InspectTarget | null>(null);
+  // R10b: the openings panel's "show me" opens the Openings layer on that opening.
+  const [focusOpening, setFocusOpening] = useState<{ id: string; n: number } | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (!id) return;
+      setLayer("openings");
+      setFocusOpening((f) => ({ id, n: (f?.n ?? 0) + 1 }));
+    };
+    window.addEventListener(OPENINGS_FOCUS_EVENT, on);
+    return () => window.removeEventListener(OPENINGS_FOCUS_EVENT, on);
+  }, []);
 
   const onInspectRoom = (roomId: string) => {
     const room = inspect?.rooms.find((r) => r.id === roomId);
@@ -124,6 +137,7 @@ export function PlanLayers({
       rooms={initialRooms}
       totalAreaM2={initialTotalAreaM2}
       readOnly={mode === "read"}
+      focus={focusOpening}
     />
   );
 

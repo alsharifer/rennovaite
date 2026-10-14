@@ -11,6 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import type { RawLinearElement } from "./elements";
+import { isUnconfirmedDetected } from "./openings-vocab";
 import { buildPlanGraph, type PlanGraph, type PlanSource, type RawContext, type RawOpening, type RawRoom } from "./geometry";
 
 /** Read persisted openings for a plan (migration 026). `[]` if the table is
@@ -18,15 +19,20 @@ import { buildPlanGraph, type PlanGraph, type PlanSource, type RawContext, type 
 async function loadOpenings(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   planId: string,
+  includeUnconfirmed: boolean,
 ): Promise<RawOpening[]> {
   try {
     const sb = supabase as unknown as SupabaseClient;
     const COLS = "id, wall_ref, room_id, kind, width_mm, height_mm, sill_mm, position, along_offset, source, derived";
     // G5c (039): a garden gate names its context wall and carries the site-reference fields.
     const COLS_039 = `${COLS}, context_id, spec, site_reference, disposition, dims_derived, derived_note`;
-    const withGates = await sb.from("plan_openings").select(COLS_039).eq("plan_id", planId);
+    // R10b (059): a detected opening counts only once confirmed — unless the caller (a render) asks for it.
+    let withGates: { data: unknown[] | null; error: { message: string } | null } = await sb.from("plan_openings").select(`${COLS_039}, confirmed_at`).eq("plan_id", planId);
+    if (withGates.error) withGates = await sb.from("plan_openings").select(COLS_039).eq("plan_id", planId);
     if (!withGates.error) {
-      return ((withGates.data ?? []) as unknown as (Record<string, unknown> & { kind: string })[]).map((o) => ({
+      return ((withGates.data ?? []) as unknown as (Record<string, unknown> & { kind: string })[])
+        .filter((o) => includeUnconfirmed || !isUnconfirmedDetected({ source: (o.source as string | null) ?? null, confirmed_at: (o.confirmed_at as string | null) ?? null }))
+        .map((o) => ({
         id: o.id as string,
         wall_ref: (o.wall_ref as string | null) ?? null,
         room_id: (o.room_id as string | null) ?? null,
@@ -44,6 +50,7 @@ async function loadOpenings(
         disposition: (o.disposition as string | null) ?? null,
         dims_derived: (o.dims_derived as boolean | null) ?? null,
         derived_note: (o.derived_note as string | null) ?? null,
+        ...(isUnconfirmedDetected({ source: (o.source as string | null) ?? null, confirmed_at: (o.confirmed_at as string | null) ?? null }) ? { unconfirmed: true } : {}),
       }));
     }
     const { data, error } = await sb
@@ -163,8 +170,13 @@ async function loadAuthoredColumns(
 /**
  * Derive the metric PlanGraph for a project from whatever we persist today
  * (rooms.polygon + plans.parsed_json.scale). Reads only — never writes.
+ *
+ * R10b: an opening DETECTED on the drawing and not yet confirmed is left out
+ * by default — every pricing and document path calls this, and a found window
+ * must not move a BoQ until the owner says it is there. A render passes
+ * `includeUnconfirmed` and labels what it used.
  */
-export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
+export async function derivePlanGraph(projectId: string, opts: { includeUnconfirmed?: boolean } = {}): Promise<PlanGraph> {
   const supabase = getSupabaseAdmin();
 
   const { data: plan, error: planErr } = await supabase
@@ -208,7 +220,7 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
   }
 
   const parsed = plan.parsed_json as ParsedJson;
-  const openings = await loadOpenings(supabase, plan.id);
+  const openings = await loadOpenings(supabase, plan.id, opts.includeUnconfirmed === true);
   const elements = await loadElements(supabase, plan.id);
   const context = await loadContext(supabase, plan.id);
   const authored = await loadAuthoredColumns(supabase, plan.id);

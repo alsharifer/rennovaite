@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
     "/api/projects/[id]/boq-diff": ["./lib/documents/fonts/**"],
     "/api/projects/[id]/drawings": ["./lib/documents/fonts/**"],
     "/api/projects/[id]/render-pack": ["./lib/documents/fonts/**"],
+    // R10b: the opening detector draws its room overlay with resvg (labels need the fonts).
+    "/api/plan-openings/detect": ["./lib/documents/fonts/**"],
   },
 
   // K8 (spec §6.0): 02 Design is one route. The old step routes are gone for

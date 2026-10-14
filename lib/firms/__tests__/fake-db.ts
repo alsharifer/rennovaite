@@ -108,6 +108,18 @@ class Query implements PromiseLike<{ data: unknown; error: Err; count?: number |
     this.filters.push((r) => r[col] !== null && r[col] !== undefined);
     return this;
   }
+  gt(col: string, val: string | number) {
+    this.filters.push((r) => r[col] != null && (r[col] as string | number) > val);
+    return this;
+  }
+  gte(col: string, val: string | number) {
+    this.filters.push((r) => r[col] != null && (r[col] as string | number) >= val);
+    return this;
+  }
+  lte(col: string, val: string | number) {
+    this.filters.push((r) => r[col] != null && (r[col] as string | number) <= val);
+    return this;
+  }
   lt(col: string, val: string | number) {
     this.filters.push((r) => r[col] != null && (r[col] as string | number) < val);
     return this;

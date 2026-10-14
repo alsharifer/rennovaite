@@ -264,6 +264,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // R10b (060): an edit of a render keeps the parent's architecture, so it
+    // inherits the openings record (and its label). Best-effort.
+    {
+      const sbx = supabase as unknown as SupabaseClient;
+      const { data: basis } = await sbx.from("renders").select("openings_basis").eq("id", parent_render_id).maybeSingle<{ openings_basis: unknown }>();
+      if (basis?.openings_basis) await sbx.from("renders").update({ openings_basis: basis.openings_basis }).eq("id", renderRow.id);
+    }
+
     // Feedback: an iteration means the parent render wasn't quite right but the
     // direction is worth refining — an "iterated" signal carrying the tweak.
     // The KG bundle is inherited from the parent (only the base render is

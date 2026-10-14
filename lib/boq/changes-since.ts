@@ -11,6 +11,7 @@
 //   plan_edit         the plan or a design layer was saved (plan_saved,
 //                     design_edit events)
 //   scope_change      K12: rooms added to / left out of the renovation (01 Plan)
+//   openings_confirmed R10b: openings found on the drawing, confirmed (01 Plan)
 //   firm_rate         the project's firm's book gained or retired an entry
 //   session_decision  a working-session decision was applied
 //
@@ -28,6 +29,8 @@ import type { RecordedCause } from "./revision-diff";
 export interface UpstreamChanges {
   /** K12: a net change to the rooms in this renovation. */
   scopeChanges: number;
+  /** R10b: openings confirmed since the revision. */
+  openingsConfirmed: number;
   planEdits: number;
   bookChanges: number;
   decisions: number;
@@ -45,17 +48,19 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export function summarizeChanges(causes: readonly Pick<RecordedCause, "kind">[], rev: number): UpstreamChanges {
   const count = (k: RecordedCause["kind"]) => causes.filter((c) => c.kind === k).length;
   const scopeChanges = count("scope_change");
+  const openingsConfirmed = count("openings_confirmed");
   const planEdits = count("plan_edit");
   const bookChanges = count("firm_rate");
   const decisions = count("session_decision");
   const corrections = count("correction");
   const parts: string[] = [];
   if (scopeChanges) parts.push("Scope changed");
+  if (openingsConfirmed) parts.push("Openings confirmed");
   if (planEdits) parts.push("plan edited");
   if (bookChanges) parts.push(`${plural(bookChanges, "book entry", "book entries")} changed`);
   if (decisions) parts.push(`${plural(decisions, "decision")} recorded`);
   const changed = parts.length > 0;
-  return { scopeChanges, planEdits, bookChanges, decisions, corrections, changed, summary: changed ? `${parts.join(", ")} since rev ${rev}` : null };
+  return { scopeChanges, openingsConfirmed, planEdits, bookChanges, decisions, corrections, changed, summary: changed ? `${parts.join(", ")} since rev ${rev}` : null };
 }
 
 /** THE function: what changed after the latest revision, up to `now`. K3's Regenerate calls this. */

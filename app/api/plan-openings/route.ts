@@ -6,6 +6,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { loadWithheldNames } from "@/lib/identity/curation";
 import { curatePlanRow, curatePlanRows, keepStoredText } from "@/lib/plan/curate-notes";
 import { DEFAULT_OPENING_DIMS } from "@/lib/plan/geometry";
+import { recordPilotEvent } from "@/lib/pilot/events";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -21,8 +22,21 @@ function db(): SupabaseClient {
 }
 
 /** Columns the editor reads back — keep in sync with migration 026. */
-const SELECT_COLS =
+const BASE_COLS =
   "id, plan_id, room_id, wall_ref, kind, width_mm, height_mm, sill_mm, position, along_offset, source, derived, created_at";
+/** R10b (059): whether a detected opening was confirmed, and what the detector said. */
+const SELECT_COLS = `${BASE_COLS}, confirmed_at, detection`;
+
+/** R10b: an edit to an opening the BoQ counts (anything but an unconfirmed find) is a plan edit. */
+async function recordOpeningsEdit(projectId: string, actor: string, detail: Record<string, unknown>) {
+  await recordPilotEvent(db(), projectId, "design_edit", { layer: "openings", ...detail }, { actor });
+}
+
+async function openingState(id: string): Promise<{ source: string | null; confirmed_at: string | null; plan_id: string | null; kind: string | null } | null> {
+  const { data, error } = await db().from("plan_openings").select("source, confirmed_at, plan_id, kind").eq("id", id).maybeSingle();
+  if (error) return null;
+  return data as { source: string | null; confirmed_at: string | null; plan_id: string | null; kind: string | null } | null;
+}
 
 /**
  * GET /api/plan-openings?plan_id=… → the plan's openings (both parsed and
@@ -40,11 +54,13 @@ export async function GET(request: NextRequest) {
   const access = await projectAccess(db(), caller, { plan_id: planId });
   if (access.denied) return access.denied;
   try {
-    const { data, error } = await db()
+    let res: { data: Record<string, unknown>[] | null; error: { message: string } | null } = await db()
       .from("plan_openings")
       .select(SELECT_COLS)
       .eq("plan_id", planId)
       .order("created_at", { ascending: true });
+    if (res.error) res = await db().from("plan_openings").select(BASE_COLS).eq("plan_id", planId).order("created_at", { ascending: true });
+    const { data, error } = res;
     if (error) {
       console.warn("[api/plan-openings] GET degraded:", error.message);
       return NextResponse.json({ openings: [], degraded: true });
@@ -116,6 +132,7 @@ export async function POST(request: NextRequest) {
       .select(SELECT_COLS)
       .single();
     if (error || !data) throw error ?? new Error("Failed to create opening.");
+    await recordOpeningsEdit(access.projectId, caller.id, { action: "add", opening_id: (data as { id: string }).id, plan_id: b.plan_id });
     return NextResponse.json({ opening: curatePlanRow(data, await loadWithheldNames(db(), access.projectId)), derived: dimsDefaulted });
   } catch (err) {
     console.error("[api/plan-openings] POST error", err);
@@ -194,6 +211,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "No fields to update." }, { status: 400 });
     }
 
+    // R10b: adjusting an opening found on the drawing confirms it — the owner
+    // has looked at it and put it where it is. Confirmed = measured.
+    const before = await openingState(id);
+    const confirming = before?.source === "detected" && !before.confirmed_at && !reset_dims;
+    if (confirming) {
+      patch.confirmed_at = new Date().toISOString();
+      patch.confirmed_by = caller.id;
+      patch.derived = false;
+    }
+
     // A string re-sent in its curated form goes back to the stored text.
     const withheld = await loadWithheldNames(db(), access.projectId);
     await keepStoredText(db(), "plan_openings", id, patch, withheld);
@@ -204,6 +231,11 @@ export async function PATCH(request: NextRequest) {
       .select(SELECT_COLS)
       .single();
     if (error || !data) throw error ?? new Error("Failed to update opening.");
+    if (confirming) {
+      await recordPilotEvent(db(), access.projectId, "design_edit", { layer: "openings_confirmed", plan_id: before?.plan_id ?? null, opening_ids: [id], count: 1, adjusted: true }, { actor: caller.id });
+    } else if (!(before?.source === "detected" && !before.confirmed_at)) {
+      await recordOpeningsEdit(access.projectId, caller.id, { action: "edit", opening_id: id, plan_id: before?.plan_id ?? null });
+    }
     return NextResponse.json({ opening: curatePlanRow(data, withheld) });
   } catch (err) {
     console.error("[api/plan-openings] PATCH error", err);
@@ -222,8 +254,13 @@ export async function DELETE(request: NextRequest) {
     }
     const access = await projectAccess(db(), caller, { opening_id: id.data });
     if (access.denied) return access.denied;
+    const before = await openingState(id.data);
     const { error } = await db().from("plan_openings").delete().eq("id", id.data);
     if (error) throw error;
+    // Removing an unconfirmed find changes no BoQ; removing a counted opening does.
+    if (before && !(before.source === "detected" && !before.confirmed_at)) {
+      await recordOpeningsEdit(access.projectId, caller.id, { action: "remove", opening_id: id.data, plan_id: before.plan_id });
+    }
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[api/plan-openings] DELETE error", err);

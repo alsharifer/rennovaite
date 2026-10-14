@@ -43,7 +43,7 @@ import { MaterialPalette } from "./MaterialPalette";
 import { RoomPhoto } from "./RoomPhoto";
 
 export type StudioRoom = { id: string; name_en: string | null; room_type: string | null };
-export type StudioRender = { id: string; imageUrl: string; prompt: string; qa?: "passed" | "failed" | null; qaReason?: string | null; outcome?: SceneOutcome | null };
+export type StudioRender = { id: string; imageUrl: string; prompt: string; qa?: "passed" | "failed" | null; qaReason?: string | null; outcome?: SceneOutcome | null; /** R10b: which openings shaped it. */ openings?: string | null };
 
 type RowState = "locked" | "ready" | "rendering" | "queued" | "waiting" | "not_yet" | "failed" | "na";
 /** One view in the list. A garden zone can have several cameras, so a scene row is keyed by its camera. */
@@ -177,7 +177,7 @@ export function RendersStudio(props: {
 
   function landed(target: Row, result: GenerateResponse, mode: "new" | "tweak") {
     const { roomId, view } = target;
-    const item: StudioRender = { id: result.render_id, imageUrl: result.image_url, prompt: result.prompt, qa: result.qa ?? null, qaReason: result.qaReason ?? null, outcome: result.outcome ?? null };
+    const item: StudioRender = { id: result.render_id, imageUrl: result.image_url, prompt: result.prompt, qa: result.qa ?? null, qaReason: result.qaReason ?? null, outcome: result.outcome ?? null, openings: result.openingsLabel ?? null };
     setInfo((p) => ({ ...p, [item.id]: item }));
     if (target.cameraId) {
       /* a scene view shows its own render */
@@ -545,6 +545,23 @@ export function RendersStudio(props: {
                   <span className="t-body-sm block text-bp-ink-secondary">{qa.text}</span>
                 </p>
               </div>
+            ) : null}
+
+            {current?.openings ? (
+              <p className="t-body-sm mt-3 flex items-start gap-2 text-bp-ink-secondary" data-render-openings="">
+                <Icon name="window" className="text-[18px]" />
+                <span>
+                  {current.openings}
+                  {props.planHref ? (
+                    <>
+                      {" · "}
+                      <a href={`${props.planHref}?layer=openings`} className="text-bp-ink-primary underline underline-offset-2">
+                        Check them on the plan
+                      </a>
+                    </>
+                  ) : null}
+                </span>
+              </p>
             ) : null}
 
             {notice ? (

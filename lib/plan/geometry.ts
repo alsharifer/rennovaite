@@ -129,10 +129,14 @@ export interface Opening {
   position: Point | null;
   /** 0..1 along the assigned wall (null if not computed). */
   along_offset: number | null;
-  source: "parsed" | "user_drawn";
+  /** R10b: "detected" = found on the drawing by lib/plan/openings-detect.ts. */
+  source: "parsed" | "user_drawn" | "detected";
   /** true = dimensions were DEFAULTED (standard door/window), not measured. A
    *  defaulted opening must never silently read as a measured quantity. */
   derived: boolean;
+  /** R10b: detected and not yet confirmed — present only when a caller (a
+   *  render) asked derivePlanGraph for unconfirmed openings. Never priced. */
+  unconfirmed?: true;
   /** G5c (039): a garden gate names the context wall it is in — garden walls are
    *  not room edges, so it is never re-snapped to a derived wall. */
   context_id?: string | null;
@@ -173,6 +177,8 @@ export interface RawOpening {
   disposition?: string | null;
   dims_derived?: boolean | null;
   derived_note?: string | null;
+  /** R10b: detected, not confirmed (only when the caller asked for them). */
+  unconfirmed?: boolean;
 }
 
 /** Where a plan's geometry came from. `user_drawn` = authored on a blank
@@ -816,13 +822,14 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
         sill_mm: ro.sill_mm ?? def.sill_mm,
         position: posM,
         along_offset: along,
-        source: ro.source === "parsed" ? "parsed" : "user_drawn",
+        source: ro.source === "parsed" ? "parsed" : ro.source === "detected" ? "detected" : "user_drawn",
         // Defaulted dimensions are always derived — never silently "measured".
         derived: ro.derived ?? dimsDefaulted,
         ...(ro.context_id ? { context_id: ro.context_id } : {}),
         ...(ro.spec ? { spec: ro.spec } : {}),
         ...(ro.site_reference ? { site_reference: true, disposition: ro.disposition ?? null } : {}),
         ...(ro.dims_derived ? { dims_derived: true, derived_note: ro.derived_note ?? null } : {}),
+        ...(ro.unconfirmed ? { unconfirmed: true as const } : {}),
       };
     })
     .filter((o): o is Opening => o !== null);

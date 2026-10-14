@@ -350,6 +350,18 @@
       "version": "20260101005800",
       "name": "rooms_in_scope",
       "sha256": "bf9e663602f0da4c5c1356f7d5707619f31bc997d4a1c146b3c9b82b3d2a9e30"
+    },
+    {
+      "legacy": null,
+      "version": "20260101005900",
+      "name": "detected_openings",
+      "sha256": "2023e4f31526ea18c373a41adf05faa792e761fb8110e7404c6240b39cf12e08"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006000",
+      "name": "renders_openings_basis",
+      "sha256": "3f822665fb5748adc16531ad61257589ebac7bc2ffb4ed192b1b26425d79a137"
     }
   ]
 }

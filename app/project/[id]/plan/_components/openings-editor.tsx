@@ -40,6 +40,8 @@ import {
   type RawRoomInput,
 } from "@/lib/overlays/viewbox";
 import { Icon } from "@/components/blueprint/Icon";
+import { OPENINGS_CHANGED_EVENT } from "@/components/blueprint/plan/OpeningsCheckPanel";
+import { isUnconfirmedDetected, type DetectionMeta } from "@/lib/plan/openings-vocab";
 
 import {
   CANVAS_FRAME,
@@ -68,8 +70,12 @@ export interface PlanOpening {
   /** Raw plan space (same space as rooms.polygon). */
   position: Pt | null;
   along_offset: number | null;
-  source: "parsed" | "user_drawn";
+  /** R10b: "detected" = found on the drawing (lib/plan/openings-detect.ts). */
+  source: "parsed" | "user_drawn" | "detected";
   derived: boolean;
+  /** R10b: when a detected opening was confirmed; null = not confirmed (derived, never priced). */
+  confirmed_at: string | null;
+  detection: DetectionMeta | null;
 }
 
 const KINDS: { key: OpeningKind; label: string; glyph: string }[] = [
@@ -106,7 +112,10 @@ export function OpeningsEditor({
   rooms,
   totalAreaM2,
   readOnly = false,
+  focus = null,
 }: {
+  /** R10b: select this opening (the confirmation panel's "show me"). */
+  focus?: { id: string; n: number } | null;
   planId: string;
   rooms: RawRoomInput[];
   /** Authoritative plan area — sets the raw-unit → metre scale. */
@@ -185,21 +194,31 @@ export function OpeningsEditor({
 
   // Load persisted openings. Degrades to an empty layer (the route returns
   // `[]` when the table is absent) rather than breaking the plan page.
+  // R10b: re-read when the confirmation panel confirms, removes or re-detects.
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/plan-openings?plan_id=${planId}`)
-      .then((r) => r.json())
-      .then((body) => {
-        if (cancelled) return;
-        if (body.error) setError(body.error);
-        else setOpenings(normaliseAll(body.openings ?? []));
-      })
-      .catch((e) => !cancelled && setError(String(e)))
-      .finally(() => !cancelled && setLoading(false));
+    const load = () =>
+      fetch(`/api/plan-openings?plan_id=${planId}`)
+        .then((r) => r.json())
+        .then((body) => {
+          if (cancelled) return;
+          if (body.error) setError(body.error);
+          else setOpenings(normaliseAll(body.openings ?? []));
+        })
+        .catch((e) => !cancelled && setError(String(e)))
+        .finally(() => !cancelled && setLoading(false));
+    void load();
+    const on = (e: Event) => {
+      if ((e as CustomEvent<{ from?: string }>).detail?.from !== "editor") void load();
+    };
+    window.addEventListener(OPENINGS_CHANGED_EVENT, on);
     return () => {
       cancelled = true;
+      window.removeEventListener(OPENINGS_CHANGED_EVENT, on);
     };
   }, [planId]);
+
+  const announce = useCallback(() => window.dispatchEvent(new CustomEvent(OPENINGS_CHANGED_EVENT, { detail: { from: "editor" } })), []);
 
   const clientToViewBox = useCallback((clientX: number, clientY: number): Pt => {
     const svg = svgRef.current;
@@ -231,6 +250,18 @@ export function OpeningsEditor({
 
   const selectedOpening =
     openings.find((o) => o.id === selectedOpeningId) ?? null;
+
+  // R10b: the panel's "show me" — select the opening and the wall it sits on.
+  const focusKey = focus ? `${focus.id}:${focus.n}` : null;
+  const [seenFocus, setSeenFocus] = useState<string | null>(null);
+  if (focusKey && focusKey !== seenFocus && !loading) {
+    const target = openings.find((o) => o.id === focus!.id);
+    setSeenFocus(focusKey);
+    if (target) {
+      setSelectedOpeningId(target.id);
+      setSelectedWallId(wallFor(target)?.id ?? null);
+    }
+  }
 
   // --- mutations -----------------------------------------------------------
 
@@ -274,6 +305,7 @@ export function OpeningsEditor({
         setOpenings((cur) => [...cur, created]);
         setSelectedOpeningId(created.id);
         pushUndo({ kind: "delete", label: `Add ${kind}`, id: created.id });
+        announce();
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add opening.");
@@ -294,11 +326,12 @@ export function OpeningsEditor({
         if (!res.ok || body.error) throw new Error(body.error ?? "Update failed.");
         const updated = normalise(body.opening);
         if (updated) setOpenings((cur) => cur.map((o) => (o.id === id ? updated : o)));
+        announce();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Update failed.");
       }
     },
-    [],
+    [announce],
   );
 
   const deleteOpening = async (id: string, record = true) => {
@@ -310,7 +343,9 @@ export function OpeningsEditor({
     try {
       const res = await fetch(`/api/plan-openings?id=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed.");
-      if (record && removed) {
+      announce();
+      // An unconfirmed find is not recreated by undo — Re-detect brings it back.
+      if (record && removed && !isUnconfirmedDetected(removed)) {
         pushUndo({ kind: "recreate", label: `Delete ${removed.kind}`, opening: removed });
       }
     } catch (e) {
@@ -367,12 +402,13 @@ export function OpeningsEditor({
         await patchOpening(step.id, step.patch);
         setSelectedOpeningId(step.id);
       }
+      announce();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Undo failed.");
     } finally {
       setBusy(false);
     }
-  }, [undoStack, readOnly, planId, patchOpening]);
+  }, [undoStack, readOnly, planId, patchOpening, announce]);
 
   // --- drag along the wall -------------------------------------------------
 
@@ -453,7 +489,8 @@ export function OpeningsEditor({
   // --- render --------------------------------------------------------------
 
   const selectedWall = selectedWallId ? wallById.get(selectedWallId) : null;
-  const derivedCount = openings.filter((o) => o.derived).length;
+  const derivedCount = openings.filter((o) => o.derived && !isUnconfirmedDetected(o)).length;
+  const foundCount = openings.filter(isUnconfirmedDetected).length;
 
   return (
     <div className="space-y-3">
@@ -502,6 +539,15 @@ export function OpeningsEditor({
                 title="Dimensions were defaulted, not measured — these never read as measured quantities."
               >
                 {derivedCount} derived
+              </span>
+            )}
+            {foundCount > 0 && (
+              <span
+                className={TAG}
+                title="Found on the drawing and not yet confirmed — they shape the renders but are not priced until confirmed."
+                data-testid="openings-found-tag"
+              >
+                {foundCount} found · to confirm
               </span>
             )}
           </span>
@@ -651,6 +697,23 @@ export function OpeningsEditor({
             void patchOpening(selectedOpening.id, patch);
           }}
           onDelete={() => void deleteOpening(selectedOpening.id)}
+          onConfirm={
+            isUnconfirmedDetected(selectedOpening)
+              ? async () => {
+                  const res = await fetch("/api/plan-openings/confirm", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ plan_id: planId, ids: [selectedOpening.id] }),
+                  });
+                  if (!res.ok) {
+                    setError("Could not confirm — try again.");
+                    return;
+                  }
+                  setOpenings((cur) => cur.map((o) => (o.id === selectedOpening.id ? { ...o, confirmed_at: new Date().toISOString(), derived: false } : o)));
+                  announce();
+                }
+              : undefined
+          }
         />
       )}
     </div>
@@ -800,10 +863,13 @@ function OpeningProperties({
   opening: o,
   onChange,
   onDelete,
+  onConfirm,
 }: {
   opening: PlanOpening;
   onChange: (patch: Record<string, unknown>) => void;
   onDelete: () => void;
+  /** R10b: present for an opening found on the drawing and not yet confirmed. */
+  onConfirm?: () => void;
 }) {
   // Drafts seed from the persisted row. The caller keys this component on the
   // opening's id + dimensions, so a new selection (or a server-confirmed edit)
@@ -844,9 +910,15 @@ function OpeningProperties({
           ))}
         </select>
         <span className={TAG}>
-          {o.source === "parsed" ? "From parse" : "User drawn"}
+          {o.source === "parsed" ? "From parse" : o.source === "detected" ? (o.confirmed_at ? "Found on the drawing · confirmed" : "Found on the drawing · not confirmed") : "User drawn"}
         </span>
-        {o.derived && (
+        {onConfirm && (
+          <button type="button" onClick={onConfirm} className={SMALL_BTN} data-testid="opening-confirm">
+            <Icon name="check" className="text-[16px]" />
+            Confirm
+          </button>
+        )}
+        {o.derived && o.source !== "detected" && (
           <span
             className={TAG}
             title="Dimensions defaulted, not measured. Enter a width and height to record a measurement."
@@ -923,8 +995,10 @@ function normalise(row: unknown): PlanOpening | null {
     sill_mm: Number(r.sill_mm ?? def.sill_mm),
     position: pos && Number.isFinite(pos[0]) && Number.isFinite(pos[1]) ? pos : null,
     along_offset: typeof r.along_offset === "number" ? r.along_offset : null,
-    source: r.source === "parsed" ? "parsed" : "user_drawn",
+    source: r.source === "parsed" ? "parsed" : r.source === "detected" ? "detected" : "user_drawn",
     derived: r.derived === true,
+    confirmed_at: typeof r.confirmed_at === "string" ? r.confirmed_at : null,
+    detection: r.detection && typeof r.detection === "object" ? (r.detection as DetectionMeta) : null,
   };
 }
 
