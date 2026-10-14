@@ -9,12 +9,13 @@ says where it is and why it waits. Newest first.
 - **058 before deploy** (prod): `rooms.in_scope`. Every reader tolerates its
   absence (nothing is out of scope); the 01 Plan checklist answers 500
   `migration_required` until it runs.
-- **Ruling: Q-11 staircase renovation** is a per-project allowance (qty 1)
-  emitted even when the plan has no stairs room — so leaving the stairs out of
-  scope does not remove it. Make it conditional on an in-scope stairs room?
-  (Changes every regenerated BoQ without a stairs room.)
-- **Ruling: the aluminium & glazing allowance** (S6, whole-unit list) stays
-  whatever the scope. Scale it, or drop items by room type?
+- **Q-11 ruled (14 Oct)** — see CLAUDE.md K12. "Villa / multi-level" is read
+  from the project's NAME (villa / townhouse / duplex): add a property type
+  (villa · townhouse · apartment, levels) at intake and read that instead.
+- **Aluminium & glazing: scale by in-scope openings** (ruled whole-home for now,
+  with the line note). The S6 list names locations (guest bedroom, master
+  bedroom, master bathroom …): drive it from the plan's openings in in-scope
+  rooms instead of the fixed reference quotation.
 - **Timeline reads rooms across every plan** of the project (pre-existing,
   `lib/timeline/load.ts`), not just the latest; scope is applied to the latest
   plan's rooms.

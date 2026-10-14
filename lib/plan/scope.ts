@@ -31,6 +31,20 @@
 //                   fixture placed IN an out-of-scope room goes with it.
 // =============================================================================
 
+/**
+ * K12 ruling (Q-11): is this a villa / multi-level home? No field records it, so
+ * the project's own name decides (villa, townhouse, duplex). Used ONLY when the
+ * plan shows no stairs room — and then the staircase line is marked assumed and
+ * the Issues navigator asks for confirmation. A property-type field at intake
+ * would replace this (docs/K_BACKLOG.md → K12).
+ */
+export function isMultiLevelProject(p: { name?: string | null; display_name?: string | null }): boolean {
+  return /\b(villa|townhouse|town house|duplex)\b/i.test(`${p.name ?? ""} ${p.display_name ?? ""}`);
+}
+
+/** K12: Q-11 kept on a villa whose plan shows no stairs room — the Issues navigator asks to confirm. */
+export const STAIRS_ASSUMED_NOTE = "Staircase assumed — confirm the villa has stairs";
+
 /** Absent (pre-058) or true = in this renovation. */
 export const isInScope = (r: { in_scope?: boolean | null }): boolean => r.in_scope !== false;
 

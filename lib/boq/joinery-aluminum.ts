@@ -18,6 +18,7 @@ import {
   JOINERY,
   ALUMINUM,
   ALUMINUM_ALLOWANCE_CAVEAT,
+  ALUMINUM_SCOPE_NOTE,
 } from "@/lib/ground-truth/mudon-actuals";
 import { enforceScope, type ScopedLine } from "./scope";
 import { lineTotal, money2, sumMoney } from "./money";
@@ -204,7 +205,7 @@ export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | n
       Math.round((a.total / a.qty) * 100) / 100,
       src,
       "site_assessment",
-      ALUMINUM_ALLOWANCE_CAVEAT,
+      `${ALUMINUM_ALLOWANCE_CAVEAT}. ${ALUMINUM_SCOPE_NOTE}.`,
     ),
   );
   // --- S6-pre (G21): "This excludes shower glass and mirrors" ---------------

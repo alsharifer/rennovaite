@@ -36,6 +36,8 @@ import { getProposedGraph } from "@/lib/plan/snapshots";
 import { loadProjectFirmOverlay, type FirmOverlay } from "@/lib/rates/firm";
 import { applyOhp } from "@/lib/rates/ohp";
 import { loadReferenceRows, type ReferenceRateRow } from "@/lib/rates/reference";
+import type { StairsContext } from "@/lib/boq/schema";
+import { isMultiLevelProject } from "@/lib/plan/scope";
 
 // Categories from pricing_skus relevant to a residential first-floor
 // refit. The brief named lowercase tokens ('tile', 'sanitary', etc.) but the
@@ -98,6 +100,8 @@ export interface BoqInputs {
   firm: FirmOverlay;
   /** L1: the reference book (tiers 3 and 5). */
   referenceRows: ReferenceRateRow[];
+  /** K12: Q-11's context — a stairs room on the plan at all (in scope or not), and a villa / multi-level project. */
+  stairs?: StairsContext;
 }
 
 /** Why a project cannot be priced: the HTTP status and body the route answers with. */
@@ -118,7 +122,7 @@ const refuse = (status: number, body: Record<string, unknown>): LoadedBoqInputs 
 export async function loadPriceablePlan(
   supabase: SupabaseClient,
   projectId: string,
-): Promise<{ project: BoqInputs["project"]; plan: BoqInputs["plan"]; rooms: BoqRoomRow[]; refusal?: never } | { refusal: BoqRefusal }> {
+): Promise<{ project: BoqInputs["project"]; plan: BoqInputs["plan"]; rooms: BoqRoomRow[]; stairs: StairsContext; refusal?: never } | { refusal: BoqRefusal }> {
   const [projectRes, plansRes] = await Promise.all([
     supabase.from("projects").select("id, name, city").eq("id", projectId).single<BoqInputs["project"]>(),
     supabase
@@ -199,7 +203,10 @@ export async function loadPriceablePlan(
   }
   const scoped = rooms.filter((r) => !outOfScope.has(r.id));
   if (scoped.length === 0) return no(400, { error: "No room is in this renovation — choose the rooms on the plan.", code: "no_rooms", scope: true });
-  return { project, plan, rooms: scoped };
+  // K12 ruling (Q-11): a stairs room ANYWHERE on the plan (even left out) means the stairs are known;
+  // with none, a villa / multi-level project keeps the allowance as an assumption.
+  const stairs: StairsContext = { onPlan: rooms.some((r) => r.room_type === "stairs"), multiLevel: isMultiLevelProject(project) };
+  return { project, plan, rooms: scoped, stairs };
 }
 
 /** Everything a BoQ is priced from, loaded from the project's stored state. */
@@ -224,7 +231,7 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
     supabase.from("approved_designs").select("room_id, render_id").eq("project_id", projectId),
   ]);
   if (priceable.refusal) return { refusal: priceable.refusal };
-  const { project, plan, rooms } = priceable;
+  const { project, plan, rooms, stairs } = priceable;
 
   if (labourRes.error || !labourRes.data || labourRes.data.length === 0) {
     return refuse(500, { error: "labour_rates table is empty — run scripts/seed-labour-rates.ts." });
@@ -265,7 +272,7 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   const referenceRows = await loadReferenceRows(supabase);
 
   return {
-    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows },
+    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs },
   };
 }
 
@@ -314,6 +321,7 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
     accessorySelections: await loadAccessoryOverrides(projectId),
     referenceRows,
     firm,
+    stairs: inputs.stairs,
   });
 
   // P4: rebuild mapped POMI sections from the take-off (element_refs + true

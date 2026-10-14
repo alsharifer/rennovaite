@@ -98,6 +98,24 @@ export type EngineInput = {
   referenceRows?: ReferenceRateRow[];
   /** L1: the project's firm overlay (tiers 1–2). Absent = no firm. */
   firm?: FirmOverlay;
+  /** K12: what Q-11 (staircase renovation) needs to know beyond the in-scope rooms. Absent = the pre-K12 rule (always one). */
+  stairs?: StairsContext;
+};
+
+/**
+ * K12 ruling (14 Oct) for Q-11, the staircase renovation allowance:
+ *   an in-scope stairs room          → priced (as before);
+ *   a stairs room, all out of scope  → no line;
+ *   no stairs room on the plan       → a villa / multi-level project keeps it as
+ *                                      a DERIVED line ("Staircase assumed —
+ *                                      confirm the villa has stairs"); anything
+ *                                      else gets no allowance.
+ */
+export type StairsContext = {
+  /** The plan has a stairs room (in scope or not). */
+  onPlan: boolean;
+  /** The project is a villa / multi-level home (lib/plan/scope.ts isMultiLevelProject). */
+  multiLevel: boolean;
 };
 
 // --- Take-off (intermediate) ---------------------------------------------------
@@ -181,6 +199,8 @@ export const BoqLineSchema = z.object({
     .optional(),
   /** L1: which tier of the resolution order answered (lib/rates/tiers.ts). */
   rate_tier: z.enum(RATE_TIERS).optional(),
+  /** K12: the take-off ASSUMED the quantity (Q-11 on a villa whose plan shows no stairs room). */
+  qty_derived: z.boolean().optional(),
 });
 
 export const BoqSectionSchema = z.object({

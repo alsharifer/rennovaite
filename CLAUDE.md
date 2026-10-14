@@ -622,11 +622,19 @@ Spec §7.4, Figma 81:716 / dark 82:2244; migration **058** `rooms.in_scope`
   progress) and the Overview / hub ("11 of 13 rooms in scope") follow.
 - **Whole-home (kept)**: project lumps Q-05 civil alterations, Q-32 site set-up,
   Q-33 DM/DEWA permits, Q-36 scaffold, Q-37 handover clean (garden GL-01–03);
-  Q-11 staircase allowance (unconditional today — ruling pending); demolition
-  from the proposed plan; the aluminium & glazing allowance (whole-unit,
-  dropped only with no interior room in scope — ruling pending); fixtures in
-  no room. Area-driven prelims (soft strip, floor removal, floor protection,
-  skips — ceil'd) follow the rooms.
+  demolition from the proposed plan; the aluminium & glazing allowance (ruled
+  whole-home, 14 Oct — every line notes "Covers the whole unit — adjust if only
+  some rooms are in scope"); fixtures in no room. Area-driven prelims (soft
+  strip, floor removal, floor protection, skips — ceil'd) follow the rooms.
+- **Q-11 staircase renovation (ruled 14 Oct)**: priced when an in-scope stairs
+  room exists; none when the stairs room is out of scope; with NO stairs room
+  on the plan, a villa / multi-level project (`isMultiLevelProject` — the
+  project's name until a property type exists) keeps it as a DERIVED line
+  (`qty_derived`) and the Issues navigator asks "Staircase assumed — confirm the
+  villa has stairs"; otherwise no allowance. The rule needs `EngineInput.stairs`
+  (`StairsContext`, built in `loadPriceablePlan`); without it (the timeline,
+  older callers) the pre-K12 rule stands. Stored revisions are untouched — only
+  a regenerate changes.
 - **Takes effect on regenerate** (a new revision). A scope edit is a
   `design_edit` event on layer "scope" with the rooms added / removed;
   `revision-causes` turns the window's NET change into `scope_change` ("Scope:

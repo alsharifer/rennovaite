@@ -6,10 +6,12 @@ import { describe, expect, it } from "vitest";
 import { fakeDb } from "@/lib/firms/__tests__/fake-db";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { buildPlanGraph, type BuildPlanGraphInput } from "@/lib/plan/geometry";
-import { isInScope, netScopeChange, scopeChangeSummary, scopeSummary } from "@/lib/plan/scope";
+import { isInScope, isMultiLevelProject, netScopeChange, scopeChangeSummary, scopeSummary } from "@/lib/plan/scope";
 import { renderLockProgress } from "@/lib/render-lock-progress";
 
 import { generateDeterministicBoq } from "../engine";
+import { boqIssues } from "../issues";
+import { buildReviewModel } from "../review-model";
 import { MUDON_FIRST_FLOOR } from "../fixtures/mudon-first-floor";
 import { appendJoineryAluminumSections } from "../joinery-aluminum";
 import { quantifyPlan } from "../quantify";
@@ -216,4 +218,51 @@ describe("the wiring (static)", () => {
     expect(read("lib/hub/overview-view.ts")).toMatch(/rooms in scope/);
     expect(read("lib/boq/revision-causes.ts")).toMatch(/kind: "scope_change"/);
   });
+});
+
+// K12 ruling (14 Oct) — Q-11 staircase renovation follows the scope.
+describe("Q-11 staircase allowance", () => {
+  const stairsRoom = { id: "stairs", name: "Stairs", room_type: "stairs", area_m2: 7.2, polygon: [[0, 0], [10, 0], [10, 20], [0, 20]] } as (typeof MUDON_FIRST_FLOOR)[number];
+  const q11 = (rooms: typeof MUDON_FIRST_FLOOR, stairs?: { onPlan: boolean; multiLevel: boolean }) => computeTakeoff(rooms, DEFAULT_FLOORING, { stairs }).items.find((i) => i.rule_id === "Q-11");
+
+  it("an in-scope stairs room → priced (measured)", () => {
+    expect(q11([...MUDON_FIRST_FLOOR, stairsRoom], { onPlan: true, multiLevel: true })).toMatchObject({ quantity: 1 });
+    expect(q11([...MUDON_FIRST_FLOOR, stairsRoom], { onPlan: true, multiLevel: true })?.qty_derived).toBeUndefined();
+  });
+  it("a stairs room left out of scope → no line", () => {
+    expect(q11(MUDON_FIRST_FLOOR, { onPlan: true, multiLevel: true })).toBeUndefined();
+  });
+  it("no stairs room: a villa keeps it as an ASSUMED (derived) line; anything else gets none", () => {
+    const v = q11(MUDON_FIRST_FLOOR, { onPlan: false, multiLevel: true });
+    expect(v).toMatchObject({ quantity: 1, qty_derived: true });
+    expect(v?.measurement).toMatch(/Staircase assumed — confirm the villa has stairs/);
+    expect(q11(MUDON_FIRST_FLOOR, { onPlan: false, multiLevel: false })).toBeUndefined();
+  });
+  it("no context (the timeline, pre-K12 callers) → the pre-K12 rule, unchanged", () => {
+    expect(q11(MUDON_FIRST_FLOOR)).toMatchObject({ quantity: 1 });
+    expect(q11(MUDON_FIRST_FLOOR)?.qty_derived).toBeUndefined();
+  });
+  it("the priced line reads derived, and the Issues navigator asks to confirm it", () => {
+    const { boq } = generateDeterministicBoq({ rooms: MUDON_FIRST_FLOOR, labourRates: LABOUR_RATES_FIXTURE as never, skus: PRICING_SKUS_FIXTURE, styleKey: "contemporary-arabic", stairs: { onPlan: false, multiLevel: true } });
+    const line = boq.sections.flatMap((s) => s.lines).find((l) => l.item_key === "stairs.renovation")!;
+    expect(line.qty_derived).toBe(true);
+    const model = buildReviewModel({ projectId: "p", boqId: "b", rev: 1, revDate: "", persona: "owner", boq: boq as never, provenance: null, tierCtx: { qsValidated: {} }, firm: null, basis: null, duplicates: [], budget: null });
+    const issues = boqIssues(model, null);
+    const g = issues.groups.find((x) => x.key === "assumed")!;
+    expect(g.rows[0]).toMatchObject({ title: "Staircase assumed — confirm the villa has stairs", open: "line" });
+    expect(issues.groups.find((x) => x.key === "derived")?.rows.some((r) => r.lineKey === g.rows[0]!.lineKey) ?? false).toBe(false);
+  });
+  it("villa / multi-level is read from the project's name until a property type exists", () => {
+    expect(isMultiLevelProject({ name: "Villa 12, The Springs" })).toBe(true);
+    expect(isMultiLevelProject({ name: "Untitled", display_name: "Arabian Ranches townhouse" })).toBe(true);
+    expect(isMultiLevelProject({ name: "Marina apartment 1204" })).toBe(false);
+  });
+});
+
+it("the aluminium & glazing allowance stays whole-home and says so on every line", () => {
+  const { boq } = generateDeterministicBoq({ rooms: MUDON_FIRST_FLOOR, labourRates: LABOUR_RATES_FIXTURE as never, skus: PRICING_SKUS_FIXTURE, styleKey: "contemporary-arabic" });
+  const out = appendJoineryAluminumSections(boq, MUDON_FIRST_FLOOR.map((r) => ({ ...r, name_en: r.name })) as never);
+  const alu = out.sections.flatMap((s) => s.lines).filter((l) => (l.rule_id ?? "").startsWith("GT/aluminum/"));
+  expect(alu.length).toBeGreaterThan(0);
+  expect(alu.every((l) => /Covers the whole unit — adjust if only some rooms are in scope/.test(l.notes ?? ""))).toBe(true);
 });

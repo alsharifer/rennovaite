@@ -95,7 +95,7 @@ try {
     check("…the whole-home lines are unchanged", wholeHome(rev1.sections) === wholeHome(rev2.sections), wholeHome(rev2.sections));
     await b.goto(`${BASE}/project/${P}/boq/revisions?from=${rev1.id}&to=${rev2.id}`, "[data-hydrated]");
     const diff = await b.evaluate("document.body.innerText");
-    check("the revision diff's cause: Scope: 2 rooms removed", /Scope: 2 rooms removed/.test(diff));
+    check("the revision diff's cause: Scope: 2 rooms removed", /Scope: 2 rooms removed/.test(diff), (diff.match(/Scope[^\n]*/g) ?? []).join(" | ") || diff.slice(0, 300));
     await b.screenshot(`${SHOTS}/3-diff-scope-cause.png`, { fullPage: true });
 
     await b.goto(`${BASE}/project/${P}`, "main");

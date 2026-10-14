@@ -21,9 +21,11 @@
 
 import type { StepStatus } from "@/lib/journey-state";
 
+import { STAIRS_ASSUMED_NOTE } from "@/lib/plan/scope";
+
 import type { ReviewModel } from "./review-types";
 
-export type IssueGroupKey = "unmatched" | "unpriced" | "duplicates" | "derived" | "basis" | "step";
+export type IssueGroupKey = "unmatched" | "unpriced" | "assumed" | "duplicates" | "derived" | "basis" | "step";
 
 export interface IssueRow {
   id: string;
@@ -60,6 +62,7 @@ export interface IssueList {
 
 export const GROUP_TITLE: Record<IssueGroupKey, string> = {
   unmatched: "YOUR PRICES — NO LONGER MATCHED",
+  assumed: "ASSUMED — CONFIRM",
   unpriced: "NOT PRICED — LEFT OUT OF THE TOTAL",
   duplicates: "POSSIBLY COUNTED TWICE",
   derived: "DERIVED — CONFIRM ON SITE",
@@ -111,6 +114,17 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
     });
   }
 
+  // K12 ruling: the staircase allowance kept on a villa whose plan shows no stairs room.
+  const assumed = lines.filter((l) => l.itemKey === "stairs.renovation" && !l.unpriced && l.tiers.qty === "derived");
+  if (assumed.length > 0) {
+    groups.push({
+      key: "assumed",
+      title: GROUP_TITLE.assumed,
+      count: assumed.length,
+      rows: assumed.map((l) => ({ id: `assumed:${l.key}`, ref: l.ref, title: STAIRS_ASSUMED_NOTE, detail: "No stairs room on the plan — the staircase allowance is priced as an assumption", action: "Open the line", lineKey: l.key, open: "line" as const, href: null })),
+    });
+  }
+
   const dups = model.notices.duplicates;
   if (dups.length > 0) {
     groups.push({
@@ -125,7 +139,7 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
     });
   }
 
-  const derived = lines.filter((l) => !l.unpriced && l.tiers.qty === "derived");
+  const derived = lines.filter((l) => !l.unpriced && l.tiers.qty === "derived" && !assumed.includes(l));
   if (derived.length > 0) {
     const reference = derived.some((l) => /reference layout/i.test(l.derivedNote ?? ""));
     groups.push({
@@ -166,7 +180,7 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
     });
   }
 
-  const keys = new Set<string>([...unpriced.map((l) => l.key), ...dups.flatMap((d) => (d.lineKeys ?? []).filter((k) => order.has(k))), ...derived.map((l) => l.key)]);
+  const keys = new Set<string>([...unpriced.map((l) => l.key), ...assumed.map((l) => l.key), ...dups.flatMap((d) => (d.lineKeys ?? []).filter((k) => order.has(k))), ...derived.map((l) => l.key)]);
   return {
     groups,
     count: groups.reduce((n, g) => n + g.rows.length, 0),
