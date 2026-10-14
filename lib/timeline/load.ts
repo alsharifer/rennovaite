@@ -22,6 +22,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { computeDrivers, sectionTotalsFromBoq } from "./drivers";
 import { estimateTimeline, type TimelineEstimate } from "./estimate";
+import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 import { gardenTimeline, isGardenProject, type GardenTimeline } from "./garden";
 
 const WET_ROOM_TYPES = new Set(["bathroom", "ensuite", "powder", "kitchen"]);
@@ -105,7 +106,10 @@ export async function loadTimeline(projectId: string): Promise<TimelineData> {
     const flooring = (styleKey && STYLE_FLOORING[styleKey]) || DEFAULT_FLOORING;
     void ((styleKey && STYLE_TIER[styleKey]) || DEFAULT_TIER);
 
-    const engineRooms: EngineRoom[] = (rooms ?? []).map((r) => ({
+    // K12 (058): the timeline schedules only the rooms in this renovation — on every visit,
+    // so a scope change shows here at once (the cost follows on the next regenerate).
+    const outOfScope = await outOfScopeRoomIds(sb, projectId);
+    const engineRooms: EngineRoom[] = (rooms ?? []).filter((r) => !outOfScope.has(r.id)).map((r) => ({
       id: r.id,
       name: r.name_en ?? "(unnamed)",
       room_type: r.room_type ?? "other",

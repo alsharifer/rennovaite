@@ -4,6 +4,24 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## K12 (2026-10-14) — rooms in this renovation
+
+- **058 before deploy** (prod): `rooms.in_scope`. Every reader tolerates its
+  absence (nothing is out of scope); the 01 Plan checklist answers 500
+  `migration_required` until it runs.
+- **Q-11 ruled (14 Oct)** — see CLAUDE.md K12. "Villa / multi-level" is read
+  from the project's NAME (villa / townhouse / duplex): add a property type
+  (villa · townhouse · apartment, levels) at intake and read that instead.
+- **Aluminium & glazing: scale by in-scope openings** (ruled whole-home for now,
+  with the line note). The S6 list names locations (guest bedroom, master
+  bedroom, master bathroom …): drive it from the plan's openings in in-scope
+  rooms instead of the fixed reference quotation.
+- **Timeline reads rooms across every plan** of the project (pre-existing,
+  `lib/timeline/load.ts`), not just the latest; scope is applied to the latest
+  plan's rooms.
+- **Scope on the phone**: the checklist sits under the canvas (the page's
+  one-column layout); no separate phone design.
+
 ## K11 (2026-10-14) — from the pilot walkthrough
 
 - **056 and 057 before deploy** (prod): `projects.draft_since` (the intake

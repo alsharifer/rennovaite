@@ -32,7 +32,7 @@ export function generateDeterministicBoq(
   const flooring =
     (input.styleKey && STYLE_FLOORING[input.styleKey]) || DEFAULT_FLOORING;
 
-  const takeoff = computeTakeoff(input.rooms, flooring);
+  const takeoff = computeTakeoff(input.rooms, flooring, { stairs: input.stairs });
   const resolver = new RateResolver(
     input.labourRates,
     input.skus,
@@ -76,6 +76,8 @@ export function generateDeterministicBoq(
       // accessory selection still wins: choosing a real product is stronger
       // evidence than the rule's default.
       ...(item.rate_status ? { rate_status: item.rate_status } : {}),
+      // K12: an assumed quantity (Q-11 on a villa without a stairs room) reads as derived.
+      ...(item.qty_derived ? { qty_derived: true } : {}),
       // L1: a firm's own rate is a priced figure in its own right — it replaces
       // the provenance the rule default carried (S6-pre "indicative").
       ...(isFirmTier(rate.rate_tier) ? { rate_status: "priced" as const } : {}),

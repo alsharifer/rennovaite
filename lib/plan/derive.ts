@@ -188,9 +188,10 @@ export async function derivePlanGraph(projectId: string): Promise<PlanGraph> {
   // Later columns are selected best-effort, newest first, for the same reason
   // as the plan columns above: an older database must still derive a graph.
   // 037 adds dims_derived/site_reference/disposition, 036 level_mm/height_mm/spec,
-  // 035 area_derived_m2/derived_note, 031 unroofed.
+  // 035 area_derived_m2/derived_note, 031 unroofed; K12's 058 in_scope.
   const sb = supabase as unknown as SupabaseClient;
   const ROOM_SELECTS = [
+    "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec, dims_derived, site_reference, disposition, in_scope",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec, dims_derived, site_reference, disposition",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note",

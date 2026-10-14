@@ -455,7 +455,7 @@
             "rate_aed": 5150,
             "total_aed": 10300,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -467,7 +467,7 @@
             "rate_aed": 5150,
             "total_aed": 10300,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -479,7 +479,7 @@
             "rate_aed": 3000,
             "total_aed": 3000,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -491,7 +491,7 @@
             "rate_aed": 12040,
             "total_aed": 12040,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -503,7 +503,7 @@
             "rate_aed": 10384,
             "total_aed": 10384,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -515,7 +515,7 @@
             "rate_aed": 14176,
             "total_aed": 14176,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -527,7 +527,7 @@
             "rate_aed": 15749,
             "total_aed": 15749,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -539,7 +539,7 @@
             "rate_aed": 1650,
             "total_aed": 16500,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -1285,7 +1285,7 @@
             "rate_aed": 5150,
             "total_aed": 10300,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -1297,7 +1297,7 @@
             "rate_aed": 5150,
             "total_aed": 10300,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -1309,7 +1309,7 @@
             "rate_aed": 3000,
             "total_aed": 3000,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -1321,7 +1321,7 @@
             "rate_aed": 12040,
             "total_aed": 12040,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -1333,7 +1333,7 @@
             "rate_aed": 10384,
             "total_aed": 10384,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -1345,7 +1345,7 @@
             "rate_aed": 14176,
             "total_aed": 14176,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -1357,7 +1357,7 @@
             "rate_aed": 15749,
             "total_aed": 15749,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -1369,7 +1369,7 @@
             "rate_aed": 1650,
             "total_aed": 16500,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2115,7 +2115,7 @@
             "rate_aed": 5150,
             "total_aed": 10300,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2127,7 +2127,7 @@
             "rate_aed": 5150,
             "total_aed": 10300,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2139,7 +2139,7 @@
             "rate_aed": 3000,
             "total_aed": 3000,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2151,7 +2151,7 @@
             "rate_aed": 12040,
             "total_aed": 12040,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2163,7 +2163,7 @@
             "rate_aed": 10384,
             "total_aed": 10384,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2175,7 +2175,7 @@
             "rate_aed": 14176,
             "total_aed": 14176,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2187,7 +2187,7 @@
             "rate_aed": 15749,
             "total_aed": 15749,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2199,7 +2199,7 @@
             "rate_aed": 1650,
             "total_aed": 16500,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2945,7 +2945,7 @@
             "rate_aed": 5150,
             "total_aed": 10300,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2957,7 +2957,7 @@
             "rate_aed": 5150,
             "total_aed": 10300,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2969,7 +2969,7 @@
             "rate_aed": 3000,
             "total_aed": 3000,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2981,7 +2981,7 @@
             "rate_aed": 12040,
             "total_aed": 12040,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -2993,7 +2993,7 @@
             "rate_aed": 10384,
             "total_aed": 10384,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -3005,7 +3005,7 @@
             "rate_aed": 14176,
             "total_aed": 14176,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -3017,7 +3017,7 @@
             "rate_aed": 15749,
             "total_aed": 15749,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },
@@ -3029,7 +3029,7 @@
             "rate_aed": 1650,
             "total_aed": 16500,
             "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only",
+            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
             "rate_status": "site_assessment",
             "scope": "supply_and_install"
           },

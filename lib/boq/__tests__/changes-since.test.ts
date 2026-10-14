@@ -32,7 +32,12 @@ const causes = (...kinds: string[]) => kinds.map((kind) => ({ kind }) as { kind:
 
 describe("summarizeChanges — what can move a regenerated BoQ", () => {
   it("nothing recorded → unchanged, no summary", () => {
-    expect(summarizeChanges([], 4)).toEqual({ planEdits: 0, bookChanges: 0, decisions: 0, corrections: 0, changed: false, summary: null });
+    expect(summarizeChanges([], 4)).toEqual({ scopeChanges: 0, planEdits: 0, bookChanges: 0, decisions: 0, corrections: 0, changed: false, summary: null });
+  });
+
+  it("K12: a change to the rooms in this renovation reads \"Scope changed since rev N\"", () => {
+    expect(summarizeChanges(causes("scope_change"), 4)).toMatchObject({ scopeChanges: 1, changed: true, summary: "Scope changed since rev 4" });
+    expect(summarizeChanges(causes("scope_change", "plan_edit"), 4).summary).toBe("Scope changed, plan edited since rev 4");
   });
 
   it("plan edits, book entries and decisions are changes, named in one line", () => {

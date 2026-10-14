@@ -136,15 +136,17 @@ export async function captureGarden(
   const planId = plan.id;
   const mPerUnit = Number(plan.plot_width_m ?? 0);
 
-  type RoomRow = { id: string; name_en: string | null; room_type: string | null; area_m2: number | null; spec?: Record<string, unknown> | null; site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null };
+  type RoomRow = { id: string; name_en: string | null; room_type: string | null; area_m2: number | null; spec?: Record<string, unknown> | null; site_reference?: boolean | null; disposition?: string | null; dims_derived?: boolean | null; in_scope?: boolean | null };
   const { data: rooms, error: roomsErr } = await selectWithFallback<RoomRow>(
     (cols) => supabase.from("rooms").select(cols).eq("plan_id", planId).returns<RoomRow[]>(),
-    ["id, name_en, room_type, area_m2, spec, site_reference, disposition, dims_derived", "id, name_en, room_type, area_m2"],
+    ["id, name_en, room_type, area_m2, spec, site_reference, disposition, dims_derived, in_scope", "id, name_en, room_type, area_m2, spec, site_reference, disposition, dims_derived", "id, name_en, room_type, area_m2"],
   );
   if (roomsErr) return { ...empty, planId };
+  // K12 (058): a zone not in this renovation is not priced, and neither is what stands in it.
+  const outOfScope = new Set((rooms ?? []).filter((r) => r.in_scope === false).map((r) => r.id));
 
   const zones = (rooms ?? [])
-    .filter((r) => isOutdoorType(r.room_type))
+    .filter((r) => isOutdoorType(r.room_type) && r.in_scope !== false)
     .map((r) => ({
       id: r.id,
       name: r.name_en?.trim() || "Zone",
@@ -192,6 +194,7 @@ export async function captureGarden(
     );
     if (!error) {
       for (const f of data ?? []) {
+        if (f.room_id && outOfScope.has(f.room_id)) continue;
         if (f.layer === "landscape") {
           const name = typeof f.spec?.name === "string" ? f.spec.name : undefined;
           units.push({ id: f.id, kind: f.type as GardenUnit["kind"], ...(name ? { name } : {}), ...siteRef(f) });

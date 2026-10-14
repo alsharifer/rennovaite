@@ -43,6 +43,7 @@ import { stagingRoomTypeFromDb, type StagingSet } from "@/lib/staging/sets";
 import { roomDimensions } from "@/lib/room-geometry";
 import { loadGardenSceneContext, renderGardenCamera } from "@/lib/scene-render/pipeline";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,6 +105,10 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     if (!room) {
       return NextResponse.json({ error: "Room not found." }, { status: 404 });
+    }
+    // K12 (058): a room left out of the renovation is not rendered.
+    if ((await outOfScopeRoomIds(supabase as unknown as import("@supabase/supabase-js").SupabaseClient, project_id)).has(room_id)) {
+      return NextResponse.json({ error: "This room is not in this renovation — add it on the plan to render it.", code: "room_not_in_scope" }, { status: 422 });
     }
 
     const { data: styleRows } = await supabase

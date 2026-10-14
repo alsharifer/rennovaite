@@ -105,6 +105,9 @@ export function RendersStudio(props: {
   renderInfo: Record<string, StudioRender>;
   viewerHref: string | null;
   costHref: string;
+  /** K12: rooms on the plan that are not in this renovation (not rendered). */
+  notInScope?: string[];
+  planHref?: string;
 }) {
   const { projectId, rooms, style } = props;
   const [locked, setLocked] = useState<Set<string>>(() => new Set(props.initialLockedRoomIds));
@@ -394,6 +397,25 @@ export function RendersStudio(props: {
             );
           })}
         </ul>
+        {props.notInScope && props.notInScope.length > 0 ? (
+          <details className="mt-3" data-not-in-scope={props.notInScope.length}>
+            <summary className="t-label-md cursor-pointer font-bp-mono text-bp-ink-tertiary hover:text-bp-ink-secondary">
+              {props.notInScope.length} not in this renovation
+            </summary>
+            <ul className="mt-2 space-y-1 pl-3">
+              {props.notInScope.map((n, i) => (
+                <li key={`${n}-${i}`} className="t-body-sm text-bp-ink-tertiary">
+                  {n}
+                </li>
+              ))}
+            </ul>
+            {props.planHref ? (
+              <a href={props.planHref} className="t-nav-item-active mt-2 inline-block pl-3 text-bp-ink-primary underline-offset-2 hover:underline">
+                Change on the plan
+              </a>
+            ) : null}
+          </details>
+        ) : null}
 
         {room && renderable ? (
           <section className="mt-6" aria-labelledby="photo-h">

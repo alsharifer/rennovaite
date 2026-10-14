@@ -26,6 +26,7 @@ import { loadProvenanceContext } from "@/lib/provenance/load";
 import type { ProvTier } from "@/lib/provenance/tier";
 
 import { estimateOf, type BasisRow } from "./estimate";
+import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 
 export type HubBasisRow = BasisRow;
 
@@ -132,8 +133,11 @@ export async function loadHubView(db: SupabaseClient, projectId: string, rail: R
     loadProposalSetup(db, projectId).catch(() => null),
     db.from("plans").select("id").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string }>(),
   ]);
-  const { data: rooms } = plan.data ? await db.from("rooms").select("room_type, unroofed").eq("plan_id", plan.data.id) : { data: [] };
-  const roomList = (rooms ?? []) as { room_type: string | null; unroofed: boolean | null }[];
+  const { data: rooms } = plan.data ? await db.from("rooms").select("id, room_type, unroofed").eq("plan_id", plan.data.id) : { data: [] };
+  const allRooms = (rooms ?? []) as { id: string; room_type: string | null; unroofed: boolean | null }[];
+  // K12 (058): the rooms in this renovation.
+  const out = await outOfScopeRoomIds(db, projectId);
+  const roomList = allRooms.filter((r) => !out.has(r.id));
   const outdoor = roomList.filter((r) => r.unroofed).length;
   const indoor = roomList.length - outdoor;
   const scope = roomList.length === 0 ? null : outdoor === 0 ? "Interior refit" : indoor === 0 ? "Garden" : "Interior and garden";
@@ -147,7 +151,7 @@ export async function loadHubView(db: SupabaseClient, projectId: string, rail: R
   let estimate: HubView["estimate"] = null;
   const latestDoc = top[0] ? byId.get(top[0].boq_id) : null;
   const meta: string[] = [];
-  if (scope) meta.push(`${scope} · ${roomList.length} ${roomList.length === 1 ? "area" : "areas"}`);
+  if (scope) meta.push(out.size > 0 ? `${scope} · ${roomList.length} of ${allRooms.length} rooms in scope` : `${scope} · ${roomList.length} ${roomList.length === 1 ? "area" : "areas"}`);
   if (setup?.clientLabel) meta.push(`client: ${setup.clientLabel}`);
   if (project?.city) meta.push(project.city);
 

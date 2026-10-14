@@ -24,6 +24,7 @@ import { getStyleByKey } from "@/lib/styles";
 import { loadTimeline } from "@/lib/timeline/load";
 
 import { estimateOf, type StoredEstimate } from "./estimate";
+import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 
 export interface OverviewAction {
   step: string;
@@ -140,10 +141,14 @@ export async function loadOverviewView(db: SupabaseClient, projectId: string, ra
     })
     .filter((t): t is { url: string; caption: string } => !!t);
 
-  const outdoor = rooms.filter((r) => r.unroofed).length;
-  const scope = rooms.length === 0 ? null : outdoor === 0 ? "Interior refit" : outdoor === rooms.length ? "Garden" : "Interior and garden";
+  // K12 (058): the scope label reads the rooms IN this renovation; "11 of 13 rooms in scope" when some are left out.
+  const out = await outOfScopeRoomIds(db, projectId);
+  const scoped = rooms.filter((r) => !out.has(r.id));
+  const outdoor = scoped.filter((r) => r.unroofed).length;
+  const scope = scoped.length === 0 ? null : outdoor === 0 ? "Interior refit" : outdoor === scoped.length ? "Garden" : "Interior and garden";
   const budget = !project?.firm_id && project?.budget_aed ? Number(project.budget_aed) : null;
-  const meta = [scope, rooms.length ? `${rooms.length} ${rooms.length === 1 ? "area" : "areas"}` : null, project?.city ?? null, budget ? `budget AED ${budget.toLocaleString("en-US")}` : null, project?.created_at ? `started ${dubai(project.created_at).date}` : null].filter((x): x is string => !!x);
+  const areas = out.size > 0 ? `${scoped.length} of ${rooms.length} rooms in scope` : rooms.length ? `${rooms.length} ${rooms.length === 1 ? "area" : "areas"}` : null;
+  const meta = [scope, areas, project?.city ?? null, budget ? `budget AED ${budget.toLocaleString("en-US")}` : null, project?.created_at ? `started ${dubai(project.created_at).date}` : null].filter((x): x is string => !!x);
 
   const direction = resolveAnyStyle(style, getStyleByKey)?.name_en ?? null;
   const st = rail.statuses;

@@ -598,6 +598,53 @@ commit per item; shots in `screenshots/k11/` (light + dark).
   → total updates → Continue to timeline). Scratch fixture for all K11 checks:
   `scripts/lib/k11-scratch.mjs` (Arabella stage 7, H7: ≈ 116,679.56, 3 TBP).
 
+### K12 — rooms in this renovation (14 Oct)
+
+Spec §7.4, Figma 81:716 / dark 82:2244; migration **058** `rooms.in_scope`
+(boolean, default true). Scope is EXPLICIT — never inferred from renders.
+
+- **01 Plan**: the right panel's "Rooms in this renovation" checklist
+  (`components/blueprint/plan/RoomsInScope.tsx`: "11 of 13", Select all /
+  Clear, the note). A tick saves at once (`PATCH /api/plan-scope { plan_id,
+  rooms: [{ id, in_scope }] }` — rooms of that plan only; a tick never waits
+  for another) and tells the canvas (`rv:plan-scope`): out-of-scope rooms are
+  dashed, unfilled, "NOT IN THIS RENOVATION". The editor's save never sends
+  `in_scope`, so the column survives every plan save.
+- **The rule** (`lib/plan/scope.ts`, `scope-load.ts outOfScopeRoomIds`): an
+  out-of-scope room STAYS on the plan graph (its metric scale is derived from
+  every room's area; the overlap check needs its floor) but contributes nothing
+  room-level: `loadPriceablePlan` hands the engine and joinery only in-scope
+  rooms (none in scope → refused "No room is in this renovation");
+  `quantifyPlan` skips its floor / ceiling / tiling and a wall only when no room
+  beside it is in scope; fixtures placed in it and garden zones / their
+  fixtures go with it; the timeline, Renders (list "N not in this renovation",
+  Generate all, the single render route 422 `room_not_in_scope`, 03 lock
+  progress) and the Overview / hub ("11 of 13 rooms in scope") follow.
+- **Whole-home (kept)**: project lumps Q-05 civil alterations, Q-32 site set-up,
+  Q-33 DM/DEWA permits, Q-36 scaffold, Q-37 handover clean (garden GL-01–03);
+  demolition from the proposed plan; the aluminium & glazing allowance (ruled
+  whole-home, 14 Oct — every line notes "Covers the whole unit — adjust if only
+  some rooms are in scope"); fixtures in no room. Area-driven prelims (soft
+  strip, floor removal, floor protection, skips — ceil'd) follow the rooms.
+- **Q-11 staircase renovation (ruled 14 Oct)**: priced when an in-scope stairs
+  room exists; none when the stairs room is out of scope; with NO stairs room
+  on the plan, a villa / multi-level project (`isMultiLevelProject` — the
+  project's name until a property type exists) keeps it as a DERIVED line
+  (`qty_derived`) and the Issues navigator asks "Staircase assumed — confirm the
+  villa has stairs"; otherwise no allowance. The rule needs `EngineInput.stairs`
+  (`StairsContext`, built in `loadPriceablePlan`); without it (the timeline,
+  older callers) the pre-K12 rule stands. Stored revisions are untouched — only
+  a regenerate changes.
+- **Takes effect on regenerate** (a new revision). A scope edit is a
+  `design_edit` event on layer "scope" with the rooms added / removed;
+  `revision-causes` turns the window's NET change into `scope_change` ("Scope:
+  2 rooms removed"), `changes-since` into "Scope changed since rev N".
+- **Tests**: `lib/boq/__tests__/scope.test.ts` (every room-level line drops by
+  exactly that room's own quantity; whole-home lines unchanged; totals to the
+  fil; re-adding restores byte for byte; per-room element take-off; fixtures;
+  renders). Live: `scripts/k12-scope-shots.mjs` (Demo villa copy: 13 → 11,
+  regenerate, diff cause, Overview, Renders, timeline, back to 13 = rev 1).
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

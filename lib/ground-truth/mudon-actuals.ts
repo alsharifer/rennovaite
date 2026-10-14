@@ -102,6 +102,8 @@ export const JOINERY_GROSS = 73_011;
 // Each line is a room-scoped ALLOWANCE flagged site_assessment. Line totals are
 // lump amounts (no unit-rate split in the quote). Never present as measured qty.
 export const ALUMINUM_ALLOWANCE_CAVEAT = "Requires site measurement — allowance only";
+/** K12 ruling (14 Oct): the aluminium & glazing allowance stays whole-home whatever the scope; the line says so. */
+export const ALUMINUM_SCOPE_NOTE = "Covers the whole unit — adjust if only some rooms are in scope";
 export const ALUMINUM: { item: string; location: string; qty: number; unit: "Nos" | "LM"; total: number }[] = [
   { item: "Thermal-break hinged door + curved fixed DG glass, 700×2650", location: "Guest bedroom", qty: 2, unit: "Nos", total: 10_300 },
   { item: "Thermal-break hinged door + curved fixed DG glass, 700×2650", location: "Master bedroom", qty: 2, unit: "Nos", total: 10_300 },

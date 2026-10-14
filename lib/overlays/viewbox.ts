@@ -44,6 +44,8 @@ export interface RawRoomInput {
   confidence?: number | null;
   /** G1: open to the sky. Absent → the type's default. */
   unroofed?: boolean | null;
+  /** K12 (058): false = not in this renovation. */
+  in_scope?: boolean | null;
 }
 
 function asPolygon(v: unknown): Pt[] | null {

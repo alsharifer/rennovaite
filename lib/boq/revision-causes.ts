@@ -21,6 +21,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatAed } from "@/lib/format/aed";
 import { isMissingSchema } from "@/lib/rates/firm";
 
+import { netScopeChange, scopeChangeSummary } from "@/lib/plan/scope";
+
 import { appliedHeadline, basisText, type BasisKind, type CorrectionOrigin } from "./own-basis-vocab";
 
 import type { RecordedCause } from "./revision-diff";
@@ -114,6 +116,8 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
   // Pilot events — the generation that produced the later revision, plan edits, decisions.
   const events = await rows(db, () => db.from("pilot_events").select("kind, recorded_at, detail").eq("project_id", projectId).gt("recorded_at", fromISO).lte("recorded_at", new Date(Date.parse(toISO) + 5_000).toISOString()).order("recorded_at"));
   const edits = new Map<string, { n: number; last: string }>();
+  // K12: scope edits (design_edit, layer "scope") are their own cause — the NET change in the window.
+  const scopeEvents: { at: string; added: string[]; removed: string[] }[] = [];
   for (const e of events) {
     const d = (e.detail ?? {}) as Row;
     const at = str(e.recorded_at);
@@ -129,6 +133,10 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
       case "design_edit": {
         if (at > toISO) break;
         const layer = d.layer ? str(d.layer) : "plan";
+        if (layer === "scope") {
+          scopeEvents.push({ at, added: Array.isArray(d.added) ? d.added.map(str) : [], removed: Array.isArray(d.removed) ? d.removed.map(str) : [] });
+          break;
+        }
         const cur = edits.get(layer) ?? { n: 0, last: at };
         edits.set(layer, { n: cur.n + 1, last: at });
         break;
@@ -143,6 +151,10 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
       default:
         break;
     }
+  }
+  if (scopeEvents.length > 0) {
+    const net = netScopeChange(scopeEvents);
+    if (net.added.length || net.removed.length) out.push({ kind: "scope_change", at: scopeEvents.at(-1)!.at, summary: scopeChangeSummary(net.added.length, net.removed.length) });
   }
   for (const [layer, { n, last }] of edits) {
     out.push({ kind: "plan_edit", at: last, summary: `plan edited — ${layer} × ${n}` });

@@ -30,7 +30,11 @@ import {
 import { polygonArea, type Pt } from "@/lib/plan/polygon";
 import { ledStripAllowance, type ComponentRoom } from "./scope-components";
 
-import type { EngineRoom, ScopeItem } from "./schema";
+import type { EngineRoom, ScopeItem, StairsContext } from "./schema";
+
+import { STAIRS_ASSUMED_NOTE } from "@/lib/plan/scope";
+
+export { STAIRS_ASSUMED_NOTE };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -139,6 +143,7 @@ export type Takeoff = {
 export function computeTakeoff(
   rooms: EngineRoom[],
   flooring: "porcelain" | "engineered_wood",
+  opts: { stairs?: StairsContext } = {},
 ): Takeoff {
   const geos = rooms.map(roomGeometry);
   // G1: outdoor zones leave both pools before anything is measured. Every
@@ -194,6 +199,7 @@ export function computeTakeoff(
   const bathFloorM2 = round2(baths.reduce((s, g) => s + g.room.area_m2, 0));
   // P8b: staircase developed tile surface = footprint × C-08 (treads + risers).
   const stairsFootprintM2 = round2(stairs.reduce((s, g) => s + g.room.area_m2, 0));
+  const stairsQ11: "priced" | "assumed" | "none" = !opts.stairs || stairs.length > 0 ? "priced" : opts.stairs.onPlan ? "none" : opts.stairs.multiLevel ? "assumed" : "none";
   const stairDevelopedM2 = round2(stairsFootprintM2 * CONSTANTS.STAIR_DEVELOPED_FACTOR);
   const netWallM2 = round2(interior.reduce((s, g) => s + g.netWallM2, 0));
 
@@ -408,15 +414,21 @@ export function computeTakeoff(
       unit: "lm",
       measurement: `F-04: Σ (dry + terrace) perimeter − door widths = ${skirtingLm} lm`,
     },
-    {
-      rule_id: "Q-11",
-      work_section: "Floor Finishes",
-      item_key: "stairs.renovation",
-      description: "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
-      quantity: 1,
-      unit: "project",
-      measurement: "allowance (R-36); treads TBC from stair drawing",
-    },
+    // K12 ruling: Q-11 follows the scope (StairsContext). Without a context, the pre-K12 rule.
+    ...(stairsQ11 === "none"
+      ? []
+      : [
+          {
+            rule_id: "Q-11",
+            work_section: "Floor Finishes" as const,
+            item_key: "stairs.renovation",
+            description: "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            quantity: 1,
+            unit: "project",
+            measurement: stairsQ11 === "assumed" ? `allowance (R-36); ${STAIRS_ASSUMED_NOTE}` : "allowance (R-36); treads TBC from stair drawing",
+            ...(stairsQ11 === "assumed" ? { qty_derived: true } : {}),
+          },
+        ]),
     // P8b: staircase tile SUPPLY — developed tread/riser surface, 144×305 slab
     // format. Was invisible (stair footprint priced as flat floor). Only when a
     // stairs room exists.

@@ -19,6 +19,7 @@ import { GardenSitePanel } from "./_components/garden-site-panel";
 import { PlanLayers } from "./_components/plan-layers";
 import { PlanNotAnalysed } from "./_components/plan-not-analysed";
 import { planGate } from "@/lib/plan/plan-gate";
+import { RoomsInScope } from "@/components/blueprint/plan/RoomsInScope";
 
 /** Plan columns this page reads. `source` and the plot dimensions arrive with
  *  migration 031 and are absent (undefined) before it. */
@@ -135,12 +136,21 @@ export default async function PlanPage({
   // columns if the column isn't applied yet so the page still renders. The
   // confidence column isn't in the generated types, so use the untyped client.
   const sb = supabase as unknown as SupabaseClient;
-  const withConf = await sb
+  // K12: in_scope (058) first; a database without it falls back to the 025/031 columns.
+  let withConf = await sb
     .from("rooms")
-    .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence, unroofed")
+    .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence, unroofed, in_scope")
     .eq("plan_id", plan.id)
     .order("name_en")
     .returns<RawRoomInput[]>();
+  if (withConf.error) {
+    withConf = await sb
+      .from("rooms")
+      .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence, unroofed")
+      .eq("plan_id", plan.id)
+      .order("name_en")
+      .returns<RawRoomInput[]>();
+  }
   let roomList: RawRoomInput[];
   let roomsErr: { message: string } | null = null;
   if (withConf.error) {
@@ -297,19 +307,10 @@ export default async function PlanPage({
               summary={{ rooms: roomList.length, area: formatM2(totalArea), label: unit }}
             />
 
-            <section aria-labelledby="rooms-h">
-              <h2 id="rooms-h" className="t-label-caps text-bp-ink-tertiary">
-                {roomList.length} {authored ? "ZONES DRAWN" : "ROOMS DETECTED"}
-              </h2>
-              <ul className="mt-2 max-h-[360px] overflow-y-auto" tabIndex={0} aria-label={authored ? "Zones" : "Rooms"}>
-                {roomList.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-3 border-b border-bp-line-hairline py-2">
-                    <span className="t-body-sm min-w-0 truncate text-bp-ink-primary">{r.name_en ?? "(unnamed)"}</span>
-                    <span className="t-num-sm text-bp-ink-secondary">{formatM2(r.area_m2)}</span>
-                  </li>
-                ))}
-              </ul>
-              <dl className="mt-3 grid grid-cols-3 gap-3">
+            <section aria-label="This renovation">
+              {/* K12 (§7.4, 81:716): which rooms this renovation covers — everything after this step follows it. */}
+              <RoomsInScope planId={plan.id} zones={authored} rooms={roomList.map((r) => ({ id: r.id, name: r.name_en ?? "(unnamed)", area_m2: r.area_m2, in_scope: r.in_scope !== false }))} />
+              <dl className="mt-4 grid grid-cols-3 gap-3">
                 <div>
                   <dt className="t-label-caps text-bp-ink-tertiary">AREA</dt>
                   <dd className="t-num-md text-bp-ink-primary">{formatM2(totalArea)}</dd>

@@ -13,6 +13,7 @@ import { tasteSeedEnabled } from "@/lib/render-grounding";
 import { IN_FLIGHT_CAP } from "@/lib/render-image";
 import { isExteriorRoomType, roomTypeFromDb } from "@/lib/render-prompts";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,7 +83,9 @@ export async function POST(request: NextRequest) {
       loadRenders(supabase, project_id),
       supabase.from("plan_fixtures").select("type, room_id, position, spec").eq("project_id", project_id),
     ]);
-    const rooms = (roomsRes.data ?? []) as BatchRoom[];
+    // K12 (058): rooms not in this renovation are not rendered.
+    const outOfScope = await outOfScopeRoomIds(supabase as unknown as import("@supabase/supabase-js").SupabaseClient, project_id);
+    const rooms = ((roomsRes.data ?? []) as BatchRoom[]).filter((r) => !outOfScope.has(r.id));
 
     const preset = await prepareGardenPreset(supabase, project_id, styleKey, rooms);
 
@@ -99,7 +102,7 @@ export async function POST(request: NextRequest) {
         .eq("project_id", project_id)
         .eq("mode", "scene");
       jobs = planSceneBatch(
-        ctx.cameras.map((c) => ({ id: c.id, label: c.label, zone_id: c.zoneId, lit: c.lit })),
+        ctx.cameras.filter((c) => !c.zoneId || !outOfScope.has(c.zoneId)).map((c) => ({ id: c.id, label: c.label, zone_id: c.zoneId, lit: c.lit })),
         (sceneRows ?? []) as SceneRenderRow[],
       );
     } else {

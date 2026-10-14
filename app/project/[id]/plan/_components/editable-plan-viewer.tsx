@@ -74,6 +74,8 @@ type RoomInput = {
   site_reference?: boolean | null;
   disposition?: string | null;
   dims_derived?: boolean | null;
+  /** K12 (058): false = not in this renovation (drawn dashed, never priced). */
+  in_scope?: boolean | null;
 };
 
 /** G5: an existing, out-of-scope footprint drawn under the zones (the house, a wall). */
@@ -97,6 +99,8 @@ type Room = {
   site_reference: boolean;
   disposition: string | null;
   dims_derived: boolean;
+  /** K12: in this renovation (the 01 Plan checklist). */
+  in_scope: boolean;
   isNew?: boolean;
   isDeleted?: boolean;
 };
@@ -222,6 +226,7 @@ function toRoom(r: RoomInput, pts: Point[]): Room {
     site_reference: r.site_reference === true,
     disposition: r.disposition ?? null,
     dims_derived: r.dims_derived === true,
+    in_scope: r.in_scope !== false,
   };
 }
 
@@ -736,6 +741,8 @@ export function EditablePlanViewer({
       site_reference: false,
       disposition: null,
       dims_derived: false,
+      // K12: a newly drawn room is in this renovation (the column default).
+      in_scope: true,
       isNew: true,
     };
     setRooms((current) => [...current, next]);
@@ -886,6 +893,19 @@ export function EditablePlanViewer({
       window.removeEventListener("rv:plan-select-rooms", onSelect);
     };
   }, [editing, fixOverlaps]);
+
+  // K12: the "Rooms in this renovation" checklist saves, then tells the canvas which rooms
+  // left or joined — they are redrawn dashed / solid at once (nothing else about them changes).
+  useEffect(() => {
+    const onScope = (e: Event) => {
+      const d = (e as CustomEvent<{ ids?: string[]; in_scope?: boolean }>).detail;
+      if (!d?.ids?.length || typeof d.in_scope !== "boolean") return;
+      const ids = new Set(d.ids);
+      setRooms((prev) => prev.map((r) => (ids.has(r.id) ? { ...r, in_scope: d.in_scope! } : r)));
+    };
+    window.addEventListener("rv:plan-scope", onScope);
+    return () => window.removeEventListener("rv:plan-scope", onScope);
+  }, []);
 
   // Best-effort parse-metrics post (table/route may be absent pre-025).
   const postParseMetrics = useCallback(
@@ -1343,10 +1363,11 @@ export function EditablePlanViewer({
                       .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
                       .join(" ")}
                     fill={overlapReport.has_overlaps ? INK : room.unroofed ? OPEN_ZONE_FILL : ROOM_FILL}
-                    fillOpacity={overlapReport.has_overlaps ? 0.05 : removed ? 0.12 : room.unroofed ? 0.45 : 0.5}
-                    stroke={room.site_reference ? BRASS : room.unroofed ? INK_SECONDARY : INK}
-                    strokeOpacity={room.unroofed ? 0.7 : 1}
-                    strokeDasharray={room.site_reference ? "3 3" : room.unroofed ? "6 4" : undefined}
+                    fillOpacity={!room.in_scope ? 0 : overlapReport.has_overlaps ? 0.05 : removed ? 0.12 : room.unroofed ? 0.45 : 0.5}
+                    stroke={room.site_reference ? BRASS : !room.in_scope || room.unroofed ? INK_SECONDARY : INK}
+                    strokeOpacity={!room.in_scope ? 0.8 : room.unroofed ? 0.7 : 1}
+                    strokeDasharray={room.site_reference ? "3 3" : !room.in_scope ? "4 3" : room.unroofed ? "6 4" : undefined}
+                    data-in-scope={room.in_scope ? "true" : "false"}
                     strokeWidth={editing && selected ? 2.5 : room.site_reference ? 2 : 1.5}
                     style={{ cursor: roomMode === "drag" ? "grab" : "pointer" }}
                     onPointerDown={
@@ -1371,6 +1392,21 @@ export function EditablePlanViewer({
                       style={{ fontFamily: SVG.mono, letterSpacing: "0.06em", fontWeight: 500 }}
                     >
                       {room.disposition === "remove" ? "EXISTING · TO REMOVE" : room.disposition === "replace" ? "EXISTING · REPLACE" : room.disposition === "keep" ? "EXISTING · KEEP" : "EXISTING · UNDECIDED"}
+                    </text>
+                  )}
+
+                  {/* K12: a room left out of the renovation (81:716) — dashed, unfilled, and said so. */}
+                  {!room.in_scope && (
+                    <text
+                      x={bb.xL + 6}
+                      y={bb.yT + (room.site_reference ? 28 : 14)}
+                      fontSize="10"
+                      fill={INK_SECONDARY}
+                      pointerEvents="none"
+                      style={{ fontFamily: SVG.mono, letterSpacing: "0.06em", fontWeight: 500 }}
+                      data-not-in-scope={room.id}
+                    >
+                      NOT IN THIS RENOVATION
                     </text>
                   )}
 
