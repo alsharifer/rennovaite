@@ -263,7 +263,7 @@
             "wastage_pct": 0
           },
           {
-            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "description": "Staircase renovation — tile fixing labour + LED nosing (excl. handrail; tile supply on its own line)",
             "quantity": 1,
             "unit": "project",
             "rate_aed": 6000,
@@ -1093,7 +1093,7 @@
             "wastage_pct": 0
           },
           {
-            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "description": "Staircase renovation — tile fixing labour + LED nosing (excl. handrail; tile supply on its own line)",
             "quantity": 1,
             "unit": "project",
             "rate_aed": 6000,
@@ -1923,7 +1923,7 @@
             "wastage_pct": 0
           },
           {
-            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "description": "Staircase renovation — tile fixing labour + LED nosing (excl. handrail; tile supply on its own line)",
             "quantity": 1,
             "unit": "project",
             "rate_aed": 6000,
@@ -2753,7 +2753,7 @@
             "wastage_pct": 0
           },
           {
-            "description": "Staircase renovation — tread tiling + LED nosing (excl. handrail)",
+            "description": "Staircase renovation — tile fixing labour + LED nosing (excl. handrail; tile supply on its own line)",
             "quantity": 1,
             "unit": "project",
             "rate_aed": 6000,
