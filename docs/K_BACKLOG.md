@@ -4,6 +4,23 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## R10b (2026-10-14) — openings found on the drawing
+
+- **Widths are rough.** The detector reads coarse fractions of a room's side
+  (0.15–0.2 typical), and a parsed plan's metre scale is isotropic over
+  normalised coordinates of a non-square crop, so widths run short (a 2–3 m
+  balcony glazing read as two ~0.7 m windows). Rooms, sides, kinds and what
+  each opens to are what renders need first; the owner adjusts widths on the
+  Openings layer. Fix candidates: ask for jamb points on the drawn wall in
+  pixels of a crop around the room; carry an x/y scale per plan.
+- **The app's room outlines can be far from the drawing** (Jumeirah Parks: the
+  stored "Dining Room" covers the hall by the P.W.D; the dining table sits in
+  "Living Room"). Detection assigns openings to the app's rooms, so an outline
+  that names the wrong space gets the wrong openings. A plan-vs-drawing check
+  (outline off its walls) would surface it; not built.
+- **Renders: the studio label** ("detected — not yet confirmed") is unit-tested
+  only; no render with `openings_basis` exists until R10c's first renders.
+
 ## K12 (2026-10-14) — rooms in this renovation
 
 - **058 before deploy** (prod): `rooms.in_scope`. Every reader tolerates its

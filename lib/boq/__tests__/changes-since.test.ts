@@ -32,7 +32,7 @@ const causes = (...kinds: string[]) => kinds.map((kind) => ({ kind }) as { kind:
 
 describe("summarizeChanges — what can move a regenerated BoQ", () => {
   it("nothing recorded → unchanged, no summary", () => {
-    expect(summarizeChanges([], 4)).toEqual({ scopeChanges: 0, planEdits: 0, bookChanges: 0, decisions: 0, corrections: 0, changed: false, summary: null });
+    expect(summarizeChanges([], 4)).toEqual({ scopeChanges: 0, openingsConfirmed: 0, planEdits: 0, bookChanges: 0, decisions: 0, corrections: 0, changed: false, summary: null });
   });
 
   it("K12: a change to the rooms in this renovation reads \"Scope changed since rev N\"", () => {

@@ -1,3 +1,5 @@
+import { OpeningsAutoDetect } from "@/components/blueprint/plan/OpeningsAutoDetect";
+import { renderOpeningsLabel, type OpeningsBasis } from "@/lib/plan/openings-vocab";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
@@ -28,6 +30,8 @@ type RenderRow = {
   parent_render_id: string | null;
   qa: unknown;
   created_at: string | null;
+  /** R10b (060). */
+  openings_basis?: OpeningsBasis | null;
 };
 
 type RenderItem = {
@@ -36,6 +40,7 @@ type RenderItem = {
   prompt: string;
   qa?: "passed" | "failed" | null;
   qaReason?: string | null;
+  openings?: string | null;
 };
 
 // K8 #5 (spec §6.4, Figma 57:612 · phone 66:1443): the renders studio, Blueprint.
@@ -102,6 +107,7 @@ function buildInitialChains(
           imageUrl: cur.image_url,
           prompt: cur.prompt,
           ...qaFrom(cur.qa),
+          openings: renderOpeningsLabel(cur.openings_basis),
         });
       }
       cur = cur.parent_render_id ? byId.get(cur.parent_render_id) : undefined;
@@ -190,11 +196,21 @@ export default async function RenderPage({
   // Fetch every render for this project, then reconstruct a linear chain
   // per room (root → … → latest leaf). This rehydrates the iteration UI on
   // page load so users see their previous renders instead of starting blank.
-  const { data: renderRows } = await supabase
+  // R10b: openings_basis (060) first; an older database reads without it.
+  const sbRows = supabase as unknown as SupabaseClient;
+  let renderRes: { data: (RenderRow & { status?: string })[] | null; error: { message: string } | null } = await sbRows
     .from("renders")
-    .select("id, room_id, prompt, image_url, parent_render_id, qa, created_at, status")
+    .select("id, room_id, prompt, image_url, parent_render_id, qa, created_at, status, openings_basis")
     .eq("project_id", projectId)
     .order("created_at", { ascending: true });
+  if (renderRes.error) {
+    renderRes = await sbRows
+      .from("renders")
+      .select("id, room_id, prompt, image_url, parent_render_id, qa, created_at, status")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: true });
+  }
+  const renderRows = renderRes.data;
 
   // G4: an evening view is an edit of a day render, not the next step in the
   // zone's iteration chain — keep it out of the chain, or it would become the
@@ -329,8 +345,16 @@ export default async function RenderPage({
     /* a pre-G4b table: chains and evenings still show */
   }
 
+  // R10b: a plan read before R10b is read for openings the first time Renders opens.
+  const detectRes = plan
+    ? await sbRows.from("plans").select("pdf_url, source, openings_detected_at").eq("id", plan.id).maybeSingle<{ pdf_url: string | null; source: string | null; openings_detected_at: string | null }>()
+    : null;
+  const detectNeeded = !!plan && !!detectRes && !detectRes.error && !!detectRes.data?.pdf_url && detectRes.data.source !== "user_drawn" && !detectRes.data.openings_detected_at;
+
   const flags = journeyFlagsFromEnv();
   return (
+    <>
+    {plan ? <OpeningsAutoDetect planId={plan.id} needed={detectNeeded} /> : null}
     <RendersStudio
       initialRoomId={initialRoomId ?? null}
       projectId={project.id}
@@ -351,5 +375,6 @@ export default async function RenderPage({
       notInScope={notInScope}
       planHref={`/project/${projectId}/plan`}
     />
+    </>
   );
 }

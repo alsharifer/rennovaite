@@ -23,6 +23,8 @@ export type GenerateResponse = {
   outcome?: SceneOutcome;
   /** G5: the 3D design view was chosen (no clean camera), not a gate failure. */
   by_choice?: boolean;
+  /** R10b: which openings shaped it — "detected, not yet confirmed" or "confirmed". */
+  openingsLabel?: string | null;
 };
 
 // The render + iterate routes run async: they return a prediction_id and the
@@ -52,6 +54,7 @@ export async function pollRenderStatus(predictionId: string): Promise<GenerateRe
       prompt?: string;
       qa?: "passed" | "failed" | null;
       qa_reason?: string | null;
+      openings_label?: string | null;
       error?: string;
     } | null;
     if (!res.ok || !body) {
@@ -64,6 +67,7 @@ export async function pollRenderStatus(predictionId: string): Promise<GenerateRe
         prompt: body.prompt ?? "",
         qa: body.qa ?? null,
         qaReason: body.qa_reason ?? null,
+        openingsLabel: body.openings_label ?? null,
       };
     }
     if (body.status === "failed") {

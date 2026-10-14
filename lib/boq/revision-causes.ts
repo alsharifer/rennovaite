@@ -21,6 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatAed } from "@/lib/format/aed";
 import { isMissingSchema } from "@/lib/rates/firm";
 
+import { OPENING_NET_ITEM_KEYS, OPENINGS_CONFIRMED_CAUSE } from "@/lib/plan/openings-vocab";
 import { netScopeChange, scopeChangeSummary } from "@/lib/plan/scope";
 
 import { appliedHeadline, basisText, type BasisKind, type CorrectionOrigin } from "./own-basis-vocab";
@@ -118,6 +119,8 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
   const edits = new Map<string, { n: number; last: string }>();
   // K12: scope edits (design_edit, layer "scope") are their own cause — the NET change in the window.
   const scopeEvents: { at: string; added: string[]; removed: string[] }[] = [];
+  // R10b: openings confirmed on 01 Plan (design_edit, layer "openings_confirmed") — one cause for the window.
+  const confirmed = { n: 0, last: "" };
   for (const e of events) {
     const d = (e.detail ?? {}) as Row;
     const at = str(e.recorded_at);
@@ -133,6 +136,11 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
       case "design_edit": {
         if (at > toISO) break;
         const layer = d.layer ? str(d.layer) : "plan";
+        if (layer === "openings_confirmed") {
+          confirmed.n += typeof d.count === "number" ? d.count : 1;
+          confirmed.last = at;
+          break;
+        }
         if (layer === "scope") {
           scopeEvents.push({ at, added: Array.isArray(d.added) ? d.added.map(str) : [], removed: Array.isArray(d.removed) ? d.removed.map(str) : [] });
           break;
@@ -155,6 +163,9 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
   if (scopeEvents.length > 0) {
     const net = netScopeChange(scopeEvents);
     if (net.added.length || net.removed.length) out.push({ kind: "scope_change", at: scopeEvents.at(-1)!.at, summary: scopeChangeSummary(net.added.length, net.removed.length) });
+  }
+  if (confirmed.n > 0) {
+    out.push({ kind: "openings_confirmed", at: confirmed.last, summary: `${OPENINGS_CONFIRMED_CAUSE} — ${confirmed.n} ${confirmed.n === 1 ? "opening" : "openings"}`, item_keys: [...OPENING_NET_ITEM_KEYS] });
   }
   for (const [layer, { n, last }] of edits) {
     out.push({ kind: "plan_edit", at: last, summary: `plan edited — ${layer} × ${n}` });

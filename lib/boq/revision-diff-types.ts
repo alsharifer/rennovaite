@@ -8,7 +8,7 @@
 // =============================================================================
 
 export type DiffClass = "quantity" | "rate" | "both" | "total" | "added" | "removed";
-export type CauseKind = "correction" | "applied_correction" | "reverted_correction" | "firm_rate" | "plan_edit" | "scope_change" | "session_decision" | "regeneration" | "engine_rounding";
+export type CauseKind = "correction" | "applied_correction" | "reverted_correction" | "firm_rate" | "plan_edit" | "scope_change" | "openings_confirmed" | "session_decision" | "regeneration" | "engine_rounding";
 
 /** Human label for a class, shared by the view and the PDF. */
 export const DIFF_CLASS_LABEL: Record<DiffClass, string> = {
@@ -30,6 +30,8 @@ export const CAUSE_KIND_LABEL: Record<CauseKind, string> = {
   plan_edit: "Plan edited",
   // K12: rooms added to / left out of the renovation on 01 Plan.
   scope_change: "Scope changed",
+  // R10b: openings found on the drawing, confirmed by the owner on 01 Plan.
+  openings_confirmed: "Openings confirmed",
   session_decision: "Session decision",
   regeneration: "BoQ regenerated",
   engine_rounding: "H7 rounding",

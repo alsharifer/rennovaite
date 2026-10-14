@@ -6,6 +6,7 @@ import { LOW_CONFIDENCE_FLAG } from "@/lib/parse/constants";
 import { getParseProvider, type ParseAsset } from "@/lib/parse/providers";
 import { repairOverlaps, toRepairInput } from "@/lib/parse/repair";
 import { planCheck } from "@/lib/plan/plan-check";
+import { resetOpeningsDetection } from "@/lib/plan/openings-detect";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -151,6 +152,15 @@ export async function POST(request: NextRequest) {
       } catch {
         /* plan_openings not applied yet — non-fatal */
       }
+    }
+
+    // R10b: the rooms are new, so openings found on the old reading (and the
+    // once-per-plan claim) go; the client starts a fresh detection when the
+    // reading finishes, and the Plan page starts it lazily if that never ran.
+    try {
+      await resetOpeningsDetection(sb, planId);
+    } catch {
+      /* 059 not applied yet — non-fatal */
     }
 
     // Best-effort parse metrics (table may be absent pre-025).

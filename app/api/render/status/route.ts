@@ -16,6 +16,7 @@ import {
 import { qaPassed, runQaGate, type QaVerdict } from "@/lib/render-qa";
 import { rehostImage } from "@/lib/render-storage";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { renderOpeningsLabel, type OpeningsBasis } from "@/lib/plan/openings-vocab";
 import { UNCHANGED_MESSAGE, compareImageUrls, isUnchangedEdit, type Similarity } from "@/lib/render/similarity";
 
 export const runtime = "nodejs";
@@ -47,6 +48,12 @@ async function retryRender(
     }),
   );
   return extractImageUrl(output);
+}
+
+/** R10b (060): "detected, not yet confirmed" / "confirmed plan" — null when no opening shaped it. */
+async function openingsLabelOf(renderId: string): Promise<string | null> {
+  const { data, error } = await (getSupabaseAdmin() as unknown as SupabaseClient).from("renders").select("openings_basis").eq("id", renderId).maybeSingle<{ openings_basis: OpeningsBasis | null }>();
+  return error ? null : renderOpeningsLabel(data?.openings_basis);
 }
 
 export async function GET(request: NextRequest) {
@@ -90,6 +97,7 @@ export async function GET(request: NextRequest) {
         mode: row.mode,
         qa: qaResult(row.qa),
         qa_reason: qaReason(row.qa),
+        openings_label: await openingsLabelOf(row.id),
       });
     }
     if (row.status === "unchanged") {
@@ -253,6 +261,7 @@ export async function GET(request: NextRequest) {
       mode: row.mode,
       qa: verdict ? (qaFailed ? "failed" : "passed") : null,
       qa_reason: qaFailed ? (verdict?.reason ?? null) : null,
+      openings_label: await openingsLabelOf(row.id),
     });
   } catch (err) {
     console.error("[api/render/status] error", err);

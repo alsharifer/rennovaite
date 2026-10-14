@@ -246,6 +246,8 @@ export type BuildOffplanBasePromptInput = {
   roomType: RoomType;
   widthM?: number | null;
   depthM?: number | null;
+  /** R10b: the room’s openings in words (lib/render/openings-prompt.ts). Absent = the old "single window" shell. */
+  openings?: string | null;
 };
 
 // Text-to-image prompt for the empty-room shell (off-plan path). Dimensions are
@@ -255,6 +257,7 @@ export function buildOffplanBasePrompt({
   roomType,
   widthM,
   depthM,
+  openings,
 }: BuildOffplanBasePromptInput): string {
   const roomLabel = ROOM_LABELS[roomType];
   const dims =
@@ -271,5 +274,7 @@ export function buildOffplanBasePrompt({
         : "bare compacted sand and dust";
     return `Empty ${roomLabel} before landscaping, ${dims}flat level ground, ${boundary}, plain unpainted blockwork boundary wall about 1.8m high running around the plot, no planting, no paving, no furniture, open sky, bright Dubai daylight, photorealistic, eye-level 24mm.`;
   }
-  return `Empty unfurnished ${roomLabel}, ${dims}ceiling 2.9m, a single window on one side wall, screed floor, white primed walls, photorealistic, eye-level 24mm.`;
+  // R10b: the openings found on (or drawn into) the plan replace the invented single window.
+  const openingsClause = openings ? `with exactly ${openings} and no other openings` : "a single window on one side wall";
+  return `Empty unfurnished ${roomLabel}, ${dims}ceiling 2.9m, ${openingsClause}, screed floor, white primed walls, photorealistic, eye-level 24mm.`;
 }

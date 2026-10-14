@@ -18,6 +18,7 @@
 // (24:814) says what to do. Done → the plan opens.
 // =============================================================================
 
+import { startOpeningsDetection } from "@/components/blueprint/plan/OpeningsAutoDetect";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -71,6 +72,8 @@ export function ReadingPlan({ projectId, planId, subtitle, eyebrow, slowAfterMs 
           return;
         }
         track(AnalyticsEvent.PlanParsed, { project_id: projectId });
+        // R10b: the plan is read — look for its windows and doors (the Plan page shows the run).
+        startOpeningsDetection(planId);
         setPhase({ kind: "done", answer: { rooms: b.rooms ?? 0, statedAreas: b.stated_areas ?? null, overlapPairs: b.overlap_pairs ?? null } });
         window.setTimeout(() => router.push(planHref), 1200);
       } catch {
