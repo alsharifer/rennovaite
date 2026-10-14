@@ -192,7 +192,7 @@ export default async function RenderPage({
   // page load so users see their previous renders instead of starting blank.
   const { data: renderRows } = await supabase
     .from("renders")
-    .select("id, room_id, prompt, image_url, parent_render_id, qa, created_at")
+    .select("id, room_id, prompt, image_url, parent_render_id, qa, created_at, status")
     .eq("project_id", projectId)
     .order("created_at", { ascending: true });
 
@@ -203,7 +203,8 @@ export default async function RenderPage({
   const viewRows = await loadRenders(sbAny, projectId);
   const eveningIds = new Set(viewRows.filter((r) => r.view === "evening").map((r) => r.id));
   const initialChains = buildInitialChains(
-    (renderRows ?? []).filter((r) => !eveningIds.has(r.id)),
+    // R10a: an edit that came back unchanged is on record, never a version.
+    (renderRows ?? []).filter((r) => !eveningIds.has(r.id) && (r as { status?: string }).status !== "unchanged"),
   );
 
   // The evening view shown beside a zone is the one made from its CURRENT day.

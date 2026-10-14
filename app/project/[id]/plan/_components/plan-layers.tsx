@@ -62,6 +62,7 @@ export function PlanLayers({
   plot = null,
   context = [],
   siteRefs,
+  initialLayer,
 }: {
   projectId: string;
   planId: string;
@@ -80,8 +81,11 @@ export function PlanLayers({
   context?: ContextOutline[];
   /** G5: zone id → site-reference state, read fresh on every server render. */
   siteRefs?: Record<string, { site_reference: boolean; disposition: string | null; dims_derived: boolean }>;
+  /** R10a: the layer to open on (`?layer=openings`). */
+  initialLayer?: string | null;
 }) {
-  const [layer, setLayer] = useState<Layer>("plan");
+  // R10a: "?layer=openings" (the renders' "Walls and windows come from your plan" link) opens on that layer.
+  const [layer, setLayer] = useState<Layer>(initialLayer === "openings" ? "openings" : "plan");
   const [target, setTarget] = useState<InspectTarget | null>(null);
 
   const onInspectRoom = (roomId: string) => {

@@ -69,10 +69,10 @@ export default async function PlanPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ room?: string }>;
+  searchParams: Promise<{ room?: string; layer?: string }>;
 }) {
   const { id: projectId } = await params;
-  const { room: focusRoomId } = await searchParams;
+  const { room: focusRoomId, layer: initialLayer } = await searchParams;
   const supabase = getSupabaseAdmin();
 
   const { data: project, error: projectErr } = await supabase
@@ -287,6 +287,7 @@ export default async function PlanPage({
                 plot={plot}
                 context={gardenSite?.context ?? []}
                 siteRefs={gardenSite?.siteRefs}
+                initialLayer={initialLayer ?? null}
                 mode="edit"
               />
             </div>

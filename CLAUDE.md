@@ -645,6 +645,36 @@ Spec §7.4, Figma 81:716 / dark 82:2244; migration **058** `rooms.in_scope`
   renders). Live: `scripts/k12-scope-shots.mjs` (Demo villa copy: 13 → 11,
   regenerate, diff cause, Overview, Renders, timeline, back to 13 = rev 1).
 
+### R10a — "Ask for a change" that tells the truth (14 Oct)
+
+Spec §7.5; the walkthrough's dining room (R10 step 0: "Move the kitchen to the
+left …" came back SSIM 0.992 — the same image — and was saved as a version).
+
+- **Unchanged edits are not versions** (`lib/render/similarity.ts`, sharp):
+  `/api/render/status` compares a finished `tweak` with its parent (SSIM on 8×8
+  windows of a 256² greyscale view, % of pixels moved > 10%, mean diff);
+  `isUnchangedEdit` = SSIM ≥ 0.985 AND < 0.5% of pixels changed → the row is
+  kept as `status: "unchanged"` (scores in `qa.similarity`), never rehosted,
+  never in a chain (the renders page filters it), and the studio says "That
+  change didn't come through — the image is the same. Try being more
+  specific." (`RenderNotice`, lib/render-batch/client.ts; the typed request
+  stays in the box). A real edit stores its scores too.
+- **Structural requests go to the plan** (`lib/render/change-request.ts`, pure,
+  deterministic): a structural verb whose object is a wall / window / door /
+  opening / kitchen / partition / stairs, a resize ("bigger windows",
+  "floor-to-ceiling"), or a placement ("kitchen on the left") → `/api/render-iterate`
+  answers 422 `structural_change` BEFORE any model call: "Walls and windows come
+  from your plan — adjust them there" + `/project/:id/plan?layer=openings` (the
+  plan page opens on that layer). Finish requests ("add curtains to the
+  window", "make the window frames black") still edit.
+- **Dining, majlis and kitchen are their own prompt types** (`InteriorRoomType`;
+  kitchens were not renderable at all). Their edit prompt adds a furnishing cue
+  ("Furnish it as a dining room: …"); the four existing rooms' prompts — the
+  render cache keys — are byte-identical. They borrow the style's living-room
+  moodboard art.
+- **Tests**: `lib/__tests__/r10a-ask-for-a-change.test.ts`; live (no model
+  call): `scripts/r10a-ask-shots.mjs`.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

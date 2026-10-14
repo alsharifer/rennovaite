@@ -16,6 +16,7 @@ import {
 import { qaPassed, runQaGate, type QaVerdict } from "@/lib/render-qa";
 import { rehostImage } from "@/lib/render-storage";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { UNCHANGED_MESSAGE, compareImageUrls, isUnchangedEdit, type Similarity } from "@/lib/render/similarity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,6 +92,9 @@ export async function GET(request: NextRequest) {
         qa_reason: qaReason(row.qa),
       });
     }
+    if (row.status === "unchanged") {
+      return NextResponse.json({ status: "unchanged", render_id: row.id, message: UNCHANGED_MESSAGE });
+    }
     if (row.status === "failed") {
       return NextResponse.json({
         status: "failed",
@@ -146,6 +150,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // R10a: an "Ask for a change" edit that returned the parent image is NOT a
+    // new version. Compared before QA / rehosting; the row is kept (status
+    // "unchanged", with the scores) so the attempt is on record, but no chain
+    // shows it and the owner is told so.
+    let similarity: Similarity | null = null;
+    if (row.mode === "tweak" && row.parent_render_id) {
+      const { data: parent } = await supabase.from("renders").select("image_url").eq("id", row.parent_render_id).maybeSingle();
+      if (parent?.image_url) similarity = await compareImageUrls(parent.image_url, imageUrl);
+      if (similarity && isUnchangedEdit(similarity)) {
+        await supabase.from("renders").update({ status: "unchanged", qa: { unchanged: true, similarity: { ...similarity } } }).eq("id", row.id);
+        return NextResponse.json({ status: "unchanged", render_id: row.id, message: UNCHANGED_MESSAGE, similarity });
+      }
+    }
+
     let finalImage = imageUrl;
     let verdict: QaVerdict | null = null;
     let qaFailed = false;
@@ -180,7 +198,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const qaJson = verdict ? { ...verdict, passed: !qaFailed } : null;
+    const sim = similarity ? { ...similarity } : null;
+    const qaJson = verdict ? { ...verdict, passed: !qaFailed, ...(sim ? { similarity: sim } : {}) } : sim ? { similarity: sim } : null;
 
     // Re-host the (ephemeral Replicate) output to durable Storage before storing
     // its URL — replicate.delivery links expire within ~a day. Best-effort: on

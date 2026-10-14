@@ -25,7 +25,12 @@ export type InteriorRoomType =
   | "master-bedroom"
   | "secondary-bedroom"
   | "bathroom"
-  | "living";
+  | "living"
+  // R10a: dining, majlis and kitchen are their own rooms — a dining room rendered
+  // with the living-room prompt came back with a sofa and coffee table.
+  | "dining"
+  | "majlis"
+  | "kitchen";
 
 export type ExteriorRoomType = "garden-zone" | "outdoor-structure";
 
@@ -90,6 +95,12 @@ const ROOM_FRAGMENTS: Record<RoomType, string> = {
     "vanity with mirror against the back wall, shower or bath visible on the side, large-format porcelain wall tiles, glass partition",
   living:
     "modular sofa facing the camera, coffee table in the foreground, feature wall visible at the back, full-height curtains on the side",
+  dining:
+    "dining table for six to eight centred under a linear pendant, upholstered dining chairs, sideboard against the back wall, the room's windows and openings where they are",
+  majlis:
+    "low perimeter majlis seating along the walls with cushions, central low table on a large rug, feature wall at the back, formal and symmetrical",
+  kitchen:
+    "full-height kitchen cabinetry along the walls, stone worktops, integrated appliances, an island or peninsula where the floor allows, the room's windows and openings where they are",
 };
 
 export type BuildRenderPromptInput = {
@@ -138,8 +149,9 @@ const DB_ROOM_TYPE_MAP: Record<string, RoomType> = {
   ensuite: "bathroom",
   powder: "bathroom",
   living: "living",
-  majlis: "living",
-  dining: "living",
+  majlis: "majlis",
+  dining: "dining",
+  kitchen: "kitchen",
   // G1b — outdoor zones. Every garden token is a zone of ground; `structure`
   // is the one that stands on it. `terrace` and `balcony` land here too: they
   // are outdoor rooms, they were a hard 400 before this map grew, and a
@@ -181,8 +193,20 @@ const ROOM_LABELS: Record<RoomType, string> = {
   "secondary-bedroom": "bedroom",
   bathroom: "bathroom",
   living: "living room",
+  dining: "dining room",
+  majlis: "majlis",
+  kitchen: "kitchen",
   "garden-zone": "garden area",
   "outdoor-structure": "garden structure",
+};
+
+// R10a: the rooms that used to borrow the living-room prompt say what furnishes
+// them. Only these three — every other room's edit prompt (the render cache key)
+// stays byte-identical.
+const EDIT_ROOM_CUES: Partial<Record<RoomType, string>> = {
+  dining: "a dining table for six to eight centred under a linear pendant, upholstered dining chairs, a sideboard against a wall — no sofa, no coffee table",
+  majlis: "low perimeter majlis seating along the walls with cushions, a central low table on a large rug, formal and symmetrical — no modular sofa",
+  kitchen: "full-height kitchen cabinetry along the walls, stone worktops, integrated appliances, an island or peninsula only where the floor allows",
 };
 
 export type BuildEditPromptInput = {
@@ -213,7 +237,9 @@ export function buildEditPrompt({
   if (isExteriorRoomType(roomType)) {
     return `Redesign this exact ${roomLabel} in ${styleName} style: ${styleFrag}${paletteClause} Keep the site's shape, boundary wall positions, levels, existing trees and camera angle exactly the same. Photorealistic landscape photography, daylight, magazine quality.`;
   }
-  return `Renovate this exact ${roomLabel} in ${styleName} style: ${styleFrag}${paletteClause} Keep the room's architecture, wall positions, window and door locations, and camera angle exactly the same. Photorealistic interior photography, magazine quality.`;
+  const cue = EDIT_ROOM_CUES[roomType];
+  const furnish = cue ? ` Furnish it as a ${roomLabel}: ${cue}.` : "";
+  return `Renovate this exact ${roomLabel} in ${styleName} style: ${styleFrag}${paletteClause}${furnish} Keep the room's architecture, wall positions, window and door locations, and camera angle exactly the same. Photorealistic interior photography, magazine quality.`;
 }
 
 export type BuildOffplanBasePromptInput = {
