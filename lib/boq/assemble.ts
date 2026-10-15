@@ -31,6 +31,7 @@ import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { applyOwnBasis } from "@/lib/boq/own-basis";
 import { loadAppliedCorrections } from "@/lib/boq/own-basis-load";
 import { derivePlanGraph } from "@/lib/plan/derive";
+import { isUnnamed } from "@/lib/plan/plan-rules";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { getProposedGraph } from "@/lib/plan/snapshots";
 import { loadProjectFirmOverlay, type FirmOverlay } from "@/lib/rates/firm";
@@ -203,6 +204,12 @@ export async function loadPriceablePlan(
   }
   const scoped = rooms.filter((r) => !outOfScope.has(r.id));
   if (scoped.length === 0) return no(400, { error: "No room is in this renovation — choose the rooms on the plan.", code: "no_rooms", scope: true });
+  // Rule 10 (15 Oct): a room still called "New room" cannot be priced — name it, or
+  // leave it out of the renovation.
+  const unnamed = scoped.filter((r) => isUnnamed(r.name_en));
+  if (unnamed.length > 0) {
+    return no(409, { error: `${unnamed.length} room${unnamed.length === 1 ? " has" : "s have"} no name — name ${unnamed.length === 1 ? "it" : "them"} or mark ${unnamed.length === 1 ? "it" : "them"} out of scope on the plan.`, code: "rooms_unnamed", room_ids: unnamed.map((r) => r.id) });
+  }
   // K12 ruling (Q-11): a stairs room ANYWHERE on the plan (even left out) means the stairs are known;
   // with none, a villa / multi-level project keeps the allowance as an assumption.
   const stairs: StairsContext = { onPlan: rooms.some((r) => r.room_type === "stairs"), multiLevel: isMultiLevelProject(project) };

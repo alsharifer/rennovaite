@@ -12,6 +12,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import type { RawLinearElement } from "./elements";
 import { isUnconfirmedDetected } from "./openings-vocab";
+import { metresPerUnit, openingsOnWalls } from "./plan-rules";
 import { buildPlanGraph, type PlanGraph, type PlanSource, type RawContext, type RawOpening, type RawRoom } from "./geometry";
 
 /** Read persisted openings for a plan (migration 026). `[]` if the table is
@@ -220,17 +221,30 @@ export async function derivePlanGraph(projectId: string, opts: { includeUnconfir
   }
 
   const parsed = plan.parsed_json as ParsedJson;
-  const openings = await loadOpenings(supabase, plan.id, opts.includeUnconfirmed === true);
+  const loadedOpenings = await loadOpenings(supabase, plan.id, opts.includeUnconfirmed === true);
   const elements = await loadElements(supabase, plan.id);
   const context = await loadContext(supabase, plan.id);
   const authored = await loadAuthoredColumns(supabase, plan.id);
+  // Rule 1/2 (15 Oct): an opening that is not on a wall, or whose wall is shorter
+  // than it, "Needs a wall" — it is out of every priced and drawn view until it
+  // is put back on one (lib/plan/plan-rules.ts). Gates keep their context wall.
+  const roomRows = (roomsRes.data ?? []) as unknown as RawRoom[];
+  const mPerU = metresPerUnit(roomRows, plan.total_area_m2, authored.source === "user_drawn" ? authored.plot_width_m : null);
+  const onWalls = new Set(
+    openingsOnWalls(
+      loadedOpenings.map((o) => ({ id: o.id, kind: o.type ?? "door", width_mm: o.width_mm ?? null, position: o.position, room_id: o.room_id ?? null, context_id: o.context_id ?? null })),
+      roomRows.map((r) => ({ id: r.id, polygon: r.polygon, room_type: r.room_type ?? null, unroofed: (r as { unroofed?: boolean | null }).unroofed ?? null })),
+      mPerU,
+    ).map((o) => o.id),
+  );
+  const openings = loadedOpenings.filter((o) => onWalls.has(o.id));
 
   return buildPlanGraph({
     projectId,
     planId: plan.id,
     scale: parsed?.scale ?? null,
     total_area_m2: plan.total_area_m2,
-    rooms: (roomsRes.data ?? []) as unknown as RawRoom[],
+    rooms: roomRows,
     openings,
     elements,
     context,

@@ -30,7 +30,7 @@ export interface StepStatus {
 
 /** regenerateReadiness's plan refusal (lib/boq/regenerate.ts), authority codes excluded. */
 export interface PlanBlock {
-  code: "no_plan" | "no_area" | "no_rooms" | "plan_has_overlaps" | "not_priceable";
+  code: "no_plan" | "no_area" | "no_rooms" | "plan_has_overlaps" | "rooms_unnamed" | "not_priceable";
   reason: string;
   fix?: { label: string; href: string };
 }

@@ -24,7 +24,7 @@ import { isProjectMember } from "@/lib/projects/access";
 
 import { loadPriceablePlan } from "./assemble";
 
-export type RegenerateBlockCode = "unauthenticated" | "not_a_project_member" | "project_not_found" | "no_plan" | "no_area" | "no_rooms" | "plan_has_overlaps" | "not_priceable";
+export type RegenerateBlockCode = "unauthenticated" | "not_a_project_member" | "project_not_found" | "no_plan" | "no_area" | "no_rooms" | "plan_has_overlaps" | "rooms_unnamed" | "not_priceable";
 
 export interface RegenerateBlock {
   code: RegenerateBlockCode;
@@ -71,6 +71,10 @@ function planBlock(refusal: { status: number; body: Record<string, unknown> }, p
     case "no_rooms":
       // K12: every room left out of the renovation.
       return refusal.body.scope ? { code, reason: "No room is in this renovation.", fix: { label: "Choose rooms on the plan", href: `/project/${projectId}/plan` } } : { code, reason: "The plan has no rooms to price.", fix: toPlan };
+    case "rooms_unnamed": {
+      const n = (refusal.body.room_ids as string[] | undefined)?.length ?? 0;
+      return { code, reason: `${n} room${n === 1 ? "" : "s"} on the plan ${n === 1 ? "has" : "have"} no name — name ${n === 1 ? "it" : "them"} or mark ${n === 1 ? "it" : "them"} out of scope.`, fix: { label: "Name rooms on the plan", href: `/project/${projectId}/plan` } };
+    }
     case "project_not_found":
       return { code, reason: "Project not found." };
     default:

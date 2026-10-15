@@ -275,8 +275,8 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
     revealLine(row.lineKey);
   };
   /** An unmatched price's actions: Remove (stop applying, kept on record) or Re-apply to a chosen line. */
-  const onIssueAction = async (row: IssueRow, action: "release" | "retarget") => {
-    if (!row.correctionId) return;
+  const onIssueAction = async (row: IssueRow, action: NonNullable<IssueRow["actions"]>[number]["key"]) => {
+    if (!row.correctionId || (action !== "release" && action !== "retarget")) return;
     setIssueError(null);
     if (action === "retarget") {
       setRetarget({ correctionId: row.correctionId, item: row.title.replace(/^Your price for /, "").replace(/ no longer matches a line$/, "") });

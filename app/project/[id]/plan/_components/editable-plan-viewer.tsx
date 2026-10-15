@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -18,6 +19,9 @@ import polygonClipping from "polygon-clipping";
 
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { polygonArea } from "@/lib/plan/polygon";
+import { fitRoomLabel } from "@/lib/plan/label-fit";
+import { snapVertexSquare } from "@/lib/plan/plan-rules";
+import { labelLanguageMismatch } from "@/lib/plan/room-names";
 import { trimOverlappingRooms, type Unresolved } from "@/lib/plan/trim-overlaps";
 import { Icon } from "@/components/blueprint/Icon";
 
@@ -385,6 +389,10 @@ export function EditablePlanViewer({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
+  // Rule 11 (15 Oct): a room renamed in English this session keeps its Arabic
+  // label until somebody updates it — flagged here; the plan check flags a
+  // pair it can tell disagree (lib/plan/room-names.ts) after the save too.
+  const [arStale, setArStale] = useState<Set<string>>(() => new Set());
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -679,11 +687,14 @@ export function EditablePlanViewer({
         } else {
           // Move only the grabbed vertex (clamped into the viewBox).
           const vi = drag.vertexIndex ?? 0;
-          nextPoly = drag.startPolygon.map((p, i) =>
-            i === vi
-              ? snap([clampToView(p[0] + dx, VIEW_W), clampToView(p[1] + dy, VIEW_H)] as Point)
-              : ([p[0], p[1]] as Point),
+          const n = drag.startPolygon.length;
+          // Rule 9 (15 Oct): the edges it meets snap square within 5°.
+          const moved = snapVertexSquare(
+            drag.startPolygon[(vi - 1 + n) % n]!,
+            snap([clampToView(drag.startPolygon[vi]![0] + dx, VIEW_W), clampToView(drag.startPolygon[vi]![1] + dy, VIEW_H)] as Point),
+            drag.startPolygon[(vi + 1) % n]!,
           );
+          nextPoly = drag.startPolygon.map((p, i) => (i === vi ? moved : ([p[0], p[1]] as Point)));
         }
         return { ...r, polygon: nextPoly, area_m2: recomputeArea(nextPoly) };
       }),
@@ -768,6 +779,20 @@ export function EditablePlanViewer({
     );
   };
 
+  const setArabicName = (roomId: string, nameAr: string) => {
+    const next = nameAr.trim() || null;
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room || (room.name_ar ?? null) === next) return;
+    snapshot();
+    correctionCounts.current.relabel += 1;
+    setRooms((current) => current.map((r) => (r.id === roomId ? { ...r, name_ar: next } : r)));
+    setArStale((s) => {
+      const n = new Set(s);
+      n.delete(roomId);
+      return n;
+    });
+  };
+
   const toggleUnroofed = (roomId: string) => {
     snapshot();
     setRooms((current) =>
@@ -805,6 +830,8 @@ export function EditablePlanViewer({
   const commitRename = () => {
     if (!renamingId) return;
     const next = renameDraft.trim() || "Room";
+    const was = rooms.find((r) => r.id === renamingId);
+    if (was && was.name_en !== next && was.name_ar?.trim()) setArStale((s) => new Set(s).add(renamingId));
     snapshot();
     correctionCounts.current.relabel += 1;
     setRooms((current) =>
@@ -1141,6 +1168,30 @@ export function EditablePlanViewer({
                 <Icon name={selectedRoom.unroofed ? "wb_sunny" : "roofing"} className="text-[16px]" />
                 {selectedRoom.unroofed ? "Unroofed" : "Roofed"}
               </button>
+              {/* Rule 11: the Arabic label, editable beside the English one. */}
+              <label htmlFor="room-name-ar" className="sr-only">
+                Arabic name
+              </label>
+              <input
+                key={`ar-${selectedRoom.id}-${selectedRoom.name_ar ?? ""}`}
+                id="room-name-ar"
+                dir="rtl"
+                lang="ar"
+                defaultValue={selectedRoom.name_ar ?? ""}
+                placeholder="الاسم بالعربية"
+                onBlur={(e) => setArabicName(selectedRoom.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                aria-describedby={arStale.has(selectedRoom.id) || labelLanguageMismatch(selectedRoom.name_en, selectedRoom.name_ar) ? "room-name-ar-stale" : undefined}
+                className={`${FIELD} w-36`}
+                data-room-name-ar=""
+              />
+              {arStale.has(selectedRoom.id) || labelLanguageMismatch(selectedRoom.name_en, selectedRoom.name_ar) ? (
+                <span id="room-name-ar-stale" className="t-label-md text-bp-ink-primary" data-ar-stale="">
+                  Update the Arabic name too
+                </span>
+              ) : null}
             </span>
           )}
           {selectedId && (
@@ -1523,91 +1574,57 @@ export function EditablePlanViewer({
                   ) : (
                     <g className="room-label">
                       {(() => {
-                        const hasAr = !!room.name_ar?.trim();
-                        // Layout per width bucket. The y values position the
-                        // EN baseline so the stack reads visually centred:
-                        //   wide   (≥120): EN, AR (if any), area
-                        //   medium (70–119): EN, area
-                        //   narrow (<70):    area only
-                        const wide = rectWPx >= 120;
-                        const medium = rectWPx >= 70 && rectWPx < 120;
-                        const enY = wide ? (hasAr ? cy - 14 : cy - 8) : medium ? cy - 6 : cy;
-                        const arY = wide && hasAr ? cy + 4 : null;
-                        const areaY = wide
-                          ? hasAr
-                            ? cy + 22
-                            : cy + 10
-                          : medium
-                            ? cy + 10
-                            : cy + 4;
+                        // Rule 12 (15 Oct): the label is measured against the room's box and
+                        // reduced until it fits — long size line → area, smaller type, an
+                        // abbreviated name, no Arabic, the area alone (lib/plan/label-fit.ts).
+                        const fitted = fitRoomLabel({
+                          name: room.name_en,
+                          nameAr: room.name_ar,
+                          longMeta: inlineLine,
+                          area: areaLabel,
+                          widthPx: rectWPx,
+                          heightPx: rectHPx,
+                        });
+                        const total = fitted.lines.reduce((h, l) => h + l.fontPx * 1.35, 0);
+                        let y = cy - total / 2;
+                        const rename = editing
+                          ? (e: ReactMouseEvent) => {
+                              e.stopPropagation();
+                              beginRename(room);
+                            }
+                          : undefined;
                         return (
                           <>
-                            {(wide || medium) && (
-                              <text
-                                x={cx}
-                                y={enY}
-                                textAnchor="middle"
-                                dominantBaseline="middle"
-                                fontSize="13"
-                                fontWeight={500}
-                                fill={INK}
-                                pointerEvents={editing ? undefined : "none"}
-                                style={{
-                                  cursor: editing ? "text" : "pointer",
-                                  fontFamily: SVG.sans,
-                                }}
-                                onPointerDown={
-                                  editing
-                                    ? (e) => onRoomPointerDown(e, room)
-                                    : undefined
-                                }
-                                onDoubleClick={
-                                  editing
-                                    ? (e) => {
-                                        e.stopPropagation();
-                                        beginRename(room);
-                                      }
-                                    : undefined
-                                }
-                              >
-                                {room.name_en}
-                              </text>
-                            )}
-                            {arY != null && (
-                              <text
-                                x={cx}
-                                y={arY}
-                                textAnchor="middle"
-                                dominantBaseline="middle"
-                                fontSize="13"
-                                fontWeight={500}
-                                fill={INK}
-                                pointerEvents="none"
-                                style={{
-                                  fontFamily: "var(--font-ibm-plex-arabic), var(--font-plex-sans), sans-serif",
-                                  direction: "rtl",
-                                }}
-                              >
-                                {room.name_ar}
-                              </text>
-                            )}
-                            <text
-                              x={cx}
-                              y={areaY}
-                              textAnchor="middle"
-                              dominantBaseline="middle"
-                              fontSize="11"
-                              fontWeight={500}
-                              fill={INK_SECONDARY}
-                              pointerEvents="none"
-                              style={{
-                                fontFamily:
-                                  SVG.mono,
-                              }}
-                            >
-                              {wide && !hasAr ? inlineLine : areaLabel}
-                              {medium ? ` · ${dimsLine}` : ""}
-                            </text>
+                            <title>{[room.name_en, room.name_ar].filter(Boolean).join(" · ")}</title>
+                            {fitted.lines.map((l, i) => {
+                              const lineY = y + (l.fontPx * 1.35) / 2;
+                              y += l.fontPx * 1.35;
+                              const en = l.kind === "en";
+                              const named = en || (l.kind === "meta" && !fitted.lines.some((x) => x.kind === "en"));
+                              return (
+                                <text
+                                  key={i}
+                                  x={cx}
+                                  y={lineY}
+                                  textAnchor="middle"
+                                  dominantBaseline="middle"
+                                  fontSize={l.fontPx}
+                                  fontWeight={500}
+                                  fill={l.kind === "meta" ? INK_SECONDARY : INK}
+                                  pointerEvents={named && editing ? undefined : "none"}
+                                  data-room-label={l.kind}
+                                  style={{
+                                    cursor: named && editing ? "text" : undefined,
+                                    fontFamily: l.kind === "meta" ? SVG.mono : l.kind === "ar" ? "var(--font-ibm-plex-arabic), var(--font-plex-sans), sans-serif" : SVG.sans,
+                                    direction: l.kind === "ar" ? "rtl" : undefined,
+                                  }}
+                                  onPointerDown={named && editing ? (e) => onRoomPointerDown(e, room) : undefined}
+                                  onDoubleClick={named ? rename : undefined}
+                                >
+                                  {l.text}
+                                </text>
+                              );
+                            })}
                           </>
                         );
                       })()}

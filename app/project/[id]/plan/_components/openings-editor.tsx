@@ -12,8 +12,13 @@
 //
 // Walls come from `deriveWallSegments` — the same derivation buildPlanGraph
 // prices from — so the wall the user picks is the wall the take-off deducts.
-// Wall ids stay volatile by contract; `wall_ref` is persisted as a hint and the
-// graph re-snaps by position at build time.
+// Wall ids stay volatile by contract (an outline edit renumbers them), so an
+// opening is drawn and dragged on the wall it SITS on (by position, within
+// 0.15 m) and never on its stored `wall_ref` — that hint went stale on
+// Jumeirah Parks and drew windows across their walls (15 Oct). The hard plan
+// rules (lib/plan/plan-rules.ts) refuse an add, a drop or a resize, with the
+// reason; an opening on no wall is drawn as "Needs a wall" and can be dragged
+// back onto one.
 // =============================================================================
 
 import {
@@ -39,9 +44,11 @@ import {
   type Pt,
   type RawRoomInput,
 } from "@/lib/overlays/viewbox";
+import { roomNameLabel as nameLabel } from "./label-render";
 import { Icon } from "@/components/blueprint/Icon";
 import { OPENINGS_CHANGED_EVENT } from "@/components/blueprint/plan/OpeningsCheckPanel";
 import { isUnconfirmedDetected, type DetectionMeta } from "@/lib/plan/openings-vocab";
+import { END_CLEAR_M, hardProblemFor, ON_WALL_TOL_M, wallAt, type RuleOpening, type RuleRoom } from "@/lib/plan/plan-rules";
 
 import {
   CANVAS_FRAME,
@@ -86,10 +93,13 @@ const KINDS: { key: OpeningKind; label: string; glyph: string }[] = [
 
 /** Minimum wall length (m) that can still take an opening of the given width. */
 function fitsOnWall(wallLenM: number, widthM: number): boolean {
-  return wallLenM >= widthM;
+  return wallLenM >= widthM + 2 * END_CLEAR_M;
 }
 
 const HISTORY_LIMIT = 20;
+
+/** An opening as the plan rules read it. */
+const asRule = (o: PlanOpening): RuleOpening => ({ id: o.id, kind: o.kind, width_mm: o.width_mm, height_mm: o.height_mm, sill_mm: o.sill_mm, position: o.position, room_id: o.room_id, detection: o.detection });
 
 /**
  * One reversible step. Because every edit persists immediately (the overlay
@@ -125,7 +135,8 @@ export function OpeningsEditor({
 }) {
   const fit = useMemo(() => fitRooms(rooms), [rooms]);
   const walls = useMemo(
-    () => deriveWallSegments(rooms.map((r) => ({ id: r.id, polygon: r.polygon }))),
+    // The same walls the BoQ prices: an open garden edge is not a wall (G1).
+    () => deriveWallSegments(rooms.map((r) => ({ id: r.id, polygon: r.polygon, room_type: r.room_type, unroofed: r.unroofed ?? null }))),
     [rooms],
   );
 
@@ -175,6 +186,7 @@ export function OpeningsEditor({
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{
     id: string;
+    /** The wall under the pointer — it can change mid-drag (snaps to the nearest wall). */
     wall: RawWallSegment;
     moved: boolean;
     pointerId: number;
@@ -230,22 +242,38 @@ export function OpeningsEditor({
     ];
   }, []);
 
-  /** Resolve an opening to the wall it sits on (by ref, else nearest). */
-  const wallFor = useCallback(
-    (o: PlanOpening): RawWallSegment | null => {
-      if (o.wall_ref) {
-        const w = wallById.get(o.wall_ref);
-        if (w) return w;
-      }
-      if (!o.position) return null;
+  /** The nearest wall to a point (any distance). */
+  const nearestWallTo = useCallback(
+    (p: Pt): { w: RawWallSegment; d: number } | null => {
       let best: { w: RawWallSegment; d: number } | null = null;
       for (const w of walls) {
-        const { dist } = projectOntoSegment(o.position, w.a, w.b);
+        const { dist } = projectOntoSegment(p, w.a, w.b);
         if (!best || dist < best.d) best = { w, d: dist };
       }
-      return best?.w ?? null;
+      return best;
     },
-    [walls, wallById],
+    [walls],
+  );
+
+  /** The wall an opening SITS on — by its position, within 0.15 m — or null ("Needs a wall"). */
+  const wallFor = useCallback(
+    (o: PlanOpening): RawWallSegment | null => {
+      return o.position ? wallAt(walls, o.position, ON_WALL_TOL_M * rawPerM) : null;
+    },
+    [walls, rawPerM],
+  );
+
+  // The plan rules, in the editor: every hard rule for one opening at a proposed place.
+  const ruleRooms: RuleRoom[] = useMemo(
+    () => rooms.map((r) => ({ id: r.id, name_en: r.name_en, room_type: r.room_type, polygon: r.polygon, unroofed: r.unroofed ?? null })),
+    [rooms],
+  );
+  const refusal = useCallback(
+    (cand: PlanOpening): string | null => {
+      const p = hardProblemFor(asRule(cand), openings.filter((x) => x.id !== cand.id).map(asRule), ruleRooms, 1 / rawPerM);
+      return p ? p.message : null;
+    },
+    [openings, ruleRooms, rawPerM],
   );
 
   const selectedOpening =
@@ -282,6 +310,11 @@ export function OpeningsEditor({
       wall.a[0] + (wall.b[0] - wall.a[0]) * t,
       wall.a[1] + (wall.b[1] - wall.a[1]) * t,
     ];
+    const no = refusal({ id: "new", plan_id: planId, room_id: wall.roomIds[0] ?? null, wall_ref: wall.id, kind, ...def, position, along_offset: t, source: "user_drawn", derived: true, confirmed_at: null, detection: null });
+    if (no) {
+      setError(no);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -418,7 +451,8 @@ export function OpeningsEditor({
   ) => {
     e.stopPropagation();
     setSelectedOpeningId(o.id);
-    const wall = wallFor(o);
+    setError(null);
+    const wall = wallFor(o) ?? (o.position ? nearestWallTo(o.position)?.w ?? null : null);
     if (wall) setSelectedWallId(wall.id);
     if (readOnly || !wall) return;
     dragRef.current = {
@@ -442,11 +476,14 @@ export function OpeningsEditor({
     if (!d || d.pointerId !== e.pointerId) return;
     d.moved = true;
     const raw = fit.toRaw(clientToViewBox(e.clientX, e.clientY));
-    // Constrain to the wall: project, then clamp so the leaf stays on-wall.
+    // Rule 1: it snaps to the wall under the pointer (within 0.6 m), else stays on its wall.
+    const under = nearestWallTo(raw);
+    if (under && under.d <= 0.6 * rawPerM) d.wall = under.w;
     const { t } = projectOntoSegment(raw, d.wall.a, d.wall.b);
     const o = openings.find((x) => x.id === d.id);
     const wallLen = Math.hypot(d.wall.b[0] - d.wall.a[0], d.wall.b[1] - d.wall.a[1]);
-    const halfT = o && wallLen > 0 ? (o.width_mm / 1000) * rawPerM / 2 / wallLen : 0;
+    // Rule 3: the leaf stays 0.1 m clear of each end.
+    const halfT = o && wallLen > 0 ? Math.min(0.5, ((o.width_mm / 1000 / 2 + END_CLEAR_M) * rawPerM) / wallLen) : 0;
     const ct = Math.max(halfT, Math.min(1 - halfT, t));
     const position: Pt = [
       d.wall.a[0] + (d.wall.b[0] - d.wall.a[0]) * ct,
@@ -463,6 +500,13 @@ export function OpeningsEditor({
     if (!d || !d.moved) return;
     const o = openings.find((x) => x.id === d.id);
     if (!o || !o.position) return;
+    const no = refusal({ ...o, room_id: d.wall.roomIds[0] ?? o.room_id });
+    if (no) {
+      // Hard rule: back where it was, with the reason.
+      setOpenings((cur) => cur.map((x) => (x.id === d.id ? { ...x, position: d.from.position, along_offset: d.from.along_offset } : x)));
+      setError(`Not moved: ${no}`);
+      return;
+    }
     // Persist position only — a drag must never clear the derived flag.
     void patchOpening(o.id, {
       position: o.position,
@@ -583,17 +627,21 @@ export function OpeningsEditor({
                 fillOpacity={0.5}
                 stroke="none"
               />
-              <text
-                x={r.pts.reduce((s, p) => s + p[0], 0) / r.pts.length}
-                y={r.pts.reduce((s, p) => s + p[1], 0) / r.pts.length}
-                textAnchor="middle"
-                fontSize={13}
-                fill={SVG.inkTertiary}
-                style={{ fontFamily: SVG.sans, fontWeight: 500 }}
-                pointerEvents="none"
-              >
-                {r.name_en}
-              </text>
+              {nameLabel(r, (nl) => (
+                <text
+                  x={nl.x}
+                  y={nl.y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={nl.fontPx}
+                  fill={SVG.inkTertiary}
+                  style={{ fontFamily: SVG.sans, fontWeight: 500 }}
+                  pointerEvents="none"
+                >
+                  <title>{r.name_en}</title>
+                  {nl.text}
+                </text>
+              ), 13)}
             </g>
           ))}
 
@@ -638,7 +686,20 @@ export function OpeningsEditor({
           {/* Openings — standard architectural notation. */}
           {openings.map((o) => {
             const wall = wallFor(o);
-            if (!wall || !o.position) return null;
+            if (!o.position) return null;
+            if (!wall) {
+              // Rule 1/2: on no wall — out of the BoQ and the renders until it is put back on one.
+              const c = fit.toViewBox(o.position);
+              return (
+                <g key={o.id} onPointerDown={(e) => onOpeningPointerDown(e, o)} className={readOnly ? undefined : "cursor-grab"} style={{ touchAction: "none" }} data-needs-wall={o.id}>
+                  <title>{`${o.kind} — needs a wall: drag it onto one`}</title>
+                  <circle cx={c[0]} cy={c[1]} r={10} fill={SVG.surface} stroke={o.id === selectedOpeningId ? SVG.brass : SVG.ink} strokeWidth={1.5} strokeDasharray="3 2" />
+                  <text x={c[0]} y={c[1] + 0.5} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill={SVG.ink} style={{ fontFamily: SVG.mono }} pointerEvents="none">
+                    !
+                  </text>
+                </g>
+              );
+            }
             return (
               <OpeningGlyph
                 key={o.id}
@@ -669,7 +730,14 @@ export function OpeningsEditor({
         <OpeningProperties
           key={`${selectedOpening.id}:${selectedOpening.width_mm}:${selectedOpening.height_mm}:${selectedOpening.sill_mm}`}
           opening={selectedOpening}
+          needsWall={!wallFor(selectedOpening)}
           onChange={(patch) => {
+            const no = refusal({ ...selectedOpening, ...(patch as Partial<PlanOpening>) });
+            if (no) {
+              setError(`Not changed: ${no}`);
+              return;
+            }
+            setError(null);
             // Inverse of a dimension edit: put back the exact previous size.
             // If it was derived, reset_dims is the only honest way back —
             // writing derived:false..true by hand would bypass the server rule.
@@ -866,8 +934,11 @@ function OpeningProperties({
   onChange,
   onDelete,
   onConfirm,
+  needsWall = false,
 }: {
   opening: PlanOpening;
+  /** Rule 1/2: on no wall — out of the BoQ and the renders. */
+  needsWall?: boolean;
   onChange: (patch: Record<string, unknown>) => void;
   onDelete: () => void;
   /** R10b: present for an opening found on the drawing and not yet confirmed. */
@@ -911,6 +982,11 @@ function OpeningProperties({
             </option>
           ))}
         </select>
+        {needsWall && (
+          <span className={TAG} data-needs-wall-tag="">
+            Needs a wall — drag it onto one
+          </span>
+        )}
         <span className={TAG}>
           {o.source === "parsed" ? "From parse" : o.source === "detected" ? (o.confirmed_at ? "Found on the drawing · confirmed" : "Found on the drawing · not confirmed") : "User drawn"}
         </span>
