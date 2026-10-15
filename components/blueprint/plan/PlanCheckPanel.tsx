@@ -8,7 +8,7 @@
 // detector, lib/plan/plan-check.ts over lib/plan/overlaps.ts). The panel says
 // so as the inverse block — how many pairs, how much floor is counted twice,
 // what it would do to the price — with the two ways out: Fix overlaps (the
-// editor's own separation, then Save) and Re-run parse (a parsed drawing
+// editor trims shared floor, no room moves, then Save) and Re-run parse (a parsed drawing
 // only). The overlaps are listed largest first; choosing one selects BOTH
 // rooms on the canvas. Below, what is blocked downstream — the rail's own
 // reasons, never a rule of its own.
@@ -21,6 +21,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import type { Coverage } from "@/lib/plan/coverage";
 import type { PlanCheckPair } from "@/lib/plan/plan-check";
 
 import { Button } from "../Button";
@@ -38,9 +39,11 @@ export interface PlanCheckPanelProps {
   /** Downstream steps the plan blocks, with the rail's reason. */
   blocked: { step: string; reason: string }[];
   summary: { rooms: number; area: string; label: string };
+  /** 15 Oct: rooms against the reading's whole-floor estimate (lib/plan/coverage.ts). */
+  coverage?: Coverage | null;
 }
 
-export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, summary }: PlanCheckPanelProps) {
+export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, summary, coverage }: PlanCheckPanelProps) {
   const router = useRouter();
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,7 +84,7 @@ export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, s
               </Button>
             ) : null}
           </div>
-          <p className="t-label-md mt-3 opacity-80">Fix overlaps moves rooms apart without reshaping them; then save. Nothing is priced until no two rooms share floor.</p>
+          <p className="t-label-md mt-3 opacity-80">Fix overlaps trims the shared floor from one room of each pair — no room moves; then save. Nothing is priced until no two rooms share floor.</p>
           {error ? (
             <p role="alert" className="t-body-sm mt-2">
               {error}
@@ -99,6 +102,19 @@ export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, s
           </p>
         </section>
       )}
+
+      {coverage?.warn ? (
+        <section className="border border-bp-line-strong bg-bp-surface-raised p-5" aria-labelledby="coverage-h" data-plan-coverage="warn">
+          <h2 id="coverage-h" className="t-label-caps flex items-center gap-2 text-bp-ink-primary">
+            <Icon name="flag" size={18} />
+            PLAN CHECK · A ROOM MAY BE MISSING
+          </h2>
+          <p className="t-body-sm mt-3 text-bp-ink-primary">{coverage.sentence}</p>
+          <p className="t-label-md mt-2 text-bp-ink-secondary">
+            The whole-floor figure is the reading&rsquo;s own estimate of the drawing. Add the missing space on the Plan layer, or re-run the parse if a room was not read.
+          </p>
+        </section>
+      ) : null}
 
       {pairs.length ? (
         <section aria-labelledby="overlaps-h">

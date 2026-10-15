@@ -7,6 +7,7 @@ import { Icon } from "@/components/blueprint/Icon";
 import { OpeningsCheckPanel } from "@/components/blueprint/plan/OpeningsCheckPanel";
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
 import type { DetectionRun } from "@/lib/plan/openings-vocab";
+import { floorCoverage, readingFloorEstimate } from "@/lib/plan/coverage";
 import { PlanRoomFocus } from "@/components/blueprint/plan/PlanRoomFocus";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
 import { FIRM_STEPS, OWNER_STEPS } from "@/lib/journey";
@@ -314,6 +315,7 @@ export default async function PlanPage({
               canReparse={!authored && Boolean(plan.pdf_url)}
               blocked={blocked}
               summary={{ rooms: roomList.length, area: formatM2(totalArea), label: unit }}
+              coverage={authored ? null : floorCoverage(roomList, readingFloorEstimate(plan.parsed_json))}
             />
 
             {/* R10b (§7.5): "We found 2 windows and an opening to the kitchen — correct?" */}

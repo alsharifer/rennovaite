@@ -748,6 +748,24 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
   `node scripts/r10b-openings-check.mjs [port] [--keep]`; accuracy over a
   read-only plan dump: `scripts/r10b-detect-accuracy.ts <dump.json> <outDir>`.
 
+### Plan geometry guards (15 Oct)
+
+- **"Fix overlaps" never moves a room** (`lib/plan/trim-overlaps.ts`, the
+  editor's toolbar and the plan check's "Fix overlaps · N"): the shared floor
+  is TRIMMED from one room of each pair (the surer room keeps it, then the
+  smaller — the parse repair's rule); a room only loses area and stays inside
+  its own outline (`staysWithin`); a room it would remove or a hole it would cut
+  is reported, not done. The old rigid push (`lib/plan/separate.ts`) is deleted
+  — it walked prod Mudon's rooms off the drawing.
+- **Floor coverage** (`lib/plan/coverage.ts`): the plan check warns "Rooms cover
+  X of ~Y m² — a room may be missing" below 90% of the reading's whole-floor
+  estimate (`parse.provider_total_area_m2`); no estimate, no check.
+- **R10c cameras** (`lib/render/cameras.ts`, pure): arms = the fewest maximal
+  rectangles; an arm counts when both sides of the floor it adds are ≥ 1.5 m;
+  < 2 counting arms → 2 views from the main arm's ends, else one per arm, max
+  3; every camera inside its room with ≥ 0.4 m to every wall, else dropped.
+  K_BACKLOG → "Plan geometry" / "R10c" has the measurements and open items.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

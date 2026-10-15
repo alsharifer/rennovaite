@@ -18,7 +18,7 @@ import polygonClipping from "polygon-clipping";
 
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { polygonArea } from "@/lib/plan/polygon";
-import { separateOverlappingRooms } from "@/lib/plan/separate";
+import { trimOverlappingRooms } from "@/lib/plan/trim-overlaps";
 import { Icon } from "@/components/blueprint/Icon";
 
 import {
@@ -171,27 +171,14 @@ function bboxOf(points: Point[]): {
   return { xL, yT, xR, yB };
 }
 
-// [x, y, w, h] from a polygon's bounding box. x/y is the top-left
-// corner; w/h are the bbox extents. Reused by the dimensions display, the
-// overlap-detection effect, and the separation algorithm.
-function polygonToRect(
-  polygon: Point[],
-): [number, number, number, number] {
-  const bb = bboxOf(polygon);
-  return [bb.xL, bb.yT, bb.xR - bb.xL, bb.yB - bb.yT];
-}
-
 // Convert a single linear distance in viewBox pixels to metres, given
 // the m² / px² scale factor. One decimal place.
 function pixelToM(px: number, scale: number): number {
   return Math.round(px * Math.sqrt(scale) * 10) / 10;
 }
 
-// The separation algorithm itself lives in lib/plan/separate.ts so it can be
-// unit-tested outside this client component — that is where "zero overlaps +
-// every area preserved" is pinned, and where the one non-shape-preserving case
-// (the viewBox clamp flattening an N-vertex room to its bbox) is documented.
-// `Room` structurally satisfies the module's generic `SeparableRoom`.
+// "Fix overlaps" lives in lib/plan/trim-overlaps.ts (unit-tested outside this
+// client component): it trims shared floor and never moves a room.
 
 type Fit = {
   rooms: Room[];
@@ -839,39 +826,30 @@ export function EditablePlanViewer({
       flashInfo("No overlaps detected");
       return;
     }
-    snapshot();
-    const adjusted = separateOverlappingRooms(visible, VIEW_W, VIEW_H);
-    // Recompute area_m2 in case clamp shrunk a too-large room.
-    const adjustedWithAreas = adjusted.map((r) => ({
-      ...r,
-      area_m2: recomputeArea(r.polygon),
-    }));
-    // Count rooms whose bbox actually shifted.
-    let movedCount = 0;
-    for (let i = 0; i < visible.length; i++) {
-      const before = polygonToRect(visible[i].polygon);
-      const after = polygonToRect(adjustedWithAreas[i].polygon);
-      if (
-        before[0] !== after[0] ||
-        before[1] !== after[1] ||
-        before[2] !== after[2] ||
-        before[3] !== after[3]
-      ) {
-        movedCount++;
-      }
+    // 15 Oct: Fix overlaps NEVER moves a room. It trims the shared floor from
+    // one room of each pair (lib/plan/trim-overlaps.ts) — the old rigid push
+    // walked prod Mudon's east rooms off the building.
+    const { rooms: trimmedRooms, trimmed, unresolved } = trimOverlappingRooms(visible);
+    if (trimmed.length === 0 && unresolved.length === 0) {
+      flashInfo("No overlaps detected");
+      return;
     }
-    // Merge the adjusted visible rooms back into the full rooms array
-    // (preserving any deleted ones).
+    snapshot();
+    const changed = new Set(trimmed.map((t) => t.id));
     const adjustedById = new Map(
-      adjustedWithAreas.map((r) => [r.id, r] as const),
+      trimmedRooms.filter((r) => changed.has(r.id)).map((r) => [r.id, { ...r, area_m2: recomputeArea(r.polygon) }] as const),
     );
     setRooms((current) =>
       current.map((r) => (r.isDeleted ? r : (adjustedById.get(r.id) ?? r))),
     );
+    const nameOf = (id: string) => visible.find((r) => r.id === id)?.name_en ?? "a room";
+    const left = unresolved.length
+      ? ` ${unresolved.length} left: ${unresolved.map((u) => `${nameOf(u.a_id)} ${u.reason === "would_cut_hole" ? "contains" : "is covered by"} ${nameOf(u.b_id)}`).join("; ")} — split or reshape by hand.`
+      : "";
     flashInfo(
-      movedCount > 0
-        ? `Adjusted ${movedCount} ${movedCount === 1 ? "room" : "rooms"} to remove overlaps`
-        : "No overlaps detected",
+      changed.size > 0
+        ? `Trimmed ${changed.size} ${changed.size === 1 ? "room" : "rooms"} where they overlapped — nothing moved.${left}`
+        : `Nothing trimmed.${left}`,
     );
   }, [rooms, snapshot, recomputeArea, flashInfo]);
 
