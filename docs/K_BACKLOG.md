@@ -99,12 +99,44 @@ says where it is and why it waits. Newest first.
     (there are none), so each door deducts from one room's wall face only.
   - The fix is a hand-corrected outline on 01 Plan (safe now that Fix overlaps
     never moves a room) or better parsing (this backlog) — the owner's call.
-- **Jumeirah Parks (prod) — confirmed widths read as measured.** All 19 found
-  openings were confirmed at 18:39 UTC on 14 Oct, under #109's rule, so every
-  width is `derived = false` (estimated, but reads as measured). Fix once the
-  follow-up (#110) is live: set `derived = true` on detected rows whose width
-  was not printed. Data change — APPROVED 15 Oct, to run once #110 has merged
-  (position and kind stay confirmed).
+- **Jumeirah Parks (prod) — confirmed widths: DONE 15 Oct.** After #110 merged
+  (03:52 UTC) the 19 detected openings were re-marked as estimates
+  (`derived = true`, `confirmed_at` kept) in one guarded statement. The owner's
+  later edits (08:55–09:01 UTC) are untouched: the archway they resized and the
+  two they drew read as measured.
+
+## Plan editor guardrails — audit of Jumeirah Parks (15 Oct, read-only)
+
+Rules in `lib/plan/plan-rules.ts` (CLAUDE.md → "Plan editor guardrails") run
+over prod as the owner left it (12 rooms, 16 openings):
+- **No opening had been left behind by the outline edits** — every one sits on
+  a wall (≤ 0.02 m). What looked wrong was the editor: it drew each opening
+  along the wall its stored `wall_ref` named, and outline edits renumber those
+  ids — 12 of 16 drawn on another wall, 4 of them across their own (Family
+  Room ↔ Kitchen archway, Living Room south window, Family Room top window, the
+  Bath door). Dragging used the same stale wall.
+- **The old powder-room door** (`7df86cda`, detected) sits on the Grass zone's
+  outer edge with nothing beyond. Gardens are exempt from the rules (ruled
+  15 Oct), so no rule names it — but the owner drew a new powder-room door
+  (`99fb3d42`) and this one is a duplicate to remove by hand.
+- **What the change does to prod BoQs** (scan 15 Oct, read-only; the stored
+  wall id never priced anything — the take-off always snapped by position, but
+  at ANY distance): Mudon pilot villa — 4 hand-drawn openings (2 windows, 2
+  doors, 2 Sep) now off every wall after the old Fix overlaps moved the rooms;
+  the current BoQ (5 Sep) deducted them from the nearest wall; a regenerate
+  drops them with the cause "4 openings need a wall". Jumeirah Parks Garden —
+  only the garden-edge door, not in its current BoQ (13 Oct). Regenerates are
+  the owner's call.
+- **Hard**: the 0.60 m Maid Room ↔ Entrance Foyer door crowds the end of its
+  1.35 m wall (rule 3).
+- **Blocks regenerate**: the two "New room" zones (deck 21.1 m², paving 15.2 m²).
+- **Soft**: the same door is under 0.70 m (rule 8); edges off square —
+  Entrance Foyer 4 (up to 6.4°), Kitchen 3 (up to 7.5°), Powder Room 2 (up to
+  11.4°), and 0.5–2° on Hall, Living Room, Grass and both New rooms; the Hall's
+  Arabic label still says غرفة الطعام (dining room).
+- None of rules 5, 6, 7: every room has a way in, both wet rooms have a door.
+  No archway is on a bathroom wall; what looked like one was an opening drawn
+  across its wall (which one is not recorded).
 
 ## R10c — plan-faithful renders: guards ruled 14–15 Oct (rules BUILT in `lib/render/cameras.ts`)
 

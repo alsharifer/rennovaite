@@ -25,7 +25,7 @@ export interface IssuesNavigatorProps {
   /** A row that names a line. */
   onRow?: (row: IssueRow) => void;
   /** K11: a row with its own actions (an unmatched price: Remove / Re-apply to…). */
-  onAction?: (row: IssueRow, action: "release" | "retarget") => void;
+  onAction?: (row: IssueRow, action: NonNullable<IssueRow["actions"]>[number]["key"]) => void;
   /** "Show only these lines" — present when the page can filter. */
   onlyThese?: { on: boolean; set: (on: boolean) => void };
   /** "Next issue J" — present when the page cycles issue lines. */

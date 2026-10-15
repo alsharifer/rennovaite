@@ -47,6 +47,22 @@ async function rows(db: SupabaseClient, build: () => PromiseLike<{ data: unknown
 const str = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v));
 const num = (v: unknown) => (v == null ? null : Number(v));
 
+/**
+ * 15 Oct: the openings each revision left out as "Needs a wall" are recorded on
+ * it (`openings_need_wall`; absent = none — every revision before the plan
+ * rules). When the set differs, the lines net of openings (plaster, paint, wet
+ * tiling) carry "N openings need a wall" / "N openings back on a wall".
+ */
+export function needsWallCause(from: unknown, to: unknown, atISO: string): RecordedCause | null {
+  const ids = (d: unknown) => new Set(Array.isArray((d as { openings_need_wall?: unknown } | null)?.openings_need_wall) ? ((d as { openings_need_wall: unknown[] }).openings_need_wall.map(String)) : []);
+  const a = ids(from), b = ids(to);
+  const out = [...b].filter((x) => !a.has(x)).length;
+  const back = [...a].filter((x) => !b.has(x)).length;
+  if (!out && !back) return null;
+  const parts = [out ? `${out} ${out === 1 ? "opening needs" : "openings need"} a wall` : null, back ? `${back} ${back === 1 ? "opening" : "openings"} back on a wall` : null].filter(Boolean);
+  return { kind: "openings_need_wall", at: atISO, summary: parts.join("; "), item_keys: [...OPENING_NET_ITEM_KEYS] };
+}
+
 export async function loadRecordedCauses(db: SupabaseClient, projectId: string, fromISO: string, toISO: string, toBoqId: string): Promise<RecordedCause[]> {
   const out: RecordedCause[] = [];
 

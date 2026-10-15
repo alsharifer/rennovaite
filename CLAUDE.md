@@ -786,6 +786,65 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
   3; every camera inside its room with ≥ 0.4 m to every wall, else dropped.
   K_BACKLOG → "Plan geometry" / "R10c" has the measurements and open items.
 
+### Plan editor guardrails (15 Oct)
+
+ONE rule set, `lib/plan/plan-rules.ts` (pure): the editor refuses on it, 01
+Plan lists it, the BoQ and the renders follow it. Tests:
+`lib/plan/__tests__/plan-rules.test.ts` (a test per rule + the Jumeirah Parks
+fixture `lib/plan/__fixtures__/jumeirah-parks-plan-15oct.json`); live:
+`node --env-file=.env.local scripts/plan-rules-check.mjs [port] [--shots=dir]`
+(scratch copy on dev, removed after).
+
+- **An opening sits on a room EDGE, by position** (`placeOpening`, ≤ 0.15 m),
+  never by its stored `wall_ref` — derived wall ids renumber with every outline
+  edit, and the Openings editor drew 12 of Jumeirah Parks' 16 openings along
+  the wrong wall (4 across theirs) and dragged them onto it. What is on each
+  side is probed 0.3 m out (`sides`), not matched edge for edge (hand-drawn
+  edges rarely agree to 0.0025 units). The editor draws an opening on
+  `wallAt(walls, position)` and derives walls with room types (an open garden
+  edge is not a wall).
+- **Hard** (the editor refuses an add / drop / resize with the reason inline —
+  `hardProblemFor`): 1 on a wall (snaps to the wall under the pointer); 2 its
+  wall shorter than it; 3 0.1 m clear each end, no overlap on one wall, height
+  ≤ ceiling (2.9 m), sill + height ≤ ceiling; 4 an archway between two rooms (a
+  terrace counts, a lawn does not), an outside door/window with nothing / a
+  terrace / a garden beyond. **"Needs a wall"** (rules 1–2): `derivePlanGraph`
+  and the render loader leave it out (`openingsOnWalls`); the editor draws a
+  dashed "!" marker that drags back onto a wall. Each revision records the ids
+  (`openings_need_wall` on the BoQ document, absent when none) and the diff
+  names the change on the lines net of openings: **"N openings need a wall"** /
+  "N openings back on a wall" (`needsWallCause`).
+- **Gardens are exempt** (ruled 15 Oct, `inGarden`): a gate, anything in a
+  garden wall (`context_id`), on a garden zone's edge or inside a garden zone —
+  no rule, never "Needs a wall", a plain marker in the editor. And
+  `buildPlanGraph` snaps an opening to a wall only within 0.15 m (before: any
+  distance — a door on a lawn's edge came off the nearest house wall).
+- **Openings move with their wall** (`lib/plan/opening-anchor.ts`):
+  `/api/update-plan` reads the old outlines and openings, fits the frame change
+  (one scale + offset over rooms that kept their corner count — a save can re-fit
+  the plan), and moves each opening to the same fraction along its edge's new
+  position (`openings_moved` in the response); an edge that is gone leaves it
+  off every wall.
+- **Soft** (listed; "Keep anyway" → `POST /api/plan-rules/keep` → the subject's
+  `spec.kept_rules`, Undo takes it back): 5 an archway / no door into a wet
+  room; 6 a window between two rooms; 7 no way into a room; 8 sizes (inside door
+  0.7–1.2 m, window ≤ 80% of its wall, archway ≥ 0.9 m); 9 edges off square
+  (the editor snaps a dragged corner square within 5° — `snapVertexSquare`);
+  11 the Arabic label naming another room (`lib/plan/room-names.ts`, flagged
+  only when both are recognised; the editor gained an Arabic name field, and a
+  rename in English flags it until updated).
+- **10 unnamed rooms block regenerate**: `loadPriceablePlan` refuses 409
+  `rooms_unnamed` for an in-scope "New room" — the rail, the button and the
+  route say the same.
+- **12 labels fit their room** (`lib/plan/label-fit.ts`): measured against the
+  room's box and reduced — area only, smaller type, an abbreviated name, no
+  Arabic, the area alone; the full name in a tooltip. Every layer.
+- **Where it shows**: the "PLAN RULES" block under the plan check
+  (`components/blueprint/plan/PlanRules.tsx`) and the top bar's "⚑ N TO FIX"
+  (`lib/plan/plan-issues.ts` → the K11 navigator, the step's own reason merged
+  in; the shell's one-row version is off on /plan as on /boq). A row selects its
+  room (switching to the Plan layer) or opening (the Openings layer).
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

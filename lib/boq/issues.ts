@@ -25,7 +25,7 @@ import { STAIRS_ASSUMED_NOTE } from "@/lib/plan/scope";
 
 import type { ReviewModel } from "./review-types";
 
-export type IssueGroupKey = "unmatched" | "unpriced" | "assumed" | "duplicates" | "derived" | "basis" | "step";
+export type IssueGroupKey = "unmatched" | "unpriced" | "assumed" | "duplicates" | "derived" | "basis" | "step" | "plan_blocks" | "plan_hard" | "plan_soft";
 
 export interface IssueRow {
   id: string;
@@ -41,7 +41,7 @@ export interface IssueRow {
   href: string | null;
   /** K11: an applied price that no longer matches a line — Remove / Re-apply to…. */
   correctionId?: string;
-  actions?: { key: "release" | "retarget"; label: string }[];
+  actions?: { key: "release" | "retarget" | "keep" | "show"; label: string }[];
 }
 
 export interface IssueGroup {
@@ -68,6 +68,9 @@ export const GROUP_TITLE: Record<IssueGroupKey, string> = {
   derived: "DERIVED — CONFIRM ON SITE",
   basis: "RATE BASIS",
   step: "THIS STEP",
+  plan_blocks: "BLOCKS REGENERATE",
+  plan_hard: "NOT ALLOWED — FIX ON THE PLAN",
+  plan_soft: "CHECK — OR KEEP ANYWAY",
 };
 
 /** The rail's own words for the unpriced lines — already the first group, so not repeated as the step's reason. */

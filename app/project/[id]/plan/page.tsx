@@ -8,6 +8,10 @@ import { OpeningsCheckPanel } from "@/components/blueprint/plan/OpeningsCheckPan
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
 import type { DetectionRun } from "@/lib/plan/openings-vocab";
 import { floorCoverage, readingFloorEstimate } from "@/lib/plan/coverage";
+import { stepIssues } from "@/lib/boq/issues";
+import { PlanRulesNavigator, PlanRulesPanel } from "@/components/blueprint/plan/PlanRules";
+import { planRuleIssues } from "@/lib/plan/plan-issues";
+import { checkPlan, metresPerUnit, type RuleOpening } from "@/lib/plan/plan-rules";
 import { matchPrintedSizes, planM2PerUnit2, printedSizeCheck, printedSizesFromParsedJson } from "@/lib/plan/printed-sizes";
 import { PlanRoomFocus } from "@/components/blueprint/plan/PlanRoomFocus";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
@@ -262,6 +266,25 @@ export default async function PlanPage({
   const canDetect = !authored && Boolean(plan.pdf_url) && !detectRes.error;
   const totalArea = plan.total_area_m2 ?? null;
   const unit = authored ? "zones" : "rooms";
+  // 15 Oct: the plan rules (lib/plan/plan-rules.ts) — the same checks the editor
+  // refuses on, listed here and in the top bar's navigator with the step's reason.
+  const [openingsRes, roomSpecRes] = await Promise.all([
+    planSb.from("plan_openings").select("id, kind, width_mm, height_mm, sill_mm, position, room_id, source, detection, spec, context_id").eq("plan_id", plan.id),
+    planSb.from("rooms").select("id, spec").eq("plan_id", plan.id),
+  ]);
+  const roomSpecs = new Map(((roomSpecRes.error ? [] : roomSpecRes.data) ?? []).map((r: { id: string; spec: Record<string, unknown> | null }) => [r.id, r.spec]));
+  const ruleMPerU = metresPerUnit(roomList, totalArea, authored ? plot?.width_m ?? null : null);
+  const ruleCheck = ruleMPerU
+    ? checkPlan({
+        rooms: roomList.filter((r) => !removedIds.has(r.id)).map((r) => ({ ...r, spec: roomSpecs.get(r.id) ?? null })),
+        openings: (openingsRes.error ? [] : (openingsRes.data ?? [])) as RuleOpening[],
+        mPerU: ruleMPerU,
+      })
+    : null;
+  const ruleViolations = ruleCheck?.violations ?? [];
+  const planStepKey = persona === "firm" ? "scope" : "plan";
+  const planStepLabel = stepDefs.find((s) => s.key === planStepKey)?.name ?? "Plan";
+  const ruleIssues = planRuleIssues(ruleViolations, stepIssues(rail?.statuses[planStepKey] ?? null, planStepLabel));
   // 15 Oct: rooms against the size the sheet prints — flagged past 10% at the
   // plan's own metre scale; Fix overlaps trims the room further over it.
   const printedById = authored ? new Map<string, number>() : matchPrintedSizes(roomList, printedSizesFromParsedJson(plan.parsed_json));
@@ -285,6 +308,7 @@ export default async function PlanPage({
   return (
     <div className="mx-auto max-w-[1600px] px-6 py-8 pb-16 lg:px-10" data-plan-page>
       {focusRoomId ? <PlanRoomFocus roomId={focusRoomId} /> : null}
+      <PlanRulesNavigator planId={plan.id} issues={ruleIssues} violations={ruleViolations} />
       <p className="t-label-caps text-bp-brass-text">{eyebrow}</p>
       <h1 className="t-heading-lg mt-2 text-bp-ink-primary">{authored ? "Your plan, as you draw it" : "The plan, as parsed"}</h1>
       <p className="t-label-md mt-2 font-bp-mono text-bp-ink-secondary">{meta.join(" · ")}</p>
@@ -328,6 +352,8 @@ export default async function PlanPage({
               coverage={authored ? null : floorCoverage(roomList, readingFloorEstimate(plan.parsed_json))}
               printed={printedFlags}
             />
+
+            <PlanRulesPanel planId={plan.id} violations={ruleViolations} />
 
             {/* R10b (§7.5): "We found 2 windows and an opening to the kitchen — correct?" */}
             {!authored ? (

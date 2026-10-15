@@ -31,6 +31,7 @@ import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { applyOwnBasis } from "@/lib/boq/own-basis";
 import { loadAppliedCorrections } from "@/lib/boq/own-basis-load";
 import { derivePlanGraph } from "@/lib/plan/derive";
+import { isUnnamed } from "@/lib/plan/plan-rules";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { getProposedGraph } from "@/lib/plan/snapshots";
 import { loadProjectFirmOverlay, type FirmOverlay } from "@/lib/rates/firm";
@@ -102,6 +103,8 @@ export interface BoqInputs {
   referenceRows: ReferenceRateRow[];
   /** K12: Q-11's context — a stairs room on the plan at all (in scope or not), and a villa / multi-level project. */
   stairs?: StairsContext;
+  /** 15 Oct: house openings the plan rules left out ("Needs a wall"), recorded on the document. */
+  openingsNeedWall?: string[];
 }
 
 /** Why a project cannot be priced: the HTTP status and body the route answers with. */
@@ -203,6 +206,12 @@ export async function loadPriceablePlan(
   }
   const scoped = rooms.filter((r) => !outOfScope.has(r.id));
   if (scoped.length === 0) return no(400, { error: "No room is in this renovation — choose the rooms on the plan.", code: "no_rooms", scope: true });
+  // Rule 10 (15 Oct): a room still called "New room" cannot be priced — name it, or
+  // leave it out of the renovation.
+  const unnamed = scoped.filter((r) => isUnnamed(r.name_en));
+  if (unnamed.length > 0) {
+    return no(409, { error: `${unnamed.length} room${unnamed.length === 1 ? " has" : "s have"} no name — name ${unnamed.length === 1 ? "it" : "them"} or mark ${unnamed.length === 1 ? "it" : "them"} out of scope on the plan.`, code: "rooms_unnamed", room_ids: unnamed.map((r) => r.id) });
+  }
   // K12 ruling (Q-11): a stairs room ANYWHERE on the plan (even left out) means the stairs are known;
   // with none, a villa / multi-level project keeps the allowance as an assumption.
   const stairs: StairsContext = { onPlan: rooms.some((r) => r.room_type === "stairs"), multiLevel: isMultiLevelProject(project) };
@@ -255,8 +264,10 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   // deciding a pricing path. The mapping now runs whenever the plan yields a
   // take-off; the viewer flag gates only the viewer and inspect UI.
   let takeoffItems: TakeoffItem[] = [];
+  let openingsNeedWall: string[] = [];
   try {
     const graph = await derivePlanGraph(projectId);
+    openingsNeedWall = graph.openings_need_wall ?? [];
     const proposed = await getProposedGraph(projectId);
     takeoffItems = quantifyPlan(graph, { proposed });
     if (!opts.dryRun) await persistTakeoffItems(projectId, takeoffItems, supabase);
@@ -272,7 +283,7 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   const referenceRows = await loadReferenceRows(supabase);
 
   return {
-    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs },
+    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs, ...(openingsNeedWall.length ? { openingsNeedWall } : {}) },
   };
 }
 
@@ -345,7 +356,10 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
   const owned = applyOwnBasis(gardened as unknown as Parameters<typeof applyOwnBasis>[0], await loadAppliedCorrections(supabase, projectId)).boq as unknown as typeof gardened;
   // L1: the firm's OH&P, LAST — its own summary line over the priced
   // subtotal, never inside a rate. A no-op without a firm book.
-  return applyOhp(owned, firm.ohpPct);
+  const priced = applyOhp(owned, firm.ohpPct);
+  // 15 Oct: the openings left out as "Needs a wall" — the record the revision
+  // diff names ("N openings need a wall"). Absent when none (every BoQ before).
+  return inputs.openingsNeedWall?.length ? { ...priced, openings_need_wall: inputs.openingsNeedWall } : priced;
 }
 
 /** Load + price in one call (the dry-run scripts and the invariance test). */

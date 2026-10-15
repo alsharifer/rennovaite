@@ -277,7 +277,7 @@ describe("the wiring (static)", () => {
     const at = src.indexOf("applyOwnBasis(gardened");
     expect(at).toBeGreaterThan(0);
     expect(src.indexOf("await loadAppliedCorrections(supabase, projectId)")).toBeGreaterThan(0);
-    expect(at).toBeLessThan(src.indexOf("return applyOhp(owned, firm.ohpPct)"));
+    expect(at).toBeLessThan(src.indexOf("applyOhp(owned, firm.ohpPct)"));
   });
 
   it("the inspector offers Add a price on an unpriced line and Apply / Save on a correction", () => {
