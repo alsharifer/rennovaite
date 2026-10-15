@@ -1,0 +1,547 @@
+{
+ "_note": "Mudon Al Naseem first-floor sheet (prod plan d09e105d) — the sheet's own data (labels, region, scale) and ONE raw model reading of its crop, 15 Oct 2026, before reconcile. Read-only capture for the alignment regression test.",
+ "page_pt": [
+  1684,
+  1191
+ ],
+ "region": [
+  376,
+  100,
+  908,
+  1100
+ ],
+ "scale": {
+  "scale": "1:100",
+  "ratio": 100,
+  "mm_per_pt": 35.27777777777777,
+  "sheet_format": "A2",
+  "source": "text-layer"
+ },
+ "raster_px": [
+  782,
+  1470
+ ],
+ "labels": [
+  {
+   "tag": "F01",
+   "name": "FAMILY AREA",
+   "dim_mm": [
+    3325,
+    3770
+   ],
+   "area_m2": 12.54,
+   "anchor_pt": [
+    705,
+    608.5
+   ]
+  },
+  {
+   "tag": "F02",
+   "name": "MASTER BEDROOM",
+   "dim_mm": [
+    3985,
+    5000
+   ],
+   "area_m2": 19.93,
+   "anchor_pt": [
+    573,
+    520.5
+   ]
+  },
+  {
+   "tag": "F03",
+   "name": "DRESS",
+   "dim_mm": [
+    2585,
+    1800
+   ],
+   "area_m2": 4.65,
+   "anchor_pt": [
+    573,
+    637.5
+   ]
+  },
+  {
+   "tag": "F04",
+   "name": "BATH",
+   "dim_mm": [
+    2585,
+    3400
+   ],
+   "area_m2": 8.79,
+   "anchor_pt": [
+    571,
+    714.5
+   ]
+  },
+  {
+   "tag": "F05",
+   "name": "PASSAGE",
+   "dim_mm": null,
+   "area_m2": null,
+   "anchor_pt": [
+    774,
+    612.5
+   ]
+  },
+  {
+   "tag": "F06",
+   "name": "BEDROOM 3",
+   "dim_mm": [
+    4000,
+    4200
+   ],
+   "area_m2": 16.8,
+   "anchor_pt": [
+    818,
+    457.5
+   ]
+  },
+  {
+   "tag": "F07",
+   "name": "TERRACE",
+   "dim_mm": null,
+   "area_m2": null,
+   "anchor_pt": [
+    812,
+    404.5
+   ]
+  },
+  {
+   "tag": "F08",
+   "name": "BATH",
+   "dim_mm": [
+    2700,
+    1750
+   ],
+   "area_m2": 4.72,
+   "anchor_pt": [
+    823,
+    530.5
+   ]
+  },
+  {
+   "tag": "F09",
+   "name": "TOILET",
+   "dim_mm": [
+    2000,
+    1350
+   ],
+   "area_m2": 2.7,
+   "anchor_pt": [
+    811,
+    686.5
+   ]
+  },
+  {
+   "tag": "F10",
+   "name": "BEDROOM-4",
+   "dim_mm": [
+    4000,
+    4800
+   ],
+   "area_m2": 19.2,
+   "anchor_pt": [
+    813,
+    758.5
+   ]
+  },
+  {
+   "tag": "F11",
+   "name": "F-BALCONY",
+   "dim_mm": null,
+   "area_m2": null,
+   "anchor_pt": [
+    815,
+    811
+   ]
+  },
+  {
+   "tag": "F12",
+   "name": "TERRACE",
+   "dim_mm": null,
+   "area_m2": null,
+   "anchor_pt": [
+    641,
+    852.5
+   ]
+  },
+  {
+   "tag": "F13",
+   "name": "F-BALCONY",
+   "dim_mm": null,
+   "area_m2": null,
+   "anchor_pt": [
+    585,
+    437.5
+   ]
+  }
+ ],
+ "vision_total_area_m2": 198.5,
+ "vision_rooms": [
+  {
+   "id": "master-bed-01",
+   "name_en": "Master Bedroom",
+   "name_ar": "غرفة النوم الرئيسية",
+   "room_type": "master_bedroom",
+   "area_m2": 19.93,
+   "polygon": [
+    [
+     0.14,
+     0.365
+    ],
+    [
+     0.42,
+     0.365
+    ],
+    [
+     0.42,
+     0.565
+    ],
+    [
+     0.14,
+     0.565
+    ]
+   ],
+   "confidence": 0.85
+  },
+  {
+   "id": "closet-01",
+   "name_en": "Dressing Room",
+   "name_ar": null,
+   "room_type": "closet",
+   "area_m2": 4.65,
+   "polygon": [
+    [
+     0.14,
+     0.565
+    ],
+    [
+     0.3,
+     0.565
+    ],
+    [
+     0.3,
+     0.635
+    ],
+    [
+     0.14,
+     0.635
+    ]
+   ],
+   "confidence": 0.8
+  },
+  {
+   "id": "bathroom-01",
+   "name_en": "Master Bath",
+   "name_ar": null,
+   "room_type": "ensuite",
+   "area_m2": 8.79,
+   "polygon": [
+    [
+     0.14,
+     0.635
+    ],
+    [
+     0.3,
+     0.635
+    ],
+    [
+     0.3,
+     0.785
+    ],
+    [
+     0.14,
+     0.785
+    ]
+   ],
+   "confidence": 0.8
+  },
+  {
+   "id": "living-01",
+   "name_en": "Family Area",
+   "name_ar": "منطقة العائلة",
+   "room_type": "living",
+   "area_m2": 12.54,
+   "polygon": [
+    [
+     0.42,
+     0.49
+    ],
+    [
+     0.58,
+     0.49
+    ],
+    [
+     0.58,
+     0.7
+    ],
+    [
+     0.42,
+     0.7
+    ]
+   ],
+   "confidence": 0.82
+  },
+  {
+   "id": "bedroom-01",
+   "name_en": "Bedroom 3",
+   "name_ar": "غرفة النوم 3",
+   "room_type": "bedroom",
+   "area_m2": 16.8,
+   "polygon": [
+    [
+     0.6,
+     0.365
+    ],
+    [
+     0.88,
+     0.365
+    ],
+    [
+     0.88,
+     0.565
+    ],
+    [
+     0.6,
+     0.565
+    ]
+   ],
+   "confidence": 0.85
+  },
+  {
+   "id": "bathroom-02",
+   "name_en": "Bath",
+   "name_ar": null,
+   "room_type": "bathroom",
+   "area_m2": 4.73,
+   "polygon": [
+    [
+     0.6,
+     0.565
+    ],
+    [
+     0.76,
+     0.565
+    ],
+    [
+     0.76,
+     0.665
+    ],
+    [
+     0.6,
+     0.665
+    ]
+   ],
+   "confidence": 0.78
+  },
+  {
+   "id": "foyer-01",
+   "name_en": "Passage",
+   "name_ar": null,
+   "room_type": "foyer",
+   "area_m2": 3.5,
+   "polygon": [
+    [
+     0.58,
+     0.565
+    ],
+    [
+     0.68,
+     0.565
+    ],
+    [
+     0.68,
+     0.665
+    ],
+    [
+     0.58,
+     0.665
+    ]
+   ],
+   "confidence": 0.72
+  },
+  {
+   "id": "powder-01",
+   "name_en": "Toilet",
+   "name_ar": null,
+   "room_type": "powder",
+   "area_m2": 2.7,
+   "polygon": [
+    [
+     0.6,
+     0.72
+    ],
+    [
+     0.76,
+     0.72
+    ],
+    [
+     0.76,
+     0.8
+    ],
+    [
+     0.6,
+     0.8
+    ]
+   ],
+   "confidence": 0.78
+  },
+  {
+   "id": "bedroom-02",
+   "name_en": "Bedroom 4",
+   "name_ar": "غرفة النوم 4",
+   "room_type": "bedroom",
+   "area_m2": 19.2,
+   "polygon": [
+    [
+     0.6,
+     0.8
+    ],
+    [
+     0.88,
+     0.8
+    ],
+    [
+     0.88,
+     0.995
+    ],
+    [
+     0.6,
+     0.995
+    ]
+   ],
+   "confidence": 0.85
+  },
+  {
+   "id": "stairs-01",
+   "name_en": "Stairs",
+   "name_ar": "درج",
+   "room_type": "stairs",
+   "area_m2": 9.5,
+   "polygon": [
+    [
+     0.42,
+     0.365
+    ],
+    [
+     0.6,
+     0.365
+    ],
+    [
+     0.6,
+     0.7
+    ],
+    [
+     0.42,
+     0.7
+    ]
+   ],
+   "confidence": 0.7
+  },
+  {
+   "id": "balcony-01",
+   "name_en": "Front Balcony",
+   "name_ar": "شرفة",
+   "room_type": "balcony",
+   "area_m2": 5.5,
+   "polygon": [
+    [
+     0.14,
+     0.3
+    ],
+    [
+     0.42,
+     0.3
+    ],
+    [
+     0.42,
+     0.365
+    ],
+    [
+     0.14,
+     0.365
+    ]
+   ],
+   "confidence": 0.75
+  },
+  {
+   "id": "terrace-01",
+   "name_en": "Terrace",
+   "name_ar": "تراس",
+   "room_type": "terrace",
+   "area_m2": 16,
+   "polygon": [
+    [
+     0.14,
+     0.82
+    ],
+    [
+     0.58,
+     0.82
+    ],
+    [
+     0.58,
+     1
+    ],
+    [
+     0.14,
+     1
+    ]
+   ],
+   "confidence": 0.72
+  },
+  {
+   "id": "terrace-02",
+   "name_en": "Terrace F07",
+   "name_ar": null,
+   "room_type": "terrace",
+   "area_m2": 8,
+   "polygon": [
+    [
+     0.6,
+     0.28
+    ],
+    [
+     0.88,
+     0.28
+    ],
+    [
+     0.88,
+     0.365
+    ],
+    [
+     0.6,
+     0.365
+    ]
+   ],
+   "confidence": 0.7
+  },
+  {
+   "id": "balcony-02",
+   "name_en": "Front Balcony Bedroom 4",
+   "name_ar": "شرفة",
+   "room_type": "balcony",
+   "area_m2": 4.5,
+   "polygon": [
+    [
+     0.6,
+     0.995
+    ],
+    [
+     0.88,
+     0.995
+    ],
+    [
+     0.88,
+     1.04
+    ],
+    [
+     0.6,
+     1.04
+    ]
+   ],
+   "confidence": 0.65
+  }
+ ]
+}

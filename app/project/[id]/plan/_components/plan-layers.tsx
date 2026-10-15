@@ -64,6 +64,7 @@ export function PlanLayers({
   context = [],
   siteRefs,
   initialLayer,
+  printedSizes,
 }: {
   projectId: string;
   planId: string;
@@ -84,6 +85,8 @@ export function PlanLayers({
   siteRefs?: Record<string, { site_reference: boolean; disposition: string | null; dims_derived: boolean }>;
   /** R10a: the layer to open on (`?layer=openings`). */
   initialLayer?: string | null;
+  /** 15 Oct: room id → the size the sheet prints (m²), for Fix overlaps. */
+  printedSizes?: Record<string, number>;
 }) {
   // R10a: "?layer=openings" (the renders' "Walls and windows come from your plan" link) opens on that layer.
   const [layer, setLayer] = useState<Layer>(initialLayer === "openings" ? "openings" : "plan");
@@ -118,6 +121,7 @@ export function PlanLayers({
       outdoorEnabled={gardenPilot}
       context={context}
       siteRefs={siteRefs}
+      printedSizes={printedSizes}
     />
   );
 

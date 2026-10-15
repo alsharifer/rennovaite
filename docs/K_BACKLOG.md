@@ -33,7 +33,56 @@ says where it is and why it waits. Newest first.
   stays inside its own outline (`staysWithin`), and what it will not do — remove
   a room, cut a hole — it reports instead. The J0 worst parse: 12 pairs → 0,
   every room inside its own outline.
-- **Mudon (prod) — no restore applied; none is ready.** Its stored outlines
+- **Fix overlaps review (15 Oct — owner): exact, previewed, printed-aware (DONE).**
+  (a) The 108.8 m² the editor showed on J0 was not a double trim — the geometric
+  trim was exact (the rooms combine to 128.6 m² at the plan's scale, and that is
+  what the trim leaves); the editor re-measured trimmed rooms from their outline
+  while the others kept the reading's areas, and J0's areas (145.7) do not add
+  to its 166.1 total. Now a trimmed room's area drops by exactly the floor
+  removed, and a trim that would split a room is tried the other way round or
+  reported. Tests: total after = rooms combined ±0.1 m² (J0 at its own scale:
+  166.1 → 128.6), three rooms over one corner, no split. In the editor J0 reads
+  "total 145.7 → 112.8 m²" — the same exact rule over the reading's own areas.
+  (b) Preview + Apply. (c) The room further over its printed size loses; the
+  plan check flags a room > 10% off its printed size.
+- **Mudon alignment — diagnosed 15 Oct (read-only), NOT fixed.** One raw
+  reading of the sheet's crop (`lib/parse/__fixtures__/mudon-sheet-reading.json`)
+  against the sheet's own data:
+  - *Frame*: the parse rasterises the plan REGION (`detectPlanRegion`: ink
+    components + label anchors + 8 pt margin) — on Mudon 18.8 × 35.3 m, the
+    building (grid 19–25 × A–N, 12.2 × 20.1 m) only 65% × 57% of it; the region
+    carries the grid bubbles, both dimension chains, the section marks and the
+    notes. The model returns 0–1 over that image and the code takes them as-is.
+    No x/y scale is taken from the sheet for geometry: the 1:100 off the text
+    layer sizes only label-only placeholders, and buildPlanGraph derives ONE
+    isotropic factor from the printed areas — so an anisotropic stretch is never
+    corrected and a uniform one is hidden.
+  - *What the model did*: top edge = grid A (0.280 vs 0.281); left edge 2.8 m
+    left of grid 19, where the A…N bubble strip and the grid lines begin; y
+    stretched from the top, bottom 6.7 m past grid N. ONE transform fits the 13
+    printed tags: x' = 0.942·x + 0.146 (R² 0.985), y' = 0.636·y + 0.112
+    (R² 0.919) — widths about right, height ×1.57, shifted left one strip.
+    Grid lines found in the vector layer (dashed 0.24 pt; the bubbles are
+    glyphs, not text), gaps checked against the printed chain.
+  - *With the transform*: tags inside their own room 3 → 8 of 13; printed sizes
+    within 10% 0 → 3 of 8. What stays: Toilet +88%, Bath F08 +35%, Bedroom 3
+    +32% — the model draws in coarse steps (Master Bedroom and Bedroom 3 the
+    same 0.28 × 0.20 box). Alignment is the main error, not the only one.
+  - *Stairs / Family Area*: the model's own "Family Area" outline lies on the
+    stair treads as read; with the transform it holds the FAMILY AREA tag (F01)
+    and sits on the family area — the "swap" is the y-stretch. The model's
+    "Stairs" outline lands on the treads in neither frame, and the sheet prints
+    NO stairs tag, so nothing on the sheet checks it. Reconcile renamed neither
+    (it scores name 3 · tag inside 2 · nearness 1 in the model's frame and
+    renames the winner; here the model had read the tags, so names decided).
+  - *Acceptance test*: `lib/parse/__tests__/mudon-alignment.test.ts` — every
+    printed tag inside its own room, every printed size within 10% (`it.fails`
+    today; flip with the fix). Overlay: `screenshots/plan-geometry/mudon-alignment-overlay.png`.
+  - *Candidate fixes (owner's call)*: crop to the building (grid 19–25 × A–N
+    from the vector layer) so the model's frame IS the building; and/or fit the
+    x/y scale + offset to the printed tags and sizes after the model, before
+    reconcile. Terrace accuracy waits for this.
+- **Mudon (prod) — no hand fix, no restore (owner, 15 Oct); diagnosis above.** Its stored outlines
   sit off the drawn walls (the old fix pushed rooms apart and left 4 px gaps, so
   no two rooms share a wall: 0 party walls). Dry runs 15 Oct, nothing written:
   - *Restore positions from the original reading*: not viable. Mudon's reading
@@ -54,7 +103,8 @@ says where it is and why it waits. Newest first.
   openings were confirmed at 18:39 UTC on 14 Oct, under #109's rule, so every
   width is `derived = false` (estimated, but reads as measured). Fix once the
   follow-up (#110) is live: set `derived = true` on detected rows whose width
-  was not printed. Data change — on the owner's go.
+  was not printed. Data change — APPROVED 15 Oct, to run once #110 has merged
+  (position and kind stay confirmed).
 
 ## R10c — plan-faithful renders: guards ruled 14–15 Oct (rules BUILT in `lib/render/cameras.ts`)
 
@@ -80,6 +130,9 @@ says where it is and why it waits. Newest first.
   windows right" is a view looking EAST — add those two openings (or fix the
   outline) first; the acceptance shot is then an explicit east-facing camera
   from the west side of the Hall, beside the two defaults.
+  **Ruled 15 Oct**: the two defaults are the placement test (pinned in
+  `lib/render/__tests__/cameras.test.ts`); the east-facing camera is HELD until
+  the owner confirms where the dining area really is.
 
 ## R10b (2026-10-14) — openings found on the drawing
 

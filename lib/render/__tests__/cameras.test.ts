@@ -68,4 +68,23 @@ describe("default cameras", () => {
       expect(everyCameraInside(r.polygon, u)).toBe(true);
     }
   });
+
+  // R10c acceptance (ruled 15 Oct): the Hall's two DEFAULT cameras are the placement test. The east-facing
+  // camera is held until the owner confirms where the dining area is (as drawn the Hall has no window and no
+  // kitchen opening, so that view cannot come from it).
+  it("Jumeirah Parks' Hall (the R10c acceptance room): two default views along its long axis, inside, facing each other", () => {
+    const { metres_per_unit: u, rooms } = fixture as unknown as { metres_per_unit: number; rooms: { name: string; polygon: Pt[] }[] };
+    const hall = rooms.find((r) => r.name === "Hall")!.polygon;
+    expect(hall).toHaveLength(9); // 2.66 × 5.84 m with a shallow notch on its north wall
+    expect(countingArms(hall, u)).toHaveLength(1); // the notch is not an arm
+    const cams = defaultCameras(hall, u);
+    expect(cams).toHaveLength(2);
+    expect(everyCameraInside(hall, u)).toBe(true);
+    const m = (p: Pt) => [Math.round(p[0] * u * 100) / 100, Math.round(p[1] * u * 100) / 100];
+    expect(cams.map((c) => m(c.position))).toEqual([[16.75, 8.97], [16.75, 13.43]]);
+    // The first looks south (down the plan, +y), the second north; both straight down the long axis.
+    expect(cams[0]!.target[1]).toBeGreaterThan(cams[0]!.position[1]);
+    expect(cams[1]!.target[1]).toBeLessThan(cams[1]!.position[1]);
+    expect(cams.every((c) => Math.abs(c.target[0] - c.position[0]) < 1e-9)).toBe(true);
+  });
 });

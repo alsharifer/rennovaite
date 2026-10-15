@@ -15,10 +15,26 @@
 // then the SMALLER room (a specific room — an ensuite drawn inside a bedroom's
 // overstated outline — keeps its floor and carves the container), then id.
 //
+// EXACTLY the overlap, never more (15 Oct review): a trim that would split a
+// room into pieces is tried the other way round, and reported if both ways
+// split — dropping a piece would remove floor that was never shared. Areas are
+// kept the same way: a trimmed room's area_m2 drops by exactly the floor
+// removed (at the caller's m² per unit²), so the total falls by exactly the
+// double-counted floor. (The first version re-measured trimmed rooms from their
+// outline while the others kept the reading's areas — two measures summed; on
+// the J0 scratch the editor showed 108.8 m² where the rooms combine to 112.8 at
+// its scale, 128.6 at the plan's.)
+//
+// Printed sizes (15 Oct): when the sheet prints a room's size, the room further
+// OVER its printed area loses the shared floor; with one printed room only, it
+// loses when its outline is over its printed size. Otherwise the parse repair's
+// order (confidence, then the smaller room keeps it).
+//
 // What it will not do, and says so (`unresolved`):
 //   - remove a room entirely (one room wholly covered by another);
 //   - cut a hole (one room wholly INSIDE another — a room outline cannot carry a
-//     hole; split the container on the plan instead).
+//     hole; split the container on the plan instead);
+//   - split a room in two (both ways round).
 // Pure, deterministic, unit-tested; same detector as everything else
 // (`sharedArea` / OVERLAP_AREA_EPSILON from lib/plan/overlaps.ts).
 // =============================================================================
@@ -33,6 +49,15 @@ export interface TrimmableRoom {
   polygon: Pt[];
   name?: string | null;
   confidence?: number | null;
+  /** The room's area as the plan carries it (m²); reduced by exactly what is trimmed. */
+  area_m2?: number | null;
+  /** The size the sheet prints for this room (m²), when it prints one. */
+  printed_m2?: number | null;
+}
+
+export interface TrimOptions {
+  /** m² per polygon unit² — needed for areas and for the printed-size rule. */
+  m2PerUnit2?: number;
 }
 
 export interface TrimRecord {
@@ -47,7 +72,7 @@ export interface TrimRecord {
 export interface Unresolved {
   a_id: string;
   b_id: string;
-  reason: "would_remove_room" | "would_cut_hole" | "clipping_failed";
+  reason: "would_remove_room" | "would_cut_hole" | "would_split_room" | "clipping_failed";
 }
 
 const DEFAULT_CONFIDENCE = 0.7;
@@ -88,8 +113,18 @@ function openRing(ring: number[][], eps: number): Pt[] {
   return pts;
 }
 
+/** How far a room's outline is over its printed size (0.1 = 10% over); null when nothing is printed. */
+export function overPrinted(room: TrimmableRoom, m2PerUnit2: number | undefined): number | null {
+  if (!room.printed_m2 || room.printed_m2 <= 0 || !m2PerUnit2) return null;
+  return (polygonArea(room.polygon) * m2PerUnit2) / room.printed_m2 - 1;
+}
+
 /** Who keeps the shared floor: true when `a` outranks `b`. */
-function outranks(a: TrimmableRoom, b: TrimmableRoom): boolean {
+function outranks(a: TrimmableRoom, b: TrimmableRoom, k: number | undefined): boolean {
+  const oa = overPrinted(a, k), ob = overPrinted(b, k);
+  if (oa !== null && ob !== null && Math.abs(oa - ob) > 1e-9) return oa < ob; // further over loses
+  if (oa !== null && ob === null && oa > 0) return false;
+  if (ob !== null && oa === null && ob > 0) return true;
   const ca = a.confidence ?? DEFAULT_CONFIDENCE, cb = b.confidence ?? DEFAULT_CONFIDENCE;
   if (Math.abs(ca - cb) > 1e-9) return ca > cb;
   const aa = polygonArea(a.polygon), ab = polygonArea(b.polygon);
@@ -115,7 +150,35 @@ export function staysWithin(before: Pt[], after: Pt[], tol: number): boolean {
  * Resolve overlaps by trimming. Returns the rooms (same order, untouched rooms
  * are the SAME objects), what was trimmed, and what could not be resolved.
  */
-export function trimOverlappingRooms<T extends TrimmableRoom>(rooms: readonly T[]): { rooms: T[]; trimmed: TrimRecord[]; unresolved: Unresolved[] } {
+type Mp = number[][][][];
+
+/** Trim `loser` by `keeper`: the single piece left, or why not. */
+function cut(loser: TrimmableRoom, keeper: TrimmableRoom, eps: number): { polygon: Pt[] } | { reason: Unresolved["reason"] } {
+  let mp: Mp;
+  try {
+    mp = polygonClipping.difference([closedRing(loser.polygon)] as never, [closedRing(keeper.polygon)] as never) as unknown as Mp;
+  } catch {
+    return { reason: "clipping_failed" };
+  }
+  const sliver = polygonArea(loser.polygon) * OVERLAP_AREA_EPSILON;
+  const pieces = mp.map((poly) => ({ poly, area: polygonArea(openRing(poly[0]!, eps)) })).filter((p) => p.area > sliver);
+  if (pieces.length === 0) return { reason: "would_remove_room" };
+  if (pieces.length > 1) return { reason: "would_split_room" };
+  if (pieces[0]!.poly.length > 1) return { reason: "would_cut_hole" };
+  const polygon = openRing(pieces[0]!.poly[0]!, eps);
+  return polygon.length < 3 ? { reason: "would_remove_room" } : { polygon };
+}
+
+/**
+ * Resolve overlaps by trimming. Returns the rooms (same order, untouched rooms
+ * are the SAME objects), what was trimmed, what could not be resolved, and —
+ * with `m2PerUnit2` — the plan's total before and after (Σ area_m2).
+ */
+export function trimOverlappingRooms<T extends TrimmableRoom>(
+  rooms: readonly T[],
+  opts: TrimOptions = {},
+): { rooms: T[]; trimmed: TrimRecord[]; unresolved: Unresolved[]; total_before_m2: number | null; total_after_m2: number | null } {
+  const k = opts.m2PerUnit2;
   const out = rooms.map((r) => r);
   const trimmed: TrimRecord[] = [];
   const unresolved: Unresolved[] = [];
@@ -137,39 +200,32 @@ export function trimOverlappingRooms<T extends TrimmableRoom>(rooms: readonly T[
     }
     if (!worst) break;
     const a = out[worst.i]!, b = out[worst.j]!;
-    const [keepIdx, loseIdx] = outranks(a, b) ? [worst.i, worst.j] : [worst.j, worst.i];
-    const keeper = out[keepIdx]!, loser = out[loseIdx]!;
     const pairKey = `${a.id}|${b.id}`;
-    let mp: number[][][][];
-    try {
-      mp = polygonClipping.difference([closedRing(loser.polygon)] as never, [closedRing(keeper.polygon)] as never) as unknown as number[][][][];
-    } catch {
-      unresolved.push({ a_id: loser.id, b_id: keeper.id, reason: "clipping_failed" });
-      skip.add(pairKey);
-      continue;
+    const [keepIdx, loseIdx] = outranks(a, b, k) ? [worst.i, worst.j] : [worst.j, worst.i];
+    // The ranked way first; if that would split the loser (or cut a hole in it), the other way.
+    const attempts: [number, number][] = [[keepIdx, loseIdx], [loseIdx, keepIdx]];
+    let done = false;
+    let firstReason: Unresolved["reason"] | null = null;
+    for (const [ki, li] of attempts) {
+      const res = cut(out[li]!, out[ki]!, eps);
+      if ("reason" in res) {
+        firstReason ??= res.reason;
+        if (res.reason === "would_split_room" || res.reason === "would_cut_hole") continue;
+        break;
+      }
+      const loser = out[li]!;
+      const removed = polygonArea(loser.polygon) - polygonArea(res.polygon);
+      const area = typeof loser.area_m2 === "number" && k ? Math.round((loser.area_m2 - removed * k) * 100) / 100 : loser.area_m2;
+      out[li] = { ...loser, polygon: res.polygon, ...(area !== undefined ? { area_m2: area } : {}) };
+      trimmed.push({ id: loser.id, kept_by: out[ki]!.id, removed });
+      done = true;
+      break;
     }
-    if (mp.length === 0) {
-      unresolved.push({ a_id: loser.id, b_id: keeper.id, reason: "would_remove_room" });
+    if (!done) {
+      unresolved.push({ a_id: out[loseIdx]!.id, b_id: out[keepIdx]!.id, reason: firstReason ?? "clipping_failed" });
       skip.add(pairKey);
-      continue;
     }
-    // The largest piece; a piece with a hole means the keeper sits inside the loser.
-    const pieces = mp.map((poly) => ({ poly, area: polygonArea(openRing(poly[0]!, eps)) })).sort((x, y) => y.area - x.area);
-    const best = pieces[0]!;
-    if (best.poly.length > 1) {
-      unresolved.push({ a_id: loser.id, b_id: keeper.id, reason: "would_cut_hole" });
-      skip.add(pairKey);
-      continue;
-    }
-    const polygon = openRing(best.poly[0]!, eps);
-    if (polygon.length < 3) {
-      unresolved.push({ a_id: loser.id, b_id: keeper.id, reason: "would_remove_room" });
-      skip.add(pairKey);
-      continue;
-    }
-    const removed = polygonArea(loser.polygon) - polygonArea(polygon);
-    out[loseIdx] = { ...loser, polygon };
-    trimmed.push({ id: loser.id, kept_by: keeper.id, removed });
   }
-  return { rooms: out, trimmed, unresolved };
+  const total = (list: readonly TrimmableRoom[]) => (list.every((r) => typeof r.area_m2 === "number") ? Math.round(list.reduce((acc, r) => acc + (r.area_m2 as number), 0) * 100) / 100 : null);
+  return { rooms: out, trimmed, unresolved, total_before_m2: total(rooms), total_after_m2: total(out) };
 }

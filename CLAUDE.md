@@ -756,7 +756,27 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
   smaller — the parse repair's rule); a room only loses area and stays inside
   its own outline (`staysWithin`); a room it would remove or a hole it would cut
   is reported, not done. The old rigid push (`lib/plan/separate.ts`) is deleted
-  — it walked prod Mudon's rooms off the drawing.
+  — it walked prod Mudon's rooms off the drawing. **Exactly the overlap**
+  (review, 15 Oct): a trim that would split a room is tried the other way round,
+  else reported (`would_split_room`); a trimmed room's `area_m2` drops by
+  exactly the floor removed (`m2PerUnit2`), so the total falls by exactly the
+  floor counted twice (J0 at the plan's scale: 166.1 → 128.6 m² = the rooms
+  combined; the first version mixed re-measured and read areas → 108.8).
+  **Preview first**: the editor shows "trims N rooms · total X → Y m²" with
+  the trimmed outlines drawn, and changes nothing until **Apply**
+  (`data-trim-preview`, `trim-apply` / `trim-cancel`). **Printed sizes**: the
+  room further OVER its printed size loses the shared floor.
+- **Printed-size check** (`lib/plan/printed-sizes.ts`): 01 Plan flags a room
+  whose outline, at the plan's own scale (buildPlanGraph's total ÷ Σ outline),
+  is > 10% off the size the sheet prints (`parsed_json.rooms[].area_source =
+  "measured"`, matched by name; a name printed twice or a renamed room gets
+  none) — "Bedroom 3 is drawn at 28.4 m² — the sheet prints 19.9 m² (43% over)."
+- **Mudon alignment — diagnosed, NOT fixed** (owner ruling: no parsing change
+  until reviewed). `lib/parse/__tests__/mudon-alignment.test.ts` over
+  `lib/parse/__fixtures__/mudon-sheet-reading.json` (the sheet's labels, region,
+  scale + one raw model reading): its two `it.fails` are the acceptance criteria
+  (every printed tag inside its own room; every printed size within 10%) — flip
+  them to `it` with the fix. K_BACKLOG → "Mudon alignment".
 - **Floor coverage** (`lib/plan/coverage.ts`): the plan check warns "Rooms cover
   X of ~Y m² — a room may be missing" below 90% of the reading's whole-floor
   estimate (`parse.provider_total_area_m2`); no estimate, no check.

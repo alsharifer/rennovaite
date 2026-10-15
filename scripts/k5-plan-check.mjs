@@ -47,7 +47,21 @@ try {
   if (SHOTS) await b.screenshot(`${SHOTS}/k5-plan-pair-selected.png`);
 
   await q(`document.querySelector('[data-testid="fix-overlaps"]').click()`);
-  check("Fix overlaps → Save becomes enabled", await b.until(`document.querySelector('[data-testid="plan-save"]')?.getAttribute('aria-disabled') === "false"`, 10000));
+  // 15 Oct: Fix overlaps previews first — total before → after, the trimmed outlines — and changes nothing until Apply.
+  check("Fix overlaps → a preview with the total before → after", await b.until(`!!document.querySelector('[data-trim-preview]')`, 10000), await q(`document.querySelector('[data-trim-preview]')?.textContent.slice(0, 240)`));
+  const before = Number(await q(`document.querySelector('[data-trim-before]')?.textContent`));
+  const afterTotal = Number(await q(`document.querySelector('[data-trim-after]')?.textContent`));
+  check("the preview removes the floor counted twice — once", afterTotal > 0 && afterTotal < before, `${before} → ${afterTotal} m²`);
+  check("the trimmed outlines are drawn on the canvas", (await q(`document.querySelectorAll('[data-trim-outlines] polygon').length`)) > 0);
+  check("nothing changed yet: Save still disabled, the overlaps still drawn", (await q(`document.querySelector('[data-testid="plan-save"]')?.getAttribute('aria-disabled')`)) === "true" && (await q(`document.querySelectorAll('[data-overlap-fill] polygon').length`)) >= 12);
+  if (SHOTS) await b.screenshot(`${SHOTS}/k5-plan-trim-preview.png`);
+  await q(`document.querySelector('[data-testid="trim-cancel"]').click()`);
+  check("Cancel → no preview, nothing changed", await b.until(`!document.querySelector('[data-trim-preview]') && document.querySelector('[data-testid="plan-save"]')?.getAttribute('aria-disabled') === "true"`, 5000));
+  await q(`document.querySelector('[data-testid="fix-overlaps"]').click()`);
+  await b.until(`!!document.querySelector('[data-trim-preview]')`, 10000);
+  await q(`document.querySelector('[data-testid="trim-apply"]').click()`);
+  check("Apply → Save becomes enabled", await b.until(`document.querySelector('[data-testid="plan-save"]')?.getAttribute('aria-disabled') === "false"`, 10000));
+  if (SHOTS) await b.screenshot(`${SHOTS}/k5-plan-trim-applied.png`);
   await q(`document.querySelector('[data-testid="plan-save"]').click()`);
   check("saved → the panel reads 'can be priced'", await b.until(`document.querySelector('[data-plan-check]')?.getAttribute('data-plan-check') === "clean"`, 60000), await q(`document.querySelector('[data-plan-check]')?.textContent.slice(0, 160)`));
   await b.goto(url, "[data-plan-check]");

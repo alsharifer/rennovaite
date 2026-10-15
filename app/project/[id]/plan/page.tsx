@@ -8,6 +8,7 @@ import { OpeningsCheckPanel } from "@/components/blueprint/plan/OpeningsCheckPan
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
 import type { DetectionRun } from "@/lib/plan/openings-vocab";
 import { floorCoverage, readingFloorEstimate } from "@/lib/plan/coverage";
+import { matchPrintedSizes, planM2PerUnit2, printedSizeCheck, printedSizesFromParsedJson } from "@/lib/plan/printed-sizes";
 import { PlanRoomFocus } from "@/components/blueprint/plan/PlanRoomFocus";
 import { loadProjectRail } from "@/components/blueprint/shell/ProjectShell";
 import { FIRM_STEPS, OWNER_STEPS } from "@/lib/journey";
@@ -261,6 +262,14 @@ export default async function PlanPage({
   const canDetect = !authored && Boolean(plan.pdf_url) && !detectRes.error;
   const totalArea = plan.total_area_m2 ?? null;
   const unit = authored ? "zones" : "rooms";
+  // 15 Oct: rooms against the size the sheet prints — flagged past 10% at the
+  // plan's own metre scale; Fix overlaps trims the room further over it.
+  const printedById = authored ? new Map<string, number>() : matchPrintedSizes(roomList, printedSizesFromParsedJson(plan.parsed_json));
+  const printedFlags = printedSizeCheck(
+    roomList.filter((r) => !removedIds.has(r.id)),
+    printedById,
+    planM2PerUnit2(roomList, totalArea),
+  );
   const meta = [
     `${roomList.length} ${unit} · ${formatM2(totalArea)}`,
     // K10: say where the rooms came from — never "parsed from the drawing" when there is no drawing.
@@ -297,6 +306,7 @@ export default async function PlanPage({
                 context={gardenSite?.context ?? []}
                 siteRefs={gardenSite?.siteRefs}
                 initialLayer={initialLayer ?? null}
+                printedSizes={Object.fromEntries(printedById)}
                 mode="edit"
               />
             </div>
@@ -316,6 +326,7 @@ export default async function PlanPage({
               blocked={blocked}
               summary={{ rooms: roomList.length, area: formatM2(totalArea), label: unit }}
               coverage={authored ? null : floorCoverage(roomList, readingFloorEstimate(plan.parsed_json))}
+              printed={printedFlags}
             />
 
             {/* R10b (§7.5): "We found 2 windows and an opening to the kitchen — correct?" */}
