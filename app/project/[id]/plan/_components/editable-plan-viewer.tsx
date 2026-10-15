@@ -18,7 +18,7 @@ import polygonClipping from "polygon-clipping";
 
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { polygonArea } from "@/lib/plan/polygon";
-import { separateOverlappingRooms } from "@/lib/plan/separate";
+import { trimOverlappingRooms, type Unresolved } from "@/lib/plan/trim-overlaps";
 import { Icon } from "@/components/blueprint/Icon";
 
 import {
@@ -171,27 +171,24 @@ function bboxOf(points: Point[]): {
   return { xL, yT, xR, yB };
 }
 
-// [x, y, w, h] from a polygon's bounding box. x/y is the top-left
-// corner; w/h are the bbox extents. Reused by the dimensions display, the
-// overlap-detection effect, and the separation algorithm.
-function polygonToRect(
-  polygon: Point[],
-): [number, number, number, number] {
-  const bb = bboxOf(polygon);
-  return [bb.xL, bb.yT, bb.xR - bb.xL, bb.yB - bb.yT];
-}
-
 // Convert a single linear distance in viewBox pixels to metres, given
 // the m² / px² scale factor. One decimal place.
 function pixelToM(px: number, scale: number): number {
   return Math.round(px * Math.sqrt(scale) * 10) / 10;
 }
 
-// The separation algorithm itself lives in lib/plan/separate.ts so it can be
-// unit-tested outside this client component — that is where "zero overlaps +
-// every area preserved" is pinned, and where the one non-shape-preserving case
-// (the viewBox clamp flattening an N-vertex room to its bbox) is documented.
-// `Room` structurally satisfies the module's generic `SeparableRoom`.
+// "Fix overlaps" lives in lib/plan/trim-overlaps.ts (unit-tested outside this
+// client component): it trims shared floor and never moves a room. 15 Oct: it
+// PREVIEWS first ("total X → Y m²", the trimmed outlines on the canvas) and
+// changes nothing until Apply.
+type TrimPreview = {
+  /** The rooms the preview was computed from — a different array means it is stale. */
+  basis: Room[];
+  byId: Map<string, Room>;
+  unresolved: Unresolved[];
+  before: number;
+  after: number;
+};
 
 type Fit = {
   rooms: Room[];
@@ -355,6 +352,8 @@ type Props = {
    *  the state this editor was mounted with, so a keep/remove decision taken in
    *  the garden panel shows on the canvas without discarding unsaved edits. */
   siteRefs?: Record<string, { site_reference: boolean; disposition: string | null; dims_derived: boolean }>;
+  /** 15 Oct: room id → the size the sheet prints (m²) — Fix overlaps trims the room further over it. */
+  printedSizes?: Record<string, number>;
 };
 
 export function EditablePlanViewer({
@@ -367,6 +366,7 @@ export function EditablePlanViewer({
   outdoorEnabled = false,
   context = [],
   siteRefs,
+  printedSizes,
 }: Props) {
   const router = useRouter();
   const editing = editingEnabled(mode);
@@ -469,6 +469,7 @@ export function EditablePlanViewer({
   // Per-session correction counts → posted to parse_metrics on save (the KPI).
   const correctionCounts = useRef({ move: 0, vertex: 0, relabel: 0, delete: 0 });
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [trimPreviewState, setTrimPreview] = useState<TrimPreview | null>(null);
   const infoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
@@ -482,6 +483,8 @@ export function EditablePlanViewer({
   const selectedRoom = visibleRooms.find((r) => r.id === selectedId) ?? null;
 
   const liveTotalM2 = visibleRooms.reduce((s, r) => s + r.area_m2, 0);
+  // A preview holds only while the rooms it was computed from are on screen.
+  const trimPreview = trimPreviewState && trimPreviewState.basis === rooms ? trimPreviewState : null;
   const openZoneCount = visibleRooms.filter((r) => r.unroofed).length;
 
   // Push current state onto history (capped to HISTORY_LIMIT entries).
@@ -833,47 +836,63 @@ export function EditablePlanViewer({
     [],
   );
 
+  const nameOfRoom = useCallback((id: string) => rooms.find((r) => r.id === id)?.name_en ?? "a room", [rooms]);
+  const unresolvedText = useCallback(
+    (unresolved: Unresolved[]) =>
+      unresolved.length
+        ? ` ${unresolved.length} left: ${unresolved
+            .map((u) => `${nameOfRoom(u.a_id)} ${u.reason === "would_cut_hole" ? "contains" : u.reason === "would_split_room" ? "crosses" : "is covered by"} ${nameOfRoom(u.b_id)}`)
+            .join("; ")} — split or reshape by hand.`
+        : "",
+    [nameOfRoom],
+  );
+
+  // 15 Oct: Fix overlaps NEVER moves a room. It trims the shared floor from
+  // one room of each pair (lib/plan/trim-overlaps.ts) — the old rigid push
+  // walked prod Mudon's east rooms off the building — removing exactly the
+  // overlap: a trimmed room's area drops by the floor it lost, so the total
+  // falls by exactly the floor that was counted twice. It previews first.
   const fixOverlaps = useCallback(() => {
     const visible = rooms.filter((r) => !r.isDeleted);
     if (visible.length < 2) {
       flashInfo("No overlaps detected");
       return;
     }
-    snapshot();
-    const adjusted = separateOverlappingRooms(visible, VIEW_W, VIEW_H);
-    // Recompute area_m2 in case clamp shrunk a too-large room.
-    const adjustedWithAreas = adjusted.map((r) => ({
-      ...r,
-      area_m2: recomputeArea(r.polygon),
-    }));
-    // Count rooms whose bbox actually shifted.
-    let movedCount = 0;
-    for (let i = 0; i < visible.length; i++) {
-      const before = polygonToRect(visible[i].polygon);
-      const after = polygonToRect(adjustedWithAreas[i].polygon);
-      if (
-        before[0] !== after[0] ||
-        before[1] !== after[1] ||
-        before[2] !== after[2] ||
-        before[3] !== after[3]
-      ) {
-        movedCount++;
-      }
+    const out = trimOverlappingRooms(
+      visible.map((r) => ({ ...r, printed_m2: printedSizes?.[r.id] ?? null })),
+      { m2PerUnit2: unitToM2Factor },
+    );
+    if (out.trimmed.length === 0 && out.unresolved.length === 0) {
+      flashInfo("No overlaps detected");
+      return;
     }
-    // Merge the adjusted visible rooms back into the full rooms array
-    // (preserving any deleted ones).
-    const adjustedById = new Map(
-      adjustedWithAreas.map((r) => [r.id, r] as const),
+    const changed = new Set(out.trimmed.map((t) => t.id));
+    const byId = new Map<string, Room>(
+      out.rooms
+        .filter((r) => changed.has(r.id))
+        .map((r) => {
+          const { printed_m2: _printed, ...room } = r;
+          void _printed;
+          return [r.id, { ...room, area_m2: Math.round(room.area_m2 * 10) / 10 }] as const;
+        }),
     );
-    setRooms((current) =>
-      current.map((r) => (r.isDeleted ? r : (adjustedById.get(r.id) ?? r))),
-    );
+    setTrimPreview({ basis: rooms, byId, unresolved: out.unresolved, before: out.total_before_m2 ?? liveTotalM2, after: out.total_after_m2 ?? liveTotalM2 });
+  }, [rooms, printedSizes, unitToM2Factor, liveTotalM2, flashInfo]);
+
+  const applyTrim = useCallback(() => {
+    if (!trimPreview) return;
+    const { byId, unresolved } = trimPreview;
+    if (byId.size > 0) {
+      snapshot();
+      setRooms((current) => current.map((r) => (r.isDeleted ? r : (byId.get(r.id) ?? r))));
+    }
+    setTrimPreview(null);
     flashInfo(
-      movedCount > 0
-        ? `Adjusted ${movedCount} ${movedCount === 1 ? "room" : "rooms"} to remove overlaps`
-        : "No overlaps detected",
+      byId.size > 0
+        ? `Trimmed ${byId.size} ${byId.size === 1 ? "room" : "rooms"} where they overlapped — nothing moved.${unresolvedText(unresolved)}`
+        : `Nothing trimmed.${unresolvedText(unresolved)}`,
     );
-  }, [rooms, snapshot, recomputeArea, flashInfo]);
+  }, [trimPreview, snapshot, flashInfo, unresolvedText]);
 
   // K5: the plan page's Plan check panel drives the editor through two window
   // events — "Fix overlaps · N" runs the same separation as the toolbar, and an
@@ -1179,6 +1198,39 @@ export function EditablePlanViewer({
           {!dirty && <span id="save-why" className="sr-only">Nothing to save — no change since the last save</span>}
         </TopBarActions>
       </div>
+      )}
+
+      {/* 15 Oct: Fix overlaps previews — the total before and after, the rooms
+          it trims, what it cannot resolve — and changes nothing until Apply. */}
+      {editing && trimPreview && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-bp-line-strong py-3" role="group" aria-label="Fix overlaps preview" data-trim-preview={trimPreview.byId.size}>
+          <p className="t-body-sm min-w-0 flex-1 text-bp-ink-primary">
+            <span className="t-label-caps mr-2">Fix overlaps</span>
+            {trimPreview.byId.size > 0 ? (
+              <>
+                trims {trimPreview.byId.size} {trimPreview.byId.size === 1 ? "room" : "rooms"} ({[...trimPreview.byId.values()].map((r) => r.name_en).join(", ")}) · total{" "}
+                <span className="t-num-sm" data-trim-before>{trimPreview.before.toFixed(1)}</span> →{" "}
+                <span className="t-num-sm" data-trim-after>{trimPreview.after.toFixed(1)}</span> m² — the floor counted twice comes off once; no room moves.
+              </>
+            ) : (
+              <>trims nothing.</>
+            )}
+            {unresolvedText(trimPreview.unresolved)}
+          </p>
+          <span className="flex items-center gap-2">
+            <button type="button" onClick={() => setTrimPreview(null)} className={TOOL_BTN} data-testid="trim-cancel">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={trimPreview.byId.size > 0 ? applyTrim : () => setTrimPreview(null)}
+              className="inline-flex h-9 items-center bg-bp-ink-primary px-4 t-label-md text-bp-ink-on-inverse rounded-none hover:bg-bp-ink-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring"
+              data-testid="trim-apply"
+            >
+              {trimPreview.byId.size > 0 ? "Apply" : "Close"}
+            </button>
+          </span>
+        </div>
       )}
 
       {/* G5: exact geometry for the selected zone, in metres on the plot. A
@@ -1635,6 +1687,19 @@ export function EditablePlanViewer({
                   stroke={INK}
                   strokeWidth={1.25}
                   strokeDasharray="4 3"
+                />
+              ))}
+            </g>
+          )}
+          {trimPreview && trimPreview.byId.size > 0 && (
+            <g pointerEvents="none" data-trim-outlines={trimPreview.byId.size}>
+              {[...trimPreview.byId.values()].map((r) => (
+                <polygon
+                  key={r.id}
+                  points={r.polygon.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
+                  fill="none"
+                  stroke={INK}
+                  strokeWidth={3}
                 />
               ))}
             </g>

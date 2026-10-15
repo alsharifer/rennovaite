@@ -38,6 +38,10 @@ export interface TakeoffItem {
   /** A5: the gross (pre-deduction) area, kept alongside the net `qty` so the
    *  deduction is auditable rather than silent. Absent when nothing deducted. */
   gross_qty?: number;
+  /** R10b: the deducted openings whose size is DERIVED (defaulted, or estimated
+   *  off the drawing and never edited) — the net quantity rests on them, so the
+   *  line carries the derived mark. Absent when every deducted size is measured. */
+  derived_opening_refs?: string[];
 }
 
 const WET_ROOM_TYPES = new Set(["bathroom", "ensuite", "powder", "kitchen"]);
@@ -122,6 +126,13 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
 
   const byWall = new Map<string, { area: number; ids: string[] }>();
   const byRoom = new Map<string, { area: number; ids: string[] }>();
+  // R10b: openings whose size is derived — a quantity net of one is derived too.
+  const derivedOpenings = new Set(graph.openings.filter((o) => o.derived).map((o) => o.id));
+  const derivedRefs = (ids: string[]) => {
+    const d = ids.filter((id) => derivedOpenings.has(id));
+    return d.length > 0 ? { derived_opening_refs: d } : {};
+  };
+
   for (const o of graph.openings) {
     if (!o.wall_id) continue; // unsnapped — cannot attribute to a wall
     const area = openingArea(o);
@@ -186,7 +197,7 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
         unit: "m2",
         wet_area: true,
         ...(ded && ded.ids.length > 0
-          ? { opening_refs: ded.ids, gross_qty: r2(gross) }
+          ? { opening_refs: ded.ids, gross_qty: r2(gross), ...derivedRefs(ded.ids) }
           : {}),
       });
     }
@@ -207,7 +218,7 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
     const roomId = w.room_ids.find((id) => inScope(id)) ?? w.room_ids[0] ?? null;
     const prov =
       ded && ded.ids.length > 0
-        ? { opening_refs: ded.ids, gross_qty: r2(gross) }
+        ? { opening_refs: ded.ids, gross_qty: r2(gross), ...derivedRefs(ded.ids) }
         : {};
     items.push({ work_item_key: "wall_plaster", room_id: roomId, element_id: w.id, qty: net, unit: "m2", wet_area: false, ...prov });
     items.push({ work_item_key: "wall_paint", room_id: roomId, element_id: w.id, qty: net, unit: "m2", wet_area: false, ...prov });

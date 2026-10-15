@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { detectionRunning, isUnconfirmedDetected, openingRowLabel, openingsSentence, OPENINGS_RULE, type DetectionMeta, type DetectionRun } from "@/lib/plan/openings-vocab";
+import { detectionRunning, isUnconfirmedDetected, openingRowLabel, openingsSentence, openingWidthLabel, widthsToCheck, OPENINGS_RULE, type DetectionMeta, type DetectionRun } from "@/lib/plan/openings-vocab";
 
 import { Button } from "../Button";
 import { Icon } from "../Icon";
@@ -37,6 +37,7 @@ interface Row {
   confirmed_at: string | null;
   detection: DetectionMeta | null;
   width_mm: number | null;
+  derived?: boolean | null;
 }
 
 export interface OpeningsCheckPanelProps {
@@ -90,17 +91,19 @@ export function OpeningsCheckPanel({ planId, rooms, canDetect, detectedAt, run: 
         const res = await fetch("/api/plan-openings/detect", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan_id: planId, mode }) });
         const body = (await res.json().catch(() => null)) as { status?: string; error?: string; run?: DetectionRun | null } | null;
         if (body?.status === "failed") setError("The drawing could not be read for openings. Try Re-detect, or draw them on the Openings layer.");
-        if (body?.status === "already" || body?.status === "running") {
-          setRun(body.run ?? null);
-        } else {
-          const st = await fetch(`/api/plan-openings/detect?plan_id=${planId}`).then((r) => r.json()).catch(() => null);
-          setRun((st?.run as DetectionRun | null) ?? null);
-        }
+        // The list first, then the state: flipping to "done" before the rows arrive
+        // showed a moment of "none found" (seen live).
+        const next =
+          body?.status === "already" || body?.status === "running"
+            ? (body.run ?? null)
+            : (((await fetch(`/api/plan-openings/detect?plan_id=${planId}`).then((r) => r.json()).catch(() => null))?.run as DetectionRun | null) ?? null);
+        await load();
+        setRun(next);
       } catch {
         setError("The drawing could not be read for openings.");
+        await load();
         setRun(null);
       }
-      await load();
       changed();
     },
     [planId, load, changed],
@@ -127,8 +130,8 @@ export function OpeningsCheckPanel({ planId, rooms, canDetect, detectedAt, run: 
       const st = await fetch(`/api/plan-openings/detect?plan_id=${planId}`).then((r) => r.json()).catch(() => null);
       const next = (st?.run as DetectionRun | null) ?? null;
       if (!detectionRunning(next)) {
-        setRun(next);
         await load();
+        setRun(next);
         changed();
       }
     }, POLL_MS);
@@ -174,6 +177,7 @@ export function OpeningsCheckPanel({ planId, rooms, canDetect, detectedAt, run: 
 
   const pending = (rows ?? []).filter(isUnconfirmedDetected);
   const counted = (rows ?? []).filter((r) => !isUnconfirmedDetected(r));
+  const toCheck = widthsToCheck(rows ?? []);
   const sentence = openingsSentence(pending, roomName);
 
   return (
@@ -185,7 +189,7 @@ export function OpeningsCheckPanel({ planId, rooms, canDetect, detectedAt, run: 
 
       {running ? (
         <p className="t-body-sm mt-3 text-bp-ink-secondary" aria-live="polite" data-testid="openings-detecting">
-          Looking for windows and doors on your drawing…
+          Finding windows and doors… <span className="text-bp-ink-tertiary">The plan is ready to use meanwhile; they appear here when found.</span>
         </p>
       ) : rows === null ? (
         <p className="t-body-sm mt-3 text-bp-ink-tertiary">Loading…</p>
@@ -221,11 +225,7 @@ export function OpeningsCheckPanel({ planId, rooms, canDetect, detectedAt, run: 
                       <span className="block">{title}</span>
                       <span className="t-label-md block text-bp-ink-secondary">{where}</span>
                     </span>
-                    {o.width_mm ? <span className="t-num-sm text-bp-ink-secondary">{(o.width_mm / 1000).toFixed(2)} m</span> : null}
-                    <span className="inline-flex items-center gap-1 text-bp-prov-derived-text">
-                      <ProvenanceMark tier="derived" className="text-bp-prov-derived-mark" />
-                      <span className="t-label-md">derived</span>
-                    </span>
+                    <WidthText row={o} />
                   </button>
                   <button type="button" onClick={() => void confirm([o.id])} disabled={busy !== null} aria-label={`Confirm ${title.toLowerCase()} in ${where}`} className="inline-flex min-h-11 min-w-11 items-center justify-center text-bp-ink-secondary hover:text-bp-ink-primary focus-visible:outline-2 focus-visible:outline-bp-focus-ring disabled:opacity-50">
                     <Icon name="check" size={18} />
@@ -260,11 +260,55 @@ export function OpeningsCheckPanel({ planId, rooms, canDetect, detectedAt, run: 
         </>
       )}
 
+      {!running && toCheck.length ? (
+        <div className="mt-5" data-testid="openings-widths-to-check">
+          <h3 className="t-label-caps text-bp-ink-tertiary">WIDTHS TO CHECK · {toCheck.length}</h3>
+          <p className="t-label-md mt-1 text-bp-ink-secondary">Confirmed where they are and what they are; their widths are estimates. Choose one and enter its width on the plan to measure it.</p>
+          <ul className="mt-2" aria-label="Openings with an estimated width">
+            {toCheck.map((o) => {
+              const { title, where } = openingRowLabel(o, roomName);
+              return (
+                <li key={o.id} className="border-b border-bp-line-hairline" data-width-check={o.id}>
+                  <button
+                    type="button"
+                    onClick={() => focus(o.id)}
+                    className="t-body-sm flex min-h-11 w-full items-center gap-3 px-1 text-left text-bp-ink-primary hover:bg-bp-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring"
+                  >
+                    <Icon name={GLYPH[o.kind] ?? "door_front"} size={18} className="text-bp-ink-secondary" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block">{title}</span>
+                      <span className="t-label-md block text-bp-ink-secondary">{where}</span>
+                    </span>
+                    <WidthText row={o} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
       {error ? (
         <div role="alert" className="surface-inverse mt-3 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink">
           <p className="t-body-sm">{error}</p>
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** "≈ 1.80 m — check" (derived mark) while the size is an estimate; "1.80 m" once measured. */
+function WidthText({ row }: { row: Row }) {
+  const w = openingWidthLabel(row);
+  if (!w) return null;
+  return w.derived ? (
+    <span className="inline-flex items-center gap-1 text-bp-prov-derived-text" data-width="derived">
+      <ProvenanceMark tier="derived" className="text-bp-prov-derived-mark" />
+      <span className="t-num-sm">{w.text}</span>
+    </span>
+  ) : (
+    <span className="t-num-sm text-bp-ink-secondary" data-width="measured">
+      {w.text}
+    </span>
   );
 }

@@ -11,8 +11,12 @@ import { loadRecordedCauses } from "@/lib/boq/revision-causes";
 import { buildOffplanBasePrompt } from "@/lib/render-prompts";
 import { editOpeningsClause, openingsBasis, openingsPhrase, roomOpeningsFor } from "@/lib/render/openings-prompt";
 
-import { drawingFrame, normaliseProposals, overlaySvg, runOpeningsDetection, snapProposals, unitToMetres, type DetectRoom, type Drawing, type Proposal } from "../openings-detect";
-import { isUnconfirmedDetected, openingsSentence, renderOpeningsLabel, DETECTED_RENDER_LABEL } from "../openings-vocab";
+import { buildPlanGraph } from "@/lib/plan/geometry";
+import { assembleMappedSections } from "@/lib/boq/elements";
+import { quantifyPlan } from "@/lib/boq/quantify";
+
+import { drawingFrame, mergeAdjacentProposals, normaliseProposals, overlaySvg, runOpeningsDetection, snapProposals, unitToMetres, type DetectRoom, type Drawing, type Proposal } from "../openings-detect";
+import { isUnconfirmedDetected, openingWidthLabel, openingsSentence, renderOpeningsLabel, widthsToCheck, DETECTED_RENDER_LABEL } from "../openings-vocab";
 
 let db: FakeDb;
 vi.mock("@/lib/supabase-admin", () => ({ getSupabaseAdmin: () => db.client }));
@@ -70,6 +74,68 @@ describe("snapProposals", () => {
     const { openings } = snapProposals([P({ kind: "door", room: "R1", side: "left", start: 0, end: 1 })], ROOMS, U);
     expect(openings[0]!.width_mm).toBe(2400);
     expect(openings[0]!.along_offset).toBeGreaterThanOrEqual(0.24 - 1e-9);
+  });
+});
+
+describe("split glazing (R10b follow-up)", () => {
+  it("merges readings of the same kind end to end on one side across a mullion gap", () => {
+    const parts = [
+      P({ kind: "window", room: "R1", opens_to: "outside", side: "top", start: 0.1, end: 0.4, confidence: 0.6, floor_to_ceiling: true }),
+      P({ kind: "window", room: "R1", opens_to: "outside", side: "top", start: 0.42, end: 0.8, confidence: 0.7 }),
+    ];
+    const merged = mergeAdjacentProposals(parts, ROOMS, U);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ start: 0.1, end: 0.8, merged_from: 2, floor_to_ceiling: true, confidence: 0.7 });
+    const { openings } = snapProposals(parts, ROOMS, U);
+    expect(openings).toHaveLength(1);
+    expect(openings[0]).toMatchObject({ kind: "window", width_mm: 2800, height_mm: 2600 });
+    expect(openings[0]!.detection).toMatchObject({ merged_from: 2, width_source: "estimated" });
+    // Without the merge the same reading is two windows (the before of the accuracy report).
+    expect(snapProposals(parts, ROOMS, U, { merge: false }).openings).toHaveLength(2);
+  });
+
+  it("never merges a door with a window, or parts a real wall apart", () => {
+    expect(mergeAdjacentProposals([P({ kind: "window", room: "R1", side: "top", start: 0.1, end: 0.4 }), P({ kind: "door", room: "R1", side: "top", start: 0.42, end: 0.6 })], ROOMS, U)).toHaveLength(2);
+    // 0.2 of a 4 m side = 0.8 m of wall between them — two windows.
+    expect(mergeAdjacentProposals([P({ kind: "window", room: "R1", side: "top", start: 0.1, end: 0.3 }), P({ kind: "window", room: "R1", side: "top", start: 0.5, end: 0.7 })], ROOMS, U)).toHaveLength(2);
+  });
+});
+
+describe("widths: confirm fixes position and kind, never the width", () => {
+  it("a width printed on the drawing is measured; an estimated one is derived", () => {
+    const { openings } = snapProposals([P({ kind: "window", room: "R1", side: "top", start: 0.25, end: 0.5, printed_width_mm: 1800 }), P({ kind: "door", room: "R1", side: "bottom", start: 0.4, end: 0.6, printed_width_mm: 40 })], ROOMS, U);
+    expect(openings.find((o) => o.kind === "window")).toMatchObject({ width_mm: 1800, detection: { width_source: "printed" } });
+    // An implausible printed figure is ignored, never used.
+    expect(openings.find((o) => o.kind === "door")).toMatchObject({ width_mm: 800, detection: { width_source: "estimated" } });
+  });
+
+  it("the panel says ≈ width — check until it is measured", () => {
+    expect(openingWidthLabel({ width_mm: 1800, derived: true })).toEqual({ text: "≈ 1.80 m — check", derived: true });
+    expect(openingWidthLabel({ width_mm: 1800, derived: false })).toEqual({ text: "1.80 m", derived: false });
+    const rows = [
+      { id: "a", kind: "window", room_id: DINING, source: "detected", confirmed_at: "x", derived: true },
+      { id: "b", kind: "window", room_id: DINING, source: "detected", confirmed_at: "x", derived: false },
+      { id: "c", kind: "window", room_id: DINING, source: "detected", confirmed_at: null, derived: true },
+    ];
+    expect(widthsToCheck(rows).map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("a wall line net of an opening with a derived width carries the derived mark", () => {
+    const graph = (derived: boolean) =>
+      buildPlanGraph({
+        projectId: "p",
+        planId: "pl",
+        scale: "1:100",
+        total_area_m2: 35,
+        rooms: ROOMS.map((r) => ({ id: r.id, name_en: r.name, name_ar: null, room_type: r.room_type, area_m2: r.area_m2, polygon: r.polygon })),
+        openings: [{ id: "w1", type: "window", position: [0.1, 0.35], width_mm: 2000, height_mm: 2600, sill_mm: 0, source: "detected", derived }],
+      });
+    const line = (derived: boolean) => assembleMappedSections(quantifyPlan(graph(derived))).flatMap((s) => s.lines).find((l) => l.work_item_key === "wall_plaster")!;
+    expect(line(true)).toMatchObject({ qty_derived: true });
+    expect(line(true).notes).toContain("1 of these opening sizes is derived");
+    expect(line(false).qty_derived).toBeUndefined();
+    // The quantity itself does not depend on the flag.
+    expect(line(true).quantity).toBe(line(false).quantity);
   });
 });
 

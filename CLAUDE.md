@@ -692,8 +692,14 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
   app's outlines often sit 0.5–1.5 m off the drawn walls and a sheet point would
   miss them. `snapProposals` / `sidePlacement` (pure) put each on the room's
   outermost wall on that side that covers it (`deriveWallSegments` — the take-off's
-  walls), size it at the plan's metre scale, clamp implausible widths, and merge
-  the same opening seen from both rooms. **The frame**: a parsed plan saved from
+  walls), size it as its share of the room's side at the plan's metre scale (not
+  clipped to one wall segment), clamp implausible widths, and merge the same
+  opening seen from both rooms. **Split glazing** (follow-up): readings of the
+  same kind end to end on one side across a ≤ 0.4 m gap (`MULLION_GAP_M`) are
+  ONE opening (`mergeAdjacentProposals`, `detection.merged_from`) — the dev
+  Mudon reading's Bedroom-4 balcony went 0.44 + 0.66 m → 1.53 m. A width
+  PRINTED on the drawing (`printed_width_mm`, plausible for the kind) is the only
+  measured one (`detection.width_source: "printed"`, `derived: false`). **The frame**: a parsed plan saved from
   the editor stores polygons in the 1000 × 600 viewBox; `drawingFrame` relates
   them to the drawing by fitting the editor's uniform scale + offset on the rooms
   the plan and `parsed_json.rooms` share by name (outliers = rooms the owner
@@ -701,7 +707,9 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
 - **When it runs**: once per plan, claimed atomically (`openings_detected_at`) —
   right after the reading (`ReadingPlan` → `startOpeningsDetection`), or lazily
   the first time 01 Plan (`OpeningsCheckPanel`) or Renders (`OpeningsAutoDetect`)
-  opens; no bulk backfill. **Re-detect** on demand replaces only unconfirmed
+  opens; no bulk backfill. Non-blocking: the page renders at once with
+  "Finding windows and doors…" in the panel and fills in when the run ends (the
+  rows are re-read BEFORE the state flips, so "none found" never flashes). **Re-detect** on demand replaces only unconfirmed
   finds; a confirmed or hand-drawn opening is never touched and a find on one is
   dropped. A re-parse resets both (`resetOpeningsDetection`). Routes:
   `GET/POST /api/plan-openings/detect`, `POST /api/plan-openings/confirm
@@ -709,9 +717,14 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
 - **Derived until confirmed.** An unconfirmed find is DERIVED (dashed, "found ·
   to confirm"): `derivePlanGraph` leaves it out by default, so no BoQ, drawing,
   schedule or viewer counts it (`{ includeUnconfirmed: true }` adds it, flagged
-  `unconfirmed`). Confirming (Confirm / Confirm all, or adjusting it on the
-  Openings layer — a drag or a resize confirms) = measured: `derived` clears and
-  a `design_edit` event `layer: "openings_confirmed"` is the revision cause
+  `unconfirmed`). **Confirm = position + kind** (follow-up, ruled 14 Oct):
+  Confirm / Confirm all / adjusting it on the Openings layer sets `confirmed_at`
+  and NEVER clears `derived` — the WIDTH stays derived until entered on the plan
+  (both dimensions → measured, the A5 rule) or printed on the drawing. The panel
+  shows "≈ 1.80 m — check" (`openingWidthLabel`) and a "WIDTHS TO CHECK · N"
+  list (`widthsToCheck`); a wall / paint / wet-tiling line net of a derived
+  opening size carries `qty_derived` (the derived mark) and says so in its notes
+  (`TakeoffItem.derived_opening_refs`). Confirming writes a `design_edit` event `layer: "openings_confirmed"` is the revision cause
   **"Openings confirmed"** (item keys `wall_plaster`, `wall_paint`, `wet_tiling` —
   the lines net of openings); `changesSinceRevision` counts it, so the rail and
   Regenerate say the BoQ moved. Edits to a counted opening are `layer: "openings"`
@@ -734,6 +747,44 @@ side wall". Migrations **059** (`plan_openings.source = 'detected'`,
   project, one parse + detection calls, no renders):
   `node scripts/r10b-openings-check.mjs [port] [--keep]`; accuracy over a
   read-only plan dump: `scripts/r10b-detect-accuracy.ts <dump.json> <outDir>`.
+
+### Plan geometry guards (15 Oct)
+
+- **"Fix overlaps" never moves a room** (`lib/plan/trim-overlaps.ts`, the
+  editor's toolbar and the plan check's "Fix overlaps · N"): the shared floor
+  is TRIMMED from one room of each pair (the surer room keeps it, then the
+  smaller — the parse repair's rule); a room only loses area and stays inside
+  its own outline (`staysWithin`); a room it would remove or a hole it would cut
+  is reported, not done. The old rigid push (`lib/plan/separate.ts`) is deleted
+  — it walked prod Mudon's rooms off the drawing. **Exactly the overlap**
+  (review, 15 Oct): a trim that would split a room is tried the other way round,
+  else reported (`would_split_room`); a trimmed room's `area_m2` drops by
+  exactly the floor removed (`m2PerUnit2`), so the total falls by exactly the
+  floor counted twice (J0 at the plan's scale: 166.1 → 128.6 m² = the rooms
+  combined; the first version mixed re-measured and read areas → 108.8).
+  **Preview first**: the editor shows "trims N rooms · total X → Y m²" with
+  the trimmed outlines drawn, and changes nothing until **Apply**
+  (`data-trim-preview`, `trim-apply` / `trim-cancel`). **Printed sizes**: the
+  room further OVER its printed size loses the shared floor.
+- **Printed-size check** (`lib/plan/printed-sizes.ts`): 01 Plan flags a room
+  whose outline, at the plan's own scale (buildPlanGraph's total ÷ Σ outline),
+  is > 10% off the size the sheet prints (`parsed_json.rooms[].area_source =
+  "measured"`, matched by name; a name printed twice or a renamed room gets
+  none) — "Bedroom 3 is drawn at 28.4 m² — the sheet prints 19.9 m² (43% over)."
+- **Mudon alignment — diagnosed, NOT fixed** (owner ruling: no parsing change
+  until reviewed). `lib/parse/__tests__/mudon-alignment.test.ts` over
+  `lib/parse/__fixtures__/mudon-sheet-reading.json` (the sheet's labels, region,
+  scale + one raw model reading): its two `it.fails` are the acceptance criteria
+  (every printed tag inside its own room; every printed size within 10%) — flip
+  them to `it` with the fix. K_BACKLOG → "Mudon alignment".
+- **Floor coverage** (`lib/plan/coverage.ts`): the plan check warns "Rooms cover
+  X of ~Y m² — a room may be missing" below 90% of the reading's whole-floor
+  estimate (`parse.provider_total_area_m2`); no estimate, no check.
+- **R10c cameras** (`lib/render/cameras.ts`, pure): arms = the fewest maximal
+  rectangles; an arm counts when both sides of the floor it adds are ≥ 1.5 m;
+  < 2 counting arms → 2 views from the main arm's ends, else one per arm, max
+  3; every camera inside its room with ≥ 0.4 m to every wall, else dropped.
+  K_BACKLOG → "Plan geometry" / "R10c" has the measurements and open items.
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 

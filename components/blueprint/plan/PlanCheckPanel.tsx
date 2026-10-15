@@ -8,7 +8,7 @@
 // detector, lib/plan/plan-check.ts over lib/plan/overlaps.ts). The panel says
 // so as the inverse block — how many pairs, how much floor is counted twice,
 // what it would do to the price — with the two ways out: Fix overlaps (the
-// editor's own separation, then Save) and Re-run parse (a parsed drawing
+// editor trims shared floor, no room moves, then Save) and Re-run parse (a parsed drawing
 // only). The overlaps are listed largest first; choosing one selects BOTH
 // rooms on the canvas. Below, what is blocked downstream — the rail's own
 // reasons, never a rule of its own.
@@ -21,7 +21,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import type { Coverage } from "@/lib/plan/coverage";
 import type { PlanCheckPair } from "@/lib/plan/plan-check";
+import { printedSizeSentence, type PrintedSizeFlag } from "@/lib/plan/printed-sizes";
 
 import { Button } from "../Button";
 import { Icon } from "../Icon";
@@ -38,9 +40,13 @@ export interface PlanCheckPanelProps {
   /** Downstream steps the plan blocks, with the rail's reason. */
   blocked: { step: string; reason: string }[];
   summary: { rooms: number; area: string; label: string };
+  /** 15 Oct: rooms against the reading's whole-floor estimate (lib/plan/coverage.ts). */
+  coverage?: Coverage | null;
+  /** 15 Oct: rooms more than 10% off the size the sheet prints (lib/plan/printed-sizes.ts). */
+  printed?: PrintedSizeFlag[];
 }
 
-export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, summary }: PlanCheckPanelProps) {
+export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, summary, coverage, printed = [] }: PlanCheckPanelProps) {
   const router = useRouter();
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,7 +87,7 @@ export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, s
               </Button>
             ) : null}
           </div>
-          <p className="t-label-md mt-3 opacity-80">Fix overlaps moves rooms apart without reshaping them; then save. Nothing is priced until no two rooms share floor.</p>
+          <p className="t-label-md mt-3 opacity-80">Fix overlaps trims the shared floor from one room of each pair — no room moves; then save. Nothing is priced until no two rooms share floor.</p>
           {error ? (
             <p role="alert" className="t-body-sm mt-2">
               {error}
@@ -99,6 +105,46 @@ export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, s
           </p>
         </section>
       )}
+
+      {coverage?.warn ? (
+        <section className="border border-bp-line-strong bg-bp-surface-raised p-5" aria-labelledby="coverage-h" data-plan-coverage="warn">
+          <h2 id="coverage-h" className="t-label-caps flex items-center gap-2 text-bp-ink-primary">
+            <Icon name="flag" size={18} />
+            PLAN CHECK · A ROOM MAY BE MISSING
+          </h2>
+          <p className="t-body-sm mt-3 text-bp-ink-primary">{coverage.sentence}</p>
+          <p className="t-label-md mt-2 text-bp-ink-secondary">
+            The whole-floor figure is the reading&rsquo;s own estimate of the drawing. Add the missing space on the Plan layer, or re-run the parse if a room was not read.
+          </p>
+        </section>
+      ) : null}
+
+      {printed.length ? (
+        <section className="border border-bp-line-strong bg-bp-surface-raised p-5" aria-labelledby="printed-h" data-plan-printed={printed.length}>
+          <h2 id="printed-h" className="t-label-caps flex items-center gap-2 text-bp-ink-primary">
+            <Icon name="flag" size={18} />
+            PLAN CHECK · {printed.length} {printed.length === 1 ? "ROOM" : "ROOMS"} OFF THE PRINTED SIZE
+          </h2>
+          <ul className="mt-2">
+            {printed.map((f) => (
+              <li key={f.id} className="border-b border-bp-line-hairline last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent(PLAN_SELECT_ROOMS_EVENT, { detail: { ids: [f.id] } }))}
+                  className="t-body-sm flex min-h-11 w-full items-center gap-3 px-1 py-2 text-left text-bp-ink-primary hover:bg-bp-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring"
+                  data-printed-room={f.id}
+                >
+                  <span className="flex-1">{printedSizeSentence(f)}</span>
+                  <Icon name="chevron_right" size={18} className="text-bp-ink-tertiary" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="t-label-md mt-2 text-bp-ink-secondary">
+            The outline is measured at this plan&rsquo;s scale; the sheet&rsquo;s figure is the room&rsquo;s printed dimensions. Reshape the outline on the Plan layer, or re-run the parse.
+          </p>
+        </section>
+      ) : null}
 
       {pairs.length ? (
         <section aria-labelledby="overlaps-h">
