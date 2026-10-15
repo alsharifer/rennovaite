@@ -103,6 +103,8 @@ export interface BoqInputs {
   referenceRows: ReferenceRateRow[];
   /** K12: Q-11's context — a stairs room on the plan at all (in scope or not), and a villa / multi-level project. */
   stairs?: StairsContext;
+  /** 15 Oct: house openings the plan rules left out ("Needs a wall"), recorded on the document. */
+  openingsNeedWall?: string[];
 }
 
 /** Why a project cannot be priced: the HTTP status and body the route answers with. */
@@ -262,8 +264,10 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   // deciding a pricing path. The mapping now runs whenever the plan yields a
   // take-off; the viewer flag gates only the viewer and inspect UI.
   let takeoffItems: TakeoffItem[] = [];
+  let openingsNeedWall: string[] = [];
   try {
     const graph = await derivePlanGraph(projectId);
+    openingsNeedWall = graph.openings_need_wall ?? [];
     const proposed = await getProposedGraph(projectId);
     takeoffItems = quantifyPlan(graph, { proposed });
     if (!opts.dryRun) await persistTakeoffItems(projectId, takeoffItems, supabase);
@@ -279,7 +283,7 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   const referenceRows = await loadReferenceRows(supabase);
 
   return {
-    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs },
+    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs, ...(openingsNeedWall.length ? { openingsNeedWall } : {}) },
   };
 }
 
@@ -352,7 +356,10 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
   const owned = applyOwnBasis(gardened as unknown as Parameters<typeof applyOwnBasis>[0], await loadAppliedCorrections(supabase, projectId)).boq as unknown as typeof gardened;
   // L1: the firm's OH&P, LAST — its own summary line over the priced
   // subtotal, never inside a rate. A no-op without a firm book.
-  return applyOhp(owned, firm.ohpPct);
+  const priced = applyOhp(owned, firm.ohpPct);
+  // 15 Oct: the openings left out as "Needs a wall" — the record the revision
+  // diff names ("N openings need a wall"). Absent when none (every BoQ before).
+  return inputs.openingsNeedWall?.length ? { ...priced, openings_need_wall: inputs.openingsNeedWall } : priced;
 }
 
 /** Load + price in one call (the dry-run scripts and the invariance test). */

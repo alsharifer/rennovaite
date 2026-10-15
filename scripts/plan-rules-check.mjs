@@ -7,11 +7,11 @@
 // Parks as the owner left it on 15 Oct: 12 rooms, 16 openings) as a SCRATCH
 // project on DEV, opens 01 Plan signed in, and checks:
 //   1. "PLAN RULES" lists the audit (2 unnamed zones blocking regenerate, the
-//      garden-edge door needing a wall, the Hall's Arabic label, the skewed
+//      garden-edge door exempt (ruled 15 Oct), the Hall's Arabic label, the skewed
 //      outlines) and the top bar's "⚑ N TO FIX" carries the same count;
 //   2. the rail refuses regenerate with "no name";
-//   3. the Openings layer draws every opening on the wall it sits on and the
-//      garden-edge door as "Needs a wall";
+//   3. the Openings layer draws every opening on the wall it sits on, none as
+//      "Needs a wall", and the garden-edge door as a garden opening;
 //   4. "Keep anyway" on a soft rule moves it to "Kept anyway"; Undo puts it back;
 //   5. every room label stays inside its room's box.
 // Refuses production; the scratch project is removed afterwards (--keep leaves it).
@@ -89,7 +89,7 @@ try {
   console.log(rules.map((x) => `      ${x}`).join("\n"));
   const has = (rule, re) => rules.some((x) => x.startsWith(rule + "|") && (!re || re.test(x)));
   check("2 unnamed zones block regenerate", rules.filter((x) => x.startsWith("unnamed|blocks|")).length === 2);
-  check("the door on the garden edge needs a wall", has("on_wall", /edge of Grass — not a wall/));
+  check("the door on the garden edge is exempt (garden openings are not the house rules')", !rules.some((x) => /in Grass/.test(x)) && !has("on_wall"));
   check("the Hall's Arabic label is flagged", has("label_lang", /Hall: the Arabic label still says/));
   check("the skewed outlines are flagged (Entrance Foyer, Kitchen, Powder Room)", ["Entrance Foyer", "Kitchen", "Powder Room"].every((n) => has("skew", new RegExp(n))));
   const navCount = Number(await q(`document.querySelector('[data-issues-navigator]')?.getAttribute('data-issue-count') ?? 0`));
@@ -122,7 +122,8 @@ try {
   await q(`[...document.querySelectorAll('[aria-label="Plan layers"] button')].find((x) => /Openings/.test(x.textContent)).click()`);
   await b.until(`!document.body.textContent.includes('Loading openings')`, 15000);
   const needs = await q(`document.querySelectorAll('[data-needs-wall]').length`);
-  check("the garden-edge door is drawn as Needs a wall (the only one)", needs === 1, `${needs}`);
+  const gardenMarks = await q(`document.querySelectorAll('[data-garden-opening]').length`);
+  check("no opening needs a wall; the garden-edge door is drawn as a garden opening", needs === 0 && gardenMarks === 1, `needs a wall ${needs}, garden ${gardenMarks}`);
   const spill2 = await q(`(() => {
     const out = [];
     for (const g of document.querySelectorAll('svg g')) {

@@ -808,10 +808,17 @@ fixture `lib/plan/__fixtures__/jumeirah-parks-plan-15oct.json`); live:
   wall shorter than it; 3 0.1 m clear each end, no overlap on one wall, height
   ≤ ceiling (2.9 m), sill + height ≤ ceiling; 4 an archway between two rooms (a
   terrace counts, a lawn does not), an outside door/window with nothing / a
-  terrace / a garden beyond, a door or window with a roofed room on one side.
-  **"Needs a wall"** (rules 1–2, or on a garden edge): `derivePlanGraph` and the
-  render loader leave it out (`openingsOnWalls`); the editor draws a dashed "!"
-  marker that drags back onto a wall.
+  terrace / a garden beyond. **"Needs a wall"** (rules 1–2): `derivePlanGraph`
+  and the render loader leave it out (`openingsOnWalls`); the editor draws a
+  dashed "!" marker that drags back onto a wall. Each revision records the ids
+  (`openings_need_wall` on the BoQ document, absent when none) and the diff
+  names the change on the lines net of openings: **"N openings need a wall"** /
+  "N openings back on a wall" (`needsWallCause`).
+- **Gardens are exempt** (ruled 15 Oct, `inGarden`): a gate, anything in a
+  garden wall (`context_id`), on a garden zone's edge or inside a garden zone —
+  no rule, never "Needs a wall", a plain marker in the editor. And
+  `buildPlanGraph` snaps an opening to a wall only within 0.15 m (before: any
+  distance — a door on a lawn's edge came off the nearest house wall).
 - **Openings move with their wall** (`lib/plan/opening-anchor.ts`):
   `/api/update-plan` reads the old outlines and openings, fits the frame change
   (one scale + offset over rooms that kept their corner count — a save can re-fit

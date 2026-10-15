@@ -239,7 +239,7 @@ export async function derivePlanGraph(projectId: string, opts: { includeUnconfir
   );
   const openings = loadedOpenings.filter((o) => onWalls.has(o.id));
 
-  return buildPlanGraph({
+  const graph = buildPlanGraph({
     projectId,
     planId: plan.id,
     scale: parsed?.scale ?? null,
@@ -259,4 +259,7 @@ export async function derivePlanGraph(projectId: string, opts: { includeUnconfir
     dims_note: authored.dims_note ?? null,
     source: authored.source,
   });
+  // Recorded so the BoQ can name them ("N openings need a wall") — absent when none.
+  const excluded = loadedOpenings.filter((o) => !onWalls.has(o.id)).map((o) => o.id).sort();
+  return excluded.length ? { ...graph, openings_need_wall: excluded } : graph;
 }

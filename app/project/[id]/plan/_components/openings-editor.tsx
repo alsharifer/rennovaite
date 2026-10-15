@@ -48,7 +48,7 @@ import { roomNameLabel as nameLabel } from "./label-render";
 import { Icon } from "@/components/blueprint/Icon";
 import { OPENINGS_CHANGED_EVENT } from "@/components/blueprint/plan/OpeningsCheckPanel";
 import { isUnconfirmedDetected, type DetectionMeta } from "@/lib/plan/openings-vocab";
-import { END_CLEAR_M, hardProblemFor, ON_WALL_TOL_M, wallAt, type RuleOpening, type RuleRoom } from "@/lib/plan/plan-rules";
+import { END_CLEAR_M, hardProblemFor, inGarden, ON_WALL_TOL_M, wallAt, type RuleOpening, type RuleRoom } from "@/lib/plan/plan-rules";
 
 import {
   CANVAS_FRAME,
@@ -688,8 +688,17 @@ export function OpeningsEditor({
             const wall = wallFor(o);
             if (!o.position) return null;
             if (!wall) {
-              // Rule 1/2: on no wall — out of the BoQ and the renders until it is put back on one.
               const c = fit.toViewBox(o.position);
+              // In the garden (a gate, a garden wall, a zone edge): exempt from the house rules (15 Oct).
+              if (inGarden(asRule(o), ruleRooms, 1 / rawPerM)) {
+                return (
+                  <g key={o.id} data-garden-opening={o.id} className="cursor-pointer" onPointerDown={(e) => { e.stopPropagation(); setSelectedOpeningId(o.id); }}>
+                    <title>{`${o.kind} in the garden — not on a house wall`}</title>
+                    <circle cx={c[0]} cy={c[1]} r={6} fill={SVG.inkSecondary} stroke={o.id === selectedOpeningId ? SVG.brass : "none"} strokeWidth={2} />
+                  </g>
+                );
+              }
+              // Rule 1/2: on no wall — out of the BoQ and the renders until it is put back on one.
               return (
                 <g key={o.id} onPointerDown={(e) => onOpeningPointerDown(e, o)} className={readOnly ? undefined : "cursor-grab"} style={{ touchAction: "none" }} data-needs-wall={o.id}>
                   <title>{`${o.kind} — needs a wall: drag it onto one`}</title>
@@ -730,7 +739,7 @@ export function OpeningsEditor({
         <OpeningProperties
           key={`${selectedOpening.id}:${selectedOpening.width_mm}:${selectedOpening.height_mm}:${selectedOpening.sill_mm}`}
           opening={selectedOpening}
-          needsWall={!wallFor(selectedOpening)}
+          needsWall={!wallFor(selectedOpening) && !inGarden(asRule(selectedOpening), ruleRooms, 1 / rawPerM)}
           onChange={(patch) => {
             const no = refusal({ ...selectedOpening, ...(patch as Partial<PlanOpening>) });
             if (no) {

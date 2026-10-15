@@ -6,11 +6,14 @@ import { describe, expect, it } from "vitest";
 import fixture from "../__fixtures__/jumeirah-parks-plan-15oct.json";
 import { deriveWallSegments } from "../geometry";
 import { abbreviations, fitRoomLabel, labelInside } from "../label-fit";
+import { needsWallCause } from "../../boq/revision-causes";
+import { buildPlanGraph } from "../geometry";
 import { reanchorOpenings } from "../opening-anchor";
 import { planRuleIssues } from "../plan-issues";
 import {
   checkPlan,
   hardProblemFor,
+  inGarden,
   metresPerUnit,
   ON_WALL_TOL_M,
   openingsOnWalls,
@@ -152,6 +155,42 @@ describe("plan rules — soft (listed, can be kept)", () => {
   });
 });
 
+describe("gardens are exempt (ruled 15 Oct)", () => {
+  // A garden: the house (roofed), a paved terrace zone and a lawn, a boundary wall with a gate.
+  const house = room("house", rect(0, 0, 6, 4), { room_type: "living", name_en: "Living" });
+  const paving = room("paving", rect(0, 4, 6, 3), { room_type: "paving", unroofed: true, name_en: "Paving" });
+  const lawn = room("lawn", rect(0, 7, 6, 5), { room_type: "artificial_grass", unroofed: true, name_en: "Lawn" });
+  const garden = [house, paving, lawn];
+  const gateInWall: RuleOpening = { id: "gate", kind: "gate", width_mm: 1200, height_mm: 2000, sill_mm: 0, position: [3, 12], context_id: "wall-1" };
+  const gateOnEdge: RuleOpening = { id: "gate2", kind: "gate", width_mm: 1000, height_mm: 2000, sill_mm: 0, position: [6, 9] };
+  const doorBetweenZones = op("zone-door", "door", 2, 7, 900);
+  const doorInLawn = op("lawn-door", "door", 3, 9.5, 900);
+  const patioDoor = op("patio", "door", 3, 4, 900, { detection: { opens_to: "outside" } });
+
+  it("a boundary gate, a gate on a zone edge and a door between zones raise nothing and need no wall", () => {
+    const r = checkPlan({ rooms: garden, openings: [gateInWall, gateOnEdge, doorBetweenZones, doorInLawn, patioDoor], mPerU: 1 });
+    expect(r.violations.filter((v) => v.opening_id)).toEqual([]);
+    expect(r.needsWall.size).toBe(0);
+    for (const o of [gateInWall, gateOnEdge, doorBetweenZones, doorInLawn]) expect(inGarden(o, garden, 1), o.id).toBe(true);
+    expect(inGarden(patioDoor, garden, 1)).toBe(false); // the house wall onto the terrace is the house's
+  });
+
+  it("none of them is deducted from a house wall: the graph snaps only within 0.15 m", () => {
+    const g = buildPlanGraph({ projectId: "p", planId: "pl", scale: null, total_area_m2: 72, rooms: garden.map((r) => ({ id: r.id, name_en: r.name_en ?? null, name_ar: null, room_type: r.room_type ?? null, area_m2: null, polygon: (r.polygon as Pt[]).map(([x, y]) => [x / 6, y / 6]), unroofed: r.unroofed ?? null })), openings: [doorInLawn, patioDoor].map((o) => ({ id: o.id, type: o.kind, width_mm: o.width_mm, position: [(o.position as Pt)[0] / 6, (o.position as Pt)[1] / 6] })), unit_to_m: 6 });
+    expect(g.openings.find((o) => o.id === "lawn-door")!.wall_id).toBeNull();
+    expect(g.openings.find((o) => o.id === "patio")!.wall_id).not.toBeNull();
+  });
+});
+
+describe("the revision cause: N openings need a wall", () => {
+  it("names the openings a revision newly left out (and the ones back on a wall), on the lines net of openings", () => {
+    expect(needsWallCause({}, { openings_need_wall: ["a", "b"] }, "t")).toEqual({ kind: "openings_need_wall", at: "t", summary: "2 openings need a wall", item_keys: ["wall_plaster", "wall_paint", "wet_tiling"] });
+    expect(needsWallCause({ openings_need_wall: ["a", "b"] }, { openings_need_wall: ["b"] }, "t")?.summary).toBe("1 opening back on a wall");
+    expect(needsWallCause({ openings_need_wall: ["a"] }, { openings_need_wall: ["a"] }, "t")).toBeNull();
+    expect(needsWallCause({}, {}, "t")).toBeNull(); // every BoQ before the rules
+  });
+});
+
 describe("rule 2 — openings move with their wall", () => {
   it("a wall dragged out carries its door at the same fraction along it", () => {
     const before = [bed, study, hall];
@@ -199,20 +238,31 @@ describe("Jumeirah Parks (prod, 15 Oct)", () => {
     }
   });
 
-  it("the door left on the garden edge (the old powder-room door): not a wall — Needs a wall, drawn as such", () => {
+  it("the door left on the garden edge (the old powder-room door) is in the garden: exempt, never deducted from a house wall", () => {
     const door = openings.find((o) => o.id.startsWith("7df86cda"))!;
     const r = checkPlan({ rooms, openings, mPerU });
-    expect(r.placements.get(door.id)!.sides.map((id) => rooms.find((x) => x.id === id)?.name_en ?? null)).toEqual(["Grass", null]);
-    expect(rules(r.violations, door.id)).toEqual(["on_wall"]);
-    expect(r.needsWall.has(door.id)).toBe(true);
-    expect(wallAt(walls, door.position as Pt, ON_WALL_TOL_M / mPerU)).toBeNull(); // the editor agrees: no wall there
-    expect(hardProblemFor(door, [], rooms, mPerU)?.rule).toBe("exterior_wall"); // and refuses a drop there
+    expect(inGarden(door, rooms, mPerU)).toBe(true);
+    expect(rules(r.violations, door.id)).toEqual([]);
+    expect(r.needsWall.has(door.id)).toBe(false);
+    expect(wallAt(walls, door.position as Pt, ON_WALL_TOL_M / mPerU)).toBeNull(); // no house wall there to deduct from
+    expect(hardProblemFor(door, [], rooms, mPerU)).toBeNull();
+  });
+
+  it("Jumeirah Parks Garden with a boundary gate: the gate is exempt from every rule", () => {
+    const grass = rooms.find((x) => x.name_en === "Grass")!.polygon as Pt[];
+    const [a, b] = [grass[0]!, grass[1]!]; // an outer edge of the lawn
+    const gate: RuleOpening = { id: "gate-1", kind: "gate", width_mm: 1200, height_mm: 2000, sill_mm: 0, position: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+    const inWall: RuleOpening = { ...gate, id: "gate-2", kind: "door", context_id: "boundary-wall-1" };
+    const r = checkPlan({ rooms, openings: [...openings, gate, inWall], mPerU });
+    expect(r.violations.filter((v) => v.opening_id === "gate-1" || v.opening_id === "gate-2")).toEqual([]);
+    expect(openingsOnWalls([gate, inWall], rooms, mPerU).map((o) => o.id)).toEqual(["gate-1", "gate-2"]);
+    expect(hardProblemFor(gate, openings, rooms, mPerU)).toBeNull();
   });
 
   it("the audit: what the rules list on the plan as left", () => {
     const r = checkPlan({ rooms, openings, mPerU });
-    // Every opening but the garden-edge door is on its wall — the drawing was wrong, not the data.
-    expect([...r.needsWall].map((id) => id.slice(0, 8))).toEqual(["7df86cda"]);
+    // Every opening is on its wall (the garden-edge door is exempt) — the drawing was wrong, not the data.
+    expect(r.needsWall.size).toBe(0);
     expect(r.violations.filter((v) => v.rule === "unnamed")).toHaveLength(2);
     expect(r.violations.find((v) => v.rule === "label_lang")?.room_id).toBe(rooms.find((x) => x.name_en === "Hall")!.id);
     const skewed = r.violations.filter((v) => v.rule === "skew").map((v) => rooms.find((x) => x.id === v.room_id)!.name_en);

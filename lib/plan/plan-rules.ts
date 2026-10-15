@@ -23,6 +23,10 @@
 //   4 archway_shared / exterior_wall
 //                   an archway joins two rooms; an exterior door or window
 //                   has nothing (or a terrace / garden) on the other side.
+// Exempt (ruled 15 Oct): gates, anything in a garden wall (`context_id`) and
+// anything on a garden zone's edge or inside a garden zone — the garden is
+// drawn with its own layers; these rules are for the house. They are never
+// "Needs a wall" and never deducted from a house wall.
 // Soft — listed, can be kept:
 //   5 wet_room_door  6 window_interior  7 no_way_in  8 size  9 skew  11 label_lang
 // Blocks regenerate:
@@ -270,6 +274,7 @@ export function placementsOverlap(A: Placement, wA: number, B: Placement, wB: nu
 export function hardProblemFor(o: RuleOpening, others: readonly RuleOpening[], rooms: readonly RuleRoom[], mPerU: number, ceilingM = CEILING_DEFAULT_M): { rule: RuleKey; message: string } | null {
   const cand = withWidth(o);
   const pl = placeOpening(cand, rooms, mPerU);
+  if (inGarden(cand, rooms, mPerU, pl)) return null;
   if (!pl) return { rule: "on_wall", message: "An opening sits on a wall — drop it on one." };
   const byId = new Map(rooms.map((r) => [r.id, r]));
   const sides: [RuleRoom | null, RuleRoom | null] = [pl.sides[0] ? byId.get(pl.sides[0])! : null, pl.sides[1] ? byId.get(pl.sides[1])! : null];
@@ -307,13 +312,29 @@ export function fitProblem(o: Pick<RuleOpening, "kind" | "width_mm" | "height_mm
 export function wallKindProblem(o: Pick<RuleOpening, "kind" | "detection" | "spec">, sides: [RuleRoom | null, RuleRoom | null]): { rule: RuleKey; message: string } | null {
   const [s1, s2] = sides;
   if (o.kind === "archway" && !(isRoom(s1) && isRoom(s2))) return { rule: "archway_shared", message: "An archway joins two rooms — this wall has nothing on the other side." };
-  if ((o.kind === "door" || o.kind === "window") && !isRoom(s1) && !isRoom(s2)) {
-    return { rule: "exterior_wall", message: `A ${o.kind} needs a room on one side — this edge is between ${s1?.name_en ?? "nothing"} and ${s2?.name_en ?? "nothing"}.` };
-  }
   if ((o.kind === "door" || o.kind === "window") && isExterior(o as RuleOpening) && !isOutside(s1) && !isOutside(s2)) {
     return { rule: "exterior_wall", message: `An outside ${o.kind} needs nothing on the other side — this wall is between ${s1?.name_en ?? "a room"} and ${s2?.name_en ?? "a room"}.` };
   }
   return null;
+}
+
+const isGardenZone = (r: RuleRoom | null | undefined) => !!r && (isOutdoorType(r.room_type) || r.unroofed === true);
+
+/**
+ * In the garden: a gate, an opening in a garden wall, or one on a garden zone's
+ * edge (no roofed room either side) or inside a garden zone. Exempt from the
+ * plan rules (ruled 15 Oct).
+ */
+export function inGarden(o: RuleOpening, rooms: readonly RuleRoom[], mPerU: number, pl: Placement | null = placeOpening(o, rooms, mPerU)): boolean {
+  if (o.kind === "gate" || o.context_id) return true;
+  const byId = new Map(rooms.map((r) => [r.id, r]));
+  if (pl) return !pl.sides.some((id) => id && !isGardenZone(byId.get(id)));
+  const p = asPt(o.position);
+  return !!p && rooms.some((r) => {
+    if (!isGardenZone(r)) return false;
+    const poly = asPoly(r.polygon);
+    return !!poly && pointInPolygon(p, poly);
+  });
 }
 
 export interface PlanRulesInput {
@@ -343,7 +364,7 @@ export function checkPlan({ rooms, openings, mPerU, ceilingM = CEILING_DEFAULT_M
   };
   const placements = new Map<string, Placement>();
   const needsWall = new Set<string>();
-  const roomOpenings = openings.filter((o) => o.kind !== "gate" && !o.context_id).map(withWidth);
+  const roomOpenings = openings.filter((o) => o.kind !== "gate" && !o.context_id).map(withWidth).filter((o) => !inGarden(o, rooms, mPerU));
   const label = (o: RuleOpening) => {
     const pl = placements.get(o.id);
     const where = pl ? pl.sides.filter(Boolean).map((id) => name(id)).join(" / ") : name(o.room_id);
@@ -361,13 +382,6 @@ export function checkPlan({ rooms, openings, mPerU, ceilingM = CEILING_DEFAULT_M
     placements.set(o.id, pl);
     const sides: [RuleRoom | null, RuleRoom | null] = [pl.sides[0] ? byId.get(pl.sides[0])! : null, pl.sides[1] ? byId.get(pl.sides[1])! : null];
     const roofed = sides.some((s) => s && !isOutdoorType(s.room_type) && s.unroofed !== true);
-    if (!roofed) {
-      // The edge of a garden zone with nothing roofed beside it is a change of surface,
-      // not a wall (the G1 open-edge rule: no wall segment is derived there).
-      needsWall.add(o.id);
-      push("on_wall", `${label(o)} is on the edge of ${sides.filter(Boolean).map((x) => x!.name_en?.trim() || "a zone").join(" / ") || "nothing"} — not a wall. Needs a wall.`, { opening_id: o.id }, o.spec);
-      continue;
-    }
     const fp = fitProblem(o, pl, roofed ? ceilingM : Infinity);
     if (fp?.rule === "wall_short") needsWall.add(o.id);
     if (fp) push(fp.rule, `${label(o)}: ${fp.message}${fp.rule === "wall_short" ? " Needs a wall." : ""}`, { opening_id: o.id }, o.spec);

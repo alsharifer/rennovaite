@@ -116,9 +116,17 @@ over prod as the owner left it (12 rooms, 16 openings):
   Room ↔ Kitchen archway, Living Room south window, Family Room top window, the
   Bath door). Dragging used the same stale wall.
 - **The old powder-room door** (`7df86cda`, detected) sits on the Grass zone's
-  outer edge with nothing beyond — a garden edge, not a wall: **Needs a wall**.
-  The owner drew a new powder-room door (`99fb3d42`); the old one is a
-  duplicate to remove.
+  outer edge with nothing beyond. Gardens are exempt from the rules (ruled
+  15 Oct), so no rule names it — but the owner drew a new powder-room door
+  (`99fb3d42`) and this one is a duplicate to remove by hand.
+- **What the change does to prod BoQs** (scan 15 Oct, read-only; the stored
+  wall id never priced anything — the take-off always snapped by position, but
+  at ANY distance): Mudon pilot villa — 4 hand-drawn openings (2 windows, 2
+  doors, 2 Sep) now off every wall after the old Fix overlaps moved the rooms;
+  the current BoQ (5 Sep) deducted them from the nearest wall; a regenerate
+  drops them with the cause "4 openings need a wall". Jumeirah Parks Garden —
+  only the garden-edge door, not in its current BoQ (13 Oct). Regenerates are
+  the owner's call.
 - **Hard**: the 0.60 m Maid Room ↔ Entrance Foyer door crowds the end of its
   1.35 m wall (rule 3).
 - **Blocks regenerate**: the two "New room" zones (deck 21.1 m², paving 15.2 m²).
