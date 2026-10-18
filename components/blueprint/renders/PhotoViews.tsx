@@ -31,13 +31,32 @@ const FOV_DRAW_DEG = 80;
 
 type Pt = [number, number];
 
-export function PhotoViews({ projectId, roomId, roomName, plan, initialViews, children }: { projectId: string; roomId: string; roomName: string; plan: MiniPlan | null; initialViews: PhotoView[]; /** B2 commit 2: the render controls for the selected view. */ children?: (view: PhotoView) => React.ReactNode }) {
+export function PhotoViews({ projectId, roomId, roomName, plan, initialViews, spendAed = null, referenceStyle = null, children }: { projectId: string; /** B2: the look the client's references share, in words. */ referenceStyle?: { text: string; at: string } | null; roomId: string; roomName: string; plan: MiniPlan | null; initialViews: PhotoView[]; /** The cost guard: this project's render spend so far (AED). */ spendAed?: number | null; /** The render controls for the selected view. */ children?: (view: PhotoView, setSpend: (aed: number) => void) => React.ReactNode }) {
   const ids = useId();
   const [views, setViews] = useState(initialViews);
   const [selected, setSelected] = useState<string | null>(initialViews[0]?.id ?? null);
   const [busy, setBusy] = useState<null | "upload" | "place">(null);
   const [error, setError] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ from: Pt; to: Pt } | null>(null);
+  const [spend, setSpend] = useState(spendAed);
+  const [refStyle, setRefStyle] = useState(referenceStyle);
+  const [reading, setReading] = useState(false);
+
+  async function readReferences() {
+    if (reading) return;
+    setReading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/reference-style`, { method: "POST" });
+      const body = (await res.json().catch(() => null)) as { reference_style?: { text: string; at: string }; error?: string } | null;
+      if (!res.ok || !body?.reference_style) throw new Error(body?.error ?? `Not read (${res.status}).`);
+      setRefStyle(body.reference_style);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The references could not be read.");
+    } finally {
+      setReading(false);
+    }
+  }
   const file = useRef<HTMLInputElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const view = views.find((v) => v.id === selected) ?? null;
@@ -149,13 +168,25 @@ export function PhotoViews({ projectId, roomId, roomName, plan, initialViews, ch
         <h2 id={`${ids}-h`} className="t-heading-sm text-bp-ink-primary">
           Your photos <span className="t-label-md font-bp-mono text-bp-ink-secondary">· {views.length}</span>
         </h2>
+        {spend != null ? (
+          <span className="t-label-md font-bp-mono tabular-nums text-bp-ink-secondary" data-render-spend={spend.toFixed(2)}>
+            Render spend · AED {spend.toFixed(2)}
+          </span>
+        ) : null}
         <button type="button" onClick={() => file.current?.click()} disabled={busy !== null} className={`inline-flex min-h-11 items-center gap-2 border border-bp-line-control px-4 t-nav-item-active text-bp-ink-primary hover:bg-bp-surface-raised disabled:text-bp-ink-tertiary ${FOCUS}`} data-add-photos="">
           <Icon name="add_photo_alternate" size={18} />
           {busy === "upload" ? "Uploading…" : "Add photos"}
         </button>
         <input ref={file} type="file" accept="image/jpeg,image/png,image/heic,image/heif" multiple className="sr-only" aria-label={`Add photos of ${roomName}`} onChange={(e) => void addPhotos(e.target.files)} />
       </div>
-      <p className="t-body-sm mt-1 text-bp-ink-secondary">Each photo becomes a view of {roomName} — restyled from the photo, so it keeps your real layout. Place each one on the plan: where you stood, and which way the phone faced.</p>
+      <div className="mt-3 border-l-2 border-bp-line-strong pl-3" data-reference-style={refStyle ? "set" : "none"}>
+        <p className="t-label-caps text-bp-ink-tertiary">STYLE FROM YOUR REFERENCES</p>
+        <p className="t-body-sm mt-1 text-bp-ink-primary">{refStyle ? refStyle.text : "Not read yet — add your reference photos on 02 Design, then read them here. Until then views follow your chosen direction."}</p>
+        <button type="button" onClick={() => void readReferences()} aria-disabled={reading} className={`t-nav-item-active mt-1 text-bp-ink-primary underline underline-offset-2 ${FOCUS}`} data-read-references="">
+          {reading ? "Reading your references…" : refStyle ? "Read the references again" : "Read my references"}
+        </button>
+      </div>
+      <p className="t-body-sm mt-3 text-bp-ink-secondary">Each photo becomes a view of {roomName} — restyled from the photo, so it keeps your real layout. Place each one on the plan: where you stood, and which way the phone faced.</p>
 
       {views.length === 0 ? (
         <p className="t-body-sm mt-4 border border-dashed border-bp-line-control px-4 py-6 text-bp-ink-secondary">No photos of {roomName} yet. Add the photos you have — one per corner, looking across the room, covers it.</p>
@@ -247,7 +278,7 @@ export function PhotoViews({ projectId, roomId, roomName, plan, initialViews, ch
           </div>
         </div>
       )}
-      {view && children ? <div className="mt-6">{children(view)}</div> : null}
+      {view && children ? <div className="mt-6">{children(view, setSpend)}</div> : null}
     </section>
   );
 }

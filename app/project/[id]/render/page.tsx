@@ -21,6 +21,8 @@ import { journeyFlagsFromEnv, ownerStepHref } from "@/lib/journey";
 import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 import type { PhotoView } from "@/lib/render/photo-views";
 import { loadMiniPlans, loadPhotoViews, type MiniPlan } from "@/lib/render/photo-views-load";
+import { loadPhotoViewRenders } from "@/lib/render/photo-view-run";
+import { projectRenderSpend } from "@/lib/render/render-spend";
 
 export const dynamic = "force-dynamic";
 
@@ -354,7 +356,7 @@ export default async function RenderPage({
   const detectNeeded = !!plan && !!detectRes && !detectRes.error && !!detectRes.data?.pdf_url && detectRes.data.source !== "user_drawn" && !detectRes.data.openings_detected_at;
 
   // B2 (MULTIVIEW_RENDERS_ENABLED): every photo of a room as a view, and the room plan to place it on.
-  let photoViews: { byRoom: Record<string, PhotoView[]>; plans: Record<string, MiniPlan> } | null = null;
+  let photoViews: { byRoom: Record<string, PhotoView[]>; plans: Record<string, MiniPlan>; renders: Awaited<ReturnType<typeof loadPhotoViewRenders>>; spendAed: number | null; referenceStyle: { text: string; at: string } | null } | null = null;
   if (process.env.MULTIVIEW_RENDERS_ENABLED === "true" && plan) {
     const ids = roomList.map((r) => r.id);
     const planCols = await sbRows.from("plans").select("source, plot_width_m").eq("id", plan.id).maybeSingle<{ source: string | null; plot_width_m: number | null }>();
@@ -362,7 +364,13 @@ export default async function RenderPage({
       loadPhotoViews(sbRows, ids),
       loadMiniPlans(sbRows, projectId, { id: plan.id, total_area_m2: plan.total_area_m2 ?? null, source: planCols.data?.source ?? null, plot_width_m: planCols.data?.plot_width_m ?? null }, ids),
     ]);
-    photoViews = { byRoom, plans };
+    const photoIds = Object.values(byRoom).flat().map((v) => v.id);
+    const [renders, spend, brief] = await Promise.all([
+      loadPhotoViewRenders(sbRows, photoIds),
+      projectRenderSpend(sbRows, projectId),
+      sbRows.from("project_briefs").select("reference_style").eq("project_id", projectId).maybeSingle<{ reference_style: { text: string; at: string } | null }>(),
+    ]);
+    photoViews = { byRoom, plans, renders, spendAed: spend?.render_spend_aed ?? null, referenceStyle: brief.error ? null : brief.data?.reference_style ?? null };
   }
 
   const flags = journeyFlagsFromEnv();

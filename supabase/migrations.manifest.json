@@ -374,6 +374,12 @@
       "version": "20260101006200",
       "name": "room_photo_views",
       "sha256": "ef1cb2fc64148277422372d25b8721bb30e8155a7c414c6f8fdfba44a8ed2dc3"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006300",
+      "name": "photo_view_check_spend",
+      "sha256": "68f6ee298e3e19ac24a270c991115c08869609d9f5bd7f6f877f80112f193600"
     }
   ]
 }

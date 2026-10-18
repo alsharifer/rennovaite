@@ -42,6 +42,7 @@ import { TopBarActions } from "../shell/TopBar";
 import { MaterialPalette } from "./MaterialPalette";
 import { RoomPhoto } from "./RoomPhoto";
 import { PhotoViews } from "./PhotoViews";
+import { PhotoViewRender, type PhotoViewRenderInfo } from "./PhotoViewRender";
 import type { PhotoView } from "@/lib/render/photo-views";
 import type { MiniPlan } from "@/lib/render/photo-views-load";
 
@@ -112,7 +113,7 @@ export function RendersStudio(props: {
   notInScope?: string[];
   planHref?: string;
   /** B2 (MULTIVIEW_RENDERS_ENABLED): each room's photo views and the plan to place them on. */
-  photoViews?: { byRoom: Record<string, PhotoView[]>; plans: Record<string, MiniPlan> } | null;
+  photoViews?: { byRoom: Record<string, PhotoView[]>; plans: Record<string, MiniPlan>; renders: Record<string, PhotoViewRenderInfo>; spendAed: number | null; referenceStyle: { text: string; at: string } | null } | null;
 }) {
   const { projectId, rooms, style } = props;
   const [locked, setLocked] = useState<Set<string>>(() => new Set(props.initialLockedRoomIds));
@@ -663,7 +664,9 @@ export function RendersStudio(props: {
 
         {/* B2: every photo of the room is a view of its own, placed on the plan. */}
         {props.photoViews && room && renderable ? (
-          <PhotoViews key={room.id} projectId={projectId} roomId={room.id} roomName={roomName} plan={props.photoViews.plans[room.id] ?? null} initialViews={props.photoViews.byRoom[room.id] ?? []} />
+          <PhotoViews key={room.id} projectId={projectId} roomId={room.id} roomName={roomName} plan={props.photoViews.plans[room.id] ?? null} initialViews={props.photoViews.byRoom[room.id] ?? []} spendAed={props.photoViews.spendAed} referenceStyle={props.photoViews.referenceStyle}>
+            {(view, setSpend) => <PhotoViewRender key={view.id} view={view} roomName={roomName} initial={props.photoViews!.renders[view.id] ?? null} onSpend={setSpend} />}
+          </PhotoViews>
         ) : null}
 
         {/* Below xl: the palette folds under the view (phone: "Material palette · 4"). */}

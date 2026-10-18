@@ -920,6 +920,44 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
   cameras); live `node --env-file=.env.local scripts/b2-photo-views-check.mjs
   [port]` on the dev test project a2661f34 (five photos through the real file
   input, P1 by drag, P2 by keyboard, P1–P5 at §4, axe light + dark, phone).
+- **Restyle with the layout held** (migration **063**; report
+  `docs/BATHROOM_PILOT_B2.md`): `POST /api/render/photo-view { room_photo_id }`
+  → `lib/render/photo-view-run.ts` → `photo-restyle.ts restyleWithCheck`:
+  `google/nano-banana` edits the photo (`PHOTO_VIEW_ARM = "edit"` — chosen by
+  measured pass rate over depth / canny / kontext / nano-banana-pro: the
+  conditioned paths kept the layout by keeping the OLD finishes, or invented
+  detail), prompted PER VIEW: the fixtures the photo shows with where they are,
+  the ones it does not ("This photo shows no vanity — do not add any"), and only
+  the style elements in view (`styleElementsFor` — a brief that mentions a vanity
+  gets one painted into the window wall). Then the **placement check**
+  (`lib/render/photo-check.ts`, pure `judgePhotoPlacement`; vision reads by
+  `claude-opus-5-5` with structured output): the room's door / window /
+  sanitary fixtures from the plan, read in the BEFORE photo once
+  (`room_photos.before_detection`, keyed by `CHECK_VERSION`) and in the render
+  beside it; every item the photo shows must be there, centre within max(12%,
+  60% of its extent), once, same left/right order, nothing added. One
+  re-render with the findings, then the honest failure "The render moved the
+  vanity — see what differs." (the studio draws both readings). A passed view
+  also gets the **style check** (`checkStyle`, ≥ 0.75 → "Style follows your
+  references ✓", else which elements do not). Size is not checked yet. Photo-view
+  renders are `mode "photo_view"`, `room_photo_id` set, **`room_id` NULL** — so
+  no room-level reader (chains, Generate all, lock progress) mistakes one for the
+  room's day render.
+- **Style from references, text first**: `POST /api/projects/:id/reference-style`
+  reads the project's References (02 Design board images) into one style brief —
+  style only, never layout — on `project_briefs.reference_style`
+  (`lib/render/reference-style.ts`; screenshots are cropped to their photo by
+  `referenceCropBox` in the eval). Images as conditioning are gated:
+  `PHOTO_VIEW_IMAGE_REFS = false` until measured (the R4 test was cut off by
+  Replicate credit).
+- **Cost guard**: every paid call a photo view makes (image model per image,
+  each vision reading per token) is a `render_spend` row (model, size,
+  cost_usd/aed; `lib/render/render-spend.ts`, prices from the Replicate model
+  pages); `projectRenderSpend` = render_spend_aed, shown in the studio.
+- **Checks**: `lib/render/__tests__/photo-check.test.ts`; the eval
+  `scripts/b2-restyle-eval.ts` + `scripts/b2-style-rescore.ts`; live
+  `scripts/b2-photo-view-check.mjs` (studio, five views) and
+  `scripts/b2-deliberate-failure.ts` (a moved vanity must fail honestly).
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 
