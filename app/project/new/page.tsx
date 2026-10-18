@@ -21,7 +21,7 @@ export default function NewProjectPage() {
   return (
     <AccountShell skin="warm">
       <div className="mx-auto max-w-[1100px] px-6 py-10 lg:px-12" data-skin-page="intake">
-        <VillaIntake gardenPilot={process.env.GARDEN_PILOT_ENABLED === "true"} eyebrow={`${step.number} · ${step.label.toUpperCase()}`} />
+        <VillaIntake gardenPilot={process.env.GARDEN_PILOT_ENABLED === "true"} roomIntake={process.env.MULTIVIEW_RENDERS_ENABLED === "true"} eyebrow={`${step.number} · ${step.label.toUpperCase()}`} />
       </div>
     </AccountShell>
   );

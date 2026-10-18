@@ -26,6 +26,7 @@ import { Icon } from "@/components/blueprint/Icon";
 import { ReadingPlan } from "@/components/blueprint/intake/ReadingPlan";
 import { PlotSizeFields } from "@/components/blueprint/plan/PlotSizeFields";
 import { EMPTY_PLOT, parsePlot, type PlotDraft } from "@/lib/plan/plot";
+import { parseIntakeDraft, ROOM_INTAKE_LABEL, ROOM_INTAKE_TYPES, type IntakeDraft, type RoomIntakeType } from "@/lib/plan/room-intake";
 import { AnalyticsEvent, track } from "@/lib/analytics";
 import { DRAWING_DISCIPLINES, KIND_LABEL, type AssetKind } from "@/lib/assets/types";
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
@@ -50,7 +51,7 @@ const PLAN_MAX_BYTES = UPLOAD_LIMITS.plan.maxBytes;
 const ASSET_MAX_BYTES = UPLOAD_LIMITS.project_asset.maxBytes;
 const CITIES = ["Dubai", "Abu Dhabi", "Sharjah", "Ras Al Khaimah", "Ajman"];
 
-type Way = "upload" | "draw" | "photos";
+type Way = "upload" | "draw" | "photos" | "room";
 type UploadResponse = { project_id: string; plan_id: string; pdf_url: string };
 type PlanState =
   | { kind: "idle" }
@@ -75,13 +76,17 @@ const isImageType = (t: string) => /^image\/(png|jpeg)$/.test(t);
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring";
 const INPUT = `h-11 w-full rounded-none border border-bp-line-control bg-bp-surface-raised px-3 t-body-sm text-bp-ink-primary placeholder:text-bp-ink-tertiary ${FOCUS}`;
 
-const WAYS: { key: Way; icon: string; title: string; body: string; garden: boolean }[] = [
-  { key: "upload", icon: "upload_file", title: "Upload a drawing", body: "A PDF or image of your floor plan. We read rooms, openings and dimensions — then you confirm them.", garden: false },
-  { key: "draw", icon: "draw", title: "Draw it yourself", body: "No drawing? Sketch rooms or garden zones on a grid with your own measurements.", garden: true },
-  { key: "photos", icon: "photo_camera", title: "Start from photos", body: "For gardens: photos of each side. We draw the zones with you.", garden: true },
+const WAYS: { key: Way; icon: string; title: string; body: string; needs: "none" | "garden" | "room" }[] = [
+  { key: "upload", icon: "upload_file", title: "Upload a drawing", body: "A PDF or image of your floor plan. We read rooms, openings and dimensions — then you confirm them.", needs: "none" },
+  { key: "draw", icon: "draw", title: "Draw it yourself", body: "No drawing? Sketch rooms or garden zones on a grid with your own measurements.", needs: "garden" },
+  { key: "photos", icon: "photo_camera", title: "Start from photos", body: "For gardens: photos of each side. We draw the zones with you.", needs: "garden" },
+  // B1 (bathroom pilot): one room from a tape measure — then mark its door, window and fixtures.
+  { key: "room", icon: "straighten", title: "One room from its dimensions", body: "Just one room? Type its length, width and height — then mark the door, window and fixtures on it.", needs: "room" },
 ];
 
-export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: boolean; eyebrow: string }) {
+const ROOM_DRAFT: IntakeDraft = { length: "", width: "", height: "" };
+
+export function VillaIntake({ gardenPilot = false, roomIntake = false, eyebrow }: { gardenPilot?: boolean; roomIntake?: boolean; eyebrow: string }) {
   const router = useRouter();
   const ids = useId();
   const [way, setWay] = useState<Way>("upload");
@@ -94,8 +99,10 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
   const [city, setCity] = useState("Dubai");
   const [busy, setBusy] = useState<null | "save" | "parse" | "draw">(null);
   const [error, setError] = useState<string | null>(null);
+  const [roomType, setRoomType] = useState<RoomIntakeType>("bathroom");
+  const [roomDims, setRoomDims] = useState<IntakeDraft>(ROOM_DRAFT);
 
-  const ways = WAYS.filter((w) => !w.garden || gardenPilot);
+  const ways = WAYS.filter((w) => w.needs === "none" || (w.needs === "garden" && gardenPilot) || (w.needs === "room" && roomIntake));
   const projectId = plan.kind === "ready" ? plan.res.project_id : null;
 
   const patchPhoto = useCallback((id: string, p: Partial<AssetItem>) => setPhotos((prev) => prev.map((it) => (it.id === id ? { ...it, ...p } : it))), []);
@@ -204,8 +211,33 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
     }
   }
 
+  /** B1: one room from L × W × H — then 01 Plan opens on the Openings layer to mark the door and window. */
+  async function startRoom() {
+    const dims = parseIntakeDraft(roomDims);
+    if (!dims.ok || busy) return;
+    setBusy("draw");
+    setError(null);
+    try {
+      const res = await fetch("/api/room-from-dimensions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room_type: roomType, length_m: dims.length_m, width_m: dims.width_m, height_m: dims.height_m, name: projectName.trim() || undefined, city }),
+      });
+      const body = (await res.json().catch(() => null)) as { project_id?: string; error?: string } | null;
+      if (!res.ok || !body?.project_id) throw new Error(body?.error ?? `Could not start the room (${res.status}).`);
+      const pid = body.project_id;
+      track(AnalyticsEvent.ProjectStarted, { project_id: pid });
+      await Promise.all([...photos.filter((p) => p.status === "queued").map((p) => uploadAssetItem(p, pid, patchPhoto)), ...drawings.filter((d) => d.status === "queued").map((d) => uploadAssetItem(d, pid, patchDrawing))]);
+      router.push(`/project/${pid}/plan?layer=openings`);
+    } catch (err) {
+      setBusy(null);
+      setError(err instanceof Error ? err.message : "Could not start the room.");
+    }
+  }
+
   // Continue: one action per way, disabled with the reason until that way is valid.
   const plotOk = !!parsePlot(plot);
+  const roomParsed = parseIntakeDraft(roomDims);
   const blockReason =
     busy === "save"
       ? "Saving the project…"
@@ -213,6 +245,10 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
       ? "Reading your plan…"
       : busy === "draw"
         ? "Opening the canvas…"
+        : way === "room"
+          ? roomParsed.ok
+            ? null
+            : roomParsed.reason
         : way === "upload"
           ? plan.kind === "ready"
             ? null
@@ -224,7 +260,7 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
             : !plotOk
               ? "Enter the plot's width and depth in metres"
               : null;
-  const onContinue = () => (blockReason ? undefined : way === "upload" ? void analyze() : void startDrawnPlan());
+  const onContinue = () => (blockReason ? undefined : way === "upload" ? void analyze() : way === "room" ? void startRoom() : void startDrawnPlan());
 
   if (busy === "parse" && plan.kind === "ready") {
     return <ReadingPlan projectId={plan.res.project_id} planId={plan.res.plan_id} eyebrow={eyebrow} subtitle={[projectName.trim() || "New project", plan.name, mb(plan.size)].join(" · ")} />;
@@ -236,7 +272,7 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
       <h1 className="t-display-serif mt-3 text-bp-ink-primary">How would you like to start?</h1>
       <p className="t-body-md mt-3 text-bp-ink-secondary">Any of these gets you to a priced plan. You can switch later.</p>
     <div className="mt-8 flex flex-col gap-10">
-      <div role="radiogroup" aria-label="How would you like to start?" className={`grid grid-cols-1 gap-4 ${ways.length === 3 ? "md:grid-cols-3" : ways.length === 2 ? "md:grid-cols-2" : ""}`}>
+      <div role="radiogroup" aria-label="How would you like to start?" className={`grid grid-cols-1 gap-4 ${ways.length === 4 ? "md:grid-cols-2 xl:grid-cols-4" : ways.length === 3 ? "md:grid-cols-3" : ways.length === 2 ? "md:grid-cols-2" : ""}`}>
         {ways.map((w) => {
           const on = way === w.key;
           return (
@@ -300,6 +336,55 @@ export function VillaIntake({ gardenPilot = false, eyebrow }: { gardenPilot?: bo
               <Icon name="error" size={20} />
               <p className="t-body-sm">{plan.message}</p>
             </div>
+          ) : null}
+        </section>
+      ) : way === "room" ? (
+        <section aria-label="Your room" className="flex flex-col gap-3" data-room-intake>
+          <p className="t-body-sm text-bp-ink-secondary">Inside faces, wall to wall, in metres. Every figure you type is kept as measured.</p>
+          <div className="grid max-w-[720px] grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="col-span-2 flex flex-col gap-1.5 md:col-span-1">
+              <label htmlFor={`${ids}-rtype`} className="t-label-caps text-bp-ink-tertiary">
+                ROOM
+              </label>
+              <select id={`${ids}-rtype`} value={roomType} onChange={(e) => setRoomType(e.target.value as RoomIntakeType)} disabled={busy === "draw"} className={INPUT}>
+                {ROOM_INTAKE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {ROOM_INTAKE_LABEL[t]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {(
+              [
+                ["length", "LENGTH (M)", "e.g. 2.66"],
+                ["width", "WIDTH (M)", "e.g. 2.63"],
+                ["height", "CEILING HEIGHT (M)", "e.g. 2.80"],
+              ] as const
+            ).map(([key, label, ph]) => (
+              <div key={key} className="flex flex-col gap-1.5">
+                <label htmlFor={`${ids}-r${key}`} className="t-label-caps text-bp-ink-tertiary">
+                  {label}
+                </label>
+                <input
+                  id={`${ids}-r${key}`}
+                  type="number"
+                  inputMode="decimal"
+                  step={0.01}
+                  min={0}
+                  value={roomDims[key]}
+                  onChange={(e) => setRoomDims((d) => ({ ...d, [key]: e.target.value }))}
+                  placeholder={ph}
+                  disabled={busy === "draw"}
+                  className={`${INPUT} font-bp-mono tabular-nums`}
+                  data-room-dim={key}
+                />
+              </div>
+            ))}
+          </div>
+          {roomParsed.ok ? (
+            <p className="t-label-md font-bp-mono tabular-nums text-bp-ink-secondary" aria-live="polite">
+              {roomParsed.length_m.toFixed(2)} × {roomParsed.width_m.toFixed(2)} m · floor {(Math.round(roomParsed.length_m * roomParsed.width_m * 100) / 100).toFixed(2)} m² · ceiling {roomParsed.height_m.toFixed(2)} m
+            </p>
           ) : null}
         </section>
       ) : (

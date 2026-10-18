@@ -8,7 +8,7 @@
 // =============================================================================
 
 export type DiffClass = "quantity" | "rate" | "both" | "total" | "added" | "removed";
-export type CauseKind = "correction" | "applied_correction" | "reverted_correction" | "firm_rate" | "plan_edit" | "scope_change" | "openings_confirmed" | "openings_need_wall" | "session_decision" | "regeneration" | "engine_rounding";
+export type CauseKind = "correction" | "applied_correction" | "reverted_correction" | "firm_rate" | "plan_edit" | "scope_change" | "openings_confirmed" | "openings_need_wall" | "ceiling_height" | "session_decision" | "regeneration" | "engine_rounding";
 
 /** Human label for a class, shared by the view and the PDF. */
 export const DIFF_CLASS_LABEL: Record<DiffClass, string> = {
@@ -33,6 +33,8 @@ export const CAUSE_KIND_LABEL: Record<CauseKind, string> = {
   // R10b: openings found on the drawing, confirmed by the owner on 01 Plan.
   openings_confirmed: "Openings confirmed",
   openings_need_wall: "Openings need a wall",
+  // B1 (061): a room's ceiling height entered or changed on 01 Plan.
+  ceiling_height: "Ceiling height",
   session_decision: "Session decision",
   regeneration: "BoQ regenerated",
   engine_rounding: "H7 rounding",

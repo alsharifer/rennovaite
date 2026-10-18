@@ -7,6 +7,8 @@ import { loadWithheldNames } from "@/lib/identity/curation";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { curatePlanRow, curatePlanRows, keepStoredText } from "@/lib/plan/curate-notes";
 import { derivePlanGraph } from "@/lib/plan/derive";
+import { isFootprintType, snapToWall } from "@/lib/overlays/footprint";
+import { loadSnapContext } from "@/lib/overlays/footprint-load";
 import { seedOverlays } from "@/lib/overlays/seed";
 import {
   ELECTRICAL_TYPES,
@@ -117,6 +119,8 @@ const UpsertSchema = z.object({
   derived_note: z.string().max(1000).nullable().optional(),
   site_reference: z.boolean().optional(),
   disposition: z.enum(["keep", "remove", "replace"]).nullable().optional(),
+  /** B1: false = place a footprint fixture exactly where sent (a free-standing bath). */
+  snap: z.boolean().optional(),
 });
 
 /**
@@ -151,6 +155,23 @@ export async function POST(request: NextRequest) {
     if (f[k] !== undefined) row[k] = f[k];
   }
   if (!f.id && row.spec === undefined) row.spec = null;
+  // B1: a WC / bidet / basin / shower / bath backs onto the nearest wall of its
+  // room — position, facing and footprint stored, and the wall reference filled
+  // in (it never was). A move keeps the stored size: merge onto the stored spec.
+  if (isFootprintType(f.type) && f.snap !== false) {
+    let base = (f.spec ?? null) as Record<string, unknown> | null;
+    if (f.id && f.spec === undefined) {
+      const { data: prev } = await supabase.from("plan_fixtures").select("spec").eq("id", f.id).maybeSingle<{ spec: Record<string, unknown> | null }>();
+      base = prev?.spec ?? null;
+    }
+    const ctx = await loadSnapContext(supabase, f.project_id);
+    const snapped = ctx ? snapToWall({ type: f.type, position: f.position, room_id: f.room_id ?? null, spec: base }, ctx.walls, ctx.mPerU) : null;
+    if (snapped) {
+      row.position = snapped.position;
+      row.wall_id = snapped.wall_id;
+      row.spec = snapped.spec;
+    }
+  }
   // The inspector re-sends the whole spec it read, curated; that must not
   // overwrite the stored text.
   const withheld = await loadWithheldNames(db(), f.project_id);

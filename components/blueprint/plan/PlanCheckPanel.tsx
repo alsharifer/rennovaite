@@ -101,7 +101,9 @@ export function PlanCheckPanel({ planId, pairs, sentence, canReparse, blocked, s
             PLAN CHECK · CAN BE PRICED
           </h2>
           <p className="t-body-sm mt-3 text-bp-ink-secondary">
-            No two rooms share floor: {summary.rooms} {summary.label} · {summary.area}. Every area-based line is measured once.
+            {summary.rooms === 1
+              ? `One ${summary.label.replace(/s$/, "")}, nothing overlaps: ${summary.area}. Every area-based line is measured once.`
+              : `No two rooms share floor: ${summary.rooms} ${summary.label} · ${summary.area}. Every area-based line is measured once.`}
           </p>
         </section>
       )}

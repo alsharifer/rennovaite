@@ -362,6 +362,12 @@
       "version": "20260101006000",
       "name": "renders_openings_basis",
       "sha256": "3f822665fb5748adc16531ad61257589ebac7bc2ffb4ed192b1b26425d79a137"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006100",
+      "name": "room_ceiling_height",
+      "sha256": "46ac00137a24be858f556aede35df6c4c4619b749a4218ee9b5e816bf98d21d6"
     }
   ]
 }

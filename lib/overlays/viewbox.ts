@@ -46,6 +46,9 @@ export interface RawRoomInput {
   unroofed?: boolean | null;
   /** K12 (058): false = not in this renovation. */
   in_scope?: boolean | null;
+  /** B1 (061): the room's stored ceiling height (m) and how it was got; null = the 2.9 m default. */
+  ceiling_h_m?: number | null;
+  ceiling_h_source?: string | null;
 }
 
 function asPolygon(v: unknown): Pt[] | null {

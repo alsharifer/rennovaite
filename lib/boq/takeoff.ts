@@ -49,6 +49,10 @@ type RoomGeometry = {
   /** G1: an outdoor garden zone — neither interior nor terrace. */
   isLandscape: boolean;
   doorCount: number; // structural door openings into the room
+  /** B1: the room's stored ceiling height, else C-01's 2.9 m. */
+  wallHeightM: number;
+  /** B1: full-height wet tiling (C-04) runs to the room's stored ceiling, else 2.9 m. */
+  tileHeightM: number;
   grossWallM2: number;
   netWallM2: number; // F-01
 };
@@ -104,7 +108,11 @@ function roomGeometry(room: EngineRoom): RoomGeometry {
   const isExternal = EXTERNAL_TYPES.has(room.room_type);
   const doorCount = 1; // every room in the refit scope has exactly one door
 
-  const grossWallM2 = perimeterM * CONSTANTS.WALL_HEIGHT_M;
+  // B1 (061): a room that STORES its ceiling height is measured at it; every
+  // other room keeps C-01 / C-04 exactly (both 2.9 m), so no existing BoQ moves.
+  const wallHeightM = room.ceiling_h_m && room.ceiling_h_m > 0 ? room.ceiling_h_m : CONSTANTS.WALL_HEIGHT_M;
+  const tileHeightM = room.ceiling_h_m && room.ceiling_h_m > 0 ? room.ceiling_h_m : CONSTANTS.BATH_TILE_HEIGHT_M;
+  const grossWallM2 = perimeterM * wallHeightM;
   const doorM2 = doorCount * CONSTANTS.DOOR_W_M * CONSTANTS.DOOR_H_M;
   const windowM2 = isBathroom
     ? 0
@@ -121,6 +129,8 @@ function roomGeometry(room: EngineRoom): RoomGeometry {
     isExternal,
     isLandscape,
     doorCount,
+    wallHeightM,
+    tileHeightM,
     grossWallM2,
     netWallM2,
   };
@@ -206,11 +216,16 @@ export function computeTakeoff(
   // F-03: bathroom wet-wall tiling area (FULL HEIGHT per C-04, v0.2)
   const bathWetWallM2 = round2(
     baths.reduce((s, g) => {
-      const gross = g.perimeterM * CONSTANTS.BATH_TILE_HEIGHT_M;
-      const door = g.doorCount * CONSTANTS.DOOR_W_M * CONSTANTS.BATH_TILE_HEIGHT_M;
+      const gross = g.perimeterM * g.tileHeightM;
+      const door = g.doorCount * CONSTANTS.DOOR_W_M * g.tileHeightM;
       return s + Math.max(0, gross - door);
     }, 0),
   );
+  // B1: say which height was used — the constant's own wording when every bath
+  // uses it (so an existing BoQ's measurement text is unchanged).
+  const bathTileHeightNote = baths.every((g) => g.tileHeightM === CONSTANTS.BATH_TILE_HEIGHT_M)
+    ? `${CONSTANTS.BATH_TILE_HEIGHT_M} m`
+    : "the room's ceiling height";
 
   // F-02: paint = dry rooms (net wall + ceiling) + bathroom ceilings
   const paintM2 = round2(
@@ -322,7 +337,7 @@ export function computeTakeoff(
       description: "Bathroom wall tile removal — full height",
       quantity: bathWetWallM2,
       unit: "m2",
-      measurement: `F-03: Σ bath (perimeter × ${CONSTANTS.BATH_TILE_HEIGHT_M} m − door) = ${bathWetWallM2} m²`,
+      measurement: `F-03: Σ bath (perimeter × ${bathTileHeightNote} − door) = ${bathWetWallM2} m²`,
     },
     {
       rule_id: "Q-04",
