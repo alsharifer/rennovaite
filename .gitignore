@@ -52,3 +52,6 @@ next-env.d.ts
 
 # Bathroom pilot B2+: screenshots show the client's own photos — never in git (like data/).
 /screenshots/bathroom-pilot/b2/
+/screenshots/bathroom-pilot/b4/
+/screenshots/bathroom-pilot/b5/
+/screenshots/bathroom-pilot/b6/
