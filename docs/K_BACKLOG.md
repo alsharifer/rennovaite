@@ -4,6 +4,25 @@ Items found while building K that are deliberately NOT fixed in the K task that
 found them (design ≠ engine; Atelier pages must not regress this cycle). Each
 says where it is and why it waits. Newest first.
 
+## Skirting on take-off plans (2026-10-18) — R-10 kept; rulings open
+
+Since U7 every BoQ priced with the element take-off dropped R-10 (skirting) —
+Floor Finishes is rebuilt from the take-off, which measures none. Fixed the way
+#107 kept Q-11: `applyElementMapping` re-appends the engine's `Q-10/R-10` line
+(`KEPT_RULE_PREFIXES`, `lib/boq/element-map.ts`). Dev Demo villa: +7,909.00
+subtotal / +8,968.81 grand on its next regenerate (143.8 lm × 55); garden-only
+projects (Arabella) unchanged. Rulings open:
+
+- **Skirting material.** R-10 is LABOUR only ("Skirting installation (MDF or
+  wood)") yet the line says "tile-matched"; nothing prices the skirting
+  supply, and the take-off's `floor_finish` (190 / m² supply & install) does
+  not say it includes one. Either the floor-finish rate covers it (say so on
+  the line) or a supply line is missing.
+- **Element take-off for skirting.** Kept from the engine's F-04 (Σ dry +
+  terrace perimeter − doors × 0.9), so it has no `element_refs`; a
+  `quantify.ts` skirting item per room would trace it. Wet rooms take none
+  (F-04 already excludes bathrooms) — keep that if it is built.
+
 ## Plan geometry — ruled 14–15 Oct (Abdallah); parsing logic NOT changed
 
 - **Floor coverage check (BUILT 15 Oct; the auto "Circulation (unassigned)"

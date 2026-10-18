@@ -230,6 +230,20 @@
             "work_item_key": "floor_finish"
           },
           {
+            "description": "Skirting — tile-matched, dry rooms + terrace",
+            "quantity": 142.38,
+            "unit": "lm",
+            "rate_aed": 55,
+            "total_aed": 7830.9,
+            "vendor_or_source": "labour_rates: Skirting installation (MDF or wood)",
+            "notes": "R-10: mid band (tier mid); F-04: Σ (dry + terrace) perimeter − door widths = 142.38 lm",
+            "rule_id": "Q-10/R-10",
+            "kind": "labour",
+            "rate_band": "mid",
+            "wastage_pct": 0,
+            "rate_tier": "labour_book"
+          },
+          {
             "description": "Staircase renovation — tile fixing labour + LED nosing (excl. handrail; tile supply on its own line)",
             "quantity": 1,
             "unit": "project",
@@ -244,7 +258,7 @@
             "rate_tier": "allowance"
           }
         ],
-        "section_total_aed": 32315
+        "section_total_aed": 40145.9
       },
       {
         "work_section": "Wall Finishes",
@@ -712,12 +726,12 @@
         "section_total_aed": 14943.25
       }
     ],
-    "subtotal_aed": 332673.15,
+    "subtotal_aed": 340504.05,
     "contingency_pct": 8,
-    "contingency_aed": 26613.85,
+    "contingency_aed": 27240.32,
     "vat_pct": 5,
-    "vat_aed": 17964.35,
-    "grand_total_aed": 377251.35,
+    "vat_aed": 18387.22,
+    "grand_total_aed": 386131.59,
     "engine": {
       "version": "0.3.0",
       "tier": "mid",
