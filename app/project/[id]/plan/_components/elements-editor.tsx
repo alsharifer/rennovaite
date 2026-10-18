@@ -23,6 +23,7 @@ import {
   type Pt,
   type RawRoomInput,
 } from "@/lib/overlays/viewbox";
+import { roomNameLabel as nameLabel } from "./label-render";
 
 import { Icon } from "@/components/blueprint/Icon";
 
@@ -405,8 +406,6 @@ export function ElementsEditor({
           {/* Zones as read-only context. Open zones keep their dashed edge so
               this layer reads the same as the plan layer underneath it. */}
           {fit.rooms.map((r) => {
-            const cx = r.pts.reduce((s, p) => s + p[0], 0) / r.pts.length;
-            const cy = r.pts.reduce((s, p) => s + p[1], 0) / r.pts.length;
             const open = r.unroofed === true;
             return (
               <g key={r.id} pointerEvents="none">
@@ -419,16 +418,12 @@ export function ElementsEditor({
                   strokeDasharray={open ? "6 4" : undefined}
                   strokeWidth={1}
                 />
-                <text
-                  x={cx}
-                  y={cy}
-                  textAnchor="middle"
-                  fontSize="12"
-                  fill={SVG.inkTertiary}
-                  style={{ fontFamily: SVG.sans }}
-                >
-                  {r.name_en}
-                </text>
+                {nameLabel(r, (nl) => (
+                  <text x={nl.x} y={nl.y} textAnchor="middle" dominantBaseline="middle" fontSize={nl.fontPx} fill={SVG.inkTertiary} style={{ fontFamily: SVG.sans }}>
+                    <title>{r.name_en}</title>
+                    {nl.text}
+                  </text>
+                ))}
               </g>
             );
           })}

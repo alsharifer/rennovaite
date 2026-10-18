@@ -33,7 +33,7 @@ import { withoutDrafts } from "@/lib/projects/intake";
 import { renderLockProgress } from "@/lib/render-lock-progress";
 import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
 
-const PLAN_CODES = new Set(["no_plan", "no_area", "no_rooms", "plan_has_overlaps", "not_priceable"]);
+const PLAN_CODES = new Set(["no_plan", "no_area", "no_rooms", "plan_has_overlaps", "rooms_unnamed", "not_priceable"]);
 
 async function safe<T>(fallback: T, fn: () => Promise<T>): Promise<T> {
   try {

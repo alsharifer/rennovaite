@@ -26,6 +26,7 @@ import {
   type Pt,
   type RawRoomInput,
 } from "@/lib/overlays/viewbox";
+import { roomNameLabel as nameLabel } from "./label-render";
 
 import {
   CANVAS_FRAME,
@@ -317,8 +318,6 @@ export function OverlayEditor({
           ))}
           {/* Rooms as read-only context */}
           {fit.rooms.map((r) => {
-            const cx = r.pts.reduce((s, p) => s + p[0], 0) / r.pts.length;
-            const cy = r.pts.reduce((s, p) => s + p[1], 0) / r.pts.length;
             return (
               <g key={r.id} pointerEvents="none">
                 <polygon
@@ -329,9 +328,12 @@ export function OverlayEditor({
                   strokeOpacity={0.5}
                   strokeWidth={1}
                 />
-                <text x={cx} y={cy} textAnchor="middle" fontSize="12" fill={SVG.inkTertiary} style={{ fontFamily: SVG.sans }}>
-                  {r.name_en}
-                </text>
+                {nameLabel(r, (nl) => (
+                  <text x={nl.x} y={nl.y} textAnchor="middle" dominantBaseline="middle" fontSize={nl.fontPx} fill={SVG.inkTertiary} style={{ fontFamily: SVG.sans }}>
+                    <title>{r.name_en}</title>
+                    {nl.text}
+                  </text>
+                ))}
               </g>
             );
           })}

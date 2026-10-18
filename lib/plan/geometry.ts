@@ -28,6 +28,7 @@ import {
   type LinearElement,
   type RawLinearElement,
 } from "./elements";
+import { ON_WALL_TOL_M } from "./plan-rules";
 import { pointToSegment } from "./polygon";
 import { dispositionOf, draftStatus, isInDesign, type Disposition, type DraftStatus } from "./site-reference";
 import { defaultUnroofed } from "./zones";
@@ -286,6 +287,8 @@ export interface PlanGraph {
   meta: PlanGraphMeta;
   derived: DerivedRecord;
   notes: string[];
+  /** 15 Oct: house openings left out because they need a wall (set by derivePlanGraph; absent when none). */
+  openings_need_wall?: string[];
 }
 
 // --- raw input (shape of a persisted room, DB or parsed_json) -----------------
@@ -810,6 +813,15 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
           if (!a || !b) continue;
           const { dist, t } = pointToSegment(posM, a, b);
           if (dist < best) { best = dist; wall_id = w.id; along = t; }
+        }
+        // 15 Oct: only a wall the opening SITS on (≤ 0.15 m). Before, any distance
+        // snapped — a door on a lawn's edge came off the nearest house wall. An
+        // opening further away keeps no wall and is deducted from none (garden
+        // openings are exempt from the plan rules; derivePlanGraph has already
+        // dropped any house opening that needs a wall).
+        if (wall_id && best > ON_WALL_TOL_M) {
+          wall_id = null;
+          along = ro.along_offset ?? null;
         }
       }
       return {

@@ -71,7 +71,8 @@ export function ShellFrame({ ctx, flags, skin, title, children }: { ctx: RailCon
   // K11 #3: "⚑ N TO FIX" on a step page that has a reason — the rail's own. The BoQ page draws its
   // own navigator (every unpriced / duplicate / derived line), so the shell's stays off there.
   const activeStep = projectId && stepKey ? (steps.find((x) => x.key === stepKey) ?? null) : null;
-  const generic = activeStep && !/\/boq$/.test(pathname) ? stepIssues(activeStep.status, activeStep.label) : null;
+  // 15 Oct: 01 Plan draws its own too — the plan rules with the step's reason merged in.
+  const generic = activeStep && !/\/(boq|plan)$/.test(pathname) ? stepIssues(activeStep.status, activeStep.label) : null;
 
   return (
     <div data-system="blueprint" data-skin={skin} data-rail={compactWide ? "compact-wide" : "standard"} className="bp-shell min-h-screen bg-bp-surface-base font-bp-sans text-bp-ink-primary">

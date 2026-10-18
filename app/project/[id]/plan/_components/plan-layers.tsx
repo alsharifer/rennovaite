@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { OPENINGS_FOCUS_EVENT } from "@/components/blueprint/plan/OpeningsCheckPanel";
 import { PlanInspector } from "@/components/blueprint/plan/PlanInspector";
@@ -102,6 +102,22 @@ export function PlanLayers({
     };
     window.addEventListener(OPENINGS_FOCUS_EVENT, on);
     return () => window.removeEventListener(OPENINGS_FOCUS_EVENT, on);
+  }, []);
+  // 15 Oct: a plan-rule issue that names a room selects it on the Plan layer —
+  // switch to it first when another layer is open, then hand the selection on.
+  const layerRef = useRef(layer);
+  useEffect(() => {
+    layerRef.current = layer;
+  }, [layer]);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ ids?: string[]; relay?: boolean }>).detail;
+      if (d?.relay || layerRef.current === "plan" || !d?.ids?.length) return;
+      setLayer("plan");
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("rv:plan-select-rooms", { detail: { ids: d.ids, relay: true } })), 80);
+    };
+    window.addEventListener("rv:plan-select-rooms", on);
+    return () => window.removeEventListener("rv:plan-select-rooms", on);
   }, []);
 
   const onInspectRoom = (roomId: string) => {

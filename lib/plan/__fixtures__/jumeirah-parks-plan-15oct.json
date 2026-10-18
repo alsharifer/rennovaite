@@ -1,0 +1,716 @@
+{
+ "_note": "Jumeirah Parks Garden (prod plan 1f9ee118), 01 Plan as the owner left it on 15 Oct 2026, read-only. Polygons and opening positions in the editor viewBox frame. Used by the plan-rules tests: the window drawn across its wall (stale wall_ref) and the door left on a garden edge.",
+ "total_area_m2": 246.8,
+ "rooms": [
+  {
+   "id": "822bb188-0d9a-416f-9eaf-c29a0ddddedb",
+   "name_en": "Entrance Foyer",
+   "name_ar": "مدخل",
+   "room_type": "foyer",
+   "area_m2": 18.2,
+   "polygon": [
+    [
+     739.4150461213949,
+     189.87296962488136
+    ],
+    [
+     740.5984366477481,
+     189.87296962488136
+    ],
+    [
+     740.5984366477481,
+     190.85232730186334
+    ],
+    [
+     795.5648862683618,
+     190.85232730186334
+    ],
+    [
+     894.194365654422,
+     194.1984660315518
+    ],
+    [
+     870.4857485574832,
+     407.2087607751324
+    ],
+    [
+     743.7405425280654,
+     408.47376444123415
+    ],
+    [
+     740.5984366477481,
+     408.47376444123415
+    ],
+    [
+     740.5984366477481,
+     343.06083293281273
+    ],
+    [
+     740.5576300778739,
+     336.93984745167535
+    ],
+    [
+     742.393925722215,
+     336.5725883228071
+    ],
+    [
+     739.8639183900117,
+     249.36894850153666
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  },
+  {
+   "id": "9d998466-b368-42d9-af19-d52995970c31",
+   "name_en": "Family Room",
+   "name_ar": "غرفة العائلة",
+   "room_type": "living",
+   "area_m2": 30,
+   "polygon": [
+    [
+     399.64258071732934,
+     24
+    ],
+    [
+     588.2493108145691,
+     24
+    ],
+    [
+     588.2493108145691,
+     241.63202182643187
+    ],
+    [
+     399.64258071732934,
+     241.63202182643187
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  },
+  {
+   "id": "6b1d1850-5770-4b78-9799-8a4aa64823d9",
+   "name_en": "Bath",
+   "name_ar": "حمام",
+   "room_type": "bathroom",
+   "area_m2": 5.5,
+   "polygon": [
+    [
+     820.4132005530996,
+     24
+    ],
+    [
+     892.9572078285769,
+     24
+    ],
+    [
+     892.9572078285769,
+     154.55614663885578
+    ],
+    [
+     820.4132005530996,
+     154.55614663885578
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  },
+  {
+   "id": "f506e79f-2b6f-4bca-b6ec-450c73272112",
+   "name_en": "Hall",
+   "name_ar": "غرفة الطعام",
+   "room_type": "dining",
+   "area_m2": 21.2,
+   "polygon": [
+    [
+     589.0428361347867,
+     338.2864642575256
+    ],
+    [
+     709.7486698228157,
+     335.91968320481914
+    ],
+    [
+     709.7486698228157,
+     343.1832526424355
+    ],
+    [
+     731.4985715657906,
+     343.1832526424355
+    ],
+    [
+     731.4985715657906,
+     338.7761430960166
+    ],
+    [
+     740.1087578092571,
+     337.0214605914239
+    ],
+    [
+     740.5984366477481,
+     343.14244607256126
+    ],
+    [
+     740.5984366477481,
+     575.331828657039
+    ],
+    [
+     590.22622666114,
+     572.9650476043325
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  },
+  {
+   "id": "ca338ae6-c5f9-4e3b-9e24-f97249cdc928",
+   "name_en": "Kitchen",
+   "name_ar": "مطبخ",
+   "room_type": "kitchen",
+   "area_m2": 22.2,
+   "polygon": [
+    [
+     588.2675113071759,
+     23.99426308605851
+    ],
+    [
+     740.5984366477481,
+     23.99426308605851
+    ],
+    [
+     740.5984366477481,
+     189.87296962488136
+    ],
+    [
+     739.4150461213949,
+     189.87296962488136
+    ],
+    [
+     739.8231118201373,
+     241.61570022542932
+    ],
+    [
+     737.946009605922,
+     241.65650679530356
+    ],
+    [
+     637.1945885864008,
+     241.65650679530356
+    ],
+    [
+     637.1945885864008,
+     335.91968320481914
+    ],
+    [
+     637.235395156275,
+     335.91968320481914
+    ],
+    [
+     637.235395156275,
+     337.34791315041787
+    ],
+    [
+     618.3419533044977,
+     337.7151722792861
+    ],
+    [
+     591.8176828862356,
+     334.24661383997494
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  },
+  {
+   "id": "8e1e0ff4-6b5a-4497-a326-3632a96b79d8",
+   "name_en": "New room",
+   "name_ar": null,
+   "room_type": "deck",
+   "area_m2": 21.1,
+   "polygon": [
+    [
+     232.5159751103089,
+     354.8160391637635
+    ],
+    [
+     393.2541686911995,
+     357.49949507338556
+    ],
+    [
+     395.93763077750344,
+     571.9747547151984
+    ],
+    [
+     229.83251302400504,
+     576
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": true
+  },
+  {
+   "id": "58bf9fcf-81d5-4fec-983c-ad703efd1022",
+   "name_en": "New room",
+   "name_ar": null,
+   "room_type": "paving",
+   "area_m2": 15.2,
+   "polygon": [
+    [
+     107.73587867418983,
+     357.49943365301687
+    ],
+    [
+     228.22238663693912,
+     358.84122302819657
+    ],
+    [
+     226.8806863033393,
+     569.2913602259454
+    ],
+    [
+     106.39411692148573,
+     573.3166055107471
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": true
+  },
+  {
+   "id": "d95938a5-ba7e-4513-a743-021d7eba8b04",
+   "name_en": "Powder Room / WD",
+   "name_ar": "دورة مياه",
+   "room_type": "powder",
+   "area_m2": 5.9,
+   "polygon": [
+    [
+     637.1945885864008,
+     241.65650679530356
+    ],
+    [
+     739.6598855406404,
+     241.65650679530356
+    ],
+    [
+     742.393925722215,
+     336.5725883228071
+    ],
+    [
+     709.7486698228157,
+     343.1832526424355
+    ],
+    [
+     709.7486698228157,
+     335.91968320481914
+    ],
+    [
+     637.1945885864008,
+     335.91968320481914
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  },
+  {
+   "id": "37f799df-752c-4fbd-9574-05d1c2a97d74",
+   "name_en": "Stairs",
+   "name_ar": "درج",
+   "room_type": "stairs",
+   "area_m2": 7,
+   "polygon": [
+    [
+     740.603259321573,
+     408.479394150529
+    ],
+    [
+     849.4384922822917,
+     408.479394150529
+    ],
+    [
+     849.4384922822917,
+     575.3267664746262
+    ],
+    [
+     740.603259321573,
+     575.3267664746262
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  },
+  {
+   "id": "fa5afe0c-b6ad-4f01-8c2e-e1677446f518",
+   "name_en": "Grass",
+   "name_ar": null,
+   "room_type": "artificial_grass",
+   "area_m2": 54,
+   "polygon": [
+    [
+     111.07492387734986,
+     33.64232847487395
+    ],
+    [
+     397.68152623340114,
+     31.0104821107925
+    ],
+    [
+     392.3146634798977,
+     350.1709145984057
+    ],
+    [
+     105.81127927127096,
+     349.99027764521355
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": true
+  },
+  {
+   "id": "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+   "name_en": "Living Room",
+   "name_ar": "غرفة المعيشة",
+   "room_type": "living",
+   "area_m2": 37.5,
+   "polygon": [
+    [
+     399.65954534839636,
+     241.61570022542932
+    ],
+    [
+     589.0428361347867,
+     241.61570022542932
+    ],
+    [
+     589.3692886937807,
+     338.2864642575256
+    ],
+    [
+     589.0428361347867,
+     338.2864642575256
+    ],
+    [
+     590.1854200912657,
+     567.3745475315604
+    ],
+    [
+     590.22622666114,
+     571.7816570779793
+    ],
+    [
+     399.65954534839636,
+     575.331828657039
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  },
+  {
+   "id": "01dfac68-c7c2-48bb-8e99-be222fd6246f",
+   "name_en": "Maid Room",
+   "name_ar": "غرفة الخادمة",
+   "room_type": "maid",
+   "area_m2": 9,
+   "polygon": [
+    [
+     740.6096140669413,
+     24.00314651272932
+    ],
+    [
+     820.4149473443063,
+     24.00314651272932
+    ],
+    [
+     820.4149473443063,
+     190.83527253111805
+    ],
+    [
+     740.6096140669413,
+     190.83527253111805
+    ]
+   ],
+   "in_scope": true,
+   "unroofed": false
+  }
+ ],
+ "openings": [
+  {
+   "id": "122a6ef4-5940-4eb9-a8e7-e39bf1b84c93",
+   "kind": "door",
+   "width_mm": 950,
+   "height_mm": 2100,
+   "sill_mm": 0,
+   "position": [
+    821.029,
+    82.7503
+   ],
+   "room_id": "6b1d1850-5770-4b78-9799-8a4aa64823d9",
+   "source": "detected",
+   "wall_ref": "wall-7",
+   "derived": true,
+   "detection": {
+    "opens_to": "room",
+    "opens_to_room_id": "01dfac68-c7c2-48bb-8e99-be222fd6246f"
+   }
+  },
+  {
+   "id": "7ec5e9cd-c8c1-437a-a682-f5d91d7a8d6f",
+   "kind": "window",
+   "width_mm": 740,
+   "height_mm": 1200,
+   "sill_mm": 900,
+   "position": [
+    400.2583,
+    56.6448
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "source": "detected",
+   "wall_ref": "wall-21",
+   "derived": true,
+   "detection": {
+    "opens_to": "outside",
+    "opens_to_room_id": null
+   }
+  },
+  {
+   "id": "db690c34-a632-4756-a49c-7404b46ec941",
+   "kind": "window",
+   "width_mm": 1700,
+   "height_mm": 2600,
+   "sill_mm": 0,
+   "position": [
+    400.2583,
+    124.1107
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "source": "detected",
+   "wall_ref": "wall-21",
+   "derived": true,
+   "detection": {
+    "opens_to": "outside",
+    "opens_to_room_id": null
+   }
+  },
+  {
+   "id": "44dc45ac-7d4b-49d8-9d14-b6753a8e93c2",
+   "kind": "archway",
+   "width_mm": 3000,
+   "height_mm": 2400,
+   "sill_mm": 0,
+   "position": [
+    588.8651,
+    132.816
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "source": "detected",
+   "wall_ref": "wall-17",
+   "derived": false,
+   "detection": {
+    "opens_to": "room",
+    "opens_to_room_id": "ca338ae6-c5f9-4e3b-9e24-f97249cdc928"
+   }
+  },
+  {
+   "id": "7bb55a40-e4d1-4003-8fb6-3f3e457aee42",
+   "kind": "window",
+   "width_mm": 850,
+   "height_mm": 1200,
+   "sill_mm": 900,
+   "position": [
+    400.2583,
+    198.1056
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "source": "detected",
+   "wall_ref": "wall-21",
+   "derived": true,
+   "detection": {
+    "opens_to": "outside",
+    "opens_to_room_id": null
+   }
+  },
+  {
+   "id": "2a0ec16d-749f-40d6-9930-82ae82331416",
+   "kind": "door",
+   "width_mm": 930,
+   "height_mm": 2100,
+   "sill_mm": 0,
+   "position": [
+    741.219,
+    134.9535
+   ],
+   "room_id": "01dfac68-c7c2-48bb-8e99-be222fd6246f",
+   "source": "detected",
+   "wall_ref": "wall-33",
+   "derived": true,
+   "detection": {
+    "opens_to": "room",
+    "opens_to_room_id": "ca338ae6-c5f9-4e3b-9e24-f97249cdc928"
+   }
+  },
+  {
+   "id": "073d9fab-2935-4dba-a992-b23c29a73159",
+   "kind": "door",
+   "width_mm": 600,
+   "height_mm": 2100,
+   "sill_mm": 0,
+   "position": [
+    797.086,
+    190.8474
+   ],
+   "room_id": "01dfac68-c7c2-48bb-8e99-be222fd6246f",
+   "source": "detected",
+   "wall_ref": "wall-39",
+   "derived": true,
+   "detection": {
+    "opens_to": "room",
+    "opens_to_room_id": "822bb188-0d9a-416f-9eaf-c29a0ddddedb"
+   }
+  },
+  {
+   "id": "a6c42a31-7267-4b98-b609-d6daad347f5f",
+   "kind": "archway",
+   "width_mm": 3000,
+   "height_mm": 2400,
+   "sill_mm": 0,
+   "position": [
+    740.603259321573,
+    491.9030803125776
+   ],
+   "room_id": "37f799df-752c-4fbd-9574-05d1c2a97d74",
+   "source": "user_drawn",
+   "wall_ref": "wall-72",
+   "derived": false,
+   "detection": null
+  },
+  {
+   "id": "7df86cda-dc76-4cf8-a86f-cffcf6063e44",
+   "kind": "door",
+   "width_mm": 600,
+   "height_mm": 2100,
+   "sill_mm": 0,
+   "position": [
+    385.4436902797617,
+    31.12285950822174
+   ],
+   "room_id": "fa5afe0c-b6ad-4f01-8c2e-e1677446f518",
+   "source": "detected",
+   "wall_ref": "wall-24",
+   "derived": true,
+   "detection": {
+    "opens_to": "room",
+    "opens_to_room_id": "f506e79f-2b6f-4bca-b6ec-450c73272112"
+   }
+  },
+  {
+   "id": "99fb3d42-5c69-4a76-a6ff-45342213ba4a",
+   "kind": "door",
+   "width_mm": 900,
+   "height_mm": 2100,
+   "sill_mm": 0,
+   "position": [
+    741.026905631428,
+    289.11454755905544
+   ],
+   "room_id": "d95938a5-ba7e-4513-a743-021d7eba8b04",
+   "source": "user_drawn",
+   "wall_ref": "wall-67",
+   "derived": true,
+   "detection": null
+  },
+  {
+   "id": "25e5365a-58b5-4733-b8b9-22893deeeba2",
+   "kind": "archway",
+   "width_mm": 2400,
+   "height_mm": 2400,
+   "sill_mm": 0,
+   "position": [
+    494.35119074159155,
+    241.61570022542932
+   ],
+   "room_id": "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+   "source": "user_drawn",
+   "wall_ref": "wall-48",
+   "derived": false,
+   "detection": null
+  },
+  {
+   "id": "dedba9b8-8ef4-439f-8e8b-176604b83717",
+   "kind": "window",
+   "width_mm": 1200,
+   "height_mm": 1200,
+   "sill_mm": 900,
+   "position": [
+    494.9428860047682,
+    573.556742867509
+   ],
+   "room_id": "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+   "source": "user_drawn",
+   "wall_ref": "wall-53",
+   "derived": true,
+   "detection": null
+  },
+  {
+   "id": "bb3ce1d0-e7dd-40d7-93a7-15f5703afe7c",
+   "kind": "window",
+   "width_mm": 1200,
+   "height_mm": 1200,
+   "sill_mm": 900,
+   "position": [
+    665.412331654444,
+    574.1484381306855
+   ],
+   "room_id": "f506e79f-2b6f-4bca-b6ec-450c73272112",
+   "source": "user_drawn",
+   "wall_ref": "wall-34",
+   "derived": true,
+   "detection": null
+  },
+  {
+   "id": "9e476ff6-4e80-4a32-a929-e8a85c6c8441",
+   "kind": "window",
+   "width_mm": 1200,
+   "height_mm": 1200,
+   "sill_mm": 900,
+   "position": [
+    664.4329739774621,
+    23.99426308605851
+   ],
+   "room_id": "ca338ae6-c5f9-4e3b-9e24-f97249cdc928",
+   "source": "user_drawn",
+   "wall_ref": "wall-36",
+   "derived": true,
+   "detection": null
+  },
+  {
+   "id": "cc03bce3-d7c0-4530-8a70-a4944df7b79b",
+   "kind": "window",
+   "width_mm": 1200,
+   "height_mm": 1200,
+   "sill_mm": 900,
+   "position": [
+    493.9459457659492,
+    24
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "source": "user_drawn",
+   "wall_ref": "wall-2",
+   "derived": true,
+   "detection": null
+  },
+  {
+   "id": "75712e25-deb1-4b29-b735-e8e7821ebe33",
+   "kind": "window",
+   "width_mm": 1200,
+   "height_mm": 1200,
+   "sill_mm": 900,
+   "position": [
+    399.65954534839636,
+    408.47376444123415
+   ],
+   "room_id": "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+   "source": "user_drawn",
+   "wall_ref": "wall-54",
+   "derived": true,
+   "detection": null
+  }
+ ]
+}

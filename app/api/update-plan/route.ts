@@ -4,7 +4,9 @@ import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { projectOfPlan, recordPilotEvent } from "@/lib/pilot/events";
+import { reanchorOpenings, type AnchorOpening, type AnchorRoom } from "@/lib/plan/opening-anchor";
 import { findOverlaps } from "@/lib/plan/overlaps";
+import { metresPerUnit } from "@/lib/plan/plan-rules";
 import { repairForSave } from "@/lib/plan/save-repair";
 import { ensureAsBuiltSnapshot } from "@/lib/plan/snapshots";
 import { projectAccess } from "@/lib/projects/http";
@@ -86,6 +88,27 @@ export async function POST(request: NextRequest) {
     const repairedSet = new Set(repairedIds);
     const rooms = [...repairedRooms, ...postedAll.filter((r) => removedIds.has(r.id))];
 
+    // Rule 2 (15 Oct): openings move with their wall. Read the outlines and the
+    // openings as they are BEFORE this save; they are re-anchored after it.
+    let before: { rooms: AnchorRoom[]; openings: AnchorOpening[]; mPerU: number | null } | null = null;
+    try {
+      const sb = supabase as unknown as SupabaseClient;
+      const [oldRooms, oldOpenings, planRow] = await Promise.all([
+        sb.from("rooms").select("id, polygon").eq("plan_id", plan_id).returns<AnchorRoom[]>(),
+        sb.from("plan_openings").select("id, position, room_id, context_id, kind").eq("plan_id", plan_id).returns<AnchorOpening[]>(),
+        sb.from("plans").select("total_area_m2, plot_width_m").eq("id", plan_id).maybeSingle<{ total_area_m2: number | null; plot_width_m: number | null }>(),
+      ]);
+      if (!oldRooms.error && !oldOpenings.error && (oldOpenings.data ?? []).length > 0) {
+        before = {
+          rooms: oldRooms.data ?? [],
+          openings: oldOpenings.data ?? [],
+          mPerU: metresPerUnit(oldRooms.data ?? [], planRow.data?.total_area_m2 ?? null, planRow.data?.plot_width_m ?? null),
+        };
+      }
+    } catch {
+      before = null; // plan_openings absent (pre-026): nothing to carry
+    }
+
     if (deleted_ids.length > 0) {
       const { error: delErr } = await supabase
         .from("rooms")
@@ -136,6 +159,25 @@ export async function POST(request: NextRequest) {
       if (Object.keys(patch).length === 0) continue;
       const { error } = await (supabase as unknown as SupabaseClient).from("rooms").update(patch).eq("id", r.id);
       if (error) throw error;
+    }
+
+    // Rule 2: each opening to the same place along its wall's new position (or
+    // off every wall — "Needs a wall" — when its wall is gone).
+    const openingsMoved: { id: string; reason: string }[] = [];
+    if (before && before.mPerU) {
+      const deleted = new Set(deleted_ids);
+      const postedById = new Map(rooms.map((r) => [r.id, r.polygon]));
+      const after: AnchorRoom[] = before.rooms.filter((r) => !deleted.has(r.id)).map((r) => ({ id: r.id, polygon: postedById.get(r.id) ?? r.polygon }));
+      for (const r of rooms) if (!after.some((a) => a.id === r.id)) after.push({ id: r.id, polygon: r.polygon });
+      const moves = reanchorOpenings(before.rooms, after, before.openings, before.mPerU);
+      for (const m of moves) {
+        const { error } = await (supabase as unknown as SupabaseClient)
+          .from("plan_openings")
+          .update({ position: m.position, along_offset: m.t, wall_ref: null })
+          .eq("id", m.id)
+          .eq("plan_id", plan_id);
+        if (!error) openingsMoved.push({ id: m.id, reason: m.reason });
+      }
     }
 
     const total = repairedRooms.reduce((sum, r) => sum + r.area_m2, 0);
@@ -207,6 +249,8 @@ export async function POST(request: NextRequest) {
       repaired_rooms: rooms
         .filter((r) => repairedSet.has(r.id))
         .map((r) => ({ id: r.id, name_en: r.name_en, polygon: r.polygon, area_m2: r.area_m2 })),
+      // Openings carried with their walls (or left off every wall when theirs went).
+      openings_moved: openingsMoved,
     });
   } catch (err) {
     console.error("[api/update-plan] error", err);

@@ -19,7 +19,7 @@ import type { BoqProvenance } from "@/lib/provenance/types";
 
 import { approvalStatus, listApprovals, type BoqApproval, type RevisionApprovalStatus } from "./approvals";
 import { assignRefs } from "./refs";
-import { loadRecordedCauses } from "./revision-causes";
+import { loadRecordedCauses, needsWallCause } from "./revision-causes";
 import { diffRevisions, snapshotRevision, type RevisionBoq, type RevisionDiff } from "./revision-diff";
 
 export interface RevisionSummary {
@@ -122,6 +122,8 @@ export async function buildProjectRevisionDiff(db: SupabaseClient, projectId: st
     summary: curateText(c.summary, ctx.withheldNames),
     descriptions: c.descriptions?.map((d) => curateText(d, ctx.withheldNames)),
   }));
+  const needsWall = needsWallCause(early.boq, late.boq, late.created_at);
+  if (needsWall) recorded.push({ ...needsWall, descriptions: undefined });
   const diff = diffRevisions(snapshotRevision(before.boq_id, before.created_at, before.boq), snapshotRevision(after.boq_id, after.created_at, after.boq), recorded);
   return {
     project,
