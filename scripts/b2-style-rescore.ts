@@ -18,7 +18,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveTarget } from "./_target-guard.mjs";
 
-import { checkCostUsd, checkItemsFor, checkStyle } from "@/lib/render/photo-check";
+import { checkCostUsd, checkItemsFor, checkStyle, STYLE_CHECK_VERSION } from "@/lib/render/photo-check";
+import { loadPhotoViews } from "@/lib/render/photo-views-load";
 import { styleElementsFor, type StyleBrief } from "@/lib/render/photo-restyle";
 import { loadMiniPlans } from "@/lib/render/photo-views-load";
 import { recordSpend, type SpendRow } from "@/lib/render/render-spend";
@@ -33,7 +34,12 @@ const { data: room } = await sb.from("rooms").select("id").eq("plan_id", plan!.i
 const items = checkItemsFor((await loadMiniPlans(sb, P, plan!, [room!.id]))[room!.id]!);
 const kindOf = new Map(items.map((i) => [i.ref, i.kind]));
 
-const scoresPath = path.join(OUT, "style-scores.json");
+// v2 judges each render beside its photo — kept apart from the v1 scores.
+const ONLY = (process.env.RESCORE_LABELS ?? "").split(",").filter(Boolean);
+const scoresPath = path.join(OUT, STYLE_CHECK_VERSION === "s2" ? "style-scores-v2.json" : "style-scores.json");
+const photos = (await loadPhotoViews(sb, [room!.id]))[room!.id]!;
+const beforeB64: Record<string, string> = {};
+for (const v of photos) beforeB64[`P${v.n}`] = Buffer.from(await (await fetch(v.url)).arrayBuffer()).toString("base64");
 const scores: Record<string, Record<string, unknown>> = fs.existsSync(scoresPath) ? JSON.parse(fs.readFileSync(scoresPath, "utf8")) : {};
 const spend: SpendRow[] = [];
 
@@ -42,6 +48,7 @@ for (const file of files) {
   const style: StyleBrief = { text: results.style.text, source: "references", line: "", elements: results.style.elements };
   const base = path.dirname(file) === path.join(OUT, "round1") ? path.join(OUT, "round1") : OUT;
   for (const [label, arm] of Object.entries(results.arms as Record<string, { rows: { photo: string; outcome: string; attempts: number }[] }>)) {
+    if (ONLY.length && !ONLY.includes(label)) continue;
     if (scores[label] && Object.keys(scores[label]!).length === arm.rows.length) continue;
     scores[label] ??= {};
     await Promise.all(
@@ -52,7 +59,7 @@ for (const file of files) {
         const seen: string[] = results.before[row.photo].seen;
         const els = styleElementsFor(style, new Set(seen.map((r) => kindOf.get(r)!).filter(Boolean)));
         const bytes = fs.readFileSync(path.join(dir, last));
-        const v = await checkStyle({ mediaType: "image/jpeg", data: bytes.toString("base64") }, els);
+        const v = await checkStyle({ mediaType: "image/jpeg", data: bytes.toString("base64") }, els, { mediaType: "image/jpeg", data: beforeB64[row.photo]! });
         spend.push({ project_id: P, purpose: "eval", model: "claude-opus-5-5", cost_usd: checkCostUsd(v.usage), detail: { step: "style_rescore", label, photo: row.photo } });
         scores[label]![row.photo] = { file: last, layout: row.outcome, style_score: v.score, style_passed: v.passed, elements: v.elements.map((e) => `${e.element}:${e.verdict}`) };
       }),

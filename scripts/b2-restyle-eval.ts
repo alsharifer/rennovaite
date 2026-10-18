@@ -44,6 +44,9 @@ const BASE = `http://localhost:${PORT}`;
 const ROUND = (args.find((a) => a.startsWith("--round=")) ?? "").slice(8);
 const ARMS = ((args.find((a) => a.startsWith("--arms=")) ?? "--arms=edit,depth,canny").slice(7).split(",") as RestyleArm[]).filter((a) => a in ARM_MODEL);
 const SEED_TEST = args.includes("--seed-test");
+// --seed-only: the reference-image arm alone; --max-attempts=1: one paid render per photo.
+const SEED_ONLY = args.includes("--seed-only");
+const MAX_ATTEMPTS = Number((args.find((a) => a.startsWith("--max-attempts=")) ?? "--max-attempts=2").slice(15)) || 2;
 const SKIP_REFS = args.includes("--skip-refs");
 const P = "a2661f34-9d96-4020-a755-40359440c302";
 const DIR = path.resolve("data/Bathroom Pilot");
@@ -144,7 +147,7 @@ async function runArm(label: string, arm: RestyleArm, extra: string[]) {
   const rows: Row[] = [];
   await Promise.all(
     views.map(async (v) => {
-      const res = await restyleWithCheck({ project_id: P, arm, photoUrl: v.url, photoBytes: photoBytes[v.id]!, items, before: before[v.id]!, style, extraImages: extra });
+      const res = await restyleWithCheck({ project_id: P, arm, photoUrl: v.url, photoBytes: photoBytes[v.id]!, items, before: before[v.id]!, style, extraImages: extra, maxAttempts: MAX_ATTEMPTS });
       spend.push(...res.spend.map((s) => ({ ...s, purpose: "eval" as const, room_photo_id: v.id, detail: { ...(s.detail ?? {}), arm: label } })));
       for (const a of res.attempts) {
         if (!a.image_url) continue;
@@ -188,8 +191,8 @@ async function runArm(label: string, arm: RestyleArm, extra: string[]) {
   console.log(`== ${label}: first ${summary.first_pass} · after retry ${summary.pass_after_retry} · ${summary.renders} renders · $${summary.cost_usd}`);
 }
 
-for (const arm of ARMS) await runArm(ROUND ? `${arm}@${ROUND}` : arm, arm, []);
-if (SEED_TEST) {
+if (!SEED_ONLY) for (const arm of ARMS) await runArm(ROUND ? `${arm}@${ROUND}` : arm, arm, []);
+if (SEED_TEST || SEED_ONLY) {
   const { data: board } = await sb.from("moodboard_items").select("asset_id, position, created_at").eq("project_id", P).eq("kind", "asset").order("position").order("created_at").limit(3);
   const ids = (board ?? []).map((b: { asset_id: string }) => b.asset_id);
   const { data: assets } = await sb.from("project_assets").select("id, storage_path").in("id", ids);

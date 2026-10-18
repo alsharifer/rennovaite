@@ -938,8 +938,13 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
   60% of its extent), once, same left/right order, nothing added. One
   re-render with the findings, then the honest failure "The render moved the
   vanity — see what differs." (the studio draws both readings). A passed view
-  also gets the **style check** (`checkStyle`, ≥ 0.75 → "Style follows your
-  references ✓", else which elements do not). Size is not checked yet. Photo-view
+  also gets the **style check** (`checkStyle` v2 — the render BESIDE its photo;
+  an old finish still showing counts "no"; ≥ 0.75 → "Style follows your
+  references ✓", else which elements do not; a layout failure reads "Style not
+  checked — the layout check comes first"). Size and fittings are not checked
+  yet. Live, one render per photo: layout 5/5, style 2/5 — nano-banana holds the
+  layout partly by restyling too little. `PHOTO_VIEW_MAX_ATTEMPTS=1` caps a
+  deployment at one paid render per view (default: re-render once). Photo-view
   renders are `mode "photo_view"`, `room_photo_id` set, **`room_id` NULL** — so
   no room-level reader (chains, Generate all, lock progress) mistakes one for the
   room's day render.
@@ -948,8 +953,9 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
   style only, never layout — on `project_briefs.reference_style`
   (`lib/render/reference-style.ts`; screenshots are cropped to their photo by
   `referenceCropBox` in the eval). Images as conditioning are gated:
-  `PHOTO_VIEW_IMAGE_REFS = false` until measured (the R4 test was cut off by
-  Replicate credit).
+  `PHOTO_VIEW_IMAGE_REFS = false`. Measured (R5, one render per photo): style
+  4/5 vs 5/15 text-only, layout 4/5 vs 13/15 — a one-in-five drop, so off until
+  Abdallah rules (docs/BATHROOM_PILOT_B2.md).
 - **Cost guard**: every paid call a photo view makes (image model per image,
   each vision reading per token) is a `render_spend` row (model, size,
   cost_usd/aed; `lib/render/render-spend.ts`, prices from the Replicate model
@@ -2926,7 +2932,8 @@ surface: the rail keeps the step you came from, `shell/step-memory.ts`).
 | `UPLOAD_SWEEP_APPLY`              | server — H9: `"true"` lets the daily sweep DELETE stale pending uploads / staged downloads. Unset = dry-run (logs what it would delete) |
 | `PROJECT_PURGE_APPLY`             | server — K10: `"true"` lets the daily purge remove projects deleted > 30 days ago (rows + Storage). Unset = dry-run (logs ids and counts) |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
-| `MULTIVIEW_RENDERS_ENABLED`       | server — the bathroom pilot's one flag (B1–B6). B1: `"true"` adds "One room from its dimensions" to the intake. Off = the intake is exactly as before |
+| `MULTIVIEW_RENDERS_ENABLED`       | server — the bathroom pilot's one flag (B1–B6). B1: `"true"` adds "One room from its dimensions" to the intake; B2: the studio's photo views. Off = intake and studio exactly as before |
+| `PHOTO_VIEW_MAX_ATTEMPTS`         | server — B2: `1` = one paid render per photo view (no re-render after a failed check). Unset = the first render and one re-render |
 
 ### Feature flags — read at server start (flip → restart)
 

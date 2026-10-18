@@ -214,7 +214,7 @@ export async function restyleWithCheck(input: {
       at.verdict = judgePhotoPlacement(input.items, input.before, after);
       const els = styleElementsFor(input.style, kinds);
       if (at.verdict.passed && els.length) {
-        at.style = await checkStyle({ mediaType: mime(bytes), data: b64(bytes) }, els);
+        at.style = await checkStyle({ mediaType: mime(bytes), data: b64(bytes) }, els, { mediaType: mime(input.photoBytes), data: b64(input.photoBytes) });
         const styleUsd = checkCostUsd(at.style.usage);
         at.cost_usd += styleUsd;
         spend.push({ project_id: input.project_id, purpose: "photo_check", model: after.model, size: null, cost_usd: styleUsd, detail: { attempt: n, step: "style", usage: at.style.usage } });

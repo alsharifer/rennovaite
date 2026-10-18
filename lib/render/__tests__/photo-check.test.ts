@@ -114,3 +114,24 @@ describe("B2 — what the restyle is told", () => {
     expect(whereInFrame([0, 0, 20, 20])).toBe("top left");
   });
 });
+
+describe("B2 — the style line and the render cap", () => {
+  it("style passes at 0.75; the line says which elements fall short, and says when style was not checked", async () => {
+    const { judgeStyle, styleLine, STYLE_PASS } = await import("../photo-check");
+    expect(STYLE_PASS).toBe(0.75);
+    const v = { elements: [{ element: "floor", verdict: "yes" as const, note: "" }, { element: "walls", verdict: "partly" as const, note: "" }, { element: "lighting", verdict: "no" as const, note: "" }] };
+    expect(judgeStyle(v.elements)).toEqual({ score: 0.5, passed: false });
+    expect(styleLine({ ...judgeStyle(v.elements), elements: v.elements }, "references")).toBe("Style only partly follows your references — walls, lighting");
+    expect(styleLine({ passed: true, elements: [] }, "references")).toBe("Style follows your references ✓");
+    expect(styleLine(null, "references")).toBe("Style not checked — the layout check comes first");
+    expect(styleLine(null, "preset")).toMatch(/your chosen direction/);
+  });
+
+  it("PHOTO_VIEW_MAX_ATTEMPTS caps renders per view at 1; anything else keeps the re-render once", async () => {
+    const { photoViewMaxAttempts } = await import("../photo-view-run");
+    expect(photoViewMaxAttempts({})).toBe(2);
+    expect(photoViewMaxAttempts({ PHOTO_VIEW_MAX_ATTEMPTS: "1" })).toBe(1);
+    expect(photoViewMaxAttempts({ PHOTO_VIEW_MAX_ATTEMPTS: "5" })).toBe(2);
+    expect(photoViewMaxAttempts({ PHOTO_VIEW_MAX_ATTEMPTS: "x" })).toBe(2);
+  });
+});

@@ -25,6 +25,16 @@ import { recordSpend } from "./render-spend";
 
 export const PHOTO_VIEW_PIPELINE = "b2-1";
 
+/**
+ * Renders per view: the first, and one re-render with the check's findings
+ * (the pair-gate loop). PHOTO_VIEW_MAX_ATTEMPTS=1 caps a deployment (or a
+ * verification run) at one paid render per view; a failure is then shown at once.
+ */
+export function photoViewMaxAttempts(env: Record<string, string | undefined> = process.env): number {
+  const n = Number(env.PHOTO_VIEW_MAX_ATTEMPTS);
+  return Number.isInteger(n) && n >= 1 && n <= 2 ? n : 2;
+}
+
 export interface PhotoViewGate {
   pipeline: string;
   outcome: "passed" | "failed" | "error";
@@ -93,7 +103,7 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
     extra = ((assets ?? []) as { storage_path: string }[]).map((a) => db.storage.from("plan-uploads").getPublicUrl(a.storage_path).data.publicUrl);
   }
 
-  const res: RestyleResult = await restyleWithCheck({ project_id: input.projectId, arm: PHOTO_VIEW_ARM, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride });
+  const res: RestyleResult = await restyleWithCheck({ project_id: input.projectId, arm: PHOTO_VIEW_ARM, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts() });
   let stored: string | null = null;
   if (res.final) stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, res.final.bytes, res.final.bytes[0] === 0x89 ? "image/png" : "image/jpeg");
 

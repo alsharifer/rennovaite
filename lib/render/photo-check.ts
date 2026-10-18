@@ -346,13 +346,21 @@ export function judgeStyle(elements: StyleVerdict["elements"]): Pick<StyleVerdic
 /** The style line: ✓ when it follows, else which elements do not yet. */
 export function styleLine(v: Pick<StyleVerdict, "passed" | "elements"> | null, source: "references" | "preset"): string {
   if (source !== "references") return "Style: your chosen direction (no references read yet)";
-  if (!v) return "Style follows your references";
+  if (!v) return "Style not checked — the layout check comes first";
   if (v.passed) return "Style follows your references ✓";
   const off = v.elements.filter((e) => e.verdict !== "yes").map((e) => e.element);
   return `Style only partly follows your references — ${off.join(", ")}`;
 }
 
-export async function checkStyle(image: ImageInput, elements: readonly { element: string; finish: string }[]): Promise<StyleVerdict> {
+/**
+ * Style check v2 (B2 live run): the render is judged BESIDE the photo it came
+ * from. Judged alone, P1's render — the same tiles and the same damaged ceiling,
+ * 14% of pixels changed — read as "warm beige tile ✓"; an element that still
+ * shows the photo's old finish now reads "no".
+ */
+export const STYLE_CHECK_VERSION = "s2";
+
+export async function checkStyle(image: ImageInput, elements: readonly { element: string; finish: string }[], before?: ImageInput): Promise<StyleVerdict> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("check unavailable: ANTHROPIC_API_KEY not set");
   const client = new Anthropic({ apiKey });
@@ -364,8 +372,12 @@ export async function checkStyle(image: ImageInput, elements: readonly { element
       {
         role: "user",
         content: [
+          ...(before ? [{ type: "text" as const, text: "IMAGE 1 — the client's bathroom as it is today:" }, imageBlock(before), { type: "text" as const, text: "IMAGE 2 — the render of the renovation:" }] : []),
           imageBlock(image),
-          { type: "text", text: `This is a render of a client's renovated bathroom. Does it follow the style brief below? For EACH element: "yes" (clearly as briefed), "partly" (some of it), or "no" (old or different finish), with a few words why. Judge only what the image shows.\n\n${elements.map((e) => `${e.element}: ${e.finish}`).join("\n")}` },
+          {
+            type: "text",
+            text: `${before ? "IMAGE 2 is" : "This is"} a render of a client's renovated bathroom. Does it follow the style brief below? For EACH element: "yes" (clearly renovated as briefed), "partly" (some of it), or "no" (a different finish${before ? " — or still the OLD finish from IMAGE 1: unchanged tiles, fittings or lights count as no" : ""}), with a few words why.\n\n${elements.map((e) => `${e.element}: ${e.finish}`).join("\n")}`,
+          },
         ],
       },
     ],
