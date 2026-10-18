@@ -25,6 +25,7 @@ export const SECTION_REF_CODES: Readonly<Record<string, string>> = {
   Demolition: "DEM",
   Blockwork: "BLK",
   Plaster: "PLA",
+  Waterproofing: "WPR",
   "Floor Finishes": "FLR",
   "Wall Finishes": "WAL",
   Ceilings: "CLG",

@@ -386,6 +386,12 @@
       "version": "20260101006400",
       "name": "room_design_anchor",
       "sha256": "475df6eb2c94cb48d7d9c8404a67b8e6b868f9414ae7969ddfc0413f3dc92017"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006500",
+      "name": "room_tiled_height",
+      "sha256": "905ac72d19c261619d9c684ac6818dab03eb8e45b063985fec53038495e804df"
     }
   ]
 }

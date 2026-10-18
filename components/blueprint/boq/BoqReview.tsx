@@ -30,7 +30,7 @@ import { Inspector, type InspectorTab } from "./Inspector";
 import { InspectorSheet, useSheetLayout } from "./InspectorSheet";
 import { useRegenerate, type RegenerateStart } from "./Regenerate";
 import type { WhatIfEngine } from "./WhatIfTab";
-import { ByRoom, Furniture, Programme, type FurnitureView, type RoomRollup } from "./Extras";
+import { ByRoom, Furniture, Options, Programme, RateBasisLine, type FurnitureView, type RoomRollup } from "./Extras";
 import { Notices } from "./Notices";
 import { PinnedTotal } from "./PinnedTotal";
 import { ProvenancePopover, type PopoverTarget } from "./ProvenancePopover";
@@ -415,6 +415,8 @@ export function BoqReview({ model, rooms, furniture, permits, packExport, highli
             {...handlers}
           />
           <SummaryChain model={model} />
+          {model.rateBasis ? <RateBasisLine rateBasis={model.rateBasis} /> : null}
+          {model.options.length > 0 ? <Options options={model.options} /> : null}
           {model.programme ? <Programme programme={model.programme} /> : null}
           {rooms.length > 0 ? <ByRoom rooms={rooms} open={view === "byroom"} highlightRoom={highlightRoom} /> : null}
           {furniture ? <Furniture furniture={furniture} /> : null}

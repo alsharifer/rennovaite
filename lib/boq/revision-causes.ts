@@ -23,6 +23,7 @@ import { isMissingSchema } from "@/lib/rates/firm";
 
 import { OPENING_NET_ITEM_KEYS, OPENINGS_CONFIRMED_CAUSE } from "@/lib/plan/openings-vocab";
 import { CEILING_ITEM_KEYS, ceilingChangeSummary, netCeilingChange, type CeilingEdit } from "@/lib/plan/ceiling";
+import { netTilingChange, TILING_ITEM_KEYS, tilingChangeSummary, type TilingEdit } from "@/lib/plan/tiling";
 import { netScopeChange, scopeChangeSummary } from "@/lib/plan/scope";
 
 import { appliedHeadline, basisText, type BasisKind, type CorrectionOrigin } from "./own-basis-vocab";
@@ -140,6 +141,8 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
   const confirmed = { n: 0, last: "" };
   // B1 (061): ceiling heights entered on 01 Plan (design_edit, layer "ceiling") — the NET change in the window.
   const ceilingEvents: { at: string; rooms: CeilingEdit[] }[] = [];
+  // B5 (065): tiled heights entered on 01 Plan (design_edit, layer "tiling") — the NET change in the window.
+  const tilingEvents: { at: string; rooms: TilingEdit[] }[] = [];
   for (const e of events) {
     const d = (e.detail ?? {}) as Row;
     const at = str(e.recorded_at);
@@ -158,6 +161,10 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
         if (layer === "openings_confirmed") {
           confirmed.n += typeof d.count === "number" ? d.count : 1;
           confirmed.last = at;
+          break;
+        }
+        if (layer === "tiling") {
+          tilingEvents.push({ at, rooms: Array.isArray(d.rooms) ? (d.rooms as Row[]).map((r) => ({ id: str(r.id), name: r.name == null ? null : str(r.name), from: num(r.from), to: num(r.to) })) : [] });
           break;
         }
         if (layer === "ceiling") {
@@ -190,6 +197,10 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
   if (ceilingEvents.length > 0) {
     const net = netCeilingChange(ceilingEvents);
     if (net.length) out.push({ kind: "ceiling_height", at: ceilingEvents.at(-1)!.at, summary: `Ceiling height — ${ceilingChangeSummary(net)}`, item_keys: [...CEILING_ITEM_KEYS] });
+  }
+  if (tilingEvents.length > 0) {
+    const net = netTilingChange(tilingEvents);
+    if (net.length) out.push({ kind: "tiled_height", at: tilingEvents.at(-1)!.at, summary: `Tiled height — ${tilingChangeSummary(net)}`, item_keys: [...TILING_ITEM_KEYS] });
   }
   if (confirmed.n > 0) {
     out.push({ kind: "openings_confirmed", at: confirmed.last, summary: `${OPENINGS_CONFIRMED_CAUSE} — ${confirmed.n} ${confirmed.n === 1 ? "opening" : "openings"}`, item_keys: [...OPENING_NET_ITEM_KEYS] });

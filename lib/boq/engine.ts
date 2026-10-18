@@ -20,7 +20,7 @@ import {
   STYLE_TIER,
   VAT_PCT,
 } from "./rules";
-import type { Boq, BoqLine, BoqSection, EngineInput, PomiSection } from "./schema";
+import type { Boq, BoqLine, BoqSection, EngineInput, PomiSection, ScopeItem } from "./schema";
 import { computeTakeoff, type Takeoff } from "./takeoff";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -44,8 +44,54 @@ export function generateDeterministicBoq(
   const bySection = new Map<PomiSection, BoqLine[]>();
 
   for (const item of takeoff.items) {
+    const line = priceScopeItem(item, resolver, input.accessorySelections);
+    const lines = bySection.get(item.work_section) ?? [];
+    lines.push(line);
+    bySection.set(item.work_section, lines);
+  }
+
+  const sections: BoqSection[] = SECTION_ORDER.filter((s) =>
+    bySection.has(s),
+  ).map((work_section) => {
+    const lines = bySection.get(work_section)!;
+    return {
+      work_section,
+      lines,
+      section_total_aed: lines.reduce((s, l) => s + l.total_aed, 0),
+    };
+  });
+
+  // H7: section totals, subtotal, contingency and VAT are all put together by
+  // `rechain` (to the fils, canonical section order) — the same function every
+  // later producer calls.
+  const boq: Boq = rechain({
+    sections,
+    subtotal_aed: 0,
+    contingency_pct: CONTINGENCY_PCT,
+    contingency_aed: 0,
+    vat_pct: VAT_PCT,
+    vat_aed: 0,
+    grand_total_aed: 0,
+    engine: {
+      version: ENGINE_VERSION,
+      tier,
+      flooring,
+      style_key: input.styleKey,
+      generated_at: new Date().toISOString(),
+    },
+  });
+
+  return { boq, takeoff };
+}
+
+/**
+ * One take-off item priced into a BoQ line — the engine's own, exported so a
+ * later rule set (B5's wet-room package) prices through the same resolver,
+ * provenance and firm overlay as every engine line.
+ */
+export function priceScopeItem(item: ScopeItem, resolver: RateResolver, accessorySelections: EngineInput["accessorySelections"] = {}): BoqLine {
     const rate = resolver.resolve(item.item_key, item.unit);
-    const chosen = input.accessorySelections?.[item.item_key];
+    const chosen = accessorySelections?.[item.item_key];
     const pricedQty = round2(item.quantity * (1 + rate.wastage));
     const line: BoqLine = {
       // A selected accessory renames the line to the thing actually specified —
@@ -89,41 +135,5 @@ export function generateDeterministicBoq(
         : {}),
       rate_tier: rate.rate_tier,
     };
-    const lines = bySection.get(item.work_section) ?? [];
-    lines.push(line);
-    bySection.set(item.work_section, lines);
-  }
-
-  const sections: BoqSection[] = SECTION_ORDER.filter((s) =>
-    bySection.has(s),
-  ).map((work_section) => {
-    const lines = bySection.get(work_section)!;
-    return {
-      work_section,
-      lines,
-      section_total_aed: lines.reduce((s, l) => s + l.total_aed, 0),
-    };
-  });
-
-  // H7: section totals, subtotal, contingency and VAT are all put together by
-  // `rechain` (to the fils, canonical section order) — the same function every
-  // later producer calls.
-  const boq: Boq = rechain({
-    sections,
-    subtotal_aed: 0,
-    contingency_pct: CONTINGENCY_PCT,
-    contingency_aed: 0,
-    vat_pct: VAT_PCT,
-    vat_aed: 0,
-    grand_total_aed: 0,
-    engine: {
-      version: ENGINE_VERSION,
-      tier,
-      flooring,
-      style_key: input.styleKey,
-      generated_at: new Date().toISOString(),
-    },
-  });
-
-  return { boq, takeoff };
+    return line;
 }

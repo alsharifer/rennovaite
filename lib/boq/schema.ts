@@ -19,6 +19,8 @@ export const POMI_SECTIONS = [
   "Demolition",
   "Blockwork",
   "Plaster",
+  // B5: the wet-room package's tanking (floor + upstand, shower walls).
+  "Waterproofing",
   "Floor Finishes",
   "Wall Finishes",
   "Ceilings",

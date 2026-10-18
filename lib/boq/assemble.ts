@@ -21,11 +21,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadAccessoryOverrides } from "@/lib/accessories/load";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
-import { generateDeterministicBoq } from "@/lib/boq/engine";
+import { generateDeterministicBoq, priceScopeItem } from "@/lib/boq/engine";
 import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
 import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
-import { elementPricer } from "@/lib/boq/rates";
+import { elementPricer, RateResolver } from "@/lib/boq/rates";
+import { applyWetRoomPackage, priceOptions, WET_ROOM_TYPES, wetRoomContextFrom, type WetRoomContext } from "@/lib/boq/wet-room";
 import type { EngineRoom, LabourRate as EngineLabourRate, PricingSku as EnginePricingSku } from "@/lib/boq/schema";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { applyOwnBasis } from "@/lib/boq/own-basis";
@@ -108,6 +109,8 @@ export interface BoqInputs {
   stairs?: StairsContext;
   /** 15 Oct: house openings the plan rules left out ("Needs a wall"), recorded on the document. */
   openingsNeedWall?: string[];
+  /** B5: a project that IS one wet room (room intake) — priced with the wet-room package. */
+  wetRoom?: WetRoomContext | null;
 }
 
 /** Why a project cannot be priced: the HTTP status and body the route answers with. */
@@ -128,7 +131,7 @@ const refuse = (status: number, body: Record<string, unknown>): LoadedBoqInputs 
 export async function loadPriceablePlan(
   supabase: SupabaseClient,
   projectId: string,
-): Promise<{ project: BoqInputs["project"]; plan: BoqInputs["plan"]; rooms: BoqRoomRow[]; stairs: StairsContext; refusal?: never } | { refusal: BoqRefusal }> {
+): Promise<{ project: BoqInputs["project"]; plan: BoqInputs["plan"]; rooms: BoqRoomRow[]; stairs: StairsContext; intake: string | null; refusal?: never } | { refusal: BoqRefusal }> {
   const [projectRes, plansRes] = await Promise.all([
     supabase.from("projects").select("id, name, city").eq("id", projectId).single<BoqInputs["project"]>(),
     supabase
@@ -229,7 +232,15 @@ export async function loadPriceablePlan(
   // K12 ruling (Q-11): a stairs room ANYWHERE on the plan (even left out) means the stairs are known;
   // with none, a villa / multi-level project keeps the allowance as an assumption.
   const stairs: StairsContext = { onPlan: rooms.some((r) => r.room_type === "stairs"), multiLevel: isMultiLevelProject(project) };
-  return { project, plan, rooms: scoped, stairs };
+  // B5: how the plan was made (061 plans.intake) — "room_dimensions" = one room typed in. Best-effort.
+  let intake: string | null = null;
+  try {
+    const { data: pi, error: piErr } = await supabase.from("plans").select("intake").eq("id", plan.id).maybeSingle<{ intake: string | null }>();
+    if (!piErr) intake = pi?.intake ?? null;
+  } catch {
+    /* pre-061 */
+  }
+  return { project, plan, rooms: scoped, stairs, intake };
 }
 
 /** Everything a BoQ is priced from, loaded from the project's stored state. */
@@ -254,7 +265,7 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
     supabase.from("approved_designs").select("room_id, render_id").eq("project_id", projectId),
   ]);
   if (priceable.refusal) return { refusal: priceable.refusal };
-  const { project, plan, rooms, stairs } = priceable;
+  const { project, plan, rooms, stairs, intake } = priceable;
 
   if (labourRes.error || !labourRes.data || labourRes.data.length === 0) {
     return refuse(500, { error: "labour_rates table is empty — run scripts/seed-labour-rates.ts." });
@@ -279,11 +290,22 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   // take-off; the viewer flag gates only the viewer and inspect UI.
   let takeoffItems: TakeoffItem[] = [];
   let openingsNeedWall: string[] = [];
+  let wetRoom: WetRoomContext | null = null;
   try {
     const graph = await derivePlanGraph(projectId);
     openingsNeedWall = graph.openings_need_wall ?? [];
     const proposed = await getProposedGraph(projectId);
     takeoffItems = quantifyPlan(graph, { proposed });
+    // B5: a project that IS one bathroom (the room intake) is priced as a
+    // bathroom refit — the wet-room package (lib/boq/wet-room.ts). Its existing
+    // ceiling is repaired, not replaced with a new gypsum one.
+    const only = rooms.length === 1 ? rooms[0]! : null;
+    if (intake === "room_dimensions" && only && WET_ROOM_TYPES.has(only.room_type ?? "")) {
+      const { data: fx } = await supabase.from("plan_fixtures").select("id, type, room_id, position, spec").eq("project_id", projectId).eq("room_id", only.id);
+      const wallTile = takeoffItems.filter((i) => i.work_item_key === "wet_tiling" && i.room_id === only.id).reduce((s, i) => s + i.qty, 0);
+      wetRoom = wetRoomContextFrom(graph, only.id, ((fx ?? []) as { id: string; type: string; room_id: string | null; position: unknown; spec: Record<string, unknown> | null }[]).filter((f) => Array.isArray(f.position)).map((f) => ({ ...f, position: f.position as [number, number] })), wallTile);
+      if (wetRoom) takeoffItems = takeoffItems.filter((i) => !(i.work_item_key === "ceiling_finish" && i.room_id === only.id));
+    }
     if (!opts.dryRun) await persistTakeoffItems(projectId, takeoffItems, supabase);
   } catch (e) {
     console.warn("[boq/assemble] P4 take-off skipped:", e instanceof Error ? e.message : e);
@@ -297,7 +319,7 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   const referenceRows = await loadReferenceRows(supabase);
 
   return {
-    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs, ...(openingsNeedWall.length ? { openingsNeedWall } : {}) },
+    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs, ...(openingsNeedWall.length ? { openingsNeedWall } : {}), ...(wetRoom ? { wetRoom } : {}) },
   };
 }
 
@@ -316,35 +338,38 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
     polygon: Array.isArray(r.polygon) ? (r.polygon as unknown as number[][]) : null,
     ...(r.ceiling_h_m ? { ceiling_h_m: Number(r.ceiling_h_m) } : {}),
   }));
+  const engineLabour = labourRates.map(
+    (r): EngineLabourRate => ({
+      work_section: r.work_section ?? "",
+      description: r.description ?? "",
+      unit: r.unit ?? "",
+      rate_low_aed: r.rate_low_aed ?? 0,
+      rate_mid_aed: r.rate_mid_aed ?? 0,
+      rate_high_aed: r.rate_high_aed ?? 0,
+    }),
+  );
+  const engineSkus = skus.map(
+    (s): EnginePricingSku => ({
+      sku: s.sku ?? "",
+      brand: s.brand ?? "",
+      category: s.category ?? "",
+      subcategory: s.subcategory ?? "",
+      description_en: s.description_en ?? "",
+      unit: s.unit ?? "",
+      price_aed: s.price_aed ?? 0,
+      vendor: s.vendor ?? "",
+    }),
+  );
+  // D1: user-chosen accessories replace the R-xx rate for their own
+  // item_key only. `{}` before migration 028 or with nothing selected,
+  // which reproduces the pre-D1 BoQ byte for byte.
+  const accessorySelections = await loadAccessoryOverrides(projectId);
   const { boq: engineBoq } = generateDeterministicBoq({
     rooms: engineRooms,
-    labourRates: labourRates.map(
-      (r): EngineLabourRate => ({
-        work_section: r.work_section ?? "",
-        description: r.description ?? "",
-        unit: r.unit ?? "",
-        rate_low_aed: r.rate_low_aed ?? 0,
-        rate_mid_aed: r.rate_mid_aed ?? 0,
-        rate_high_aed: r.rate_high_aed ?? 0,
-      }),
-    ),
-    skus: skus.map(
-      (s): EnginePricingSku => ({
-        sku: s.sku ?? "",
-        brand: s.brand ?? "",
-        category: s.category ?? "",
-        subcategory: s.subcategory ?? "",
-        description_en: s.description_en ?? "",
-        unit: s.unit ?? "",
-        price_aed: s.price_aed ?? 0,
-        vendor: s.vendor ?? "",
-      }),
-    ),
+    labourRates: engineLabour,
+    skus: engineSkus,
     styleKey: chosenStyleKey,
-    // D1: user-chosen accessories replace the R-xx rate for their own
-    // item_key only. `{}` before migration 028 or with nothing selected,
-    // which reproduces the pre-D1 BoQ byte for byte.
-    accessorySelections: await loadAccessoryOverrides(projectId),
+    accessorySelections,
     referenceRows,
     firm,
     stairs: inputs.stairs,
@@ -360,7 +385,15 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
   const overlaid = await appendOverlaySections(mappedBoq, projectId, supabase);
   // Ground-truth: append Joinery + Aluminum & Glass sections (Atrium/Global
   // Creation actuals; aluminum = site_assessment allowances). Core, additive.
-  const withJoinery = appendJoineryAluminumSections(overlaid, rooms);
+  const joined = appendJoineryAluminumSections(overlaid, rooms);
+  // B5: one bathroom from its dimensions — the wet-room package over the villa
+  // lines, priced through the same resolver as the engine (same tier, books, firm).
+  const withJoinery = inputs.wetRoom
+    ? (() => {
+        const resolver = new RateResolver(engineLabour, engineSkus, engineBoq.engine.tier, accessorySelections, { reference: referenceRows, firm });
+        return applyWetRoomPackage(joined as unknown as Parameters<typeof applyWetRoomPackage>[0], inputs.wetRoom, (item) => priceScopeItem(item, resolver, accessorySelections)) as unknown as typeof joined;
+      })()
+    : joined;
   // G3: append the landscape sections from the drawn garden (zones, runs,
   // units, points) priced at the calibrated landscape rates. No-op for a
   // project with no outdoor zones, which is every interior project.
@@ -371,7 +404,8 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
   const owned = applyOwnBasis(gardened as unknown as Parameters<typeof applyOwnBasis>[0], await loadAppliedCorrections(supabase, projectId)).boq as unknown as typeof gardened;
   // L1: the firm's OH&P, LAST — its own summary line over the priced
   // subtotal, never inside a rate. A no-op without a firm book.
-  const priced = applyOhp(owned, firm.ohpPct);
+  // B5: options are priced LAST, through the final chain (OH&P, contingency, VAT).
+  const priced = priceOptions(applyOhp(owned, firm.ohpPct) as unknown as Parameters<typeof priceOptions>[0]) as unknown as ReturnType<typeof applyOhp<typeof owned>>;
   // 15 Oct: the openings left out as "Needs a wall" — the record the revision
   // diff names ("N openings need a wall"). Absent when none (every BoQ before).
   return inputs.openingsNeedWall?.length ? { ...priced, openings_need_wall: inputs.openingsNeedWall } : priced;

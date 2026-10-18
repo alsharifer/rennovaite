@@ -358,6 +358,29 @@ export function buildProposalPages(input: ProposalInput): string[] {
     svg += text(M, y, line, { size: 2.7, fill: DOC.INK_2, font: DOC.MONO });
     y += 4.6;
   }
+  // B5: options — priced for the client to choose, never inside the total above.
+  const options = boq.options ?? [];
+  if (options.length) {
+    if (y + 12 + options.length * 14 > BOTTOM) {
+      push(svg);
+      ({ svg, y } = header());
+    }
+    y += 4;
+    svg += label(M, y, "Options — priced separately, not in the total");
+    y += 3;
+    svg += hline(M, R, y, DOC.STRONG, 0.5);
+    for (const o of options) {
+      svg += text(M, y + 6, o.label, { size: 3.1, weight: 500 });
+      svg += text(R, y + 6, o.delta_total_aed != null ? `+ AED ${aed(o.delta_total_aed)}` : `+ AED ${aed(o.net_aed)}`, { size: 3.1, font: DOC.MONO, anchor: "end", attrs: `data-option="${esc(o.key)}" data-option-delta="${o.delta_total_aed ?? ""}"` });
+      y += 9;
+      for (const line of wrapWords(`${o.note} ${o.delta_total_aed != null ? "Incl. contingency and VAT." : "Before contingency and VAT."}`, 92)) {
+        svg += text(M, y, line, { size: 2.7, fill: DOC.INK_2 });
+        y += 4.4;
+      }
+      y += 1.6;
+      svg += hline(M, R, y);
+    }
+  }
   push(svg);
 
   // 3 Exclusions & assumptions (K4) ------------------------------------------------------------

@@ -644,12 +644,12 @@
         "lines": [
           {
             "description": "Wall painting — primer + 2 coats",
-            "quantity": 426.95,
+            "quantity": 391.45,
             "unit": "m2",
             "rate_aed": 35,
-            "total_aed": 14943.25,
+            "total_aed": 13700.75,
             "vendor_or_source": "Deterministic take-off (P4)",
-            "notes": "Aggregated from 63 element take-off items.",
+            "notes": "Aggregated from 63 element take-off items. Wet-room walls are painted only above their tiled height: 35.5 m² of wall is tiled instead.",
             "rule_id": "P4/quantify/wall_paint",
             "kind": "supply_and_install",
             "rate_band": "mid",
@@ -723,15 +723,15 @@
             "work_item_key": "wall_paint"
           }
         ],
-        "section_total_aed": 14943.25
+        "section_total_aed": 13700.75
       }
     ],
-    "subtotal_aed": 340504.05,
+    "subtotal_aed": 339261.55,
     "contingency_pct": 8,
-    "contingency_aed": 27240.32,
+    "contingency_aed": 27140.92,
     "vat_pct": 5,
-    "vat_aed": 18387.22,
-    "grand_total_aed": 386131.59,
+    "vat_aed": 18320.12,
+    "grand_total_aed": 384722.59,
     "engine": {
       "version": "0.3.0",
       "tier": "mid",
@@ -742,7 +742,7 @@
   "rooms": [
     {
       "room_id": "bath-01",
-      "total_aed": 13341,
+      "total_aed": 12956.35,
       "items": [
         {
           "work_item_key": "wet_tiling",
@@ -759,18 +759,18 @@
           "total_aed": 1860.1
         },
         {
-          "work_item_key": "wall_paint",
-          "description": "Wall painting — primer + 2 coats",
-          "qty": 33.82,
-          "unit": "m2",
-          "total_aed": 1183.7
-        },
-        {
           "work_item_key": "floor_finish",
           "description": "Floor finish — supply & install",
           "qty": 4.7,
           "unit": "m2",
           "total_aed": 893
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 22.83,
+          "unit": "m2",
+          "total_aed": 799.05
         },
         {
           "work_item_key": "ceiling_finish",
@@ -783,7 +783,7 @@
     },
     {
       "room_id": "mbath-01",
-      "total_aed": 12426.6,
+      "total_aed": 11953.4,
       "items": [
         {
           "work_item_key": "wet_tiling",
@@ -807,18 +807,18 @@
           "total_aed": 893
         },
         {
-          "work_item_key": "wall_paint",
-          "description": "Wall painting — primer + 2 coats",
-          "qty": 23.66,
-          "unit": "m2",
-          "total_aed": 828.1
-        },
-        {
           "work_item_key": "ceiling_finish",
           "description": "Gypsum ceiling + finish",
           "qty": 4.7,
           "unit": "m2",
           "total_aed": 611
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 10.14,
+          "unit": "m2",
+          "total_aed": 354.9
         }
       ]
     },
@@ -994,7 +994,7 @@
     },
     {
       "room_id": "toilet-01",
-      "total_aed": 8446.7,
+      "total_aed": 8062.05,
       "items": [
         {
           "work_item_key": "wet_tiling",
@@ -1018,18 +1018,18 @@
           "total_aed": 513
         },
         {
-          "work_item_key": "wall_paint",
-          "description": "Wall painting — primer + 2 coats",
-          "qty": 10.99,
-          "unit": "m2",
-          "total_aed": 384.65
-        },
-        {
           "work_item_key": "ceiling_finish",
           "description": "Gypsum ceiling + finish",
           "qty": 2.7,
           "unit": "m2",
           "total_aed": 351
+        },
+        {
+          "work_item_key": "wall_paint",
+          "description": "Wall painting — primer + 2 coats",
+          "qty": 0,
+          "unit": "m2",
+          "total_aed": 0
         }
       ]
     },

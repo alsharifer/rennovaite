@@ -205,6 +205,8 @@ export async function derivePlanGraph(projectId: string, opts: { includeUnconfir
   // ceiling_h_m/ceiling_h_source.
   const sb = supabase as unknown as SupabaseClient;
   const ROOM_SELECTS = [
+    // B5 (065): tiled_height_m.
+    "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec, dims_derived, site_reference, disposition, in_scope, ceiling_h_m, ceiling_h_source, tiled_height_m",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec, dims_derived, site_reference, disposition, in_scope, ceiling_h_m, ceiling_h_source",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec, dims_derived, site_reference, disposition, in_scope",
     "id, name_en, name_ar, room_type, area_m2, polygon, unroofed, area_derived_m2, derived_note, level_mm, height_mm, spec, dims_derived, site_reference, disposition",

@@ -1034,6 +1034,53 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
   `scripts/b2-photo-view-check.mjs` (studio, five views) and
   `scripts/b2-deliberate-failure.ts` (a moved vanity must fail honestly).
 
+### Bathroom pilot B5 — a wet-room BoQ (19 Oct)
+
+Report `docs/BATHROOM_PILOT_B5.md` (the audit table). Migration **065**.
+
+- **Painting by rule (every project).** `rooms.tiled_height_m` (null = the
+  type default: full height for a wet room). The element take-off
+  (`quantify.ts`): wet tiling runs to the tiled height, net of each opening's
+  part in that band. Wall paint is measured only above it, on walls that bound
+  only wet rooms (one face per wall; a wall with a dry room keeps its paint).
+  `tiled_m2` names what is not painted, and a zero line is `stated_zero`.
+  - Editable on 01 Plan (`TiledHeights`, `PATCH /api/plan-tiling`); a
+    `design_edit` on layer "tiling" is the revision cause "Tiled height — …".
+  - The Mudon golden lost 35.5 m² of wet-wall paint.
+- **Wet-room package** (`lib/boq/wet-room.ts`) — only when
+  `plans.intake = 'room_dimensions'` and the one room is a bathroom, ensuite
+  or powder room (villas are untouched until R10). Applied in `assemble.ts`
+  after joinery:
+  - **removes** villa lines: Q-05, the GT aluminium package, the GT door
+    joinery and bath cabinet, Q-19 re-pipe, Q-20 heater supply, Q-22 wall-hung
+    WC, Q-24d actuator, villa prelims, the plain mirror; ceiling_finish is
+    filtered from the take-off;
+  - **adds** W-01…W-24, priced through the engine's resolver
+    (`priceScopeItem`, exported from engine.ts) on rules R-49, R-51–R-65:
+    strip-out, waterproofing (a new POMI section, REF WPR, after Plaster),
+    screed, skirting 0 stated, lit niche, ceiling repair (allowance), WC / bidet
+    / bath, backlit mirror, shaver, extractor, cove on the bulkhead, heater
+    box-in, ceiling paint;
+  - **one TBC line** (community NOC) at 0, never in the total;
+  - **options** (`boq.options`, outside the sections): wall-hung WC and
+    bulkhead removal. `priceOptions` runs LAST, putting each option's delta
+    through the chain;
+  - **every line has `rate_basis`** (`lib/boq/rate-basis.ts`: calibrated |
+    market | allowance | tbc | firm);
+  - **`confirm_on_site` questions** appear in the Issues navigator under
+    "ALLOWANCE — CONFIRM ON SITE".
+  - The heater (a plumbing `water_heater` fixture) and the bulkhead
+    (`rooms.spec.bulkhead`) come from the plan.
+- **Where it shows:**
+  - the BoQ page `RateBasisLine` + `Options` (Extras);
+  - the BoQ PDF page 1 — a one-page summary with options and basis; rows
+    tighten above 10 sections;
+  - the proposal — options under the price summary, no provenance.
+- **Bidet and bath points are priced** (650 / 750, `lib/overlays/catalog.ts`).
+- **Pilot:** AED 202,645.35 → **49,267.88**; options + 2,778.30 / + 905.38.
+- **Checks:** `lib/boq/__tests__/wet-room.test.ts`, `scripts/b5-bathroom-boq.ts`
+  (in-process dump), live `scripts/b5-bathroom-check.ts`.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

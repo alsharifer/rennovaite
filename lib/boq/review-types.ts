@@ -24,6 +24,10 @@ export interface ReviewLine {
   unpriced: boolean;
   /** "≈ Derived from the reference layout — firm after site verification." */
   derivedNote: string | null;
+  /** B5: a question the line asks before its figure is firm ("Is the leak fixed?"). */
+  confirm: string | null;
+  /** B5: what the rate rests on — calibrated · market · allowance · TBC (lib/boq/rate-basis.ts). */
+  basis: string | null;
   itemKey: string | null;
   elementRefs: string[];
   /** Why an unpriced line has no rate, in curated words. */
@@ -112,4 +116,19 @@ export interface ReviewModel {
   /** K11: applied prices whose line is not in this revision — never dropped silently (Issues navigator). */
   unmatchedPrices: { correctionId: string; item: string; type: "rate" | "quantity"; value: number; basis: string | null; by: string | null }[];
   programme: { total_days: number; phases: { name: string; start_day: number; days: number }[]; basis: string } | null;
+  /** B5: priced OUTSIDE the total — what each adds, what it replaces, and what it moves the total by. */
+  options: ReviewOption[];
+  /** B5: what the rates rest on, by line count and amount (absent on a BoQ that does not record it). */
+  rateBasis: { basis: string; lines: number; amount: number }[] | null;
+}
+
+export interface ReviewOption {
+  key: string;
+  label: string;
+  note: string;
+  net: number;
+  /** The grand total if taken, minus the grand total — incl. OH&P, contingency and VAT. */
+  delta: number | null;
+  adds: { description: string; quantity: number; unit: string; rate: number; amount: number; basis: string | null }[];
+  replaces: { description: string; amount: number }[];
 }

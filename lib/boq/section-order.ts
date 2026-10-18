@@ -22,6 +22,7 @@ export const CANONICAL_SECTION_ORDER = [
   "Demolition",
   "Blockwork",
   "Plaster",
+  "Waterproofing",
   "Floor Finishes",
   "Wall Finishes",
   "Ceilings",

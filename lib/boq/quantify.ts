@@ -42,6 +42,26 @@ export interface TakeoffItem {
    *  off the drawing and never edited) — the net quantity rests on them, so the
    *  line carries the derived mark. Absent when every deducted size is measured. */
   derived_opening_refs?: string[];
+  /** B5: wall paint only — the wall area NOT painted because it is tiled (a wall
+   *  that bounds only wet rooms is painted above their tiled height). */
+  tiled_m2?: number;
+}
+
+/**
+ * B5 (065): how high a room's walls are tiled — the stored value (capped at the
+ * ceiling), else the type default: full height for a wet room (what wet_tiling
+ * has always measured), none for a dry room. Dry rooms are never tiled here.
+ */
+export function tiledHeightOf(room: { type: string | null; tiled_height_m?: number }, ceilingH: number): number {
+  if (!isWet(room.type)) return 0;
+  const t = room.tiled_height_m;
+  return typeof t === "number" && t >= 0 ? Math.min(t, ceilingH) : ceilingH;
+}
+
+/** The part of an opening inside the wall band [lo, hi] (m²). */
+function openingInBand(o: { width_mm: number; height_mm: number; sill_mm: number }, lo: number, hi: number): number {
+  const s = (o.sill_mm || 0) / 1000, t = s + (o.height_mm || 0) / 1000;
+  return ((o.width_mm || 0) / 1000) * Math.max(0, Math.min(hi, t) - Math.max(lo, s));
 }
 
 const WET_ROOM_TYPES = new Set(["bathroom", "ensuite", "powder", "kitchen"]);
@@ -126,6 +146,9 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
 
   const byWall = new Map<string, { area: number; ids: string[] }>();
   const byRoom = new Map<string, { area: number; ids: string[] }>();
+  // B5: the openings themselves, for the part of each inside a tiled / painted band.
+  const openingsByRoom = new Map<string, (typeof graph.openings)[number][]>();
+  const openingsByWall = new Map<string, (typeof graph.openings)[number][]>();
   // R10b: openings whose size is derived — a quantity net of one is derived too.
   const derivedOpenings = new Set(graph.openings.filter((o) => o.derived).map((o) => o.id));
   const derivedRefs = (ids: string[]) => {
@@ -152,7 +175,9 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
       r.area += area;
       r.ids.push(o.id);
       byRoom.set(rid, r);
+      (openingsByRoom.get(rid) ?? openingsByRoom.set(rid, []).get(rid)!).push(o);
     }
+    (openingsByWall.get(o.wall_id) ?? openingsByWall.set(o.wall_id, []).get(o.wall_id)!).push(o);
   }
 
   // K12 (058): a room NOT in this renovation contributes no room-level quantity.
@@ -183,12 +208,17 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
     if (!room.unroofed) {
       items.push({ work_item_key: "ceiling_finish", room_id: room.id, element_id: room.id, qty: r2(room.area_m2), unit: "m2", wet_area: wet });
     }
-    if (wet) {
-      // Full-height wet-wall tiling: room perimeter × ceiling height, NET of
-      // any door/window opening onto this room (A5). Floored at 0.
+    const th = tiledHeightOf(room, h);
+    if (wet && th > 0) {
+      // Wet-wall tiling: room perimeter × the tiled height (B5 — full height by
+      // default, the ceiling), NET of the part of every door/window opening onto
+      // this room that falls in the tiled band (A5). Floored at 0. At full height
+      // the band is the whole wall: the pre-B5 formula, unchanged.
       const ded = byRoom.get(room.id);
-      const gross = perimeterM(room.polygon) * h;
-      const tileArea = r2(Math.max(0, gross - (ded?.area ?? 0)));
+      const full = th >= h - 1e-9;
+      const gross = perimeterM(room.polygon) * (full ? h : th);
+      const cut = full ? (ded?.area ?? 0) : (openingsByRoom.get(room.id) ?? []).reduce((s, o) => s + openingInBand(o, 0, th), 0);
+      const tileArea = r2(Math.max(0, gross - cut));
       items.push({
         work_item_key: "wet_tiling",
         room_id: room.id,
@@ -221,7 +251,23 @@ export function quantifyPlan(graph: PlanGraph, opts: QuantifyOptions = {}): Take
         ? { opening_refs: ded.ids, gross_qty: r2(gross), ...derivedRefs(ded.ids) }
         : {};
     items.push({ work_item_key: "wall_plaster", room_id: roomId, element_id: w.id, qty: net, unit: "m2", wet_area: false, ...prov });
-    items.push({ work_item_key: "wall_paint", room_id: roomId, element_id: w.id, qty: net, unit: "m2", wet_area: false, ...prov });
+    // B5 (room sheet §7 item 7): a wall that bounds only wet rooms is their tiled
+    // face — painted only ABOVE the lowest tiled height among them (nothing at
+    // full height). A wall with a dry room on it keeps its painted face. The
+    // take-off counts one face per wall, as it always has.
+    const rooms = w.room_ids.map((id) => graph.rooms.find((r) => r.id === id)).filter((r): r is (typeof graph.rooms)[number] => !!r);
+    const tiledWall = rooms.length > 0 && rooms.every((r) => isWet(r.type));
+    if (tiledWall) {
+      const th = Math.min(...rooms.map((r) => tiledHeightOf(r, ceilingByRoom.get(r.id) ?? globalCeiling)));
+      const band = Math.max(0, h - th);
+      const paintGross = length * band;
+      const paintCut = (openingsByWall.get(w.id) ?? []).reduce((s, o) => s + openingInBand(o, th, h), 0);
+      const paintNet = r2(Math.max(0, paintGross - paintCut));
+      const paintProv = paintCut > 0 && ded ? { opening_refs: ded.ids, gross_qty: r2(paintGross), ...derivedRefs(ded.ids) } : {};
+      items.push({ work_item_key: "wall_paint", room_id: roomId, element_id: w.id, qty: paintNet, unit: "m2", wet_area: true, ...paintProv, tiled_m2: r2(Math.max(0, net - paintNet)) });
+    } else {
+      items.push({ work_item_key: "wall_paint", room_id: roomId, element_id: w.id, qty: net, unit: "m2", wet_area: false, ...prov });
+    }
   }
 
   // --- Demolition: walls in as-built but not proposed ---
