@@ -4,6 +4,9 @@ Report only — nothing in the app changed. Checked on `master` @ `9885cea`.
 
 ## Verdict: GO, with one sequencing condition
 
+> **Update, 18 Oct:** #112 merged to master (`483ffe0`) after this check, so
+> the condition below is met. B1 can branch from master.
+
 The baseline is green. Every K item is merged. Nothing found blocks the pilot.
 
 **Sequencing:** PR #112 (plan editor guardrails, OPEN) touches five files that
