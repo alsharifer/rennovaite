@@ -900,6 +900,27 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
   3096: intake form → door + window → fixtures → reload → BoQ; shots in
   `screenshots/bathroom-pilot/b1/`).
 
+### Bathroom pilot B2 — photo views that keep the layout (18 Oct)
+
+- **Every photo of a room is a view** (migration **062**): `room_photos` always
+  held many rows per room but the render route reads only the latest; the
+  studio's "Your photos" (`components/blueprint/renders/PhotoViews.tsx`, behind
+  `MULTIVIEW_RENDERS_ENABLED`) lists ALL of them, oldest first, as "Photo N ·
+  your photo" (`lib/render/photo-views.ts`, pure; the same file assigned twice
+  is one view). Add photos takes several at once (the H9 direct upload, client
+  compression keeps the portrait frame). Each photo is placed on the room plan —
+  press where it was taken, drag toward what it shows, or type X / Y (m) and the
+  heading — → `PATCH /api/room-photos` (`camera_position` in normalised plan
+  space, `camera_heading_deg` compass, 0 = plan up, clockwise; a camera outside
+  the room is 422 `outside_room`). Placing a photo is not a plan edit (no
+  `design_edit`; the BoQ is not stale). `renders.room_photo_id` links a render to
+  its photo view. `room_photo_id` is a project reference kind
+  (`lib/projects/access.ts`).
+- **Checks**: `lib/render/__tests__/photo-views.test.ts` (the sheet's §4
+  cameras); live `node --env-file=.env.local scripts/b2-photo-views-check.mjs
+  [port]` on the dev test project a2661f34 (five photos through the real file
+  input, P1 by drag, P2 by keyboard, P1–P5 at §4, axe light + dark, phone).
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

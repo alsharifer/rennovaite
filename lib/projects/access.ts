@@ -50,6 +50,8 @@ export interface ProjectRefs {
   context_id?: string | null;
   moodboard_item_id?: string | null;
   prediction_id?: string | null;
+  /** B2 (062): a photo of a room — a photo view. */
+  room_photo_id?: string | null;
 }
 
 type RefKind = keyof ProjectRefs;
@@ -82,6 +84,10 @@ async function resolveRef(db: SupabaseClient, kind: RefKind, id: string): Promis
     case "room_id": {
       const r = await one(db.from("rooms").select("plan_id").eq("id", id).maybeSingle<{ plan_id: string | null }>(), "room");
       return r?.plan_id ? projectOfPlan(db, r.plan_id) : null;
+    }
+    case "room_photo_id": {
+      const ph = await one(db.from("room_photos").select("room_id").eq("id", id).maybeSingle<{ room_id: string | null }>(), "room photo");
+      return ph?.room_id ? resolveRef(db, "room_id", ph.room_id) : null;
     }
     case "render_id":
       return (await one(db.from("renders").select("project_id").eq("id", id).maybeSingle<{ project_id: string | null }>(), "render"))?.project_id ?? null;
@@ -118,6 +124,7 @@ const NOT_FOUND: Record<RefKind, string> = {
   opening_id: "opening",
   context_id: "context",
   moodboard_item_id: "moodboard_item",
+  room_photo_id: "room_photo",
 };
 
 /** K10: which of these projects are deleted (055). Before 055 nothing can be. */

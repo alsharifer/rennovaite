@@ -19,6 +19,8 @@ import { StateBlock } from "@/components/blueprint/StateBlock";
 import { RendersStudio } from "@/components/blueprint/renders/RendersStudio";
 import { journeyFlagsFromEnv, ownerStepHref } from "@/lib/journey";
 import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
+import type { PhotoView } from "@/lib/render/photo-views";
+import { loadMiniPlans, loadPhotoViews, type MiniPlan } from "@/lib/render/photo-views-load";
 
 export const dynamic = "force-dynamic";
 
@@ -351,6 +353,18 @@ export default async function RenderPage({
     : null;
   const detectNeeded = !!plan && !!detectRes && !detectRes.error && !!detectRes.data?.pdf_url && detectRes.data.source !== "user_drawn" && !detectRes.data.openings_detected_at;
 
+  // B2 (MULTIVIEW_RENDERS_ENABLED): every photo of a room as a view, and the room plan to place it on.
+  let photoViews: { byRoom: Record<string, PhotoView[]>; plans: Record<string, MiniPlan> } | null = null;
+  if (process.env.MULTIVIEW_RENDERS_ENABLED === "true" && plan) {
+    const ids = roomList.map((r) => r.id);
+    const planCols = await sbRows.from("plans").select("source, plot_width_m").eq("id", plan.id).maybeSingle<{ source: string | null; plot_width_m: number | null }>();
+    const [byRoom, plans] = await Promise.all([
+      loadPhotoViews(sbRows, ids),
+      loadMiniPlans(sbRows, projectId, { id: plan.id, total_area_m2: plan.total_area_m2 ?? null, source: planCols.data?.source ?? null, plot_width_m: planCols.data?.plot_width_m ?? null }, ids),
+    ]);
+    photoViews = { byRoom, plans };
+  }
+
   const flags = journeyFlagsFromEnv();
   return (
     <>
@@ -374,6 +388,7 @@ export default async function RenderPage({
       costHref={ownerStepHref("cost", projectId, flags)}
       notInScope={notInScope}
       planHref={`/project/${projectId}/plan`}
+      photoViews={photoViews}
     />
     </>
   );

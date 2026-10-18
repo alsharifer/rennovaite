@@ -368,6 +368,12 @@
       "version": "20260101006100",
       "name": "room_ceiling_height",
       "sha256": "46ac00137a24be858f556aede35df6c4c4619b749a4218ee9b5e816bf98d21d6"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006200",
+      "name": "room_photo_views",
+      "sha256": "ef1cb2fc64148277422372d25b8721bb30e8155a7c414c6f8fdfba44a8ed2dc3"
     }
   ]
 }

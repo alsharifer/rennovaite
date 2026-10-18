@@ -41,6 +41,9 @@ import { StateBlock } from "../StateBlock";
 import { TopBarActions } from "../shell/TopBar";
 import { MaterialPalette } from "./MaterialPalette";
 import { RoomPhoto } from "./RoomPhoto";
+import { PhotoViews } from "./PhotoViews";
+import type { PhotoView } from "@/lib/render/photo-views";
+import type { MiniPlan } from "@/lib/render/photo-views-load";
 
 export type StudioRoom = { id: string; name_en: string | null; room_type: string | null };
 export type StudioRender = { id: string; imageUrl: string; prompt: string; qa?: "passed" | "failed" | null; qaReason?: string | null; outcome?: SceneOutcome | null; /** R10b: which openings shaped it. */ openings?: string | null };
@@ -108,6 +111,8 @@ export function RendersStudio(props: {
   /** K12: rooms on the plan that are not in this renovation (not rendered). */
   notInScope?: string[];
   planHref?: string;
+  /** B2 (MULTIVIEW_RENDERS_ENABLED): each room's photo views and the plan to place them on. */
+  photoViews?: { byRoom: Record<string, PhotoView[]>; plans: Record<string, MiniPlan> } | null;
 }) {
   const { projectId, rooms, style } = props;
   const [locked, setLocked] = useState<Set<string>>(() => new Set(props.initialLockedRoomIds));
@@ -655,6 +660,11 @@ export function RendersStudio(props: {
             Confirm your plan first — every room on it gets a view here.
           </StateBlock>
         )}
+
+        {/* B2: every photo of the room is a view of its own, placed on the plan. */}
+        {props.photoViews && room && renderable ? (
+          <PhotoViews key={room.id} projectId={projectId} roomId={room.id} roomName={roomName} plan={props.photoViews.plans[room.id] ?? null} initialViews={props.photoViews.byRoom[room.id] ?? []} />
+        ) : null}
 
         {/* Below xl: the palette folds under the view (phone: "Material palette · 4"). */}
         <details className="mt-8 border-y border-bp-line-hairline xl:hidden">
