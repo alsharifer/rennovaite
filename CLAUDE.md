@@ -1081,6 +1081,47 @@ Report `docs/BATHROOM_PILOT_B5.md` (the audit table). Migration **065**.
 - **Checks:** `lib/boq/__tests__/wet-room.test.ts`, `scripts/b5-bathroom-boq.ts`
   (in-process dump), live `scripts/b5-bathroom-check.ts`.
 
+### Bathroom pilot B6 — the room's client pack (19 Oct)
+
+Report `docs/BATHROOM_PILOT_B6.md`. No migration.
+
+- **The document**: `GET /api/projects/:id/room-pack` — a DOCUMENT route
+  (`guardDocumentRoute`, in `DOCUMENT_ROUTES`, `DRAWINGS_ENABLED`, fonts in
+  `outputFileTracingIncludes`). `?format=json` gives the contents;
+  `?format=pages` gives the page SVGs plus `images` (where each photograph sits).
+  - Loader: `lib/documents/room-pack-pdf.ts` (`generateRoomPack`).
+  - Pages: `lib/documents/room-pack.ts` (`buildRoomPack`, pure).
+  - Page order: cover (anchor render, total) → the room with every photo's camera
+    → a page per view (the locked / latest passed version beside the photo, the
+    studio's check lines) → the drawings → materials (the anchor's spec) → BoQ →
+    price (chain to the fil, to-be-priced, options) → indicative programme
+    (`loadTimeline`, labelled derived).
+  - Export pack adds it when the plan is a room intake with one room (`run.ts`
+    `roomPack`), with two checks: the total equals the BoQ's, and no withheld
+    identity.
+- **The drawings**: `lib/drawings/room-sheets.ts`, 1:20, numbered **R-** so they
+  never collide with the drawing set's A- sheets.
+  - R-101 plan: walls; the door's leaf and swing from `plan_openings.spec.hinge`
+    (`"W"` etc. — no swing and "hinge not stated" without it; set by API, no
+    editor control yet); fixture codes; a chain per wall that closes; fixture
+    centres.
+  - R-201…R-204 elevations, one per wall from inside:
+    - tile setting-out `settingOut` (joint vs centred tile, larger equal cuts,
+      dimensioned joint to joint) on the anchor's tile (`wallTileFrom`, default
+      600 × 1200 assumed);
+    - openings from the graph;
+    - fixtures at `FIXTURE_HEIGHTS_MM` with ≈, face-on only on the wall their
+      back is against (`backWallOf`), else a side profile;
+    - the mirror round only when the spec says so (`mirrorIsRound`);
+    - `spec.column_wall` / `niche_wall` place the shower valve and niche;
+      `water_heater` takes `spec.height_mm`.
+  - Every dim carries `data-dim` / `data-mm` / `data-src`.
+- **Checks**: `lib/drawings/__tests__/room-sheets.test.ts`; live
+  `scripts/b6-room-pack-check.ts [port]`. It checks every dimension against the
+  graph to the mm, that the chains and setting-out close, the hinge, the total,
+  and identity, and writes review PNGs with the photos to
+  `screenshots/bathroom-pilot/b6/pack/`.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

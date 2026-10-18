@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
     "/api/projects/[id]/boq-diff": ["./lib/documents/fonts/**"],
     "/api/projects/[id]/drawings": ["./lib/documents/fonts/**"],
     "/api/projects/[id]/render-pack": ["./lib/documents/fonts/**"],
+    // B6: the room client pack.
+    "/api/projects/[id]/room-pack": ["./lib/documents/fonts/**"],
     // R10b: the opening detector draws its room overlay with resvg (labels need the fonts).
     "/api/plan-openings/detect": ["./lib/documents/fonts/**"],
   },

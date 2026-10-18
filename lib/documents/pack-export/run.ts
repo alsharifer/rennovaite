@@ -79,6 +79,9 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
   const hasInterior = types.some((x) => !isOutdoorType(x));
   const scope: PackScope = hasGarden && hasInterior ? "mixed" : hasGarden ? "garden" : "interior";
   const garden = scope !== "interior";
+  // B6: a project that IS one room (the room intake) gets its client pack — renders, drawings, BoQ, price.
+  const { data: intakeRow } = plan ? await db.from("plans").select("intake").eq("id", plan.id).maybeSingle<{ intake: string | null }>() : { data: null };
+  const roomPack = intakeRow?.intake === "room_dimensions" && types.length === 1;
 
   // --- 1. BoQ -----------------------------------------------------------------------
   await progress("boq", 5, options.regenerateBoq ? "regenerating the BoQ" : "using the latest BoQ");
@@ -150,6 +153,7 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
     ...(garden ? [{ name: `${base}-render-pack.pdf`, path: `/api/projects/${P}/render-pack`, type: "application/pdf" }] : []),
     ...(options.boqPdf ? [{ name: `${base}-boq.pdf`, path: `/api/projects/${P}/boq-pdf`, type: "application/pdf" }] : []),
     ...(options.proposal ? [{ name: `${base}-proposal.pdf`, path: `/api/projects/${P}/proposal`, type: "application/pdf" }] : []),
+    ...(roomPack ? [{ name: `${base}-room-pack.pdf`, path: `/api/projects/${P}/room-pack`, type: "application/pdf" }] : []),
   ];
   const produced: { name: string; bytes: Uint8Array; type: string; status: number }[] = [];
   for (const d of docs) {
@@ -157,7 +161,7 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
     produced.push({ name: d.name, bytes: r.bytes, type: d.type, status: r.status });
   }
   check(
-    `${["drawing set", ...(garden ? ["render pack"] : []), ...(options.boqPdf ? ["BoQ"] : []), ...(options.proposal ? ["proposal"] : [])].join(", ")} export as PDFs`,
+    `${["drawing set", ...(garden ? ["render pack"] : []), ...(options.boqPdf ? ["BoQ"] : []), ...(options.proposal ? ["proposal"] : []), ...(roomPack ? ["room pack"] : [])].join(", ")} export as PDFs`,
     produced.every((p) => p.status === 200 && p.bytes.byteLength > 10_000),
     produced.map((p) => `${p.name}: ${p.status} · ${p.bytes.byteLength} bytes`).join("; "),
   );
@@ -223,6 +227,15 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
       proposal: proposalDoc && proposalGate?.firm ? { pages: proposalDoc.pages ?? [], brand: proposalGate.firm.brand, terms: !!proposalGate.firm.terms_text, basis: proposalGate.verdict.reason, reference: proposalDoc.reference ?? null } : null,
     }),
   );
+
+  // B6: the room pack prints the BoQ's total and no withheld identity.
+  if (roomPack) {
+    const rp = (await t.get<{ pages?: string[] }>(`/api/projects/${P}/room-pack?format=pages`)).body.pages ?? [];
+    const joined = rp.join("");
+    check("room pack: the total is the BoQ's, to the fil", joined.includes(`data-grand-total="${boq.grand_total_aed}"`), `AED ${boq.grand_total_aed}`);
+    const leaks = withheldNames.filter((n) => n.length >= 3 && new RegExp(esc(n), "i").test(joined.replace(/<[^>]+>/g, " ")));
+    check("room pack: no withheld identity printed", leaks.length === 0, leaks.join(", "));
+  }
 
   if (ctx.extraChecks) checks.push(...ctx.extraChecks({ sheets, packPages, pdfs: produced.map((p) => ({ name: p.name, bytes: p.bytes })) }));
 

@@ -41,6 +41,6 @@ describe("document fonts", () => {
       for (const c of calls) expect(c, f).toContain("documentFontOptions()");
     }
     const config = readFileSync(path.join(ROOT, "next.config.ts"), "utf8");
-    for (const r of ["boq-pdf", "proposal", "boq-diff", "drawings", "render-pack"]) expect(config).toContain(`"/api/projects/[id]/${r}": ["./lib/documents/fonts/**"]`);
+    for (const r of ["boq-pdf", "proposal", "boq-diff", "drawings", "render-pack", "room-pack"]) expect(config).toContain(`"/api/projects/[id]/${r}": ["./lib/documents/fonts/**"]`);
   });
 });
