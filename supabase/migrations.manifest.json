@@ -380,6 +380,12 @@
       "version": "20260101006300",
       "name": "photo_view_check_spend",
       "sha256": "68f6ee298e3e19ac24a270c991115c08869609d9f5bd7f6f877f80112f193600"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006400",
+      "name": "room_design_anchor",
+      "sha256": "475df6eb2c94cb48d7d9c8404a67b8e6b868f9414ae7969ddfc0413f3dc92017"
     }
   ]
 }

@@ -22,8 +22,11 @@ import { cameraOf } from "./photo-views";
 import { loadMiniPlans } from "./photo-views-load";
 import { PHOTO_VIEW_IMAGE_REFS, styleBriefFrom, type ReferenceStyle } from "./reference-style";
 import { recordSpend } from "./render-spend";
+import { loadRoomAnchor } from "./photo-view-anchor";
+import { followsLine, specElements } from "./room-spec";
 
-export const PHOTO_VIEW_PIPELINE = "b2-1";
+// b4-1: a view of an anchored room renders against the anchor (image + spec) and is checked beside it.
+export const PHOTO_VIEW_PIPELINE = "b4-1";
 
 /**
  * Renders per view: the first, and one re-render with the check's findings
@@ -40,7 +43,7 @@ export interface PhotoViewGate {
   outcome: "passed" | "failed" | "error";
   line: string;
   style_line: string;
-  style_source: "references" | "preset";
+  style_source: "references" | "preset" | "anchor";
   arm: string;
   checked: string[];
   items: CheckItem[];
@@ -62,6 +65,24 @@ export interface PhotoViewGate {
     cost_usd: number;
     error?: string;
   }[];
+  cost_usd: number;
+  /** B4: the room anchor this render was made against (absent = none, or this view is the anchor). */
+  anchor?: { render_id: string; label: string } | null;
+  /** B4: set on a version made by "Ask for a change". */
+  change?: PhotoViewChange | null;
+}
+
+/** B4: what an "Ask for a change" asked for and what it changed. */
+export interface PhotoViewChange {
+  request: string;
+  changed: string[];
+  summary: string;
+  /** "Last change: “…” → version 2 · changed: floor finish". */
+  line: string;
+  version: number;
+  parent_render_id: string;
+  ssim: number | null;
+  changed_pct: number | null;
   cost_usd: number;
 }
 
@@ -97,7 +118,7 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
   const { data: brief } = await db.from("project_briefs").select("reference_style").eq("project_id", input.projectId).maybeSingle<{ reference_style: ReferenceStyle | null }>();
   const { data: choice } = await db.from("style_choices").select("style_key").eq("project_id", input.projectId).is("room_id", null).order("created_at", { ascending: false }).limit(1).maybeSingle<{ style_key: string }>();
   const preset = resolveAnyStyle(choice?.style_key ?? null, getStyleByKey);
-  const style = styleBriefFrom(brief?.reference_style ?? null, preset ? { name_en: preset.name_en, prompt: preset.one_line } : null);
+  let style = styleBriefFrom(brief?.reference_style ?? null, preset ? { name_en: preset.name_en, prompt: preset.one_line } : null);
 
   let extra: string[] = [];
   if (PHOTO_VIEW_IMAGE_REFS && brief?.reference_style?.item_ids?.length) {
@@ -105,8 +126,24 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
     extra = ((assets ?? []) as { storage_path: string }[]).map((a) => db.storage.from("plan-uploads").getPublicUrl(a.storage_path).data.publicUrl);
   }
 
+  // B4: once the room is anchored, every OTHER view renders against the anchor —
+  // its image after the photo (in place of the references, which it already
+  // embodies) and the room design spec as the look — and is checked beside it.
+  // The anchor's own view renders as before, and no render here moves the anchor.
+  const anchor = await loadRoomAnchor(db, photo.room_id);
+  let anchorInput: { label: string; bytes: Uint8Array } | null = null;
+  if (anchor && anchor.room_photo_id !== photo.id) {
+    const { data: ar } = await db.from("renders").select("image_url").eq("id", anchor.render_id).maybeSingle<{ image_url: string | null }>();
+    const elements = specElements(anchor.spec);
+    if (ar?.image_url && elements.length > 0) {
+      anchorInput = { label: anchor.label, bytes: new Uint8Array(await (await fetch(ar.image_url)).arrayBuffer()) };
+      extra = [ar.image_url];
+      style = { text: elements.map((e) => `${e.element}: ${e.finish}`).join("; ") + ".", source: "anchor", line: followsLine("follows", anchor.label), elements };
+    }
+  }
+
   const arm = photoViewArm();
-  const res: RestyleResult = await restyleWithCheck({ project_id: input.projectId, arm, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts() });
+  const res: RestyleResult = await restyleWithCheck({ project_id: input.projectId, arm, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts(), anchor: anchorInput });
   let stored: string | null = null;
   if (res.final) stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, res.final.bytes, res.final.bytes[0] === 0x89 ? "image/png" : "image/jpeg");
 
@@ -138,6 +175,7 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
       ...(a.error ? { error: a.error } : {}),
     })),
     cost_usd: Math.round((res.attempts.reduce((s, a) => s + a.cost_usd, 0) + spend.reduce((s, r) => s + (r.cost_usd ?? 0), 0)) * 10000) / 10000,
+    ...(anchorInput && anchor ? { anchor: { render_id: anchor.render_id, label: anchor.label } } : {}),
   };
   const { data: row, error } = await db
     .from("renders")
@@ -152,6 +190,7 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
       mode: "photo_view",
       gate,
       status: res.outcome === "error" ? "failed" : "succeeded",
+      ...(anchorInput && anchor ? { anchor_render_id: anchor.render_id } : {}),
     })
     .select("id")
     .single<{ id: string }>();

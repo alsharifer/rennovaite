@@ -25,6 +25,7 @@ import { compareImages, type Similarity } from "@/lib/render/similarity";
 import { checkCostUsd, checkStyle, detectItems, judgePhotoPlacement, styleLine, type StyleVerdict, type Box, type CheckItem, type Detection, type PlacementFailure, type PlacementVerdict } from "./photo-check";
 import { cropToFrame, fitMap, frameRect, geometricMap, padToAspect, toPhotoBoxes, type FrameMap } from "./frame-pin";
 import { IMAGE_PRICE_USD, type SpendRow } from "./render-spend";
+import { anchorPromptLine, checkFollows, followsLine } from "./room-spec";
 
 export type RestyleArm = "edit" | "edit_pro" | "kontext" | "depth" | "canny";
 
@@ -58,7 +59,8 @@ export const PHOTO_VIEW_ARM: RestyleArm = photoViewArm({});
 export interface StyleBrief {
   /** The look, in words — style only, never layout or quantities. */
   text: string;
-  source: "references" | "preset";
+  /** B4: "anchor" = the room design spec read from the room's locked view. */
+  source: "references" | "preset" | "anchor";
   /** "Style follows your references" / "Style: <direction>". */
   line: string;
   /** The same look per element (floor, walls, vanity, mirror, …) — lets a view name only what it shows. */
@@ -105,7 +107,7 @@ export function retryLine(failures: readonly PlacementFailure[]): string {
   return `The last attempt failed the layout check: ${fix.join("; ")}.`;
 }
 
-export function restylePrompt(arm: RestyleArm, style: StyleBrief, inView: readonly { item: CheckItem; box: Box }[], absent: readonly CheckItem[] = [], failures: readonly PlacementFailure[] = []): string {
+export function restylePrompt(arm: RestyleArm, style: StyleBrief, inView: readonly { item: CheckItem; box: Box }[], absent: readonly CheckItem[] = [], failures: readonly PlacementFailure[] = [], anchor: { label: string } | null = null): string {
   const list = inView.map(({ item, box }) => `the ${item.short} (${whereInFrame(box)} of the frame)`).join(", ");
   const none = absent.length ? `This photo shows no ${[...new Set(absent.map((a) => a.short))].join(", no ")} — do not add any.` : "";
   const retry = retryLine(failures);
@@ -117,6 +119,8 @@ export function restylePrompt(arm: RestyleArm, style: StyleBrief, inView: readon
       list ? `Every fixture stays exactly where it is and the size it is — ${list} — one of each; do not move, mirror or resize any fixture.` : "",
       none,
       "Fixtures keep their type and how they are mounted (a floor-standing WC or bidet stays floor-standing).",
+      // B4: the room's locked view comes as the second image; its spec is the look.
+      anchor ? anchorPromptLine(anchor) : "",
       `Change only the finishes and the design of the fixtures: ${look}`,
       "Tidy the room: no towels on the floor, mats, toiletries, bins or clutter — where clutter stood, leave plain wall and floor, never a new fixture. Photorealistic.",
       retry,
@@ -201,6 +205,8 @@ export async function restyleWithCheck(input: {
   /** Replace the generated prompt (the deliberate-failure demonstration only). */
   promptOverride?: (attempt: number) => string | null;
   maxAttempts?: number;
+  /** B4: the room's anchor — its image goes to the model after the photo (the caller passes it in extraImages), and the follows check replaces the style check. */
+  anchor?: { label: string; bytes: Uint8Array } | null;
 }): Promise<RestyleResult> {
   const model = ARM_MODEL[input.arm];
   const inView = input.items
@@ -215,7 +221,7 @@ export async function restyleWithCheck(input: {
   const pinned = input.arm === "edit_pro" ? await padToAspect(input.photoBytes) : null;
   const photoSize = imageSize(input.photoBytes);
   for (let n = 1; n <= (input.maxAttempts ?? 2); n++) {
-    const prompt = input.promptOverride?.(n) ?? restylePrompt(input.arm, input.style, inView, absent, attempts.at(-1)?.verdict?.failures ?? []);
+    const prompt = input.promptOverride?.(n) ?? restylePrompt(input.arm, input.style, inView, absent, attempts.at(-1)?.verdict?.failures ?? [], input.anchor ? { label: input.anchor.label } : null);
     const at: Attempt = { attempt: n, arm: input.arm, model, prompt, image_url: null, size: null, verdict: null, after: null, similarity: null, style: null, cost_usd: 0 };
     try {
       // B2b: nano-banana-pro gets the photo padded to its 9 : 16 frame, and its
@@ -248,10 +254,13 @@ export async function restyleWithCheck(input: {
       at.verdict = judgePhotoPlacement(input.items, input.before, after);
       const els = styleElementsFor(input.style, kinds);
       if (at.verdict.passed && els.length) {
-        at.style = await checkStyle({ mediaType: mime(bytes), data: b64(bytes) }, els, { mediaType: mime(input.photoBytes), data: b64(input.photoBytes) });
+        // B4: an anchored view is judged beside the anchor (the same finishes?), not the references.
+        at.style = input.anchor
+          ? await checkFollows({ mediaType: mime(bytes), data: b64(bytes) }, { mediaType: mime(input.anchor.bytes), data: b64(input.anchor.bytes) }, els)
+          : await checkStyle({ mediaType: mime(bytes), data: b64(bytes) }, els, { mediaType: mime(input.photoBytes), data: b64(input.photoBytes) });
         const styleUsd = checkCostUsd(at.style.usage);
         at.cost_usd += styleUsd;
-        spend.push({ project_id: input.project_id, purpose: "photo_check", model: after.model, size: null, cost_usd: styleUsd, detail: { attempt: n, step: "style", usage: at.style.usage } });
+        spend.push({ project_id: input.project_id, purpose: "photo_check", model: after.model, size: null, cost_usd: styleUsd, detail: { attempt: n, step: input.anchor ? "follows" : "style", usage: at.style.usage } });
       }
     } catch (e) {
       at.error = e instanceof Error ? e.message.slice(0, 300) : String(e);
@@ -265,5 +274,11 @@ export async function restyleWithCheck(input: {
   const outcome: RestyleResult["outcome"] = passed ? "passed" : attempts.every((a) => !a.verdict) ? "error" : "failed";
   const failedVerdict = [...attempts].reverse().find((a) => a.verdict)?.verdict;
   const line = passed ? last.verdict!.line : outcome === "error" ? `The render could not be checked — ${last.error ?? "unknown error"}.` : failedVerdict!.line;
-  return { outcome, line, style_line: styleLine(passed ? last.style : null, input.style.source), attempts, final, spend };
+  const styled = passed ? last.style : null;
+  const style_line = input.anchor
+    ? styled
+      ? followsLine(styled.passed ? "follows" : "differs", input.anchor.label, styled.elements.filter((e) => e.verdict !== "yes").map((e) => e.element))
+      : "Finishes not checked — the layout check comes first"
+    : styleLine(styled, input.style.source === "anchor" ? "references" : input.style.source);
+  return { outcome, line, style_line, attempts, final, spend };
 }

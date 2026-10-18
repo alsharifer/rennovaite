@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
   const access = await projectAccess(db, caller, { room_photo_id: parsed.data.room_photo_id });
   if (access.denied) return access.denied;
+  // B4: a locked view keeps its version — it changes only by "Ask for a change".
+  const { data: lock } = await db.from("room_photos").select("locked_render_id").eq("id", parsed.data.room_photo_id).maybeSingle<{ locked_render_id: string | null }>();
+  if (lock?.locked_render_id) return NextResponse.json({ error: "This view is locked — ask for a change to it instead.", code: "view_locked" }, { status: 409 });
   try {
     const out = await runPhotoView(db, { projectId: access.projectId!, roomPhotoId: parsed.data.room_photo_id, actor: caller.id });
     return NextResponse.json({ ...out, spend: await projectRenderSpend(db, access.projectId!) });
