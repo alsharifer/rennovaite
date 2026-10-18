@@ -23,6 +23,7 @@ import { fetchSceneBytes, runRenderModel } from "@/lib/scene-render/pipeline";
 import { compareImages, type Similarity } from "@/lib/render/similarity";
 
 import { checkCostUsd, checkStyle, detectItems, judgePhotoPlacement, styleLine, type StyleVerdict, type Box, type CheckItem, type Detection, type PlacementFailure, type PlacementVerdict } from "./photo-check";
+import { cropToFrame, fitMap, frameRect, geometricMap, padToAspect, toPhotoBoxes, type FrameMap } from "./frame-pin";
 import { IMAGE_PRICE_USD, type SpendRow } from "./render-spend";
 
 export type RestyleArm = "edit" | "edit_pro" | "kontext" | "depth" | "canny";
@@ -36,10 +37,23 @@ export const ARM_MODEL: Record<RestyleArm, string> = {
 };
 
 /**
- * THE photo-view path, chosen by measured pass rate on the five pilot photos
- * (docs/BATHROOM_PILOT_B2.md). Set from the eval — see that report.
+ * THE photo-view path's default model, chosen by measured pass rate on the
+ * five pilot photos (docs/BATHROOM_PILOT_B2.md, B2b): "pro" = nano-banana-pro
+ * with its frame pinned (frame-pin.ts) — both checks 3/5 against nano-banana's
+ * 2/5 under the size rule. "edit" (nano-banana) is the fallback:
+ * PHOTO_VIEW_MODEL=edit.
  */
-export const PHOTO_VIEW_ARM: RestyleArm = "edit";
+export type PhotoViewModel = "pro" | "edit";
+export const PHOTO_VIEW_DEFAULT_MODEL = "pro" as PhotoViewModel;
+
+/** The arm a photo view renders with: PHOTO_VIEW_MODEL ("pro" | "edit"), else the default. */
+export function photoViewArm(env: Record<string, string | undefined> = process.env): RestyleArm {
+  const m = env.PHOTO_VIEW_MODEL === "pro" || env.PHOTO_VIEW_MODEL === "edit" ? env.PHOTO_VIEW_MODEL : PHOTO_VIEW_DEFAULT_MODEL;
+  return m === "pro" ? "edit_pro" : "edit";
+}
+
+/** @deprecated read photoViewArm() — kept for the eval scripts. */
+export const PHOTO_VIEW_ARM: RestyleArm = photoViewArm({});
 
 export interface StyleBrief {
   /** The look, in words — style only, never layout or quantities. */
@@ -86,7 +100,7 @@ export function whereInFrame(b: Box): string {
 export function retryLine(failures: readonly PlacementFailure[]): string {
   if (failures.length === 0) return "";
   const fix = failures.map((f) =>
-    f.reason === "added" ? `there is no ${f.short} in this photo — do not add one` : f.reason === "duplicated" ? `there is exactly one ${f.short} — do not repeat it` : f.reason === "removed" ? `keep the ${f.short} — it is in the photo` : `keep the ${f.short} exactly where the photo has it`,
+    f.reason === "added" ? `there is no ${f.short} in this photo — do not add one` : f.reason === "duplicated" ? `there is exactly one ${f.short} — do not repeat it` : f.reason === "removed" ? `keep the ${f.short} — it is in the photo` : f.reason === "resized" ? `keep the ${f.short} the size it is in the photo` : `keep the ${f.short} exactly where the photo has it`,
   );
   return `The last attempt failed the layout check: ${fix.join("; ")}.`;
 }
@@ -99,6 +113,7 @@ export function restylePrompt(arm: RestyleArm, style: StyleBrief, inView: readon
   if (arm === "edit" || arm === "edit_pro" || arm === "kontext") {
     return [
       "Renovate the bathroom in this photo. Keep the photograph exactly as taken: the same camera position, the same portrait framing, the same room, walls, ceiling height, door and window. Do not widen, zoom or re-frame the view.",
+      arm === "edit_pro" ? "The narrow strips at the left and right edges are a mirrored copy of the photo's own edges, added only to fill the frame: renovate them to match, and keep the room itself exactly where the photo has it." : "",
       list ? `Every fixture stays exactly where it is and the size it is — ${list} — one of each; do not move, mirror or resize any fixture.` : "",
       none,
       "Fixtures keep their type and how they are mounted (a floor-standing WC or bidet stays floor-standing).",
@@ -122,7 +137,8 @@ export function restylePrompt(arm: RestyleArm, style: StyleBrief, inView: readon
 export function restyleInput(arm: RestyleArm, prompt: string, photoUrl: string, extraImages: readonly string[] = [], seed?: number): Record<string, unknown> {
   if (arm === "edit") return { prompt, image_input: [photoUrl, ...extraImages], aspect_ratio: "match_input_image", output_format: "jpg" };
   if (arm === "kontext") return { prompt, input_image: photoUrl, aspect_ratio: "match_input_image", output_format: "jpg", safety_tolerance: 2 };
-  if (arm === "edit_pro") return { prompt, image_input: [photoUrl, ...extraImages], aspect_ratio: "match_input_image", resolution: "2K", output_format: "jpg" };
+  // B2b: the photo arrives padded to 9 : 16 (frame-pin.ts) — the frame is pinned, not matched.
+  if (arm === "edit_pro") return { prompt, image_input: [photoUrl, ...extraImages], aspect_ratio: "9:16", resolution: "2K", output_format: "jpg" };
   return { prompt, control_image: photoUrl, output_format: "jpg", safety_tolerance: 2, ...(seed != null ? { seed } : {}) };
 }
 
@@ -138,6 +154,8 @@ export interface Attempt {
   similarity: Similarity | null;
   /** The style check (only when the brief carries elements). */
   style: StyleVerdict | null;
+  /** B2b: how a frame-pinned output was cut back to the photo's frame. */
+  frame?: { map: FrameMap; rect: { left: number; top: number; width: number; height: number }; output: string };
   error?: string;
   cost_usd: number;
 }
@@ -194,22 +212,38 @@ export async function restyleWithCheck(input: {
   const attempts: Attempt[] = [];
   const spend: SpendRow[] = [];
   let final: RestyleResult["final"] = null;
+  const pinned = input.arm === "edit_pro" ? await padToAspect(input.photoBytes) : null;
+  const photoSize = imageSize(input.photoBytes);
   for (let n = 1; n <= (input.maxAttempts ?? 2); n++) {
     const prompt = input.promptOverride?.(n) ?? restylePrompt(input.arm, input.style, inView, absent, attempts.at(-1)?.verdict?.failures ?? []);
     const at: Attempt = { attempt: n, arm: input.arm, model, prompt, image_url: null, size: null, verdict: null, after: null, similarity: null, style: null, cost_usd: 0 };
     try {
-      const url = await runRenderModel(model, restyleInput(input.arm, prompt, input.photoUrl, input.extraImages ?? []));
-      const bytes = await fetchSceneBytes(url);
+      // B2b: nano-banana-pro gets the photo padded to its 9 : 16 frame, and its
+      // output is cut back to the photo's frame before anything is checked.
+      const source = pinned ? `data:image/jpeg;base64,${pinned.bytes.toString("base64")}` : input.photoUrl;
+      const url = await runRenderModel(model, restyleInput(input.arm, prompt, source, input.extraImages ?? []));
+      const raw = await fetchSceneBytes(url);
       at.image_url = url;
-      at.size = sizeOf(bytes);
       at.cost_usd += IMAGE_PRICE_USD[model] ?? 0;
-      spend.push({ project_id: input.project_id, purpose: "photo_view", model, size: at.size, cost_usd: IMAGE_PRICE_USD[model] ?? null, detail: { attempt: n, arm: input.arm } });
+      spend.push({ project_id: input.project_id, purpose: "photo_view", model, size: sizeOf(raw), cost_usd: IMAGE_PRICE_USD[model] ?? null, detail: { attempt: n, arm: input.arm } });
+      const reference = { image: { mediaType: mime(input.photoBytes), data: b64(input.photoBytes) }, located: input.before.items };
+      const read = await detectItems({ mediaType: mime(raw), data: b64(raw) }, input.items, "after", imageSize(raw), reference);
+      const checkUsd = checkCostUsd(read.usage);
+      at.cost_usd += checkUsd;
+      spend.push({ project_id: input.project_id, purpose: "photo_check", model: read.model, size: null, cost_usd: checkUsd, detail: { attempt: n, usage: read.usage } });
+      let bytes: Uint8Array = raw;
+      let after = read;
+      if (pinned) {
+        const out = imageSize(raw)!;
+        const map = fitMap(input.before.items, read.items, photoSize!, out, geometricMap(pinned.plan, out));
+        const rect = frameRect(map, photoSize!, out);
+        bytes = new Uint8Array(await cropToFrame(raw, rect));
+        after = { ...read, items: toPhotoBoxes(read.items, map, photoSize!, out) };
+        at.frame = { map, rect, output: `${out.width}x${out.height}` };
+      }
+      at.size = sizeOf(bytes);
       final = { bytes, url, size: at.size };
       at.similarity = await compareImages(Buffer.from(input.photoBytes), Buffer.from(bytes)).catch(() => null);
-      const after = await detectItems({ mediaType: mime(bytes), data: b64(bytes) }, input.items, "after", imageSize(bytes), { image: { mediaType: mime(input.photoBytes), data: b64(input.photoBytes) }, located: input.before.items });
-      const checkUsd = checkCostUsd(after.usage);
-      at.cost_usd += checkUsd;
-      spend.push({ project_id: input.project_id, purpose: "photo_check", model: after.model, size: null, cost_usd: checkUsd, detail: { attempt: n, usage: after.usage } });
       at.after = after;
       at.verdict = judgePhotoPlacement(input.items, input.before, after);
       const els = styleElementsFor(input.style, kinds);

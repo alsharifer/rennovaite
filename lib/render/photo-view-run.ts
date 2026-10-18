@@ -17,7 +17,7 @@ import { getStyleByKey } from "@/lib/styles";
 import { resolveAnyStyle } from "@/lib/garden-styles";
 
 import { CHECK_VERSION, checkItemsFor, checkCostUsd, expectedInView, type CheckItem, type Detection } from "./photo-check";
-import { PHOTO_VIEW_ARM, readBefore, restyleWithCheck, type RestyleResult } from "./photo-restyle";
+import { photoViewArm, readBefore, restyleWithCheck, type RestyleResult } from "./photo-restyle";
 import { cameraOf } from "./photo-views";
 import { loadMiniPlans } from "./photo-views-load";
 import { PHOTO_VIEW_IMAGE_REFS, styleBriefFrom, type ReferenceStyle } from "./reference-style";
@@ -57,6 +57,8 @@ export interface PhotoViewGate {
     ssim: number | null;
     changed_pct: number | null;
     style: { score: number; passed: boolean; elements: { element: string; verdict: string; note: string }[] } | null;
+    /** B2b: a frame-pinned output, and how it was cut back to the photo. */
+    frame?: { source: string; k: number; residual_px: number | null; rect: { left: number; top: number; width: number; height: number }; output: string } | null;
     cost_usd: number;
     error?: string;
   }[];
@@ -103,7 +105,8 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
     extra = ((assets ?? []) as { storage_path: string }[]).map((a) => db.storage.from("plan-uploads").getPublicUrl(a.storage_path).data.publicUrl);
   }
 
-  const res: RestyleResult = await restyleWithCheck({ project_id: input.projectId, arm: PHOTO_VIEW_ARM, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts() });
+  const arm = photoViewArm();
+  const res: RestyleResult = await restyleWithCheck({ project_id: input.projectId, arm, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts() });
   let stored: string | null = null;
   if (res.final) stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, res.final.bytes, res.final.bytes[0] === 0x89 ? "image/png" : "image/jpeg");
 
@@ -114,7 +117,7 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
     line: res.line,
     style_line: res.style_line,
     style_source: style.source,
-    arm: PHOTO_VIEW_ARM,
+    arm: arm,
     checked: res.attempts.find((a) => a.verdict)?.verdict?.checked ?? [],
     items,
     before: before.items,
@@ -130,6 +133,7 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
       ssim: a.similarity ? Math.round(a.similarity.ssim * 1000) / 1000 : null,
       changed_pct: a.similarity ? Math.round(a.similarity.changedPct * 10) / 10 : null,
       style: a.style ? { score: a.style.score, passed: a.style.passed, elements: a.style.elements } : null,
+      frame: a.frame ? { source: a.frame.map.source, k: Math.round(a.frame.map.k * 1000) / 1000, residual_px: a.frame.map.residual_px, rect: a.frame.rect, output: a.frame.output } : null,
       cost_usd: Math.round(a.cost_usd * 10000) / 10000,
       ...(a.error ? { error: a.error } : {}),
     })),

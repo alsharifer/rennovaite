@@ -15,6 +15,7 @@
 
 import { useId, useState } from "react";
 
+import { FITTINGS_NOTE, FITTINGS_NOTE_FULL } from "@/lib/render/photo-check-vocab";
 import type { PhotoViewGate } from "@/lib/render/photo-view-run";
 import type { PhotoView } from "@/lib/render/photo-views";
 
@@ -121,11 +122,13 @@ export function PhotoViewRender({ view, roomName, initial, onSpend }: { view: Ph
         <div className="mt-4 space-y-2" aria-live="polite">
           {passed ? (
             <p className="t-body-sm text-bp-ink-primary" data-check-line="layout">
-              {gate.line}
+              {gate.line} <span className="text-bp-ink-secondary" title={FITTINGS_NOTE_FULL}>· {FITTINGS_NOTE}</span>
             </p>
           ) : (
             <div role="status" className="surface-inverse bg-bp-alert-surface px-4 py-3 text-bp-alert-ink" data-check-line="layout">
-              <p className="t-body-sm">{gate.line}</p>
+              <p className="t-body-sm">
+                {gate.line} <span title={FITTINGS_NOTE_FULL}>· {FITTINGS_NOTE}</span>
+              </p>
               {failed ? (
                 <button type="button" onClick={() => setDiff((v) => !v)} aria-pressed={diff} className={`t-nav-item-active mt-2 underline underline-offset-2 ${FOCUS}`}>
                   {diff ? "Hide what differs" : "See what differs"}

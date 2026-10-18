@@ -956,6 +956,27 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
   the edit model after the photo: `PHOTO_VIEW_IMAGE_REFS = true` (ruled 18 Oct —
   R5 measured style 4/5 vs 5/15 text-only at layout 4/5 vs 13/15; the style gain
   is worth the possible one-in-five layout cost; docs/BATHROOM_PILOT_B2.md).
+- **B2b — frame-pinned pro, size check** (SUPERSEDES "`PHOTO_VIEW_ARM = "edit"`"
+  and "size not checked"): the model is `photoViewArm()` —
+  `PHOTO_VIEW_MODEL` = `pro` (default, `google/nano-banana-pro`) | `edit`
+  (nano-banana, the fallback). Pro takes only an aspect enum, so
+  `lib/render/frame-pin.ts` pads the photo to 9 : 16 with mirrored edges
+  (`padToAspect`), and cuts the output back to the photo's frame. The cut uses
+  the pad geometry, refined from the fixtures read in both images (`fitMap`):
+  one scale + offset, accepted only within `FIT_BOUNDS` (15 % / 10 %), so a
+  recomposition fails instead of being cropped into passing. The placement
+  check and the style check run on the cut-back image. **Size**: every item's
+  box area must stay within ±`SIZE_TOLERANCE` (25 %) of the photo's ("the render
+  shrank the WC (−59 % of its area)"). Every photo view's check line ends
+  "· fittings may differ" (`FITTINGS_NOTE`, `photo-check-vocab.ts` — the
+  client-safe strings). Small fittings (taps, rails, hooks, riser) stay
+  unchecked: stated, not fixed. Live (P1–P5, refs on, 2 attempts):
+  - pro: layout + style **3/5** at ≈ US$0.21 per render;
+  - nano-banana under the size rule: 2/5 at ≈ US$0.09 per render;
+  - P2 and P3 still recompose (the vanity grows to the references' size).
+
+  ±25 % is near the reading noise. `scripts/b2b-rejudge.ts` re-judges eval
+  images without rendering.
 - **Cost guard**: every paid call a photo view makes (image model per image,
   each vision reading per token) is a `render_spend` row (model, size,
   cost_usd/aed; `lib/render/render-spend.ts`, prices from the Replicate model
@@ -2934,6 +2955,7 @@ surface: the rail keeps the step you came from, `shell/step-memory.ts`).
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
 | `MULTIVIEW_RENDERS_ENABLED`       | server — the bathroom pilot's one flag (B1–B6). B1: `"true"` adds "One room from its dimensions" to the intake; B2: the studio's photo views. Off = intake and studio exactly as before |
 | `PHOTO_VIEW_MAX_ATTEMPTS`         | server — B2: `1` = one paid render per photo view (no re-render after a failed check). Unset = the first render and one re-render |
+| `PHOTO_VIEW_MODEL`                | server — B2b: the photo-view restyle model. Unset / `"pro"` = frame-pinned `google/nano-banana-pro`; `"edit"` = `google/nano-banana` (the fallback) |
 
 ### Feature flags — read at server start (flip → restart)
 

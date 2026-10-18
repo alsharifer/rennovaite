@@ -37,7 +37,7 @@ describe("B2 — the placement check", () => {
   const BEFORE = { items: [at("D1", [55, 30, 80, 66]), at("F3", [25, 48, 52, 58]), at("F4", [0, 15, 25, 80]), at("F1", [70, 80, 100, 100]), at("W1", null), at("F2", [85, 70, 100, 85])] };
 
   it("passes when every item the photo shows is in place, once — whatever its new design", () => {
-    const after = { items: [at("D1", [57, 31, 82, 67]), at("F3", [22, 46, 55, 60]), at("F4", [0, 14, 27, 82]), at("F1", [68, 78, 100, 100]), at("W1", null), at("F2", [84, 71, 100, 86])] };
+    const after = { items: [at("D1", [57, 31, 82, 67]), at("F3", [24, 47, 53, 58.5]), at("F4", [0, 14, 27, 82]), at("F1", [68, 78, 100, 100]), at("W1", null), at("F2", [84, 71, 100, 86])] };
     const v = judgePhotoPlacement(ITEMS, BEFORE, after);
     expect(v.passed).toBe(true);
     expect(v.checked.sort()).toEqual(["D1", "F1", "F2", "F3", "F4"]);
@@ -133,5 +133,60 @@ describe("B2 — the style line and the render cap", () => {
     expect(photoViewMaxAttempts({ PHOTO_VIEW_MAX_ATTEMPTS: "1" })).toBe(1);
     expect(photoViewMaxAttempts({ PHOTO_VIEW_MAX_ATTEMPTS: "5" })).toBe(2);
     expect(photoViewMaxAttempts({ PHOTO_VIEW_MAX_ATTEMPTS: "x" })).toBe(2);
+  });
+});
+
+describe("B2b — size, and the pro frame pinned back to the photo", () => {
+  it("a fixture whose box grows or shrinks by more than 25% fails as resized", async () => {
+    const { judgePhotoPlacement: judge, SIZE_TOLERANCE } = await import("../photo-check");
+    expect(SIZE_TOLERANCE).toBe(0.25);
+    const before = { items: [at("W1", [20, 30, 40, 50])] }; // 400
+    expect(judge(ITEMS, before, { items: [at("W1", [21, 31, 39, 49])] }).passed).toBe(true); // 324 = −19%
+    const small = judge(ITEMS, before, { items: [at("W1", [22, 33, 38, 47])] }); // 224 = −44%
+    expect(small.failures[0]).toMatchObject({ reason: "resized", message: "the render shrank the window (-44% of its area)" });
+    expect(judge(ITEMS, before, { items: [at("W1", [18, 28, 43, 53])] }).failures[0]!.message).toMatch(/enlarged the window/);
+  });
+
+  it("the photo is padded to 9 : 16 at its sides; the output maps back by that geometry", async () => {
+    const { padPlan, geometricMap, frameRect, toPhotoBoxes } = await import("../frame-pin");
+    const plan = padPlan(946, 2048);
+    expect(plan).toEqual({ w: 946, h: 2048, W: 1152, H: 2048, padL: 103, padT: 0 });
+    const out = { width: 1536, height: 2752 };
+    const geo = geometricMap(plan, out);
+    const rect = frameRect(geo, { width: 946, height: 2048 }, out);
+    expect(rect.left).toBe(Math.round(103 * (1536 / 1152)));
+    expect(rect.width / rect.height).toBeCloseTo(946 / 2048, 2);
+    // A box read in the output's frame lands back where the photo had it.
+    const inOut = [{ ref: "F1", present: true, box: [((103 + 0.7 * 946) / 1152) * 100, 80, ((103 + 946) / 1152) * 100, 100] as [number, number, number, number], instances: 1 }];
+    const back = toPhotoBoxes(inOut, geo, { width: 946, height: 2048 }, out)[0]!.box!;
+    expect(back[0]).toBeCloseTo(70, 0);
+    expect(back[2]).toBeCloseTo(100, 0);
+  });
+
+  it("fixtures refine the crop — but a recomposition is never fitted away", async () => {
+    const { padPlan, geometricMap, fitMap } = await import("../frame-pin");
+    const photo = { width: 946, height: 2048 }, out = { width: 1536, height: 2752 };
+    const geo = geometricMap(padPlan(946, 2048), out);
+    const before = [at("F1", [70, 80, 100, 100]), at("F3", [25, 48, 52, 58]), at("D1", [55, 30, 80, 66])];
+    // The model shifted everything 20 px right: the fit finds it.
+    const shift = (b: [number, number, number, number]): [number, number, number, number] => [
+      ((geo.ox + (b[0] / 100) * photo.width * geo.k + 20) / out.width) * 100, ((geo.oy + (b[1] / 100) * photo.height * geo.k) / out.height) * 100,
+      ((geo.ox + (b[2] / 100) * photo.width * geo.k + 20) / out.width) * 100, ((geo.oy + (b[3] / 100) * photo.height * geo.k) / out.height) * 100,
+    ];
+    const fitted = fitMap(before, before.map((l) => ({ ...l, box: shift(l.box!) })), photo, out, geo);
+    expect(fitted.source).toBe("fixtures");
+    expect(fitted.ox - geo.ox).toBeCloseTo(20, 0);
+    // The model zoomed in 1.6× (the B2 recomposition): out of bounds — the geometry stands and the check judges it.
+    const zoom = (b: [number, number, number, number]): [number, number, number, number] => [b[0] * 1.6 - 30, b[1] * 1.6 - 30, b[2] * 1.6 - 30, b[3] * 1.6 - 30];
+    expect(fitMap(before, before.map((l) => ({ ...l, box: zoom(l.box!) })), photo, out, geo).source).toBe("geometry");
+    // One item in common is not enough to fit.
+    expect(fitMap(before.slice(0, 1), before.slice(0, 1), photo, out, geo).source).toBe("geometry");
+  });
+
+  it("PHOTO_VIEW_MODEL picks the model; the other is the fallback", async () => {
+    const { photoViewArm, PHOTO_VIEW_DEFAULT_MODEL } = await import("../photo-restyle");
+    expect(photoViewArm({ PHOTO_VIEW_MODEL: "pro" })).toBe("edit_pro");
+    expect(photoViewArm({ PHOTO_VIEW_MODEL: "edit" })).toBe("edit");
+    expect(photoViewArm({})).toBe(PHOTO_VIEW_DEFAULT_MODEL === "pro" ? "edit_pro" : "edit");
   });
 });

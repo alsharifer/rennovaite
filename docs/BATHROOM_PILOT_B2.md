@@ -6,7 +6,79 @@ results are in `data/Bathroom Pilot/b2-eval/` (gitignored — client photos);
 this file has the numbers. Screenshots: `screenshots/bathroom-pilot/b2/`
 (gitignored for the same reason).
 
-## Where it stands
+## B2b — the pro model with its frame pinned (18 Oct, later)
+
+**Goal:** a full restyle AND the layout, by removing nano-banana-pro's re-frame
+rather than accepting nano-banana's under-restyling.
+
+**How:**
+- **No way to pin the size directly.** nano-banana-pro takes no output size,
+  only an aspect enum, and the photo (946 × 2048, 1 : 2.16) matches none of them.
+- **Pad, then cut back.** The photo is padded to exactly 9 : 16 with mirrored
+  edges (`lib/render/frame-pin.ts`). The output is cut back to the photo's frame
+  by that geometry, refined from the fixtures the check finds in both images.
+  That refinement is a uniform scale + offset, accepted only within 15 % /
+  10 % of the geometry, so a recomposition fails instead of being absorbed.
+- **The check runs on the cut-back image.** The crops checked out (P1 and P4
+  were refined from fixtures, residual 16 and 41 px of 2752; P2, P3 and P5 kept
+  the geometry).
+
+**The size rule is in** (`SIZE_TOLERANCE`, box area within ±25 % of the photo's),
+and every view's check line now reads "… · fittings may differ"; small fittings
+stay unchecked.
+
+**Run:** P1–P5, the client's reference images on, `PHOTO_VIEW_MAX_ATTEMPTS=2`,
+through the studio. nano-banana's reference-image renders (R5) were judged again
+under the same size rule (`scripts/b2b-rejudge.ts`, readings only, no renders).
+
+| pipeline (current check, size included) | layout | style v2 | **both** | renders | cost per render |
+|---|---|---|---|---|---|
+| **nano-banana-pro, frame-pinned + references** | 3 / 5 | 3 / 3 passed | **3 / 5** | 8 | ≈ US$0.21 (AED 0.75) |
+| nano-banana + references (R5, one attempt) | 2 / 5 | 2 / 2 passed | 2 / 5 | 5 | ≈ US$0.09 (AED 0.32) |
+| *B2 table, before the size rule:* nano-banana + references | *4 / 5* | *4 / 5* | *3 / 5* | | |
+
+Per view, frame-pinned pro:
+
+| view | outcome | attempts | style | cost US$ |
+|---|---|---|---|---|
+| P1 | layout ✓ | 1 | 0.88 ✓ | 0.23 |
+| P2 | **failed** — shrank the WC (−59 %), moved the bidet, enlarged the vanity (+244 %) | 2 | — | 0.38 |
+| P3 | **failed** — moved the WC, enlarged the vanity (+109 %) | 2 | — | 0.38 |
+| P4 | layout ✓ | 1 | 0.90 ✓ | 0.23 |
+| P5 | layout ✓ (attempt 1 shrank the shower glass −63 %) | 2 | 0.90 ✓ | 0.42 |
+
+Total US$1.64 (AED 6.02) for the five views: 8 pro renders and their checks.
+nano-banana + references under the size rule: P1 shrank the door (−31 %), P2
+enlarged the vanity (+154 %), P3 enlarged the WC (+44 %); P4 and P5 passed at
+style 0.90.
+
+**Picked by both checks: frame-pinned pro** (3/5 vs 2/5). It is the default
+(`PHOTO_VIEW_DEFAULT_MODEL = "pro"`); nano-banana is the fallback behind
+`PHOTO_VIEW_MODEL=edit`.
+
+Caveats on that pick:
+- Pro had its re-render (two attempts) and nano-banana did not. On first
+  attempts they tie at 2/5.
+- Pro costs ~2.4× per render.
+
+**The verify bar was not met.** P2 and P3 are not layout-green after two
+attempts each, so style is 3/5, not ≥ 4/5. These are real recompositions, not
+crop error. In P2 pro moved the door right, swapped the WC and the bidet, and
+grew the vanity into a long floating unit. Removing the re-frame was necessary,
+but not sufficient: pro still redesigns the vanity at the size the references
+show.
+
+**The size rule is close to the readings' own noise.** A second reading of the
+same nano-banana P1 image found the door 31 % smaller than the first reading
+did. ±25 % fails some renders on reading noise, not on the render.
+
+**Options (not taken — they spend renders):**
+1. **Render P2 and P3 again:** 2–4 pro renders, ≈ US$0.4–0.8.
+2. **Tell the prompt to keep the vanity's size and run:** the vanity is the
+   repeat offender (+109 %, +154 %, +244 %).
+3. **Loosen size to ±35 %, or average two readings:** a check change, no renders.
+
+## Where B2 stood (before B2b — the model and size rule above supersede it)
 
 - **Layout is held.** The live run through the studio — one render per photo
   (`PHOTO_VIEW_MAX_ATTEMPTS=1`, at Abdallah's spending cap) — passed the
@@ -29,7 +101,7 @@ this file has the numbers. Screenshots: `screenshots/bathroom-pilot/b2/`
 
 **Ruled (18 Oct):** reference images on — the five views in this report were rendered before the switch, with the text brief only; renders from now on carry the first three references after the photo.
 
-## The model: `google/nano-banana` (edit), prompted per view
+## The B2 model: `google/nano-banana` (edit), prompted per view — now the fallback (`PHOTO_VIEW_MODEL=edit`)
 
 `PHOTO_VIEW_ARM = "edit"` (`lib/render/photo-restyle.ts`). Final prompt and
 check, layout after the loop's one re-render, style with check v2 (beside the

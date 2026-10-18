@@ -15,7 +15,7 @@
 //      (room_photos.before_detection), so every restyle of it is held to the
 //      same reading.
 //   3. The same reading of the AFTER image.
-//   4. `judgePhotoPlacement` (pure): every item the before photo shows must be
+//   4. `judgePhotoPlacement` (pure; B2b adds size): every item the before photo shows must be
 //      in the after image, in the same place (its centre within max(12% of the
 //      frame, 60% of its own extent) — the G5d tolerance), not duplicated, not
 //      swapped left/right with another; and no fixture the photo does not have
@@ -128,7 +128,7 @@ const centre = (b: Box): [number, number] => [(b[0] + b[2]) / 2, (b[1] + b[3]) /
 export interface PlacementFailure {
   ref: string;
   short: string;
-  reason: "removed" | "moved" | "duplicated" | "added" | "swapped";
+  reason: "removed" | "moved" | "resized" | "duplicated" | "added" | "swapped";
   message: string;
 }
 
@@ -141,7 +141,8 @@ export interface PlacementVerdict {
   line: string;
 }
 
-export const LAYOUT_OK_LINE = "Layout follows your photo ✓";
+import { FITTINGS_NOTE, FITTINGS_NOTE_FULL, LAYOUT_OK_LINE, SIZE_TOLERANCE } from "./photo-check-vocab";
+export { FITTINGS_NOTE, FITTINGS_NOTE_FULL, LAYOUT_OK_LINE, SIZE_TOLERANCE };
 
 /** The honest failure: the first thing that moved, said plainly. */
 export function failureLine(failures: readonly PlacementFailure[]): string {
@@ -173,6 +174,12 @@ export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<De
     const tolY = Math.max(12, 0.6 * (b.box![3] - b.box![1]));
     if (Math.abs(ax - bx) > tolX || Math.abs(ay - by) > tolY) {
       failures.push({ ref: it.ref, short: it.short, reason: "moved", message: `the render moved the ${it.short}` });
+      continue;
+    }
+    const area = (x: Box) => Math.max(0, x[2] - x[0]) * Math.max(0, x[3] - x[1]);
+    const ratio = area(b.box!) > 0 ? area(a.box) / area(b.box!) : 1;
+    if (ratio < 1 - SIZE_TOLERANCE || ratio > 1 + SIZE_TOLERANCE) {
+      failures.push({ ref: it.ref, short: it.short, reason: "resized", message: `the render ${ratio < 1 ? "shrank" : "enlarged"} the ${it.short} (${Math.round((ratio - 1) * 100)}% of its area)` });
       continue;
     }
     if (a.instances > Math.max(1, b.instances)) failures.push({ ref: it.ref, short: it.short, reason: "duplicated", message: `the render added a second ${it.short}` });
