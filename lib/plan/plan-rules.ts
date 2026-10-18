@@ -91,6 +91,19 @@ export interface RuleRoom {
   in_scope?: boolean | null;
   unroofed?: boolean | null;
   spec?: Record<string, unknown> | null;
+  /** B1 (061): the room's stored ceiling height (m); absent = the 2.9 m default. */
+  ceiling_h_m?: number | null;
+}
+
+/**
+ * Rule 3's ceiling for an opening: the lowest ceiling of the roofed rooms either
+ * side (a room's stored height, else the default) — none when both sides are
+ * open ground.
+ */
+function ceilingOver(sides: readonly (RuleRoom | null)[], ceilingM: number): number {
+  const roofed = sides.filter((s): s is RuleRoom => !!s && !isOutdoorType(s.room_type) && s.unroofed !== true);
+  if (roofed.length === 0) return Infinity;
+  return Math.min(...roofed.map((s) => (s.ceiling_h_m != null && Number(s.ceiling_h_m) > 0 ? Number(s.ceiling_h_m) : ceilingM)));
 }
 
 export interface RuleOpening {
@@ -278,11 +291,10 @@ export function hardProblemFor(o: RuleOpening, others: readonly RuleOpening[], r
   if (!pl) return { rule: "on_wall", message: "An opening sits on a wall — drop it on one." };
   const byId = new Map(rooms.map((r) => [r.id, r]));
   const sides: [RuleRoom | null, RuleRoom | null] = [pl.sides[0] ? byId.get(pl.sides[0])! : null, pl.sides[1] ? byId.get(pl.sides[1])! : null];
-  const roofed = sides.some((s) => s && !isOutdoorType(s.room_type) && s.unroofed !== true);
   // The wrong kind of wall first: no position along it would make it right.
   const wp = wallKindProblem(cand, sides);
   if (wp) return wp;
-  const fp = fitProblem(cand, pl, roofed ? ceilingM : Infinity);
+  const fp = fitProblem(cand, pl, ceilingOver(sides, ceilingM));
   if (fp) return fp;
   for (const other of others) {
     if (other.id === cand.id || other.kind === "gate" || other.context_id) continue;
@@ -381,8 +393,7 @@ export function checkPlan({ rooms, openings, mPerU, ceilingM = CEILING_DEFAULT_M
     }
     placements.set(o.id, pl);
     const sides: [RuleRoom | null, RuleRoom | null] = [pl.sides[0] ? byId.get(pl.sides[0])! : null, pl.sides[1] ? byId.get(pl.sides[1])! : null];
-    const roofed = sides.some((s) => s && !isOutdoorType(s.room_type) && s.unroofed !== true);
-    const fp = fitProblem(o, pl, roofed ? ceilingM : Infinity);
+    const fp = fitProblem(o, pl, ceilingOver(sides, ceilingM));
     if (fp?.rule === "wall_short") needsWall.add(o.id);
     if (fp) push(fp.rule, `${label(o)}: ${fp.message}${fp.rule === "wall_short" ? " Needs a wall." : ""}`, { opening_id: o.id }, o.spec);
     const wp = wallKindProblem(o, sides);

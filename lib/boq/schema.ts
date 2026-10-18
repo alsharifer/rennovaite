@@ -55,6 +55,8 @@ export type EngineRoom = {
   /** Optional plan polygon ([[x,y],...], pixel space). Used only to recover
    *  the width:depth aspect ratio; real dimensions come from area_m2. */
   polygon?: number[][] | null;
+  /** B1 (061): the room's STORED ceiling height in metres. Absent = C-01 / C-04's 2.9 m. */
+  ceiling_h_m?: number;
 };
 
 export type LabourRate = {

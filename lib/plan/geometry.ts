@@ -51,6 +51,14 @@ export interface Room {
   area_m2: number;
   ceiling_h_m: number;
   /**
+   * B1 (061): where `ceiling_h_m` came from when the room STORES one —
+   * "measured" (typed on the plan or at the room intake) or "derived" (an
+   * assumed figure someone stored). Absent = nothing stored: the 2.9 m default
+   * (0 for an unroofed zone), listed in `derived_fields` — so every graph
+   * built before 061 reads exactly as it did.
+   */
+  ceiling_h_source?: "measured" | "derived";
+  /**
    * G1 enclosure model: this zone is open to the sky. An unroofed zone has no
    * ceiling, and its polygon edges emit NO wall — a garden is bounded by what
    * somebody drew, not by where two lawns happen to meet. Defaults false, so
@@ -315,6 +323,20 @@ export interface RawRoom {
   dims_derived?: boolean | null;
   site_reference?: boolean | null;
   disposition?: string | null;
+  /** B1 (migration 061): the room's own ceiling height (m) and how it was got. */
+  ceiling_h_m?: number | null;
+  ceiling_h_source?: string | null;
+}
+
+/**
+ * B1: the ceiling height a room STORES, if any — null when it states none (the
+ * graph then keeps the 2.9 m default, derived). A stored value with no source
+ * was typed by someone, so it reads as measured.
+ */
+export function storedCeiling(raw: { ceiling_h_m?: number | string | null; ceiling_h_source?: string | null }): { h: number; source: "measured" | "derived" } | null {
+  const h = raw.ceiling_h_m == null ? NaN : Number(raw.ceiling_h_m);
+  if (!Number.isFinite(h) || h <= 0) return null;
+  return { h, source: raw.ceiling_h_source === "derived" ? "derived" : "measured" };
 }
 
 export interface BuildPlanGraphInput {
@@ -664,6 +686,9 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
   const rooms: Room[] = rawRooms.map(({ raw, poly }) => {
     const unroofed =
       raw.unroofed == null ? defaultUnroofed(raw.room_type) : raw.unroofed === true;
+    // B1 (061): a roofed room's stored height wins over the default; an unroofed
+    // zone has no ceiling whatever is stored.
+    const stored = unroofed ? null : storedCeiling(raw);
     return {
       id: raw.id,
       name_en: raw.name_en?.trim() || "Room",
@@ -674,7 +699,8 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       // An unroofed zone has no ceiling. Reporting 2.9 m would put a ceiling
       // finish and a wall height onto a lawn, and every consumer downstream
       // would believe it.
-      ceiling_h_m: unroofed ? 0 : DEFAULT_CEILING_H_M,
+      ceiling_h_m: unroofed ? 0 : stored ? stored.h : DEFAULT_CEILING_H_M,
+      ...(stored ? { ceiling_h_source: stored.source } : {}),
       unroofed,
       ...(raw.in_scope === false ? { in_scope: false as const } : {}),
       area_derived_m2:
@@ -692,7 +718,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
         ...(raw.dims_derived === true ? ["dims"] : []),
         // A measured scale makes the metric polygon a measurement too.
         ...(measuredScale ? [] : ["polygon"]),
-        ...(unroofed ? [] : ["ceiling_h_m"]),
+        ...(unroofed || stored?.source === "measured" ? [] : ["ceiling_h_m"]),
         // A stated area with an approximated share is still partly derived.
         ...(raw.area_m2 == null || (Number(raw.area_derived_m2) || 0) > 0 ? ["area_m2"] : []),
       ],
@@ -894,7 +920,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       wall_thickness: true,
       is_structural: true,
       openings_empty: openings.length === 0,
-      ceiling_h: rooms.some((r) => !r.unroofed),
+      ceiling_h: rooms.some((r) => !r.unroofed && r.ceiling_h_source !== "measured"),
       north: true,
       level: true,
       metric_scale: !measuredScale,

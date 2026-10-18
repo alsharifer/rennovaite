@@ -244,13 +244,13 @@ describe("H1: every server action outside the public allowlist requires a signed
 // NON_PROJECT_ROUTE_FILES (firm-scoped or global, each with its reason) is
 // project-scoped: each handler reaches projectAccess (lib/projects/http.ts →
 // authorizeProject, which resolves EVERY id the request carries), or — for the
-// two routes that CREATE a project — addProjectMember. Before the project check
+// routes that CREATE a project — addProjectMember. Before the project check
 // a handler may await only its caller, its params and its request body: no
 // lookup, no read, no side effect happens for a non-member.
 // =============================================================================
 
 const PROJECT_ROUTES = GUARDED_ROUTES.filter((f) => !(f in NON_PROJECT_ROUTE_FILES));
-const CREATES_PROJECT = new Set(["app/api/upload/route.ts", "app/api/draw-plan/route.ts"]);
+const CREATES_PROJECT = new Set(["app/api/upload/route.ts", "app/api/draw-plan/route.ts", "app/api/room-from-dimensions/route.ts"]);
 // H9: routes that take a pending upload authorize INSIDE signUpload / finishUpload
 // (lib/uploads/server.ts authorizeScope → authorizeProject / requireFirm, before
 // any storage read or signature — asserted below). They reach one of those.

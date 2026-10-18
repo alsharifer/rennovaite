@@ -123,9 +123,12 @@ export function OpeningsEditor({
   totalAreaM2,
   readOnly = false,
   focus = null,
+  defaults,
 }: {
   /** R10b: select this opening (the confirmation panel's "show me"). */
   focus?: { id: string; n: number } | null;
+  /** B1: a room-from-dimensions plan's door / window sizes (the route stores the same). */
+  defaults?: Partial<typeof DEFAULT_OPENING_DIMS>;
   planId: string;
   rooms: RawRoomInput[];
   /** Authoritative plan area — sets the raw-unit → metre scale. */
@@ -265,7 +268,7 @@ export function OpeningsEditor({
 
   // The plan rules, in the editor: every hard rule for one opening at a proposed place.
   const ruleRooms: RuleRoom[] = useMemo(
-    () => rooms.map((r) => ({ id: r.id, name_en: r.name_en, room_type: r.room_type, polygon: r.polygon, unroofed: r.unroofed ?? null })),
+    () => rooms.map((r) => ({ id: r.id, name_en: r.name_en, room_type: r.room_type, polygon: r.polygon, unroofed: r.unroofed ?? null, ceiling_h_m: r.ceiling_h_m ?? null })),
     [rooms],
   );
   const refusal = useCallback(
@@ -296,7 +299,7 @@ export function OpeningsEditor({
   const addOpening = async (kind: OpeningKind) => {
     const wall = selectedWallId ? wallById.get(selectedWallId) : null;
     if (!wall || readOnly) return;
-    const def = DEFAULT_OPENING_DIMS[kind];
+    const def = defaults?.[kind] ?? DEFAULT_OPENING_DIMS[kind];
     const wallLenM = Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1]) / rawPerM;
     if (!fitsOnWall(wallLenM, def.width_mm / 1000)) {
       setError(
@@ -335,7 +338,7 @@ export function OpeningsEditor({
       if (!res.ok || body.error) throw new Error(body.error ?? "Failed to add opening.");
       const created = normalise(body.opening);
       if (created) {
-        setOpenings((cur) => [...cur, created]);
+        setOpenings((cur) => withOpening(cur, created));
         setSelectedOpeningId(created.id);
         pushUndo({ kind: "delete", label: `Add ${kind}`, id: created.id });
         announce();
@@ -428,7 +431,7 @@ export function OpeningsEditor({
         if (!res.ok || body.error) throw new Error(body.error ?? "Undo failed.");
         const created = normalise(body.opening);
         if (created) {
-          setOpenings((cur) => [...cur, created]);
+          setOpenings((cur) => withOpening(cur, created));
           setSelectedOpeningId(created.id);
         }
       } else {
@@ -551,6 +554,7 @@ export function OpeningsEditor({
               aria-describedby={!selectedWall ? "openings-add-hint" : undefined}
               onClick={() => void addOpening(k.key)}
               className={`${CHIP_BTN} ${chipState(false)}`}
+              data-add-opening={k.key}
             >
               <Icon name={k.glyph} className="text-[16px]" />
               {k.label}
@@ -672,6 +676,7 @@ export function OpeningsEditor({
                     strokeWidth={14}
                     strokeLinecap="round"
                     className="cursor-pointer"
+                    data-wall-hit={w.id}
                     onPointerDown={(e) => {
                       e.stopPropagation();
                       setSelectedWallId(w.id);
@@ -1087,6 +1092,15 @@ function normalise(row: unknown): PlanOpening | null {
     confirmed_at: typeof r.confirmed_at === "string" ? r.confirmed_at : null,
     detection: r.detection && typeof r.detection === "object" ? (r.detection as DetectionMeta) : null,
   };
+}
+
+/**
+ * Add an opening the list does not already hold. The layer's first load can
+ * answer AFTER an add was stored but BEFORE the add's own response — then the
+ * load already carries it, and appending again drew it twice (B1 live check).
+ */
+function withOpening(list: PlanOpening[], o: PlanOpening): PlanOpening[] {
+  return list.some((x) => x.id === o.id) ? list.map((x) => (x.id === o.id ? o : x)) : [...list, o];
 }
 
 function normaliseAll(rows: unknown[]): PlanOpening[] {

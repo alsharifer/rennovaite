@@ -10,6 +10,9 @@ import {
 } from "react";
 
 import { FIXTURE_META } from "@/lib/overlays/catalog";
+import { DEFAULT_FOOTPRINT_MM, footprintCorners, footprintOf, isFootprintType, snapToWall } from "@/lib/overlays/footprint";
+import { deriveWallSegments } from "@/lib/plan/geometry";
+import { metresPerUnit } from "@/lib/plan/plan-rules";
 import {
   ELECTRICAL_TYPES,
   GARDEN_TYPES,
@@ -51,6 +54,8 @@ interface Fixture {
   position: Pt;
   source: "rule" | "user";
   spec?: Record<string, unknown> | null;
+  /** B1: the wall a footprint fixture backs onto (a hint — re-found by position). */
+  wall_id?: string | null;
   /** G5 */
   site_reference?: boolean;
   disposition?: string | null;
@@ -112,6 +117,18 @@ export function OverlayEditor({
     return gardenPilot ? all : all.filter((t) => !GARDEN_TYPES.includes(t));
   }, [layer, gardenPilot]);
 
+  // B1: a WC / bidet / basin / shower / bath backs onto its room's nearest wall.
+  // The route stores the snap; the editor previews the same one while dragging.
+  const walls = useMemo(() => deriveWallSegments(rooms.map((r) => ({ id: r.id, polygon: r.polygon, room_type: r.room_type, unroofed: r.unroofed ?? null }))), [rooms]);
+  const mPerU = useMemo(() => metresPerUnit(rooms, null, plot?.width_m ?? null), [rooms, plot]);
+  const snapped = useCallback(
+    (f: Pick<Fixture, "type" | "position" | "room_id" | "spec">): Pick<Fixture, "position" | "spec"> => {
+      const s = mPerU && isFootprintType(f.type) ? snapToWall({ type: f.type, position: f.position, room_id: f.room_id, spec: f.spec ?? null }, walls, mPerU) : null;
+      return s ? { position: s.position, spec: s.spec } : { position: f.position, spec: f.spec ?? null };
+    },
+    [walls, mPerU],
+  );
+
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +136,7 @@ export function OverlayEditor({
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
-  const dragRef = useRef<{ id: string; moved: boolean; pointerId: number } | null>(null);
+  const dragRef = useRef<{ id: string; moved: boolean; pointerId: number; drop?: Pt } | null>(null);
 
   // Load fixtures (server seeds rule defaults on first access).
   useEffect(() => {
@@ -154,17 +171,24 @@ export function OverlayEditor({
   const persistMove = useCallback(
     async (f: Fixture) => {
       try {
-        await fetch("/api/plan-fixtures", {
+        const res = await fetch("/api/plan-fixtures", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: f.id, project_id: projectId, type: f.type, room_id: f.room_id, position: f.position }),
         });
+        // B1: the stored fixture is what the route snapped — show that, not the drop point.
+        const body = (await res.json().catch(() => null)) as { fixture?: Fixture } | null;
+        if (body?.fixture) setFixtures((cur) => cur.map((x) => (x.id === f.id ? (body.fixture as Fixture) : x)));
       } catch {
         /* best-effort */
       }
     },
     [projectId],
   );
+
+  // B1: a footprint fixture belongs to the room it is dragged into (its wall is that
+  // room's); every other fixture keeps its room exactly as before.
+  const roomFor = (f: Fixture, p: Pt): string | null => (isFootprintType(f.type) ? roomAt(fit, p) ?? f.room_id : f.room_id);
 
   const onFixturePointerDown = (e: ReactPointerEvent<SVGGElement>, f: Fixture) => {
     e.stopPropagation();
@@ -178,7 +202,9 @@ export function OverlayEditor({
     if (!d || d.pointerId !== e.pointerId) return;
     d.moved = true;
     const raw = snap(fit.toRaw(clientToViewBox(e.clientX, e.clientY)));
-    setFixtures((cur) => cur.map((f) => (f.id === d.id ? { ...f, position: raw } : f)));
+    // A footprint fixture slides along its wall as it is dragged (the drop point is kept for the route).
+    setFixtures((cur) => cur.map((f) => (f.id === d.id ? { ...f, room_id: roomFor(f, raw), ...snapped({ ...f, position: raw, room_id: roomFor(f, raw) }) } : f)));
+    d.drop = raw;
   };
 
   const onPointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
@@ -187,7 +213,8 @@ export function OverlayEditor({
     if (!d) return;
     if (d.moved) {
       const f = fixtures.find((x) => x.id === d.id);
-      if (f) void persistMove({ ...f, position: snap(fit.toRaw(clientToViewBox(e.clientX, e.clientY))) });
+      const drop = d.drop ?? snap(fit.toRaw(clientToViewBox(e.clientX, e.clientY)));
+      if (f) void persistMove({ ...f, position: drop, room_id: roomFor(f, drop) });
     }
   };
 
@@ -204,7 +231,7 @@ export function OverlayEditor({
       const res = await fetch("/api/plan-fixtures", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, type, position: raw, room_id: roomAt(fit, raw), ...(DEFAULT_SPEC[type] ? { spec: DEFAULT_SPEC[type] } : {}) }),
+        body: JSON.stringify({ project_id: projectId, type, position: raw, room_id: roomAt(fit, raw), ...(DEFAULT_SPEC[type] ? { spec: DEFAULT_SPEC[type] } : isFootprintType(type) ? { spec: { ...DEFAULT_FOOTPRINT_MM[type], footprint: "default" } } : {}) }),
       });
       const body = await res.json();
       if (body.fixture) setFixtures((cur) => [...cur, body.fixture as Fixture]);
@@ -217,11 +244,14 @@ export function OverlayEditor({
   const saveSpec = async (f: Fixture, spec: Record<string, unknown>) => {
     setFixtures((cur) => cur.map((x) => (x.id === f.id ? { ...x, spec } : x)));
     try {
-      await fetch("/api/plan-fixtures", {
+      const res = await fetch("/api/plan-fixtures", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: f.id, project_id: projectId, type: f.type, room_id: f.room_id, position: f.position, spec }),
       });
+      // B1: a new depth moves a footprint's centre off its wall — take the stored one.
+      const body = (await res.json().catch(() => null)) as { fixture?: Fixture } | null;
+      if (body?.fixture) setFixtures((cur) => cur.map((x) => (x.id === f.id ? (body.fixture as Fixture) : x)));
     } catch {
       setError("Could not save the change.");
     }
@@ -342,12 +372,27 @@ export function OverlayEditor({
           {layerFixtures.map((f) => {
             const [vx, vy] = fit.toViewBox(f.position);
             const selected = selectedId === f.id;
+            // B1: a sized fixture draws its footprint, turned to face the room.
+            const fp = mPerU && f.spec && typeof f.spec.width_mm === "number" ? footprintOf(f.type, f.spec) : null;
+            const outline = fp && mPerU ? footprintCorners(f.position, fp, mPerU).map((p) => fit.toViewBox(p)) : null;
             return (
               <g
                 key={f.id}
                 style={{ cursor: readOnly ? "default" : "grab" }}
                 onPointerDown={readOnly ? undefined : (e) => onFixturePointerDown(e, f)}
+                data-fixture-type={f.type}
+                data-footprint={fp ? `${fp.width_mm}x${fp.depth_mm}@${fp.rotation_deg}` : undefined}
               >
+                {outline ? (
+                  <polygon
+                    points={outline.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
+                    fill={SVG.surface}
+                    fillOpacity={0.85}
+                    stroke={selected ? SVG.brass : SVG.ink}
+                    strokeDasharray={fp?.footprint === "default" ? "4 3" : undefined}
+                    strokeWidth={selected ? 2.5 : 1.25}
+                  />
+                ) : null}
                 <circle
                   cx={vx}
                   cy={vy}
@@ -397,9 +442,11 @@ export function OverlayEditor({
 function FixtureInspector({ f, readOnly, onSpec }: { f: Fixture; readOnly: boolean; onSpec: (spec: Record<string, unknown>) => void }) {
   const spec = (f.spec ?? {}) as Record<string, unknown>;
   const name = typeof spec.name === "string" ? spec.name : FIXTURE_META[f.type].label;
+  // B1: a sanitary fixture's footprint — width along its wall, depth into the room, gap to the wall.
+  const fp = footprintOf(f.type, spec);
   const sizeKeys: [string, string][] =
-    f.type === "tree" ? [["height_mm", "H"], ["canopy_mm", "Canopy"]] : f.type === "planter_box" || f.type === "wall_feature" ? [["width_mm", "W"], ["depth_mm", "D"], ["height_mm", "H"]] : [];
-  const [draft, setDraft] = useState<Record<string, number>>(() => Object.fromEntries(sizeKeys.map(([k]) => [k, Number(spec[k] ?? 0)])));
+    f.type === "tree" ? [["height_mm", "H"], ["canopy_mm", "Canopy"]] : f.type === "planter_box" || f.type === "wall_feature" ? [["width_mm", "W"], ["depth_mm", "D"], ["height_mm", "H"]] : fp ? [["width_mm", "W"], ["depth_mm", "D"], ["wall_gap_mm", "Gap"]] : [];
+  const [draft, setDraft] = useState<Record<string, number>>(() => Object.fromEntries(sizeKeys.map(([k]) => [k, Number(spec[k] ?? (fp ? fp[k as "width_mm" | "depth_mm" | "wall_gap_mm"] : 0))])));
   const isLight = f.type === "garden_light";
   return (
     <div className={INSPECTOR_BAR}>
@@ -411,10 +458,12 @@ function FixtureInspector({ f, readOnly, onSpec }: { f: Fixture; readOnly: boole
         </label>
       ))}
       {sizeKeys.length > 0 && !readOnly && (
-        <button type="button" onClick={() => onSpec({ ...spec, ...draft, assumed: false })} className={SMALL_BTN}>
+        <button type="button" onClick={() => onSpec(fp ? { ...spec, ...draft, footprint: "entered" } : { ...spec, ...draft, assumed: false })} className={SMALL_BTN}>
           Set size (mm)
         </button>
       )}
+      {fp ? <span className="t-label-md font-bp-mono text-bp-ink-secondary">faces {fp.rotation_deg}°{f.wall_id ? ` · on ${f.wall_id}` : ""}</span> : null}
+      {fp?.footprint === "default" && <span className={TAG}>Size default</span>}
       {isLight && (
         <label className="flex items-center gap-1.5">
           <span className="t-label-md text-bp-ink-tertiary">Fitting</span>

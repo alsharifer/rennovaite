@@ -22,6 +22,7 @@ import { formatAed } from "@/lib/format/aed";
 import { isMissingSchema } from "@/lib/rates/firm";
 
 import { OPENING_NET_ITEM_KEYS, OPENINGS_CONFIRMED_CAUSE } from "@/lib/plan/openings-vocab";
+import { CEILING_ITEM_KEYS, ceilingChangeSummary, netCeilingChange, type CeilingEdit } from "@/lib/plan/ceiling";
 import { netScopeChange, scopeChangeSummary } from "@/lib/plan/scope";
 
 import { appliedHeadline, basisText, type BasisKind, type CorrectionOrigin } from "./own-basis-vocab";
@@ -137,6 +138,8 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
   const scopeEvents: { at: string; added: string[]; removed: string[] }[] = [];
   // R10b: openings confirmed on 01 Plan (design_edit, layer "openings_confirmed") — one cause for the window.
   const confirmed = { n: 0, last: "" };
+  // B1 (061): ceiling heights entered on 01 Plan (design_edit, layer "ceiling") — the NET change in the window.
+  const ceilingEvents: { at: string; rooms: CeilingEdit[] }[] = [];
   for (const e of events) {
     const d = (e.detail ?? {}) as Row;
     const at = str(e.recorded_at);
@@ -155,6 +158,10 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
         if (layer === "openings_confirmed") {
           confirmed.n += typeof d.count === "number" ? d.count : 1;
           confirmed.last = at;
+          break;
+        }
+        if (layer === "ceiling") {
+          ceilingEvents.push({ at, rooms: Array.isArray(d.rooms) ? (d.rooms as Row[]).map((r) => ({ id: str(r.id), name: r.name == null ? null : str(r.name), from: num(r.from), to: num(r.to) })) : [] });
           break;
         }
         if (layer === "scope") {
@@ -179,6 +186,10 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
   if (scopeEvents.length > 0) {
     const net = netScopeChange(scopeEvents);
     if (net.added.length || net.removed.length) out.push({ kind: "scope_change", at: scopeEvents.at(-1)!.at, summary: scopeChangeSummary(net.added.length, net.removed.length) });
+  }
+  if (ceilingEvents.length > 0) {
+    const net = netCeilingChange(ceilingEvents);
+    if (net.length) out.push({ kind: "ceiling_height", at: ceilingEvents.at(-1)!.at, summary: `Ceiling height — ${ceilingChangeSummary(net)}`, item_keys: [...CEILING_ITEM_KEYS] });
   }
   if (confirmed.n > 0) {
     out.push({ kind: "openings_confirmed", at: confirmed.last, summary: `${OPENINGS_CONFIRMED_CAUSE} — ${confirmed.n} ${confirmed.n === 1 ? "opening" : "openings"}`, item_keys: [...OPENING_NET_ITEM_KEYS] });

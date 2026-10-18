@@ -34,6 +34,10 @@ export const PLUMBING_TYPES = [
   "washing_machine_point",
   "water_heater",
   "floor_drain",
+  // B1 bathroom pilot: the two wet-room fixtures the layer could not place.
+  // Footprint-typed like the WC / basin / shower (lib/overlays/footprint.ts).
+  "bidet_point",
+  "bath_point",
   // G1 garden pilot. Distinct from `floor_drain`: an external surface gully on
   // a stormwater or soakaway run, not a wet-room trap.
   "drainage_point",

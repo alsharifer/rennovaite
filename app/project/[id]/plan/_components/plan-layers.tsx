@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 
 import { OPENINGS_FOCUS_EVENT } from "@/components/blueprint/plan/OpeningsCheckPanel";
 import { PlanInspector } from "@/components/blueprint/plan/PlanInspector";
@@ -65,7 +65,10 @@ export function PlanLayers({
   siteRefs,
   initialLayer,
   printedSizes,
+  openingDefaults,
 }: {
+  /** B1: a room-from-dimensions plan's door / window sizes. */
+  openingDefaults?: ComponentProps<typeof OpeningsEditor>["defaults"];
   projectId: string;
   planId: string;
   initialRooms: RawRoomInput[];
@@ -158,6 +161,7 @@ export function PlanLayers({
       totalAreaM2={initialTotalAreaM2}
       readOnly={mode === "read"}
       focus={focusOpening}
+      defaults={openingDefaults}
     />
   );
 

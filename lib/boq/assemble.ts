@@ -31,6 +31,7 @@ import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { applyOwnBasis } from "@/lib/boq/own-basis";
 import { loadAppliedCorrections } from "@/lib/boq/own-basis-load";
 import { derivePlanGraph } from "@/lib/plan/derive";
+import { storedCeiling } from "@/lib/plan/geometry";
 import { isUnnamed } from "@/lib/plan/plan-rules";
 import { findOverlaps } from "@/lib/plan/overlaps";
 import { getProposedGraph } from "@/lib/plan/snapshots";
@@ -86,6 +87,8 @@ export type BoqRoomRow = {
   room_type: string | null;
   area_m2: number | null;
   polygon: unknown;
+  /** B1 (061): the room's stored ceiling height (m), when it states one. */
+  ceiling_h_m?: number | null;
 };
 
 export interface BoqInputs {
@@ -204,6 +207,17 @@ export async function loadPriceablePlan(
   } catch {
     /* pre-058 */
   }
+  // B1 (061): a room's stored ceiling height — the engine's wall and wet-tiling
+  // areas use it instead of the 2.9 m constants. Best-effort: before 061 (or for
+  // a room that states none) the constants stand, exactly as before.
+  const ceilingById = new Map<string, number>();
+  try {
+    const { data: hs, error: hErr } = await supabase.from("rooms").select("id, ceiling_h_m, ceiling_h_source").eq("plan_id", plan.id).not("ceiling_h_m", "is", null).returns<{ id: string; ceiling_h_m: number | null; ceiling_h_source: string | null }[]>();
+    if (!hErr) for (const r of hs ?? []) { const s = storedCeiling(r); if (s) ceilingById.set(r.id, s.h); }
+  } catch {
+    /* pre-061 */
+  }
+  for (const r of rooms) if (ceilingById.has(r.id)) r.ceiling_h_m = ceilingById.get(r.id)!;
   const scoped = rooms.filter((r) => !outOfScope.has(r.id));
   if (scoped.length === 0) return no(400, { error: "No room is in this renovation — choose the rooms on the plan.", code: "no_rooms", scope: true });
   // Rule 10 (15 Oct): a room still called "New room" cannot be priced — name it, or
@@ -300,6 +314,7 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
     room_type: r.room_type ?? "other",
     area_m2: r.area_m2 ?? 0,
     polygon: Array.isArray(r.polygon) ? (r.polygon as unknown as number[][]) : null,
+    ...(r.ceiling_h_m ? { ceiling_h_m: Number(r.ceiling_h_m) } : {}),
   }));
   const { boq: engineBoq } = generateDeterministicBoq({
     rooms: engineRooms,

@@ -49,6 +49,9 @@ export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
   washing_machine_point: { label: "Washing machine", code: "WM", glyph: "local_laundry_service", boqDescription: "Washing-machine supply + waste point", unitRateAed: 450 },
   water_heater: { label: "Water heater", code: "WH", glyph: "water_heater", boqDescription: "Electric water heater — supply & install", unitRateAed: null },
   floor_drain: { label: "Floor drain", code: "FD", glyph: "water_drop", boqDescription: "Wet-area floor drain + trap — supply & install", unitRateAed: 220 },
+  // B1. No default rate yet (the bathroom BoQ is B5's) — a QS-to-price line, never a silent zero.
+  bidet_point: { label: "Bidet point", code: "BD", glyph: "wash", boqDescription: "Bidet supply + waste — first & second fix", unitRateAed: null },
+  bath_point: { label: "Bath point", code: "BT", glyph: "bathtub", boqDescription: "Bath supply + waste — first & second fix", unitRateAed: null },
   // G1. Same reasoning as garden_light — priced with the landscape rate book.
   drainage_point: { label: "Drainage point", code: "DR", glyph: "water", boqDescription: "External surface drainage point — gully + connection", unitRateAed: null },
   // --- G3 landscape items (priced per unit from the landscape rate book) ---

@@ -27,7 +27,8 @@ describe("plan page gate", () => {
     const src = readFileSync(path.join(ROOT, "app/project/[id]/plan/page.tsx"), "utf8");
     expect(src).toContain("planGate({ authored, roomCount: roomList.length })");
     // K12: the room list is the "Rooms in this renovation" checklist over the same roomList.
-    expect(src).toMatch(/<RoomsInScope planId=\{plan\.id\} zones=\{authored\} rooms=\{roomList\.map\(/);
+    // B1: a room-from-dimensions plan lists rooms, not zones.
+    expect(src).toMatch(/<RoomsInScope planId=\{plan\.id\} zones=\{authored && !roomIntake\} rooms=\{roomList\.map\(/);
     expect(src).not.toMatch(/planReady = .*parsed_json/);
   });
 });

@@ -28,6 +28,10 @@ import { PlanLayers } from "./_components/plan-layers";
 import { PlanNotAnalysed } from "./_components/plan-not-analysed";
 import { planGate } from "@/lib/plan/plan-gate";
 import { RoomsInScope } from "@/components/blueprint/plan/RoomsInScope";
+import { CeilingHeights, type CeilingRoom } from "@/components/blueprint/plan/CeilingHeights";
+import { storedCeiling } from "@/lib/plan/geometry";
+import { ROOM_INTAKE_OPENING_DIMS } from "@/lib/plan/room-intake";
+import { isOutdoorType } from "@/lib/plan/zones";
 
 /** Plan columns this page reads. `source` and the plot dimensions arrive with
  *  migration 031 and are absent (undefined) before it. */
@@ -145,12 +149,21 @@ export default async function PlanPage({
   // confidence column isn't in the generated types, so use the untyped client.
   const sb = supabase as unknown as SupabaseClient;
   // K12: in_scope (058) first; a database without it falls back to the 025/031 columns.
+  // B1: the ceiling height (061) before that.
   let withConf = await sb
     .from("rooms")
-    .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence, unroofed, in_scope")
+    .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence, unroofed, in_scope, ceiling_h_m, ceiling_h_source")
     .eq("plan_id", plan.id)
     .order("name_en")
     .returns<RawRoomInput[]>();
+  if (withConf.error) {
+    withConf = await sb
+      .from("rooms")
+      .select("id, name_en, name_ar, room_type, area_m2, polygon, confidence, unroofed, in_scope")
+      .eq("plan_id", plan.id)
+      .order("name_en")
+      .returns<RawRoomInput[]>();
+  }
   if (withConf.error) {
     withConf = await sb
       .from("rooms")
@@ -205,6 +218,9 @@ export default async function PlanPage({
   // (roomList) — or is authored. A parse record is not required: the Demo villa has 13 rooms
   // and no parsed_json, and used to read "No drawing attached".
   const planReady = planGate({ authored, roomCount: roomList.length }) === "editor";
+  // B1 (061): a plan made from one room's typed dimensions. Best-effort: before 061, none is.
+  const intakeRes = await planSb.from("plans").select("intake").eq("id", plan.id).maybeSingle<{ intake: string | null }>();
+  const roomIntake = !intakeRes.error && intakeRes.data?.intake === "room_dimensions";
   const parsedComplete = planReady;
   const gardenPilot = process.env.GARDEN_PILOT_ENABLED === "true";
 
@@ -265,7 +281,7 @@ export default async function PlanPage({
   const detection = detectRes.error ? null : detectRes.data;
   const canDetect = !authored && Boolean(plan.pdf_url) && !detectRes.error;
   const totalArea = plan.total_area_m2 ?? null;
-  const unit = authored ? "zones" : "rooms";
+  const unit = authored && !roomIntake ? "zones" : "rooms";
   // 15 Oct: the plan rules (lib/plan/plan-rules.ts) — the same checks the editor
   // refuses on, listed here and in the top bar's navigator with the step's reason.
   const [openingsRes, roomSpecRes] = await Promise.all([
@@ -293,13 +309,24 @@ export default async function PlanPage({
     printedById,
     planM2PerUnit2(roomList, totalArea),
   );
+  const intakeRoom = roomIntake && roomList.length === 1 ? roomList[0]! : null;
   const meta = [
-    `${roomList.length} ${unit} · ${formatM2(totalArea)}`,
+    intakeRoom ? `1 room · ${(intakeRoom.area_m2 ?? 0).toFixed(2)} m²` : `${roomList.length} ${unit} · ${formatM2(totalArea)}`,
     // K10: say where the rooms came from — never "parsed from the drawing" when there is no drawing.
-    authored ? (plot ? `drawn on a ${plot.width_m} × ${plot.depth_m} m plot` : "drawn by you") : plan.pdf_url ? "parsed from the drawing" : "no drawing attached",
+    // B1: a room from its dimensions says them — L × W × H, all measured.
+    intakeRoom && plot
+      ? `${plot.width_m.toFixed(2)} × ${plot.depth_m.toFixed(2)} × ${intakeRoom.ceiling_h_m != null ? Number(intakeRoom.ceiling_h_m).toFixed(2) : "2.90"} m · from your measurements`
+      : authored ? (plot ? `drawn on a ${plot.width_m} × ${plot.depth_m} m plot` : "drawn by you") : plan.pdf_url ? "parsed from the drawing" : "no drawing attached",
     meanConfidencePct != null ? `${meanConfidencePct}% avg confidence` : null,
     correctionsTotal != null && correctionsTotal > 0 ? `${correctionsTotal} correction${correctionsTotal === 1 ? "" : "s"}` : null,
   ].filter(Boolean) as string[];
+  // B1 (061): every roofed room's height — typed (measured) or the 2.90 m default.
+  const ceilingRooms: CeilingRoom[] = roomList
+    .filter((r) => !removedIds.has(r.id) && !isOutdoorType(r.room_type) && r.unroofed !== true)
+    .map((r) => {
+      const s = storedCeiling(r);
+      return { id: r.id, name: r.name_en ?? "(unnamed)", ceiling_h_m: s?.h ?? null, source: s?.source ?? null };
+    });
   const next =
     persona === "firm"
       ? { label: "Continue to 03 Specification", href: `/project/${projectId}/accessories` }
@@ -310,7 +337,7 @@ export default async function PlanPage({
       {focusRoomId ? <PlanRoomFocus roomId={focusRoomId} /> : null}
       <PlanRulesNavigator planId={plan.id} issues={ruleIssues} violations={ruleViolations} />
       <p className="t-label-caps text-bp-brass-text">{eyebrow}</p>
-      <h1 className="t-heading-lg mt-2 text-bp-ink-primary">{authored ? "Your plan, as you draw it" : "The plan, as parsed"}</h1>
+      <h1 className="t-heading-lg mt-2 text-bp-ink-primary">{roomIntake ? "Your room, from its dimensions" : authored ? "Your plan, as you draw it" : "The plan, as parsed"}</h1>
       <p className="t-label-md mt-2 font-bp-mono text-bp-ink-secondary">{meta.join(" · ")}</p>
 
       {parsedComplete ? (
@@ -331,6 +358,7 @@ export default async function PlanPage({
                 siteRefs={gardenSite?.siteRefs}
                 initialLayer={initialLayer ?? null}
                 printedSizes={Object.fromEntries(printedById)}
+                openingDefaults={roomIntake ? ROOM_INTAKE_OPENING_DIMS : undefined}
                 mode="edit"
               />
             </div>
@@ -368,7 +396,7 @@ export default async function PlanPage({
 
             <section aria-label="This renovation">
               {/* K12 (§7.4, 81:716): which rooms this renovation covers — everything after this step follows it. */}
-              <RoomsInScope planId={plan.id} zones={authored} rooms={roomList.map((r) => ({ id: r.id, name: r.name_en ?? "(unnamed)", area_m2: r.area_m2, in_scope: r.in_scope !== false }))} />
+              <RoomsInScope planId={plan.id} zones={authored && !roomIntake} rooms={roomList.map((r) => ({ id: r.id, name: r.name_en ?? "(unnamed)", area_m2: r.area_m2, in_scope: r.in_scope !== false }))} />
               <dl className="mt-4 grid grid-cols-3 gap-3">
                 <div>
                   <dt className="t-label-caps text-bp-ink-tertiary">AREA</dt>
@@ -384,6 +412,8 @@ export default async function PlanPage({
                 </div>
               </dl>
             </section>
+
+            {ceilingRooms.length > 0 ? <CeilingHeights planId={plan.id} rooms={ceilingRooms} /> : null}
 
             {process.env.DRAWINGS_ENABLED === "true" || process.env.VIEWER_3D_ENABLED === "true" ? (
               <section aria-label="From this plan" className="flex flex-col items-start gap-3 border-t border-bp-line-hairline pt-4">

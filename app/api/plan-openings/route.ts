@@ -6,6 +6,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { loadWithheldNames } from "@/lib/identity/curation";
 import { curatePlanRow, curatePlanRows, keepStoredText } from "@/lib/plan/curate-notes";
 import { DEFAULT_OPENING_DIMS } from "@/lib/plan/geometry";
+import { openingDefaultsFor } from "@/lib/plan/room-intake";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { projectAccess } from "@/lib/projects/http";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -30,6 +31,13 @@ const SELECT_COLS = `${BASE_COLS}, confirmed_at, detection`;
 /** R10b: an edit to an opening the BoQ counts (anything but an unconfirmed find) is a plan edit. */
 async function recordOpeningsEdit(projectId: string, actor: string, detail: Record<string, unknown>) {
   await recordPilotEvent(db(), projectId, "design_edit", { layer: "openings", ...detail }, { actor });
+}
+
+/** B1 (061): the plan's intake — a room-from-dimensions plan has its own door / window defaults. */
+async function planIntake(planId: string | null | undefined): Promise<string | null> {
+  if (!planId) return null;
+  const { data, error } = await db().from("plans").select("intake").eq("id", planId).maybeSingle<{ intake: string | null }>();
+  return error ? null : data?.intake ?? null;
 }
 
 async function openingState(id: string): Promise<{ source: string | null; confirmed_at: string | null; plan_id: string | null; kind: string | null } | null> {
@@ -109,7 +117,7 @@ export async function POST(request: NextRequest) {
     const b = parsed.data;
     const access = await projectAccess(db(), caller, { plan_id: b.plan_id, room_id: b.room_id ?? null, context_id: (b as { context_id?: string | null }).context_id ?? null });
     if (access.denied) return access.denied;
-    const def = DEFAULT_OPENING_DIMS[b.kind];
+    const def = openingDefaultsFor(DEFAULT_OPENING_DIMS, b.kind, await planIntake(b.plan_id));
     const dimsDefaulted = b.width_mm == null || b.height_mm == null;
 
     const { data, error } = await db()
@@ -197,7 +205,8 @@ export async function PATCH(request: NextRequest) {
           .single<{ kind: "door" | "window" | "archway" | "gate" }>();
         kind = row?.kind ?? "door";
       }
-      const def = DEFAULT_OPENING_DIMS[kind];
+      const { data: own } = await db().from("plan_openings").select("plan_id").eq("id", id).maybeSingle<{ plan_id: string | null }>();
+      const def = openingDefaultsFor(DEFAULT_OPENING_DIMS, kind, await planIntake(own?.plan_id));
       patch.width_mm = def.width_mm;
       patch.height_mm = def.height_mm;
       patch.sill_mm = def.sill_mm;

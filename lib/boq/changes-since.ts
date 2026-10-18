@@ -12,6 +12,7 @@
 //                     design_edit events)
 //   scope_change      K12: rooms added to / left out of the renovation (01 Plan)
 //   openings_confirmed R10b: openings found on the drawing, confirmed (01 Plan)
+//   ceiling_height    B1: a room's ceiling height entered or changed (01 Plan)
 //   firm_rate         the project's firm's book gained or retired an entry
 //   session_decision  a working-session decision was applied
 //
@@ -49,6 +50,7 @@ export function summarizeChanges(causes: readonly Pick<RecordedCause, "kind">[],
   const count = (k: RecordedCause["kind"]) => causes.filter((c) => c.kind === k).length;
   const scopeChanges = count("scope_change");
   const openingsConfirmed = count("openings_confirmed");
+  const ceilingChanges = count("ceiling_height");
   const planEdits = count("plan_edit");
   const bookChanges = count("firm_rate");
   const decisions = count("session_decision");
@@ -56,6 +58,7 @@ export function summarizeChanges(causes: readonly Pick<RecordedCause, "kind">[],
   const parts: string[] = [];
   if (scopeChanges) parts.push("Scope changed");
   if (openingsConfirmed) parts.push("Openings confirmed");
+  if (ceilingChanges) parts.push("Ceiling height changed");
   if (planEdits) parts.push("plan edited");
   if (bookChanges) parts.push(`${plural(bookChanges, "book entry", "book entries")} changed`);
   if (decisions) parts.push(`${plural(decisions, "decision")} recorded`);

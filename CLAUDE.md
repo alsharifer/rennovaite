@@ -845,6 +845,61 @@ fixture `lib/plan/__fixtures__/jumeirah-parks-plan-15oct.json`); live:
   in; the shell's one-row version is off on /plan as on /boq). A row selects its
   room (switching to the Plan layer) or opening (the Openings layer).
 
+### Bathroom pilot B1 — one room from its dimensions (18 Oct)
+
+`data/Bathroom Pilot/` (gitignored): the prompt pack, the room sheet (THE
+fixture: 266 × 263 × 280, openings §2, fixtures §3, acceptance §8), photos,
+references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
+`MULTIVIEW_RENDERS_ENABLED`. Migration **061**.
+
+- **Intake** "One room from its dimensions" (`villa-intake.tsx`, flag-gated —
+  NOT the garden pilot, no plot to type): room type (bathroom / ensuite / powder
+  / kitchen / bedroom / living / other), L × W × H to 2 dp →
+  `POST /api/room-from-dimensions` (`lib/plan/room-intake.ts`, pure). An
+  authored plan whose plot IS the room (`plot_width_m` = L, a measured scale),
+  `plans.intake = 'room_dimensions'`, one rectangular room, every entered value
+  measured (`dims_derived` false, `ceiling_h_source` measured). Continue opens
+  01 Plan on the Openings layer. Nothing bathroom-specific in the schema.
+- **Ceiling height** (061 `rooms.ceiling_h_m` + `ceiling_h_source`
+  measured | derived): `buildPlanGraph` uses a roofed room's stored value
+  (`storedCeiling`; `Room.ceiling_h_source` set only then; out of
+  `derived_fields`), else 2.9 derived exactly as before; an unroofed zone ignores
+  it. The element take-off already read `ceiling_h_m`; the engine's C-01 / C-04
+  (`WALL_HEIGHT_M`, `BATH_TILE_HEIGHT_M`) now read `EngineRoom.ceiling_h_m` too
+  (`assemble.ts` loads it best-effort; the measurement text is unchanged unless
+  a bath stores one). The plan rules' door/window height check uses the lower
+  ceiling either side. Editable for ANY room on 01 Plan (`CeilingHeights` panel
+  → `PATCH /api/plan-ceiling`, saves at once, a `design_edit` on layer
+  "ceiling" with from → to) → revision cause **"Ceiling height — Bathroom 2.90
+  (default) → 2.80 m"** on the wall-area lines and "Ceiling height changed since
+  rev N" (`lib/plan/ceiling.ts`). The editor's plan save never sends it.
+- **Openings**: the A5 editor as is (click a wall, Add, drag along it); on a
+  room-intake plan a door starts 0.8 × 2.1 m and a window 0.6 × 1.2 m on a 1.2 m
+  sill (`ROOM_INTAKE_OPENING_DIMS`, route + editor), derived until both
+  dimensions are entered.
+- **Fixtures with a footprint** (`lib/overlays/footprint.ts`, pure; no
+  migration): `wc_point`, `bidet_point` (new), `basin_point` (vanity),
+  `shower_mixer`, `bath_point` (new; bidet / bath are QS-to-price lines until
+  B5). `spec` = width_mm (along the wall) · depth_mm (into the room) ·
+  rotation_deg (compass heading it FACES, 0 = plan up, clockwise) · wall_gap_mm
+  · footprint default | entered. Defaults WC 400 × 700, bidet 400 × 550, vanity
+  900 × 600, shower 900 × 900, bath 1700 × 750. `/api/plan-fixtures` SNAPS
+  every add / move / resize to the nearest wall of its room (back flush + gap,
+  kept on the wall) and fills `plan_fixtures.wall_id` — a HINT like an
+  opening's `wall_ref` (re-find by position). `snap: false` opts out. The
+  plumbing layer draws the footprint (dashed while default) and previews the
+  snap while dragging. The BoQ still counts points.
+- **Invariant**: no existing BoQ moves — `lib/boq/__tests__/ceiling-height.test.ts`
+  (Mudon's mapped BoQ with 061's columns null = the P4 golden file; graphs and
+  take-offs identical; Arabella identical) and the dev dry-run diffs of Arabella
+  and the demo villa byte-identical between master and B1.
+- **Checks**: `lib/plan/__tests__/room-intake.test.ts` (the sheet: floor 7.00,
+  wet tiling 27.53 = 10.58 × 2.80 − 0.87 × 2.10 − 0.45 × 0.60, plan rules green,
+  fixtures at the sheet's centres); live `node --env-file=.env.local
+  scripts/b1-room-check.mjs [port] [--keep]` (the `bathroom` launch entry, port
+  3096: intake form → door + window → fixtures → reload → BoQ; shots in
+  `screenshots/bathroom-pilot/b1/`).
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic
@@ -2812,6 +2867,7 @@ surface: the rail keeps the step you came from, `shell/step-memory.ts`).
 | `UPLOAD_SWEEP_APPLY`              | server — H9: `"true"` lets the daily sweep DELETE stale pending uploads / staged downloads. Unset = dry-run (logs what it would delete) |
 | `PROJECT_PURGE_APPLY`             | server — K10: `"true"` lets the daily purge remove projects deleted > 30 days ago (rows + Storage). Unset = dry-run (logs ids and counts) |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
+| `MULTIVIEW_RENDERS_ENABLED`       | server — the bathroom pilot's one flag (B1–B6). B1: `"true"` adds "One room from its dimensions" to the intake. Off = the intake is exactly as before |
 
 ### Feature flags — read at server start (flip → restart)
 
