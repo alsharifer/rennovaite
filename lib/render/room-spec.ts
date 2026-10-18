@@ -46,7 +46,7 @@ const SPEC_SCHEMA = {
 export const SPEC_PROMPT = [
   "This is a render of a client's renovated bathroom — the view they locked as THE design of the room.",
   "Read its design as a short specification, one phrase per field (at most 14 words), in the words a tiler, joiner and supplier would use: colour, tone, material, format, finish.",
-  "floor_tile, wall_tile (and tiled_height: 'full height', 'to 1.2 m', …), vanity (construction, wood tone, top, basin), mirror (shape, lighting), wc (type, mounting), shower_screen (glass, frame, door), fittings_finish (taps, shower, accessories), palette (the 3–4 colours that set the look).",
+  "floor_tile, wall_tile (and tiled_height: 'full height', 'to 1.2 m', …), vanity (construction, wood tone, top, basin), mirror (shape, lighting), wc (shape, colour and finish — never how it is mounted), shower_screen (glass, frame, door), fittings_finish (taps, shower, accessories), palette (the 3–4 colours that set the look).",
   "Describe ONLY what the image shows; a field it does not show is an empty string. Never describe the layout, positions or sizes.",
 ].join("\n");
 
@@ -92,7 +92,7 @@ export async function checkFollows(render: ImageInput, anchor: ImageInput, eleme
           block(render),
           {
             type: "text",
-            text: `The two images look at the room from different places, so the layout and what is in frame differ — that is expected. For EACH element below, judge only whether IMAGE 2 has the SAME finish and design as IMAGE 1: "same", "partly" (close but visibly different in colour, material or form), "different", or "not_visible" (IMAGE 2 does not show it). A few words why.\n\n${elements.map((e) => `${e.element}: ${e.finish}`).join("\n")}`,
+            text: `The two images look at the room from different places, so the layout and what is in frame differ — that is expected. For EACH element below, judge only whether IMAGE 2 has the SAME finish and design as IMAGE 1 — ignore where things are, their size and how a WC or bidet is mounted: "same", "partly" (close but visibly different in colour, material or form), "different", or "not_visible" (IMAGE 2 does not show it). A few words why.\n\n${elements.map((e) => `${e.element}: ${e.finish}`).join("\n")}`,
           },
         ],
       },

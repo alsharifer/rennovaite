@@ -55,12 +55,21 @@ export interface RoomAnchor {
   locked_at: string | null;
 }
 
-/** The spec as style elements (field order, nulls dropped; tiled height joins the walls). */
+/**
+ * How a WC or bidet is MOUNTED is the plan's (a plumbing decision — the pilot keeps
+ * the floor-standing WC; wall-hung is a priced option), never the anchor's: the
+ * spec carries the design and finish only.
+ */
+const MOUNTING = /\b(wall[- ]hung|wall[- ]mounted|floor[- ]standing|floor[- ]mounted|back[- ]to[- ]wall|close[- ]coupled|with (a )?concealed cistern|concealed[- ]cistern)\b/gi;
+export const withoutMounting = (s: string) => s.replace(MOUNTING, "").replace(/\s{2,}/g, " ").replace(/\s+([,.;])/g, "$1").replace(/^[\s,]+|[\s,]+$/g, "");
+
+/** The spec as style elements (field order, nulls dropped; tiled height joins the walls; no mounting). */
 export function specElements(spec: RoomDesignSpec): { element: string; finish: string }[] {
   const out: { element: string; finish: string }[] = [];
   for (const f of SPEC_FIELDS) {
     if (f === "tiled_height") continue;
-    const v = spec[f]?.trim();
+    const raw = spec[f]?.trim();
+    const v = raw && f === "wc" ? withoutMounting(raw) : raw;
     if (!v) continue;
     out.push({ element: SPEC_ELEMENT[f], finish: f === "wall_tile" && spec.tiled_height?.trim() ? `${v}, tiled ${spec.tiled_height.trim()}` : v });
   }
@@ -131,6 +140,8 @@ export function followsStateOf(input: { viewPhotoId: string; anchor: Pick<RoomAn
   if (!input.renderAnchorId) return "unchecked";
   if (input.renderAnchorId !== anchor.render_id) return "stale";
   if (input.changedSpec && input.changedSpec.length > 0) return "changed";
+  // A render that did not keep the layout was never compared with the anchor.
+  if (input.followsPassed == null) return "unchecked";
   return input.followsPassed ? "follows" : "differs";
 }
 

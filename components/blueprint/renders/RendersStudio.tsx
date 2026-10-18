@@ -41,10 +41,8 @@ import { StateBlock } from "../StateBlock";
 import { TopBarActions } from "../shell/TopBar";
 import { MaterialPalette } from "./MaterialPalette";
 import { RoomPhoto } from "./RoomPhoto";
-import { PhotoViews } from "./PhotoViews";
-import { PhotoViewRender, type PhotoViewRenderInfo } from "./PhotoViewRender";
+import { PHOTO_STATE, PhotoViewCentre, PhotoViewSide, usePhotoViews, type PhotoViewsInitial } from "./PhotoViewStudio";
 import type { PhotoView } from "@/lib/render/photo-views";
-import type { MiniPlan } from "@/lib/render/photo-views-load";
 
 export type StudioRoom = { id: string; name_en: string | null; room_type: string | null };
 export type StudioRender = { id: string; imageUrl: string; prompt: string; qa?: "passed" | "failed" | null; qaReason?: string | null; outcome?: SceneOutcome | null; /** R10b: which openings shaped it. */ openings?: string | null };
@@ -112,10 +110,15 @@ export function RendersStudio(props: {
   /** K12: rooms on the plan that are not in this renovation (not rendered). */
   notInScope?: string[];
   planHref?: string;
-  /** B2 (MULTIVIEW_RENDERS_ENABLED): each room's photo views and the plan to place them on. */
-  photoViews?: { byRoom: Record<string, PhotoView[]>; plans: Record<string, MiniPlan>; renders: Record<string, PhotoViewRenderInfo>; spendAed: number | null; referenceStyle: { text: string; at: string } | null } | null;
+  /** B2/B4 (MULTIVIEW_RENDERS_ENABLED): each room's photo views, their versions and locks, each room's anchor. */
+  photoViews?: PhotoViewsInitial | null;
 }) {
   const { projectId, rooms, style } = props;
+  // B4: a room with photos is rendered view by view from them (82:48); its one-photo day render is superseded.
+  const pv = usePhotoViews(projectId, props.photoViews ?? null);
+  const multiview = !!props.photoViews;
+  const photosOf = (roomId: string): PhotoView[] => pv.byRoom[roomId] ?? [];
+  const photoRooms = new Set(Object.entries(pv.byRoom).filter(([, vs]) => vs.length > 0).map(([id]) => id));
   const [locked, setLocked] = useState<Set<string>>(() => new Set(props.initialLockedRoomIds));
   const [rows, setRows] = useState<Row[]>(() => buildRows(rooms, props.batchJobs, new Set(props.initialLockedRoomIds)));
   const [chains, setChains] = useState<Record<string, { list: StudioRender[]; index: number }>>(() =>
@@ -142,11 +145,15 @@ export function RendersStudio(props: {
     rowsRef.current = rows;
   }, [rows]);
 
-  const firstRow = (props.initialRoomId ? rows.find((r) => r.roomId === props.initialRoomId) : undefined) ?? rows.find((r) => r.state !== "na" && rooms.find((x) => x.id === r.roomId)?.room_type === "master_bedroom") ?? rows.find((r) => r.state !== "na") ?? rows[0] ?? null;
-  const [selectedId, setSelectedId] = useState<string | null>(firstRow?.id ?? null);
-  const row = selectedId ? (rows.find((r) => r.id === selectedId) ?? null) : null;
+  // A room with photo views lists them instead of its single day render.
+  const visibleRows = rows.filter((r) => !photoRooms.has(r.roomId));
+  const firstRow = (props.initialRoomId ? visibleRows.find((r) => r.roomId === props.initialRoomId) : undefined) ?? visibleRows.find((r) => r.state !== "na" && rooms.find((x) => x.id === r.roomId)?.room_type === "master_bedroom") ?? visibleRows.find((r) => r.state !== "na") ?? null;
+  const firstPhoto = (props.initialRoomId ? photosOf(props.initialRoomId)[0] : undefined) ?? (firstRow ? undefined : rooms.map((r) => photosOf(r.id)[0]).find(Boolean));
+  const [selectedId, setSelectedId] = useState<string | null>(firstPhoto ? `photo:${firstPhoto.id}` : (firstRow?.id ?? visibleRows[0]?.id ?? null));
+  const photoSel: PhotoView | null = selectedId?.startsWith("photo:") ? (Object.values(pv.byRoom).flat().find((v) => `photo:${v.id}` === selectedId) ?? null) : null;
+  const row = selectedId && !photoSel ? (visibleRows.find((r) => r.id === selectedId) ?? null) : null;
   const selected = row ? { roomId: row.roomId, view: row.view } : null;
-  const room = row ? (rooms.find((r) => r.id === row.roomId) ?? null) : null;
+  const room = row ? (rooms.find((r) => r.id === row.roomId) ?? null) : photoSel ? (rooms.find((r) => r.id === photoSel.room_id) ?? null) : null;
   const roomName = room?.name_en?.trim() || "Room";
   const isEvening = selected?.view === "evening";
   const isScene = !!row?.cameraId;
@@ -164,9 +171,13 @@ export function RendersStudio(props: {
   const busy = !!row && busyKey === row.id;
   const tweaks = chain ? chain.list.length - 1 : 0;
   const atCap = !!room && !isEvening && tweaks >= MAX_TWEAKS && !keepGoing.has(room.id);
-  const lockedCount = rows.filter((r) => r.state === "locked").length;
-  const views = rows.filter((r) => r.state !== "na");
+  const allPhotos = Object.values(pv.byRoom).flat();
+  const lockedCount = visibleRows.filter((r) => r.state === "locked").length + allPhotos.filter((v) => pv.locked[v.id]).length;
+  const views = visibleRows.filter((r) => r.state !== "na");
+  const viewCount = views.length + allPhotos.length;
   const outstanding = views.filter((r) => r.state !== "ready" && r.state !== "locked").length;
+  const remainingPhotos = pv.remaining.length;
+  const remainingTotal = outstanding + remainingPhotos;
   const stagingAvailable = !!(props.stagingEnabled && style && room && isLocked && !isEvening && (() => {
     const t = stagingRoomTypeFromDb(room.room_type);
     return t != null && getStagingSet(style.key, t) != null;
@@ -284,6 +295,9 @@ export function RendersStudio(props: {
     setBatchRunning(true);
     setError(null);
     try {
+      // B4: the photo views first (the cost guard's default scope — positioned photos only), then the rest.
+      if (remainingPhotos > 0) await pv.renderRemaining();
+      if (outstanding === 0) return;
       await runBatch(
         projectId,
         (plan) => setRows((prev) => {
@@ -327,22 +341,30 @@ export function RendersStudio(props: {
     <label className="block">
       <span className="sr-only">View</span>
       <select
-        value={row?.id ?? ""}
+        value={selectedId ?? ""}
         onChange={(e) => {
           const r = rows.find((x) => x.id === e.target.value);
           if (r) select(r);
+          else if (e.target.value.startsWith("photo:")) setSelectedId(e.target.value);
         }}
         className="t-heading-sm min-h-12 w-full border border-bp-line-control bg-bp-surface-base px-3 text-bp-ink-primary"
       >
-        {rows.map((r) => (
+        {visibleRows.map((r) => (
           <option key={r.id} value={r.id}>
             {r.roomName} · {r.view === "evening" ? "evening" : "day"} — {STATE[r.state].label.toLowerCase()}
           </option>
         ))}
+        {rooms.flatMap((rm) =>
+          photosOf(rm.id).map((v) => (
+            <option key={v.id} value={`photo:${v.id}`}>
+              {rm.name_en?.trim() || "Room"} · {v.label} — {PHOTO_STATE[pv.viewInfo(v).state].label.toLowerCase()}
+            </option>
+          )),
+        )}
       </select>
       <span className="t-label-md mt-1 block font-bp-mono text-bp-ink-tertiary">
-        {chain && !isEvening ? `Version ${chain.index + 1} of ${chain.list.length} · ` : ""}
-        {lockedCount} / {views.length} views locked
+        {chain && !isEvening && !photoSel ? `Version ${chain.index + 1} of ${chain.list.length} · ` : ""}
+        {lockedCount} / {viewCount} views locked
       </span>
     </label>
   );
@@ -370,48 +392,101 @@ export function RendersStudio(props: {
         <div className="flex items-baseline">
           <h2 className="t-label-caps flex-1 text-bp-ink-tertiary">ALL VIEWS</h2>
           <span className="t-label-md font-bp-mono text-bp-ink-tertiary">
-            {lockedCount} / {views.length} locked
+            {lockedCount} / {viewCount} views locked
           </span>
         </div>
         <div className="mt-3">
-          <Button kind="secondary" onClick={() => void renderRemaining()} disabled={batchRunning ? { reason: "Rendering now — up to three at once", reasonId: "batch-reason" } : outstanding === 0 ? { reason: "Every view is rendered", reasonId: "batch-reason" } : false} testId="render-remaining">
-            {batchRunning ? "Rendering…" : `Render remaining ${outstanding}`}
+          <Button kind="secondary" onClick={() => void renderRemaining()} disabled={batchRunning || pv.running ? { reason: "Rendering now — up to three at once", reasonId: "batch-reason" } : remainingTotal === 0 ? { reason: "Every view is rendered", reasonId: "batch-reason" } : false} testId="render-remaining">
+            {batchRunning || pv.running ? "Rendering…" : `Render remaining ${remainingTotal}`}
           </Button>
-          {batchRunning || outstanding === 0 ? (
+          {batchRunning || pv.running || remainingTotal === 0 ? (
             <p id="batch-reason" className="t-label-md mt-1.5 font-bp-mono text-bp-ink-tertiary">
-              {batchRunning ? "Rendering now — up to three at once" : "Every view is rendered"}
+              {batchRunning || pv.running ? "Rendering now — up to three at once" : "Every view is rendered"}
+            </p>
+          ) : null}
+          {remainingPhotos > 0 && pv.costPerView ? (
+            <p className="t-label-md mt-1.5 font-bp-mono tabular-nums text-bp-ink-secondary" data-cost-guard={remainingPhotos}>
+              {remainingPhotos} positioned {remainingPhotos === 1 ? "photo" : "photos"} · ≈ AED {(pv.costPerView.low * remainingPhotos).toFixed(2)}–{(pv.costPerView.high * remainingPhotos).toFixed(2)}
             </p>
           ) : null}
         </div>
-        <p className="t-body-sm mt-3 text-bp-ink-secondary">A day view for every room, plus an evening view where the plan has lighting. Up to three render at once.</p>
-        <ul className="mt-4 border-t border-bp-line-hairline" aria-label="Rooms and views">
-          {rows.map((r) => {
-            const on = r.id === row?.id;
-            const s = STATE[r.state];
+        <p className="t-body-sm mt-3 text-bp-ink-secondary">
+          {multiview ? "Every photo you placed on the plan, restyled from the photo. Views from where you have no photo only on request. " : ""}A day view for every room, plus an evening view where the plan has lighting. Up to three render at once.
+        </p>
+        <div className="mt-4" aria-label="Rooms and views" role="list">
+          {rooms.map((rm) => {
+            const own = visibleRows.filter((r) => r.roomId === rm.id);
+            const photos = photosOf(rm.id);
+            if (own.length === 0 && photos.length === 0) return null;
+            const anchor = pv.anchors[rm.id];
             return (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  aria-current={on ? "true" : undefined}
-                  onClick={() => select(r)}
-                  title={r.note ?? undefined}
-                  data-view-row={r.id}
-                  data-view-state={r.state}
-                  className={`relative flex w-full items-center gap-3 border-b border-bp-line-hairline px-2.5 py-2.5 text-left ${on ? "bg-bp-surface-raised before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-bp-brass" : "hover:bg-bp-surface-raised"}`}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate ${on ? "t-heading-sm" : "t-body-sm"} ${r.state === "na" ? "text-bp-ink-tertiary" : "text-bp-ink-primary"}`}>{r.roomName}</span>
-                    <span className="t-label-md block font-bp-mono text-bp-ink-tertiary">{r.state === "na" ? "—" : viewLabel(r.view)}</span>
+              <div key={rm.id} role="listitem" className="border-t border-bp-line-hairline" data-room-group={rm.id}>
+                <p className="flex items-baseline gap-2 px-2.5 pb-1 pt-3">
+                  <span className="t-heading-sm flex-1 truncate text-bp-ink-primary">{rm.name_en?.trim() || "Room"}</span>
+                  <span className="t-label-md font-bp-mono text-bp-ink-tertiary">
+                    {own.filter((r) => r.state !== "na").length + photos.length} {own.filter((r) => r.state !== "na").length + photos.length === 1 ? "view" : "views"}
                   </span>
-                  <span className="flex shrink-0 items-center gap-1.5 text-bp-ink-secondary">
-                    <Icon name={s.icon} className={`text-[18px]${r.state === "rendering" ? " motion-safe:animate-spin" : ""}`} />
-                    <span className="t-label-caps">{r.outcome === "substituted" && (r.state === "ready" || r.state === "locked") ? "3D VIEW" : s.label}</span>
-                  </span>
-                </button>
-              </li>
+                </p>
+                <ul>
+                  {own.map((r) => {
+                    const on = r.id === row?.id;
+                    const s = STATE[r.state];
+                    return (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          aria-current={on ? "true" : undefined}
+                          onClick={() => select(r)}
+                          title={r.note ?? undefined}
+                          data-view-row={r.id}
+                          data-view-state={r.state}
+                          className={`relative flex w-full items-center gap-3 px-2.5 py-2 pl-5 text-left ${on ? "bg-bp-surface-raised before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-bp-brass" : "hover:bg-bp-surface-raised"}`}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className={`block truncate ${on ? "t-nav-item-active" : "t-body-sm"} ${r.state === "na" ? "text-bp-ink-tertiary" : "text-bp-ink-primary"}`}>
+                              {r.state === "na" ? "Not rendered" : r.cameraId ? `${r.roomName} · ${viewLabel(r.view).toLowerCase()}` : `${viewLabel(r.view)} view · ${props.initialPhotosByRoom[r.roomId] ? "from your photo" : "concept"}`}
+                            </span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1.5 text-bp-ink-secondary">
+                            <Icon name={s.icon} className={`text-[18px]${r.state === "rendering" ? " motion-safe:animate-spin" : ""}`} />
+                            <span className="t-label-caps">{r.outcome === "substituted" && (r.state === "ready" || r.state === "locked") ? "3D VIEW" : s.label}</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                  {photos.map((v) => {
+                    const on = `photo:${v.id}` === selectedId;
+                    const st = pv.viewInfo(v).state;
+                    const s = PHOTO_STATE[st];
+                    return (
+                      <li key={v.id}>
+                        <button
+                          type="button"
+                          aria-current={on ? "true" : undefined}
+                          onClick={() => {
+                            setSelectedId(`photo:${v.id}`);
+                            setError(null);
+                          }}
+                          title={st === "anchor" ? "Locked — every other view of this room follows its finishes" : st === "stale" && anchor ? `${anchor.label} changed after this view was rendered` : undefined}
+                          data-view-row={`photo:${v.id}`}
+                          data-view-state={st}
+                          className={`relative flex w-full items-center gap-3 px-2.5 py-2 pl-5 text-left ${on ? "bg-bp-surface-raised before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-bp-brass" : "hover:bg-bp-surface-raised"}`}
+                        >
+                          <span className={`min-w-0 flex-1 ${on ? "t-nav-item-active" : "t-body-sm"} text-bp-ink-primary`}>{v.label}</span>
+                          <span className="flex shrink-0 items-center gap-1.5 text-bp-ink-secondary">
+                            <Icon name={s.icon} className={`text-[18px]${st === "rendering" ? " motion-safe:animate-spin" : ""}`} />
+                            <span className="t-label-caps">{s.label}</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             );
           })}
-        </ul>
+        </div>
         {props.notInScope && props.notInScope.length > 0 ? (
           <details className="mt-3" data-not-in-scope={props.notInScope.length}>
             <summary className="t-label-md cursor-pointer font-bp-mono text-bp-ink-tertiary hover:text-bp-ink-secondary">
@@ -432,7 +507,7 @@ export function RendersStudio(props: {
           </details>
         ) : null}
 
-        {room && renderable ? (
+        {room && renderable && !photoRooms.has(room.id) ? (
           <section className="mt-6" aria-labelledby="photo-h">
             <h2 id="photo-h" className="t-label-caps text-bp-ink-tertiary">
               ROOM PHOTO
@@ -469,7 +544,9 @@ export function RendersStudio(props: {
       {/* Centre — the view */}
       <section aria-labelledby="view-h" className="min-w-0 px-4 py-6 md:px-8">
         <div className="mb-4 lg:hidden">{viewSelect}</div>
-        {room ? (
+        {photoSel && room ? (
+          <PhotoViewCentre key={photoSel.id} api={pv} roomName={roomName} photo={photoSel} onSelect={(id) => setSelectedId(`photo:${id}`)} />
+        ) : room ? (
           <>
             <div className="flex items-start gap-4">
               <div className="min-w-0 flex-1">
@@ -662,11 +739,31 @@ export function RendersStudio(props: {
           </StateBlock>
         )}
 
-        {/* B2: every photo of the room is a view of its own, placed on the plan. */}
-        {props.photoViews && room && renderable ? (
-          <PhotoViews key={room.id} projectId={projectId} roomId={room.id} roomName={roomName} plan={props.photoViews.plans[room.id] ?? null} initialViews={props.photoViews.byRoom[room.id] ?? []} spendAed={props.photoViews.spendAed} referenceStyle={props.photoViews.referenceStyle}>
-            {(view, setSpend) => <PhotoViewRender key={view.id} view={view} roomName={roomName} initial={props.photoViews!.renders[view.id] ?? null} onSpend={setSpend} />}
-          </PhotoViews>
+        {/* B4: a room with no photo views yet — add them; each becomes a view of its own. */}
+        {multiview && room && renderable && !photoSel && !photoRooms.has(room.id) ? (
+          <section className="mt-10 border-t border-bp-line-hairline pt-6" aria-labelledby="your-photos-h" data-photo-views="0">
+            <h2 id="your-photos-h" className="t-heading-sm text-bp-ink-primary">Your photos</h2>
+            <p className="t-body-sm mt-1 text-bp-ink-secondary">Each photo of {roomName} becomes a view of its own — restyled from the photo, so it keeps your real layout.</p>
+            <label className={`mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 border border-bp-line-control px-4 t-nav-item-active text-bp-ink-primary hover:bg-bp-surface-raised ${pv.uploading ? "text-bp-ink-tertiary" : ""}`} data-add-photos="">
+              <Icon name="add_photo_alternate" size={18} />
+              {pv.uploading ? "Uploading…" : "Add photos"}
+              <input type="file" accept="image/jpeg,image/png,image/heic,image/heif" multiple className="sr-only" disabled={!!pv.uploading} onChange={async (e) => { const v = await pv.addPhotos(room.id, e.target.files); if (v) setSelectedId(`photo:${v.id}`); }} />
+            </label>
+            {pv.notice[room.id] ? <p role="alert" className="surface-inverse t-body-sm mt-3 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink">{pv.notice[room.id]!.text}</p> : null}
+          </section>
+        ) : null}
+
+        {/* Below xl: the plan + checks of a photo view fold under it. */}
+        {photoSel && room ? (
+          <details className="mt-8 border-t border-bp-line-hairline xl:hidden" data-photo-side-folded="">
+            <summary className="t-heading-sm flex min-h-12 cursor-pointer list-none items-center justify-between text-bp-ink-primary [&::-webkit-details-marker]:hidden">
+              Views on the plan · design checks
+              <Icon name="expand_more" className="text-[20px] text-bp-ink-secondary" />
+            </summary>
+            <div className="pb-4">
+              <PhotoViewSide api={pv} roomName={roomName} photo={photoSel} onSelect={(id) => setSelectedId(`photo:${id}`)} />
+            </div>
+          </details>
         ) : null}
 
         {/* Below xl: the palette folds under the view (phone: "Material palette · 4"). */}
@@ -682,7 +779,12 @@ export function RendersStudio(props: {
       </section>
 
       {/* Right — the palette */}
-      <aside aria-label="Materials" className="hidden border-l border-bp-line-hairline px-6 py-6 xl:block">
+      <aside aria-label={photoSel ? "Views on the plan and materials" : "Materials"} className="hidden border-l border-bp-line-hairline px-6 py-6 xl:block">
+        {photoSel && room ? (
+          <div className="mb-8 border-b border-bp-line-hairline pb-8">
+            <PhotoViewSide api={pv} roomName={roomName} photo={photoSel} onSelect={(id) => setSelectedId(`photo:${id}`)} />
+          </div>
+        ) : null}
         <MaterialPalette projectId={projectId} furniture={stagingAvailable && room ? { roomId: room.id, optedIn: props.initialFurnitureOptIns.includes(room.id) } : null} />
       </aside>
 

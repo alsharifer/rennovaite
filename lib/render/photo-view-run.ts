@@ -17,11 +17,11 @@ import { getStyleByKey } from "@/lib/styles";
 import { resolveAnyStyle } from "@/lib/garden-styles";
 
 import { CHECK_VERSION, checkItemsFor, checkCostUsd, expectedInView, type CheckItem, type Detection } from "./photo-check";
-import { photoViewArm, readBefore, restyleWithCheck, type RestyleResult } from "./photo-restyle";
+import { ARM_MODEL, photoViewArm, readBefore, restyleWithCheck, type RestyleResult } from "./photo-restyle";
 import { cameraOf } from "./photo-views";
 import { loadMiniPlans } from "./photo-views-load";
 import { PHOTO_VIEW_IMAGE_REFS, styleBriefFrom, type ReferenceStyle } from "./reference-style";
-import { recordSpend } from "./render-spend";
+import { IMAGE_PRICE_USD, recordSpend, USD_TO_AED } from "./render-spend";
 import { loadRoomAnchor } from "./photo-view-anchor";
 import { followsLine, specElements } from "./room-spec";
 
@@ -36,6 +36,16 @@ export const PHOTO_VIEW_PIPELINE = "b4-1";
 export function photoViewMaxAttempts(env: Record<string, string | undefined> = process.env): number {
   const n = Number(env.PHOTO_VIEW_MAX_ATTEMPTS);
   return Number.isInteger(n) && n >= 1 && n <= 2 ? n : 2;
+}
+
+/** Vision readings per attempt (the after reading + the style or follows check), US$ — measured in B2b at ≈ 0.03 each. */
+const CHECKS_PER_ATTEMPT_USD = 0.065;
+
+/** B4 cost guard: what one view costs to render, AED — one attempt … `maxAttempts` (the studio's estimate). */
+export function photoViewCostAed(maxAttempts: number, env: Record<string, string | undefined> = process.env): { low: number; high: number } {
+  const per = (IMAGE_PRICE_USD[ARM_MODEL[photoViewArm(env)]] ?? 0) + CHECKS_PER_ATTEMPT_USD;
+  const aed = (usd: number) => Math.round(usd * USD_TO_AED * 100) / 100;
+  return { low: aed(per), high: aed(per * Math.max(1, maxAttempts)) };
 }
 
 export interface PhotoViewGate {

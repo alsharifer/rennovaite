@@ -84,10 +84,17 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
     return { kind: "unchanged", render_id: id, message: UNCHANGED_MESSAGE };
   }
 
-  // The layout still holds: the edit read beside the photo, against the photo's own reading.
-  const before = photo.before_detection?.detection ?? { items: parent.gate.before };
-  const photoBytes = new Uint8Array(await (await fetch(photo.public_url)).arrayBuffer());
-  const read = await detectItems({ mediaType: mime(next), data: b64(next) }, parent.gate.items, "after", imageSize(next), { image: { mediaType: mime(photoBytes), data: b64(photoBytes) }, located: before.items });
+  // The layout still holds: a change is held to the VERSION it edits — the edit
+  // read beside its parent, against the parent's own reading (which already
+  // passed against the photo). Held to the photo instead, an edit inherits
+  // whatever its parent was measured with: a B2 version predates the size rule,
+  // and every change to it failed on the parent's own vanity (live, 18 Oct).
+  const parentRead = parent.gate.attempts.at(-1)?.after ?? null;
+  const reference = parentRead
+    ? { bytes: parentBytes, items: parentRead }
+    : { bytes: new Uint8Array(await (await fetch(photo.public_url)).arrayBuffer()), items: (photo.before_detection?.detection ?? { items: parent.gate.before }).items };
+  const before = { items: reference.items };
+  const read = await detectItems({ mediaType: mime(next), data: b64(next) }, parent.gate.items, "after", imageSize(next), { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: reference.items });
   const readUsd = checkCostUsd(read.usage);
   cost += readUsd;
   spend.push({ project_id: input.projectId, purpose: "photo_check", model: read.model, cost_usd: readUsd, detail: { step: "change_layout", usage: read.usage } });

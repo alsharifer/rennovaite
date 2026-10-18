@@ -84,3 +84,13 @@ describe("B4 room design spec", () => {
     expect(changePrompt("lighter oak floor")).toMatch(/^Edit this photo of a renovated bathroom: lighter oak floor\. Change ONLY that\./);
   });
 });
+
+describe("B4 spec carries no mounting", () => {
+  it("drops how the WC is mounted — that is the plan's, not the anchor's", async () => {
+    const { specElements: els, withoutMounting } = await import("../room-spec-vocab");
+    expect(withoutMounting("White ceramic wall-hung WC with matching wall-hung bidet")).toBe("White ceramic WC with matching bidet");
+    expect(withoutMounting("Floor-standing close-coupled rimless WC, white gloss")).toBe("rimless WC, white gloss");
+    const wc = els({ ...SPEC, wc: "White ceramic wall-hung WC" }).find((e) => e.element === "WC")!;
+    expect(wc.finish).toBe("White ceramic WC");
+  });
+});

@@ -181,9 +181,13 @@ export async function loadProjectJourney(db: SupabaseClient, projectId: string, 
           db.from("rooms").select("id, room_type").eq("plan_id", plan.id),
           db.from("approved_designs").select("room_id").eq("project_id", projectId),
         ]);
+        // B4 (064): a room anchored by a locked photo view is a locked design too (best-effort before 064).
+        const ids = ((rooms ?? []) as { id: string }[]).map((r) => r.id);
+        const anchored = ids.length ? await db.from("room_anchors").select("room_id").in("room_id", ids) : { data: [] as { room_id: string }[], error: null };
+        const lockedIds = [...((approved ?? []) as { room_id: string | null }[]).map((a) => a.room_id), ...(anchored.error ? [] : ((anchored.data ?? []) as { room_id: string }[]).map((a) => a.room_id))];
         // K12: only the rooms in this renovation are views to lock.
         const out = await outOfScopeRoomIds(db, projectId);
-        return renderLockProgress(((rooms ?? []) as { id: string; room_type: string | null }[]).filter((r) => !out.has(r.id)), ((approved ?? []) as { room_id: string | null }[]).map((a) => a.room_id).filter((x): x is string => !!x));
+        return renderLockProgress(((rooms ?? []) as { id: string; room_type: string | null }[]).filter((r) => !out.has(r.id)), lockedIds.filter((x): x is string => !!x));
       }),
     ]);
     facts.owner = { brief: brief > 0, moodboardItems, renders, renderViews, unpricedLines };

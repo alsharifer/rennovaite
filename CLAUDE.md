@@ -977,6 +977,54 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
 
   ±25 % is near the reading noise. `scripts/b2b-rejudge.ts` re-judges eval
   images without rendering.
+- **B4 — one design across a room's views** (migration **064**; spec §7.5,
+  Figma 82:48 / dark 82:2438; report `docs/BATHROOM_PILOT_B4.md`):
+  - **Lock and anchor.** `POST /api/render/photo-view/lock { render_id }` locks
+    a version that passed its layout check (`room_photos.locked_render_id`).
+    The room's FIRST lock anchors it (`room_anchors`): a room design spec is
+    read from that render (`lib/render/room-spec.ts extractRoomSpec`). It
+    holds floor tile, wall tile + tiled height, vanity, mirror, WC, shower
+    screen, fittings finish and palette. The WC's mounting is never in the
+    spec (`withoutMounting`): the plan decides it.
+  - **Other views render against the anchor.** Every other view of the room
+    sends the anchor's image after the photo, in place of the references, and
+    uses the spec as the look. A follows check (`checkFollows`, the render
+    beside the anchor) writes "Finishes follow Photo 2 (locked) ✓".
+    `renders.anchor_render_id` records which anchor version the render
+    followed.
+  - **What never moves the anchor.** Re-rendering a non-anchor view never
+    touches it, and a locked view is never re-rendered (409 `view_locked`).
+  - **"Ask for a change"** (`POST /api/render/photo-view/change`,
+    `lib/render/photo-view-change.ts`) keeps the edit-model path: nano-banana
+    edits the current image, then:
+    - a structural request goes to the plan (422);
+    - an unchanged image is kept as `status: "unchanged"`, never a version,
+      with R10a's message;
+    - an edit that moves a fixture is not kept;
+    - otherwise it becomes version N, with "Last change: “…” → version N ·
+      changed: <what>" (`describeChange`).
+  - **A change on the anchor moves the anchor.** The spec is read again,
+    history kept in `room_anchors.history`. Every other view then shows TO
+    UPDATE ("Photo 2 changed after this view was rendered"); none is
+    re-rendered automatically.
+  - **The studio** (`components/blueprint/renders/PhotoViewStudio.tsx`,
+    `usePhotoViews`):
+    - a room with photos lists its photo views in a left list grouped by
+      room; its one-photo day render is superseded;
+    - the centre shows the eyebrow, the image (Restyled / Your photo), the
+      views strip with Add photos and Add a view (disabled with its reason:
+      no 3D interior scene in this pilot), the design checks, Lock / Render
+      again / versions, Ask for a change and the last change;
+    - the right column shows VIEWS ON THE PLAN (room, openings, fixtures, P
+      markers; press and drag to place), the design checks per view, render
+      spend and the references.
+  - **"Render remaining" is the cost guard's default scope**
+    (`viewsToRender`): positioned, unlocked views not yet rendered against
+    the current anchor. It shows "N positioned photos · ≈ AED a–b"
+    (`photoViewCostAed`) and renders two at a time.
+  - **Next step (not wired):** the spec feeds 03 Specification and the BoQ.
+  - **Checks:** `lib/render/__tests__/room-spec.test.ts`; live
+    `node --env-file=.env.local scripts/b4-anchor-check.mjs [port] --phase=look|lock|render|change|shots`.
 - **Cost guard**: every paid call a photo view makes (image model per image,
   each vision reading per token) is a `render_spend` row (model, size,
   cost_usd/aed; `lib/render/render-spend.ts`, prices from the Replicate model
