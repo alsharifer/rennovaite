@@ -6,9 +6,10 @@
 // 4/13), and nothing on the interior path checked placement. So the client's
 // references reach a restyle first as TEXT: a vision model reads them together
 // and writes one style brief — materials, colours, fixture finishes, lighting,
-// mood — never layout, never quantities (the moodboard descriptor rule). Images
-// are a gated option (PHOTO_VIEW_IMAGE_REFS), adopted only if the placement
-// check's pass rate holds with them.
+// mood — never layout, never quantities (the moodboard descriptor rule). The
+// first three reference images also go to the edit model, after the photo
+// (PHOTO_VIEW_IMAGE_REFS) — on, by Abdallah's ruling of 18 Oct, after B2 measured
+// style 4/5 with them vs 5/15 without, at a layout pass rate of 4/5 vs 13/15.
 //
 // References arrive as phone screenshots (Pinterest): `referenceCropBox` finds
 // the photo inside the app chrome, `cropReference` cuts it out.
@@ -22,8 +23,13 @@ import type { StyleBrief } from "./photo-restyle";
 
 export const REFERENCES_LINE = "Style follows your references";
 
-/** Image references only after the placement check holds with them (B2 measured; see docs/BATHROOM_PILOT_B2.md). */
-export const PHOTO_VIEW_IMAGE_REFS = false;
+/**
+ * The client's first three reference images go to the edit model after the
+ * photo. ON (ruled 18 Oct): the style gain (4/5 vs 5/15) is worth a possible
+ * one-in-five layout cost (4/5 vs 13/15) — the placement check still holds every
+ * render to the photo. See docs/BATHROOM_PILOT_B2.md.
+ */
+export const PHOTO_VIEW_IMAGE_REFS = true;
 
 export interface ReferenceStyle {
   text: string;

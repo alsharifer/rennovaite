@@ -952,10 +952,10 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
   reads the project's References (02 Design board images) into one style brief —
   style only, never layout — on `project_briefs.reference_style`
   (`lib/render/reference-style.ts`; screenshots are cropped to their photo by
-  `referenceCropBox` in the eval). Images as conditioning are gated:
-  `PHOTO_VIEW_IMAGE_REFS = false`. Measured (R5, one render per photo): style
-  4/5 vs 5/15 text-only, layout 4/5 vs 13/15 — a one-in-five drop, so off until
-  Abdallah rules (docs/BATHROOM_PILOT_B2.md).
+  `referenceCropBox` in the eval). The first three reference images also go to
+  the edit model after the photo: `PHOTO_VIEW_IMAGE_REFS = true` (ruled 18 Oct —
+  R5 measured style 4/5 vs 5/15 text-only at layout 4/5 vs 13/15; the style gain
+  is worth the possible one-in-five layout cost; docs/BATHROOM_PILOT_B2.md).
 - **Cost guard**: every paid call a photo view makes (image model per image,
   each vision reading per token) is a `render_spend` row (model, size,
   cost_usd/aed; `lib/render/render-spend.ts`, prices from the Replicate model

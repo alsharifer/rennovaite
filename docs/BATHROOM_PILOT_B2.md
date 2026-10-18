@@ -19,15 +19,15 @@ this file has the numbers. Screenshots: `screenshots/bathroom-pilot/b2/`
   photo): style 4 / 5, both checks 3 / 5 — against 4 / 15 without them — with a
   layout pass rate of 4 / 5 against 13 / 15. B2's rule was to adopt images only
   if the layout pass rate does not drop; it dropped by one render in five, which
-  is inside the run-to-run spread but is a drop, so **images stay OFF**
-  (`PHOTO_VIEW_IMAGE_REFS = false`) pending the call below.
+  is inside the run-to-run spread but is a drop — so it went to Abdallah, who
+  ruled (18 Oct) that the style gain is worth the possible one-in-five layout
+  cost: **images are ON** (`PHOTO_VIEW_IMAGE_REFS = true`). The placement check
+  still holds every render to the photo.
 - **The honest failure works**: a render told to move the vanity instead tiled
   over the door; the check named what actually changed — "The render removed
   the door — see what differs." — never a pass.
 
-**The call:** turn reference images on (`PHOTO_VIEW_IMAGE_REFS = true`,
-`lib/render/reference-style.ts`) for a large style gain at a possible small layout
-cost — or keep them off and accept text-only style.
+**Ruled (18 Oct):** reference images on — the five views in this report were rendered before the switch, with the text brief only; renders from now on carry the first three references after the photo.
 
 ## The model: `google/nano-banana` (edit), prompted per view
 
