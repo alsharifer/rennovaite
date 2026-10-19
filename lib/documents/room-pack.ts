@@ -114,7 +114,7 @@ function frame(input: RoomPackInput, title: string, n: number): string {
 
 const wrapSvg = (body: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="${PACK_W}mm" height="${PACK_H}mm" viewBox="0 0 ${PACK_W} ${PACK_H}">${body}</svg>`;
 
-const FIXTURE_NAME: Record<string, string> = { wc_point: "WC", bidet_point: "Bidet", basin_point: "Vanity", shower_mixer: "Shower", bath_point: "Bath" };
+const FIXTURE_NAME: Record<string, string> = { wc_point: "WC", bidet_point: "Bidet", basin_point: "Vanity", shower_mixer: "Shower", bath_point: "Bath", storage_cabinet: "Cabinet" };
 
 /** The room in a box, with fixtures, openings and the photo markers. */
 function roomPlanSvg(input: RoomPackInput, x: number, y: number, w: number, h: number): string {

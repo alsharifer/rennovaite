@@ -75,6 +75,16 @@ export async function lockPhotoView(db: SupabaseClient, input: { projectId: stri
 
   let anchor = await loadRoomAnchor(db, photo.room_id);
   let anchoredNow = false;
+  if (anchor && anchor.room_photo_id === photo.id && anchor.render_id !== r.id) {
+    // The anchor view locked on another version: the anchor follows it. A version
+    // the anchor held before takes back its own spec (no new reading).
+    const { data: cur } = await db.from("room_anchors").select("render_id, spec, history").eq("room_id", photo.room_id).maybeSingle<{ render_id: string; spec: unknown; history: { render_id: string; spec: unknown }[] | null }>();
+    const prior = (cur?.history ?? []).filter((h) => h.render_id === r.id).at(-1);
+    if (cur && prior) {
+      await db.from("room_anchors").update({ render_id: r.id, spec: prior.spec, history: [...(cur.history ?? []), { render_id: cur.render_id, spec: cur.spec, until: now, request: "locked another version" }], updated_at: now }).eq("room_id", photo.room_id);
+      anchor = await loadRoomAnchor(db, photo.room_id);
+    } else anchor = (await moveAnchor(db, { projectId: input.projectId, roomId: photo.room_id, render: { id: r.id, image_url: r.image_url, room_photo_id: photo.id }, actor: input.actor, request: "locked another version" })) ?? anchor;
+  }
   if (!anchor) {
     const spec = await readSpec(db, input.projectId, { id: r.id, image_url: r.image_url, room_photo_id: photo.id }, input.actor);
     // The insert races nothing that matters: a second concurrent first-lock loses on the primary key and keeps the first.

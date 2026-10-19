@@ -23,6 +23,7 @@ import { loadMiniPlans } from "./photo-views-load";
 import { PHOTO_VIEW_IMAGE_REFS, styleBriefFrom, type ReferenceStyle } from "./reference-style";
 import { IMAGE_PRICE_USD, recordSpend, USD_TO_AED } from "./render-spend";
 import { loadRoomAnchor } from "./photo-view-anchor";
+import { fittingNotes } from "./fitting-notes";
 import { followsLine, specElements } from "./room-spec";
 
 // b4-1: a view of an anchored room renders against the anchor (image + spec) and is checked beside it.
@@ -153,7 +154,9 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
   }
 
   const arm = photoViewArm();
-  const res: RestyleResult = await restyleWithCheck({ project_id: input.projectId, arm, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts(), anchor: anchorInput });
+  const wcInView = items.some((it) => it.kind === "wc" && before!.items.find((l) => l.ref === it.ref)?.present);
+  const notes = fittingNotes(cameraOf(photo), mini, wcInView);
+  const res: RestyleResult = await restyleWithCheck({ notes, project_id: input.projectId, arm, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts(), anchor: anchorInput });
   let stored: string | null = null;
   if (res.final) stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, res.final.bytes, res.final.bytes[0] === 0x89 ? "image/png" : "image/jpeg");
 

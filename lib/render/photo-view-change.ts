@@ -27,7 +27,8 @@ import { fetchSceneBytes, runRenderModel } from "@/lib/scene-render/pipeline";
 import { imageSize } from "@/lib/scene-render/gate";
 
 import { classifyChangeRequest, planOpeningsHref, STRUCTURAL_MESSAGE } from "./change-request";
-import { checkCostUsd, detectItems, judgePhotoPlacement } from "./photo-check";
+import { carryLocated, checkCostUsd, checkItemsFor, detectItems, judgePhotoPlacement } from "./photo-check";
+import { loadMiniPlans } from "./photo-views-load";
 import { moveAnchor } from "./photo-view-anchor";
 import { PhotoViewError, type PhotoViewChange, type PhotoViewGate } from "./photo-view-run";
 import { IMAGE_PRICE_USD, recordSpend, type SpendRow } from "./render-spend";
@@ -39,7 +40,7 @@ export const CHANGE_MODEL = "google/nano-banana";
 export function changePrompt(request: string): string {
   return [
     `Edit this photo of a renovated bathroom: ${request.trim()}.`,
-    "Change ONLY that. Keep everything else exactly as it is: the same camera, framing and crop, the same room, door, window and every fixture in the same place and size, and every finish the request does not mention. Photorealistic.",
+    "Change ONLY that. Keep everything else exactly as it is: the same camera, framing and crop, the same room, door, window and every fixture in the same place and size, and every finish the request does not mention. Do not add any window, door or opening — where something is removed, leave plain tiled wall. Photorealistic.",
   ].join(" ");
 }
 
@@ -93,16 +94,24 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   const reference = parentRead
     ? { bytes: parentBytes, items: parentRead }
     : { bytes: new Uint8Array(await (await fetch(photo.public_url)).arrayBuffer()), items: (photo.before_detection?.detection ?? { items: parent.gate.before }).items };
-  const before = { items: reference.items };
-  const read = await detectItems({ mediaType: mime(next), data: b64(next) }, parent.gate.items, "after", imageSize(next), { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: reference.items });
+  // The plan may have changed since the parent was rendered (a cabinet where the
+  // bidet was): the edit is checked against the plan's CURRENT items, the
+  // parent's reading carried over to them.
+  const { data: plan } = await db.from("plans").select("id, total_area_m2, source, plot_width_m").eq("project_id", input.projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; total_area_m2: number | null; source: string | null; plot_width_m: number | null }>();
+  const mini = plan ? (await loadMiniPlans(db, input.projectId, plan, [photo.room_id]))[photo.room_id] : undefined;
+  const items = mini ? checkItemsFor(mini) : parent.gate.items;
+  const carried = mini ? carryLocated(parent.gate.items, reference.items, items) : reference.items;
+  const before = { items: carried };
+  const read = await detectItems({ mediaType: mime(next), data: b64(next) }, items, "after", imageSize(next), { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: carried });
   const readUsd = checkCostUsd(read.usage);
   cost += readUsd;
   spend.push({ project_id: input.projectId, purpose: "photo_check", model: read.model, cost_usd: readUsd, detail: { step: "change_layout", usage: read.usage } });
-  const verdict = judgePhotoPlacement(parent.gate.items, before, read);
+  const verdict = judgePhotoPlacement(items, before, read);
   if (!verdict.passed) {
     const first = verdict.failures[0];
     const message = `That change ${first ? first.message.replace(/^the render /, "") : "moved the layout"} — it was not kept. Try asking for it differently.`;
-    const id = await record("unchanged", { unchanged: false, layout_failed: true, request, failures: verdict.failures, similarity: sim }, null);
+    // Kept for "see what differs": the candidate (the model URL, short-lived) and both readings.
+    const id = await record("unchanged", { unchanged: false, layout_failed: true, request, failures: verdict.failures, similarity: sim, candidate_url: url, items, before: carried, after: read.items }, null);
     return { kind: "moved", render_id: id, message };
   }
 
@@ -110,6 +119,13 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   const whatUsd = checkCostUsd(what.usage);
   cost += whatUsd;
   spend.push({ project_id: input.projectId, purpose: "photo_check", model: read.model, cost_usd: whatUsd, detail: { step: "change_describe", usage: what.usage } });
+  // R10a, read not measured: the image moved a little but the request did not
+  // happen ("No visible change; shattaf still present", live 19 Oct) — the
+  // honest unchanged answer, never a version.
+  if (what.request_done === "no") {
+    const id = await record("unchanged", { unchanged: true, request, similarity: sim, read_unchanged: true, summary: what.summary, candidate_url: url }, null);
+    return { kind: "unchanged", render_id: id, message: UNCHANGED_MESSAGE };
+  }
 
   const { count } = await db.from("renders").select("id", { count: "exact", head: true }).eq("room_photo_id", photo.id).eq("mode", "photo_view").eq("status", "succeeded");
   const version = (count ?? 0) + 1;
@@ -125,7 +141,9 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
     cost_usd: Math.round(cost * 10000) / 10000,
   };
   const stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, next, mime(next));
-  const gate: PhotoViewGate = { ...parent.gate, outcome: "passed", line: verdict.line, change, cost_usd: change.cost_usd };
+  // The version's own reading is what the next change is held to.
+  const attempts = parent.gate.attempts.length ? [...parent.gate.attempts.slice(0, -1), { ...parent.gate.attempts.at(-1)!, after: read.items }] : parent.gate.attempts;
+  const gate: PhotoViewGate = { ...parent.gate, items, attempts, outcome: "passed", line: verdict.line, change, cost_usd: change.cost_usd };
   const id = await record("succeeded", gate as unknown as Record<string, unknown>, stored);
 
   // The lock follows the version the user changed; on the anchor view, so does the anchor.

@@ -78,6 +78,49 @@ export interface WetRoomContext {
   heater: { id: string; where: string } | null;
   /** room spec: a bulkhead over the shower (kept by default; removal is an option). */
   bulkhead: boolean;
+  /** room spec: the value-engineered choices the room takes (rooms.spec.wet_room). */
+  choices: WetRoomChoices;
+  /** room spec: what is on site now, when it differs from the plan (the strip-out names it). */
+  existing_fixtures: string | null;
+}
+
+/**
+ * The spec choices a wet room can take (rooms.spec.wet_room) — each a different
+ * PRODUCT at its own allowance, never a cut rate. Absent = the base case.
+ */
+export interface WetRoomChoices {
+  /** "fixed_panel" = one fixed walk-in panel instead of the hinged enclosure. */
+  shower_screen: "enclosure" | "fixed_panel";
+  /** "manual" = a concealed manual mixer instead of the thermostatic set. */
+  shower_valve: "thermostatic" | "manual";
+  /** "ready_made" = a wall-hung unit with its own ceramic basin top. */
+  vanity: "floating_stone" | "ready_made";
+  /** "mid" = mid-range WC, basin mixer and LED mirror. */
+  fittings: "premium" | "mid";
+  /** "bagged" = waste carried out by hand instead of a skip. */
+  waste: "skip" | "bagged";
+  /** false = the niche without its LED strip. */
+  niche_led: boolean;
+}
+
+export const BASE_CHOICES: WetRoomChoices = { shower_screen: "enclosure", shower_valve: "thermostatic", vanity: "floating_stone", fittings: "premium", waste: "skip", niche_led: true };
+
+export function wetRoomChoicesOf(spec: unknown): WetRoomChoices {
+  const w = (spec && typeof spec === "object" ? (spec as Record<string, unknown>).wet_room : null) as Record<string, unknown> | null | undefined;
+  if (!w || typeof w !== "object") return { ...BASE_CHOICES };
+  return {
+    shower_screen: w.shower_screen === "fixed_panel" ? "fixed_panel" : "enclosure",
+    shower_valve: w.shower_valve === "manual" ? "manual" : "thermostatic",
+    vanity: w.vanity === "ready_made" ? "ready_made" : "floating_stone",
+    fittings: w.fittings === "mid" ? "mid" : "premium",
+    waste: w.waste === "bagged" ? "bagged" : "skip",
+    niche_led: w.niche_led !== false,
+  };
+}
+
+function existingFixturesOf(spec: unknown): string | null {
+  const w = spec && typeof spec === "object" ? ((spec as Record<string, unknown>).wet_room as Record<string, unknown> | undefined) : undefined;
+  return w && typeof w.existing_fixtures === "string" && w.existing_fixtures.trim() ? w.existing_fixtures.trim() : null;
 }
 
 // --- the room, measured -------------------------------------------------------------------
@@ -153,6 +196,8 @@ export function wetRoomContextFrom(graph: PlanGraph, roomId: string, fixtures: r
     fixtures: fx,
     heater: h ? { id: h.id, where: `${wallWord(toM(h.position), room.polygon)}${typeof h.spec?.note === "string" ? ` — ${h.spec.note}` : ""}` } : null,
     bulkhead: room.spec?.bulkhead != null && room.spec.bulkhead !== false,
+    choices: wetRoomChoicesOf(room.spec),
+    existing_fixtures: existingFixturesOf(room.spec),
   };
 }
 
@@ -210,6 +255,7 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
     description, quantity, unit, rate_aed: 0, total_aed: 0, vendor_or_source: "TBC — QS to price", notes: why, rule_id, item_key, kind: "allowance", rate_band: "allowance", wastage_pct: 0, rate_status: "needs_qs", rate_tier: "unpriced",
   });
 
+  const ch = ctx.choices;
   const shower = count(ctx, "shower_mixer")[0] ?? null;
   const glassSides = shower ? shower.free.filter((s) => s > 0.3) : [];
   const showerWalls = shower ? shower.onWall.filter((s) => s > 0.3) : [];
@@ -220,12 +266,16 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
   remove("Preliminaries", (l) => ["Q-32", "Q-33", "Q-36", "Q-37"].includes(ruleOf(l)));
   add("Preliminaries", W("W-01", "Preliminaries", "prelim.room_protection", "Protection of the access route + dust screens, daily clean — one room", 1, "project", "single-room package (R-49)", { element_refs: room }));
   add("Preliminaries", tbc("W-02", "prelim.room_noc", "Building management / community NOC for internal works", 1, "project", "B5 — a like-for-like bathroom refit with no structural or MEP relocation needs the community's NOC, not a DM permit; the fee varies by community. TBC — QS to price (R-50 has no figure)."));
+  if (ch.waste === "bagged") {
+    remove("Preliminaries", (l) => ruleOf(l) === "Q-34");
+    add("Preliminaries", W("W-30", "Preliminaries", "prelim.waste_bagged", "Strip-out waste bagged and carried out by hand, carted away — one room (no skip)", 1, "project", "one room's strip-out (R-73) — check the community allows it", { element_refs: room }));
+  }
   add("Preliminaries", W("W-03", "Preliminaries", "prelim.room_clean", "Final clean — the room and its access route", 1, "project", "single-room package (R-51)", { element_refs: room }));
 
   // --- Demolition & strip-out (the element take-off measures none of it).
   add("Demolition", W("W-04", "Demolition", "demo.wall_tile_removal", "Strip existing wall tiles to the tiled height, cart away", ctx.wall_tile_m2, "m2", `= the wall tiling measured (${ctx.wall_tile_m2} m²) — existing tiling assumed to the same height; confirm on site`, { element_refs: room }));
   add("Demolition", W("W-05", "Demolition", "demo.floor_removal", "Strip existing floor tiles and bed", ctx.floor_m2, "m2", `floor area ${ctx.floor_m2} m²`, { element_refs: room }));
-  add("Demolition", W("W-06", "Demolition", "demo.soft_strip", `Strip out sanitaryware (${fixtureList || "fixtures"}), vanity top, mirror and accessories; isolate and cap services`, ctx.floor_m2, "m2", `soft strip by floor area ${ctx.floor_m2} m² (R-01)`, { element_refs: [...room, ...ctx.fixtures.map((f) => f.id)] }));
+  add("Demolition", W("W-06", "Demolition", "demo.soft_strip", `Strip out the existing sanitaryware (${ctx.existing_fixtures ?? (fixtureList || "fixtures")}), vanity top, mirror and accessories; isolate and cap services`, ctx.floor_m2, "m2", `soft strip by floor area ${ctx.floor_m2} m² (R-01)`, { element_refs: [...room, ...ctx.fixtures.map((f) => f.id)] }));
   if (glassSides.length) add("Demolition", W("W-07", "Demolition", "demo.shower_screen", "Take down the existing shower screen and its fixings", 1, "no", "one screen, replaced (R-52)", { element_refs: [shower!.id] }));
   add("Demolition", W("W-08", "Demolition", "demo.ceiling_strip", "Strip the damaged ceiling finish back to sound plaster", ctx.floor_m2, "m2", `ceiling = floor area ${ctx.floor_m2} m² (R-53)`, { element_refs: room, rate_status: "site_assessment" }));
 
@@ -242,19 +292,34 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
   add("Floor Finishes", { ...W("W-12", "Floor Finishes", "floor.skirting", "Skirting — none: the walls are tiled from the floor", 0, "lm", `walls tiled to ${ctx.tiled_m >= ctx.ceiling_m - 1e-9 ? "full height" : `${ctx.tiled_m.toFixed(2)} m`} — no skirting (R-10; F-04 takes no wet room)`), stated_zero: true });
 
   // --- Wall finishes: the lit niche.
-  if (shower) add("Wall Finishes", W("W-13", "Wall Finishes", "wall.shower_niche", "Recessed shower niche with LED strip — formed, waterproofed, tiled", 1, "no", "one niche (R-56)", { element_refs: [shower.id] }));
+  if (shower)
+    add("Wall Finishes", ch.niche_led
+      ? W("W-13", "Wall Finishes", "wall.shower_niche", "Recessed shower niche with LED strip — formed, waterproofed, tiled", 1, "no", "one niche (R-56)", { element_refs: [shower.id] })
+      : W("W-13", "Wall Finishes", "wall.shower_niche_plain", "Recessed shower niche — formed, waterproofed, tiled (no LED strip)", 1, "no", "one niche (R-74)", { element_refs: [shower.id] }));
 
   // --- Ceilings: the existing ceiling is repaired, not replaced.
   add("Ceilings", W("W-14", "Ceilings", "ceiling.repair", `Ceiling repair — fungicidal wash, stain-block, skim${ctx.bulkhead ? "; the curved bulkhead over the shower made good with it" : ""}. Allowance until the cause of the water damage is known`, ctx.floor_m2, "m2", `ceiling = floor area ${ctx.floor_m2} m² (R-54) — is the leak fixed?`, { element_refs: room, rate_status: "site_assessment", confirm_on_site: "Ceiling repair is an allowance until the cause of the water damage is known — is the leak fixed?" }));
 
   // --- Sanitaryware: floor-standing WC base case; bidet; basin + mixer; shower set.
   remove("Sanitaryware", (l) => ["Q-22", "Q-24d"].includes(ruleOf(l)));
-  if (wcs.length) add("Sanitaryware", W("W-15", "Sanitaryware", "san.wc_floor", "Floor-standing close-coupled rimless WC — supply and install (existing position)", wcs.length, "no", `WC on the plan × ${wcs.length}`, { element_refs: wcs.map((f) => f.id) }));
+  if (wcs.length)
+    add("Sanitaryware", ch.fittings === "mid"
+      ? W("W-15", "Sanitaryware", "san.wc_floor_mid", "Floor-standing close-coupled WC, mid-range — supply and install (existing position)", wcs.length, "no", `WC on the plan × ${wcs.length} (R-71)`, { element_refs: wcs.map((f) => f.id) })
+      : W("W-15", "Sanitaryware", "san.wc_floor", "Floor-standing close-coupled rimless WC — supply and install (existing position)", wcs.length, "no", `WC on the plan × ${wcs.length}`, { element_refs: wcs.map((f) => f.id) }));
   if (bidets.length) add("Sanitaryware", W("W-16", "Sanitaryware", "san.bidet", "Floor-standing bidet with mixer — supply and install (existing position)", bidets.length, "no", `bidet on the plan × ${bidets.length}`, { element_refs: bidets.map((f) => f.id) }));
   if (baths.length) add("Sanitaryware", W("W-17", "Sanitaryware", "san.bath", "Bath — supply and install", baths.length, "no", `bath on the plan × ${baths.length}`, { element_refs: baths.map((f) => f.id) }));
   edit("Sanitaryware", (l) => ruleOf(l) === "Q-23", () => ({ description: "Basin with mixer, brushed brass — supply and install (existing position)", element_refs: basins.map((f) => f.id) }));
   edit("Sanitaryware", (l) => ruleOf(l) === "Q-24", () => ({ description: "Thermostatic shower — concealed valve, rain head + hand shower, brushed brass (existing position)", ...(shower ? { element_refs: [shower.id] } : {}) }));
   if (!shower) remove("Sanitaryware", (l) => ruleOf(l) === "Q-24");
+  // A ready-made vanity brings its own basin: the line is the mixer alone.
+  if (basins.length && (ch.vanity === "ready_made" || ch.fittings === "mid")) {
+    remove("Sanitaryware", (l) => ruleOf(l) === "Q-23");
+    add("Sanitaryware", W("W-29", "Sanitaryware", "san.basin_mixer_mid", `Basin mixer, brushed brass, mid-range — supply and install (${ch.vanity === "ready_made" ? "on the vanity's own basin" : "existing basin position"})`, basins.length, "no", ch.vanity === "ready_made" ? "R-70 — the basin is part of the ready-made vanity" : "R-70", { element_refs: basins.map((f) => f.id) }));
+  }
+  if (shower && ch.shower_valve === "manual") {
+    remove("Sanitaryware", (l) => ruleOf(l) === "Q-24");
+    add("Sanitaryware", W("W-27", "Sanitaryware", "san.shower_manual", "Concealed manual shower mixer with diverter, rain head + hand shower, brushed brass (existing position)", 1, "no", "one shower (R-68)", { element_refs: [shower.id] }));
+  }
   if (!basins.length) remove("Sanitaryware", (l) => ruleOf(l) === "Q-23");
 
   // --- Joinery: a floating vanity with a stone top and an open shelf; the door stays.
@@ -262,14 +327,25 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
   const vanity = basins[0];
   edit("Joinery", (l) => l.rule_id === "GT/joinery/vanity", () => ({ description: `Floating vanity, oak-tone, open towel shelf — supply and install${vanity?.width_m ? ` (${Math.round(vanity.width_m * 1000)} mm run, plan)` : ""}`, ...(vanity ? { element_refs: [vanity.id] } : {}) }));
   edit("Joinery", (l) => ruleOf(l) === "S6-05", () => ({ description: "Stone vanity top with undermount cut-out — allowance, requires site measurement" }));
-  if (!basins.length) remove("Joinery", (l) => l.rule_id === "GT/joinery/vanity" || ruleOf(l) === "S6-05");
+  if (!basins.length || ch.vanity === "ready_made") remove("Joinery", (l) => l.rule_id === "GT/joinery/vanity" || ruleOf(l) === "S6-05");
+  if (basins.length && ch.vanity === "ready_made") add("Joinery", W("W-28", "Joinery" as PomiSection, "joinery.vanity_ready", `Ready-made wall-hung vanity unit, two drawers, integrated ceramic basin top — supply and install${vanity?.width_m ? ` (≈ ${Math.round(vanity.width_m * 1000)} mm, plan)` : ""}`, basins.length, "no", "R-69 — a catalogue unit, not made to measure", { element_refs: basins.map((f) => f.id) }));
+  const cabinets = count(ctx, "storage_cabinet");
+  if (cabinets.length) add("Joinery", W("W-25", "Joinery" as PomiSection, "joinery.storage_cabinet", "White storage cabinet, floor-standing, moisture-resistant — supply and install (beside the WC)", cabinets.length, "no", `cabinet on the plan × ${cabinets.length} (R-66)`, { element_refs: cabinets.map((f) => f.id) }));
 
   // --- Glass + mirror: no whole-home aluminium; the shower's own glass; a backlit mirror.
   remove("Aluminum & Glass", (l) => (l.rule_id ?? "").startsWith("GT/aluminum/") || ruleOf(l) === "S6-07");
-  if (glassSides.length) {
+  if (glassSides.length && ch.shower_screen === "fixed_panel") {
+    // One fixed walk-in panel on the longest open side; the other side stays open as the entry.
+    const side = Math.max(...glassSides);
+    remove("Aluminum & Glass", (l) => ruleOf(l) === "S6-06");
+    add("Aluminum & Glass", W("W-26", "Aluminum & Glass" as PomiSection, "alum.shower_panel_fixed", `Fixed walk-in glass panel, clear, brushed-brass profile and stay bar (${side.toFixed(2)} m side; the other side open as the entry)`, 1, "no", "one panel (R-67)", { element_refs: [shower!.id] }));
+  } else if (glassSides.length) {
     edit("Aluminum & Glass", (l) => ruleOf(l) === "S6-06", (l) => ({ description: `Frameless clear glass enclosure — ${glassSides.length === 1 ? "one panel with door" : `${glassSides.length} panels incl. hinged door`}, brushed-brass fittings (${glassSides.map((s) => s.toFixed(2)).join(" + ")} m)`, quantity: glassSides.length, total_aed: lineTotal(glassSides.length, l.rate_aed), notes: `${String(l.notes ?? "")}; sides of the shower's footprint open to the room, from the plan`.replace(/^; /, ""), element_refs: [shower!.id] }));
   } else remove("Aluminum & Glass", (l) => ruleOf(l) === "S6-06");
-  if (basins.length) add("Aluminum & Glass", W("W-18", "Aluminum & Glass" as PomiSection, "alum.mirror_backlit", "Backlit LED mirror, round or pill, demister — supply and install", 1, "no", "one mirror over the vanity (R-59)", { element_refs: basins.map((f) => f.id) }));
+  if (basins.length)
+    add("Aluminum & Glass", ch.fittings === "mid"
+      ? W("W-18", "Aluminum & Glass" as PomiSection, "alum.mirror_led_mid", "LED-lit mirror, mid-range — supply and install", 1, "no", "one mirror over the vanity (R-72)", { element_refs: basins.map((f) => f.id) })
+      : W("W-18", "Aluminum & Glass" as PomiSection, "alum.mirror_backlit", "Backlit LED mirror, round or pill, demister — supply and install", 1, "no", "one mirror over the vanity (R-59)", { element_refs: basins.map((f) => f.id) }));
 
   // --- The skim line on tiled walls is substrate preparation, not a paint finish; the
   // calibrated accessories carry the design's finish (their rate is the reference's).

@@ -166,7 +166,7 @@ function fixtureGeoms(input: RoomSheetsInput, walls: readonly RoomWall[]): Fixtu
       if (!fp) {
         const w = wallOf(walls, centre) ?? walls.slice().sort((x, y) => along(x, centre).off - along(y, centre).off)[0]!;
         const s = along(w, centre).s;
-        const wid = typeof f.spec?.width_mm === "number" ? (f.spec.width_mm as number) / 1000 : 0.8;
+        const wid = typeof f.spec?.width_mm === "number" ? (f.spec.width_mm as number) / 1000 : f.type === "shattaf_point" ? 0.1 : 0.8;
         onWalls.push({ w, s0: s - wid / 2, s1: s + wid / 2 });
       }
       return { f, corners, centre, onWalls, free };
@@ -199,8 +199,8 @@ function dim(p0: V, p1: V, off: V, valueMm: number, src: string, o: { approx?: b
   return s;
 }
 
-const CODE: Record<string, string> = { wc_point: "WC", bidet_point: "BD", basin_point: "VAN", shower_mixer: "SH", bath_point: "BT", water_heater: "WH" };
-const NAME: Record<string, string> = { wc_point: "Floor-standing WC", bidet_point: "Bidet", basin_point: "Vanity + basin", shower_mixer: "Shower", bath_point: "Bath", water_heater: "Water heater (existing)" };
+const CODE: Record<string, string> = { wc_point: "WC", bidet_point: "BD", basin_point: "VAN", shower_mixer: "SH", bath_point: "BT", water_heater: "WH", storage_cabinet: "CB", shattaf_point: "SF" };
+const NAME: Record<string, string> = { wc_point: "Floor-standing WC", bidet_point: "Bidet", basin_point: "Vanity + basin", shower_mixer: "Shower", bath_point: "Bath", water_heater: "Water heater (existing)", storage_cabinet: "Storage cabinet (white)", shattaf_point: "Shattaf (health faucet)" };
 
 function openingsOf(graph: PlanGraph, roomId: string): Opening[] {
   return graph.openings.filter((o) => o.position && (o.room_id === roomId || graph.walls.find((w) => w.id === o.wall_id)?.room_ids.includes(roomId)));
@@ -241,7 +241,8 @@ export function renderRoomPlan(input: RoomSheetsInput): RoomSheet {
         body += L(pa[0], pa[1], pb[0], pb[1], { stroke: INK_900, w: 0.6 }) + `<g data-glass="true"></g>`;
       }
     }
-    const c = P(g.centre);
+    // A point fixture on a wall (a shattaf, a heater): its code sits inside the room, off the wall band.
+    const c = P(!g.corners.length && g.onWalls[0] ? add(g.centre, mul(g.onWalls[0].w.inward, 0.14)) : g.centre);
     body += T(c[0], c[1] + 0.9, CODE[g.f.type] ?? g.f.type, { anchor: "middle", size: 2.8, fill: INK_900, weight: 600 });
   }
   for (const d of input.fixtures.filter((f) => f.type === "floor_drain")) {
@@ -346,7 +347,7 @@ export function mirrorIsRound(spec: string | null | undefined): boolean {
   return !!spec && /\b(round|circular|circle|oval|pill)\b/i.test(spec) && !/\b(rectangular|rectangle|square)\b/i.test(spec);
 }
 
-const SIDE_NAME: Record<string, string> = { wc_point: "WC", bidet_point: "Bidet", basin_point: "Vanity", bath_point: "Bath" };
+const SIDE_NAME: Record<string, string> = { wc_point: "WC", bidet_point: "Bidet", basin_point: "Vanity", bath_point: "Bath", storage_cabinet: "Cabinet" };
 
 /** The wall a fixture's back is against: the side whose span is its width along the wall. */
 function backWallOf(g: FixtureGeom): FixtureGeom["onWalls"][number] | undefined {
@@ -374,6 +375,8 @@ export const FIXTURE_HEIGHTS_MM = {
   niche_bottom: 1100,
   niche_top: 1400,
   heater_bottom: 2100,
+  cabinet_top: 850,
+  shattaf: 600,
 } as const;
 
 /** The setting-out along a wall: joints from the left end, with equal cuts at both ends. */
@@ -443,7 +446,7 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
       // A fixture is drawn face-on only on the wall its back is against; on a
       // wall it merely touches by its side it is a profile (no mirror, no shaver).
       if (g.f.type !== "shower_mixer" && backWallOf(g) !== on) {
-        const top = g.f.type === "wc_point" ? FH.wc_cistern_top : g.f.type === "bidet_point" ? FH.bidet : g.f.type === "basin_point" ? FH.vanity_top : g.f.type === "bath_point" ? 550 : null;
+        const top = g.f.type === "wc_point" ? FH.wc_cistern_top : g.f.type === "bidet_point" ? FH.bidet : g.f.type === "basin_point" ? FH.vanity_top : g.f.type === "bath_point" ? 550 : g.f.type === "storage_cabinet" ? FH.cabinet_top : null;
         const bottom = g.f.type === "basin_point" ? FH.vanity_underside : 0;
         if (top !== null) body += box(s0, s1, bottom, top, `${(SIDE_NAME[g.f.type] ?? g.f.type).toUpperCase()} (SIDE)`, `standard:${g.f.type}_side`, `${g.f.id}:side`);
         continue;
@@ -490,6 +493,14 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
             const nc = sc + (isCol ? 0.35 : 0), nw = 0.3;
             body += `<rect x="${n2(X(nc - nw))}" y="${n2(Y(FH.niche_top / 1000))}" width="${n2(nw * 2 * S)}" height="${n2(((FH.niche_top - FH.niche_bottom) / 1000) * S)}" fill="none" stroke="${INK_700}" stroke-width="0.3" stroke-dasharray="0.8 0.6" data-fixture="${esc(g.f.id)}:niche"/>` + T(X(nc), Y(FH.niche_top / 1000) - 1.2, `NICHE ≈ ${FH.niche_bottom}–${FH.niche_top}`, { anchor: "middle", size: 2.2, attrs: `data-mm="${FH.niche_bottom}" data-src="standard:niche_bottom" data-approx="true"` });
           }
+          break;
+        }
+        case "storage_cabinet":
+          body += box(s0, s1, 0, FH.cabinet_top, "STORAGE CABINET", "standard:cabinet_top", g.f.id);
+          break;
+        case "shattaf_point": {
+          const z = FH.shattaf / 1000;
+          body += `<circle cx="${n2(X(sc))}" cy="${n2(Y(z))}" r="1.3" fill="none" stroke="${INK_900}" stroke-width="0.3" data-fixture="${esc(g.f.id)}"/>` + T(X(sc), Y(z) - 2.4, `SHATTAF ≈ ${FH.shattaf}`, { size: 2.2, anchor: "middle", attrs: `data-mm="${FH.shattaf}" data-src="standard:shattaf" data-approx="true"` });
           break;
         }
         case "water_heater": {

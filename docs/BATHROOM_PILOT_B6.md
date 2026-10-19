@@ -88,6 +88,71 @@ setting-out, sill / head, fixture walls, side profiles, mirror shape.
    Openings editor has no control for it yet. Without one the sheet says "hinge
    not stated" and draws no swing.
 
+## Client comments (19 Oct)
+
+Three comments, applied to the dev test bathroom with
+`scripts/b6-client-comments.ts` through the app's own routes (idempotent):
+
+1. **A white storage cabinet instead of the bidet.** The bidet leaves the plan,
+   and a `storage_cabinet` fixture takes its place. It is a footprint on the
+   wet-room layer with no services, so the overlay feed gives it no point line.
+   Its `spec.replaces = "bidet_point"`. The wet-room package prices it as
+   joinery: W-25 / R-66, AED 750 allowance. The strip-out still names the bidet
+   because it is still on site (`rooms.spec.wet_room.existing_fixtures`).
+2. **The shattaf on the right of the WC.** We read "right" as the user's right
+   hand when seated, which you confirmed. The WC faces east, so the shattaf goes
+   on its south side, between the WC and the cabinet, 1,620 mm from the north
+   wall.
+   - It is a `shattaf_point` fixture: a supply point at AED 350, QS to confirm.
+   - It appears as SF on R-101 and on the west elevation at ≈ 600 mm.
+3. **A price closer to 35–40K.** You picked three groups of spec changes, set in
+   `rooms.spec.wet_room` (`WetRoomChoices`, `lib/boq/wet-room.ts`):
+   - fixed walk-in glass panel (R-67) + manual concealed mixer (R-68);
+   - ready-made vanity with integrated basin (R-69) + mid-range basin mixer
+     (R-70), WC (R-71) and LED mirror (R-72);
+   - bagged waste (R-73) + a niche without LED (R-74).
+
+   Each is a different PRODUCT at its own allowance; no existing rate is cut. No
+   choices set = the base case, byte for byte (tested).
+
+**The price: AED 49,267.88 → 38,778.38** (subtotal 34,196.10 + contingency
+2,735.69 + VAT 1,846.59).
+
+### Renders: what the check caught
+
+The renders now know about a swap.
+- A fixture that replaces another becomes a check item read as the old item in
+  the photo and the new one in the render. It is held to the old item's
+  footprint (centre x, bottom edge), not its size.
+- The replaced item is its own "gone" item, so a render that keeps the bidet
+  FAILS.
+- The restyle prompt says "Replace the bidet (…) with a white floor-standing
+  storage cabinet standing in the same spot; no bidet anywhere".
+- `lib/render/fitting-notes.ts` tells each view where the shattaf is relative to
+  the WC in that frame, and to remove the hand spray by the door.
+- "Ask for a change" is now checked against the plan's CURRENT items, with the
+  parent's reading carried over (`carryLocated`).
+
+Live, on the anchor (Photo 2), there were 10 nano-banana edits at about
+US$0.07 each, US$0.78 that day:
+
+| request | result |
+|---|---|
+| all five changes at once | refused: shower glass removed |
+| cabinet, before the "gone" item existed | **kept, wrong**: bidet kept, cabinet beside the door. The anchor was re-locked to v4 (re-locking now moves the anchor back) |
+| cabinet, worded "remove the bidet … put a cabinet where it stood" | **v6** ✓ |
+| shattaf removal (×3) | refused twice: invented window; one no-op kept as v7 |
+| fixed glass panel | 422 (the word "door") → reworded → refused: invented window |
+| ceramic vanity top | refused once (window) → **v8** ✓ |
+
+Every change prompt now says "Do not add any window, door or opening".
+A change whose reading says the request did not happen (`request_done: "no"`)
+is the honest "unchanged" answer, never a version: v7 was that no-op.
+
+The anchor is now **v8**: cabinet ✓, ceramic vanity top ✓, but the shattaf is
+still by the door and the glass is still the hinged screen. The other four views
+are not re-rendered yet.
+
 ## Part 2 — the client project (not started)
 
 The brief's second half: create the client's project from the room sheet,

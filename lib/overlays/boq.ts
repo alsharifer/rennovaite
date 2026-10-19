@@ -83,7 +83,7 @@ export function buildOverlaySections(fixtures: FixtureLike[]): OverlayBoqSection
   // Electrical & Lighting — which reads as two points to anyone counting.
   const gardenOwned = new Set<string>(GARDEN_TYPES);
   for (const f of fixtures) {
-    if (gardenOwned.has(f.type)) continue;
+    if (gardenOwned.has(f.type) || FIXTURE_META[f.type]?.pointLine === false) continue;
     const arr = idsByType.get(f.type) ?? [];
     arr.push(f.id);
     idsByType.set(f.type, arr);

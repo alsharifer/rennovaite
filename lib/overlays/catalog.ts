@@ -21,6 +21,8 @@ export interface FixtureMeta {
   boqDescription: string;
   /** Default supply+install AED per point; null → needs_qs. */
   unitRateAed: number | null;
+  /** false = no point line in the overlay BoQ feed (a footprint with no services). */
+  pointLine?: false;
 }
 
 export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
@@ -53,6 +55,11 @@ export const FIXTURE_META: Record<FixtureType, FixtureMeta> = {
   // wash-basin point (650); a bath is a mixer supply + a waste like the shower
   // mixer point (750). Default point rates, QS to confirm (they were B1's TBC lines).
   bidet_point: { label: "Bidet point", code: "BD", glyph: "wash", boqDescription: "Bidet supply + waste — first & second fix", unitRateAed: 650 },
+  // Client comments (19 Oct): the shattaf moves beside the WC — a new supply point
+  // there, priced like the other point reconnections (QS to confirm).
+  shattaf_point: { label: "Shattaf point", code: "SF", glyph: "water_drop", boqDescription: "Shattaf (health faucet) supply point beside the WC — first & second fix", unitRateAed: 350 },
+  // No services: the wet-room package prices the cabinet as joinery.
+  storage_cabinet: { label: "Storage cabinet", code: "CB", glyph: "shelves", boqDescription: "Storage cabinet", unitRateAed: null, pointLine: false },
   bath_point: { label: "Bath point", code: "BT", glyph: "bathtub", boqDescription: "Bath supply + waste — first & second fix", unitRateAed: 750 },
   // G1. Same reasoning as garden_light — priced with the landscape rate book.
   drainage_point: { label: "Drainage point", code: "DR", glyph: "water", boqDescription: "External surface drainage point — gully + connection", unitRateAed: null },

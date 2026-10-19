@@ -122,6 +122,7 @@ describe("B1 — fixtures with a footprint, snapped to their wall (§3)", () => 
       basin_point: { width_mm: 900, depth_mm: 600 },
       shower_mixer: { width_mm: 900, depth_mm: 900 },
       bath_point: { width_mm: 1700, depth_mm: 750 },
+      storage_cabinet: { width_mm: 400, depth_mm: 450 },
     });
     expect(footprintOf("floor_drain", null)).toBeNull();
     expect(footprintOf("bath_point", null)).toMatchObject({ width_mm: 1700, depth_mm: 750, footprint: "default" });

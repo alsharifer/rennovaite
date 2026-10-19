@@ -42,11 +42,23 @@ export interface CheckItem {
   ref: string;
   /** The plan row it stands for (opening or fixture id). */
   plan_id: string;
-  kind: "door" | "window" | "wc" | "bidet" | "vanity" | "shower" | "bath";
+  kind: "door" | "window" | "wc" | "bidet" | "vanity" | "shower" | "bath" | "cabinet";
   /** What the reader of a failure calls it: "WC", "vanity", "shower glass". */
   short: string;
   /** What the vision model is asked to find. */
   description: string;
+  /**
+   * A fixture that REPLACES another in the same spot (spec.replaces — a cabinet
+   * where the bidet was): the before photo is read for what stands there today,
+   * the render for the new item; same place, any size.
+   */
+  replaces?: { short: string; description: string };
+  /**
+   * The item a replacement removes (the bidet the cabinet replaces): read in
+   * both images, and the render FAILS if it is still there. Never a fixture to
+   * keep, never "added".
+   */
+  gone?: true;
 }
 
 const FIXTURE_KIND: Record<string, Pick<CheckItem, "kind" | "short" | "description">> = {
@@ -55,6 +67,7 @@ const FIXTURE_KIND: Record<string, Pick<CheckItem, "kind" | "short" | "descripti
   basin_point: { kind: "vanity", short: "vanity", description: "the vanity / basin counter with its washbasin (the counter, not the mirror above it)" },
   shower_mixer: { kind: "shower", short: "shower glass", description: "the shower enclosure — its glass screen or panels (clear or frosted, framed or frameless) and the tray / floor area inside them" },
   bath_point: { kind: "bath", short: "bath", description: "the bath tub" },
+  storage_cabinet: { kind: "cabinet", short: "storage cabinet", description: "a white floor-standing storage cabinet" },
 };
 
 export interface PlanLite {
@@ -72,9 +85,33 @@ export function checkItemsFor(plan: PlanLite): CheckItem[] {
   }
   for (const fx of plan.fixtures) {
     const k = FIXTURE_KIND[fx.type];
-    if (k) out.push({ ref: `F${++f}`, plan_id: fx.id, ...k });
+    const was = typeof fx.spec?.replaces === "string" ? FIXTURE_KIND[fx.spec.replaces] : undefined;
+    if (k) out.push({ ref: `F${++f}`, plan_id: fx.id, ...k, ...(was ? { replaces: { short: was.short, description: was.description } } : {}) });
+  }
+  // What each replacement removes, so a render that keeps it fails.
+  let x = 0;
+  for (const it of [...out]) {
+    if (!it.replaces) continue;
+    const was = Object.values(FIXTURE_KIND).find((k) => k.short === it.replaces!.short)!;
+    out.push({ ref: `X${++x}`, plan_id: `${it.plan_id}:replaced`, ...was, gone: true });
   }
   return out;
+}
+
+/**
+ * Carry a reading made with one item list over to the plan's current list: an
+ * item on the same plan row keeps its box under its new ref; a replacement
+ * (a cabinet where the bidet was) takes the box of what it replaces. Items with
+ * nothing to carry are absent. Pure.
+ */
+export function carryLocated(prevItems: readonly CheckItem[], prevLocated: readonly Located[], nextItems: readonly CheckItem[]): Located[] {
+  const at = (it: CheckItem | undefined) => (it ? prevLocated.find((l) => l.ref === it.ref) : undefined);
+  return nextItems.map((it) => {
+    const same = at(prevItems.find((p) => p.plan_id === it.plan_id));
+    const was = it.replaces && !same ? at(prevItems.find((p) => p.short === it.replaces!.short && !p.gone)) : it.gone && !same ? at(prevItems.find((p) => p.short === it.short && !p.gone)) : undefined;
+    const l = same ?? was;
+    return l ? { ...l, ref: it.ref } : { ref: it.ref, present: false, box: null, instances: 0 };
+  });
 }
 
 /** The phone's horizontal field of view, portrait, ultrawide-ish (the sheet: "~24 mm-equivalent ultrawide feel"). */
@@ -128,7 +165,7 @@ const centre = (b: Box): [number, number] => [(b[0] + b[2]) / 2, (b[1] + b[3]) /
 export interface PlacementFailure {
   ref: string;
   short: string;
-  reason: "removed" | "moved" | "resized" | "duplicated" | "added" | "swapped";
+  reason: "removed" | "moved" | "resized" | "duplicated" | "added" | "swapped" | "kept";
   message: string;
 }
 
@@ -162,14 +199,22 @@ export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<De
   const B = new Map(before.items.map((x) => [x.ref, x]));
   const A = new Map(after.items.map((x) => [x.ref, x]));
   const failures: PlacementFailure[] = [];
-  const checked: CheckItem[] = items.filter((it) => B.get(it.ref)?.present && B.get(it.ref)?.box);
+  const checked: CheckItem[] = items.filter((it) => !it.gone && B.get(it.ref)?.present && B.get(it.ref)?.box);
+  // A replaced item still in the render: the swap did not happen.
+  for (const it of items) {
+    if (!it.gone) continue;
+    const a = A.get(it.ref);
+    if (a?.present && a.box && (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) >= 2) failures.push({ ref: it.ref, short: it.short, reason: "kept", message: `the render kept the ${it.short} — it is being replaced` });
+  }
   for (const it of checked) {
     const b = B.get(it.ref)!, a = A.get(it.ref);
     if (!a || !a.present || !a.box) {
       failures.push({ ref: it.ref, short: it.short, reason: "removed", message: `the render removed the ${it.short}` });
       continue;
     }
-    const [bx, by] = centre(b.box!), [ax, ay] = centre(a.box);
+    // A replacement stands where the old item stood: its FOOTPRINT (centre x,
+    // bottom edge) is held, not its box centre — a cabinet is taller than a bidet.
+    const [bx, by] = it.replaces ? [centre(b.box!)[0], b.box![3]] : centre(b.box!), [ax, ay] = it.replaces ? [centre(a.box)[0], a.box[3]] : centre(a.box);
     const tolX = Math.max(12, 0.6 * (b.box![2] - b.box![0]));
     const tolY = Math.max(12, 0.6 * (b.box![3] - b.box![1]));
     if (Math.abs(ax - bx) > tolX || Math.abs(ay - by) > tolY) {
@@ -177,6 +222,11 @@ export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<De
       continue;
     }
     const area = (x: Box) => Math.max(0, x[2] - x[0]) * Math.max(0, x[3] - x[1]);
+    // A replacement is a different object in the same spot: its size is its own.
+    if (it.replaces) {
+      if (a.instances > 1) failures.push({ ref: it.ref, short: it.short, reason: "duplicated", message: `the render added a second ${it.short}` });
+      continue;
+    }
     const ratio = area(b.box!) > 0 ? area(a.box) / area(b.box!) : 1;
     if (ratio < 1 - SIZE_TOLERANCE || ratio > 1 + SIZE_TOLERANCE) {
       failures.push({ ref: it.ref, short: it.short, reason: "resized", message: `the render ${ratio < 1 ? "shrank" : "enlarged"} the ${it.short} (${Math.round((ratio - 1) * 100)}% of its area)` });
@@ -186,7 +236,7 @@ export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<De
   }
   // A fixture the photo does not have, added (a bath where the room has none).
   for (const it of items) {
-    if (B.get(it.ref)?.present) continue;
+    if (it.gone || B.get(it.ref)?.present) continue;
     const a = A.get(it.ref);
     if (a?.present && a.box && (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) >= 4) failures.push({ ref: it.ref, short: it.short, reason: "added", message: `the render added a ${it.short}` });
   }
@@ -265,7 +315,7 @@ export function detectionPrompt(items: readonly CheckItem[], role: "before" | "a
     "Mirrors, towels, rugs, bins and toiletries are not items.",
     "",
     "ITEMS:",
-    ...items.map((it) => `${it.ref}: ${it.description}`),
+    ...items.map((it) => `${it.ref}: ${role === "before" && it.replaces ? it.replaces.description : it.description}`),
   ].join("\n");
 }
 

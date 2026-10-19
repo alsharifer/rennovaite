@@ -102,13 +102,18 @@ export function whereInFrame(b: Box): string {
 export function retryLine(failures: readonly PlacementFailure[]): string {
   if (failures.length === 0) return "";
   const fix = failures.map((f) =>
-    f.reason === "added" ? `there is no ${f.short} in this photo — do not add one` : f.reason === "duplicated" ? `there is exactly one ${f.short} — do not repeat it` : f.reason === "removed" ? `keep the ${f.short} — it is in the photo` : f.reason === "resized" ? `keep the ${f.short} the size it is in the photo` : `keep the ${f.short} exactly where the photo has it`,
+    f.reason === "added" ? `there is no ${f.short} in this photo — do not add one` : f.reason === "duplicated" ? `there is exactly one ${f.short} — do not repeat it` : f.reason === "removed" ? `keep the ${f.short} — it is in the photo` : f.reason === "resized" ? `keep the ${f.short} the size it is in the photo` : f.reason === "kept" ? `remove the ${f.short} completely — it is replaced` : `keep the ${f.short} exactly where the photo has it`,
   );
   return `The last attempt failed the layout check: ${fix.join("; ")}.`;
 }
 
-export function restylePrompt(arm: RestyleArm, style: StyleBrief, inView: readonly { item: CheckItem; box: Box }[], absent: readonly CheckItem[] = [], failures: readonly PlacementFailure[] = [], anchor: { label: string } | null = null): string {
-  const list = inView.map(({ item, box }) => `the ${item.short} (${whereInFrame(box)} of the frame)`).join(", ");
+export function restylePrompt(arm: RestyleArm, style: StyleBrief, inViewAll: readonly { item: CheckItem; box: Box }[], absent: readonly CheckItem[] = [], failures: readonly PlacementFailure[] = [], anchor: { label: string } | null = null, notes: readonly string[] = []): string {
+  // A replaced item is named only in its swap line, never as a fixture to keep.
+  const inView = inViewAll.filter((v) => !v.item.gone);
+  const kept = inView.filter((v) => !v.item.replaces);
+  const list = kept.map(({ item, box }) => `the ${item.short} (${whereInFrame(box)} of the frame)`).join(", ");
+  // A replacement: what stands there today goes, the new item takes its spot.
+  const swaps = inView.filter((v) => v.item.replaces).map(({ item, box }) => `Replace the ${item.replaces!.short} (${whereInFrame(box)} of the frame) with ${item.description} standing in the same spot; no ${item.replaces!.short} anywhere.`);
   const none = absent.length ? `This photo shows no ${[...new Set(absent.map((a) => a.short))].join(", no ")} — do not add any.` : "";
   const retry = retryLine(failures);
   const look = styleTextFor(style, new Set(inView.map((v) => v.item.kind)));
@@ -117,8 +122,10 @@ export function restylePrompt(arm: RestyleArm, style: StyleBrief, inView: readon
       "Renovate the bathroom in this photo. Keep the photograph exactly as taken: the same camera position, the same portrait framing, the same room, walls, ceiling height, door and window. Do not widen, zoom or re-frame the view.",
       arm === "edit_pro" ? "The narrow strips at the left and right edges are a mirrored copy of the photo's own edges, added only to fill the frame: renovate them to match, and keep the room itself exactly where the photo has it." : "",
       list ? `Every fixture stays exactly where it is and the size it is — ${list} — one of each; do not move, mirror or resize any fixture.` : "",
+      ...swaps,
       none,
-      "Fixtures keep their type and how they are mounted (a floor-standing WC or bidet stays floor-standing).",
+      ...notes,
+      `${swaps.length ? "Every other fixture keeps" : "Fixtures keep"} their type and how they are mounted (a floor-standing WC or bidet stays floor-standing).`,
       // B4: the room's locked view comes as the second image; its spec is the look.
       anchor ? anchorPromptLine(anchor) : "",
       `Change only the finishes and the design of the fixtures: ${look}`,
@@ -129,7 +136,9 @@ export function restylePrompt(arm: RestyleArm, style: StyleBrief, inView: readon
   return [
     "A photorealistic photograph of a renovated bathroom, taken on a phone held upright (portrait), wide angle, from the same spot and angle as the structure shows.",
     list ? `In the frame, exactly where the structure shows them: ${list}.` : "",
+    ...swaps,
     none,
+    ...notes,
     "Floor-standing WC and bidet. The door and window as they are. No text or logos.",
     `Finishes and fixtures: ${look}`,
     "Where clutter stood, plain wall and floor — never a new fixture.",
@@ -207,13 +216,15 @@ export async function restyleWithCheck(input: {
   maxAttempts?: number;
   /** B4: the room's anchor — its image goes to the model after the photo (the caller passes it in extraImages), and the follows check replaces the style check. */
   anchor?: { label: string; bytes: Uint8Array } | null;
+  /** Lines from the plan the prompt must carry (where a fitting goes in this view). */
+  notes?: readonly string[];
 }): Promise<RestyleResult> {
   const model = ARM_MODEL[input.arm];
   const inView = input.items
     .map((item) => ({ item, loc: input.before.items.find((l) => l.ref === item.ref) }))
     .filter((x) => x.loc?.present && x.loc.box)
     .map((x) => ({ item: x.item, box: x.loc!.box! }));
-  const kinds = new Set(inView.map((v) => v.item.kind));
+  const kinds = new Set(inView.filter((v) => !v.item.gone).map((v) => v.item.kind));
   const absent = input.items.filter((it) => !input.before.items.find((l) => l.ref === it.ref)?.present);
   const attempts: Attempt[] = [];
   const spend: SpendRow[] = [];
@@ -221,7 +232,7 @@ export async function restyleWithCheck(input: {
   const pinned = input.arm === "edit_pro" ? await padToAspect(input.photoBytes) : null;
   const photoSize = imageSize(input.photoBytes);
   for (let n = 1; n <= (input.maxAttempts ?? 2); n++) {
-    const prompt = input.promptOverride?.(n) ?? restylePrompt(input.arm, input.style, inView, absent, attempts.at(-1)?.verdict?.failures ?? [], input.anchor ? { label: input.anchor.label } : null);
+    const prompt = input.promptOverride?.(n) ?? restylePrompt(input.arm, input.style, inView, absent, attempts.at(-1)?.verdict?.failures ?? [], input.anchor ? { label: input.anchor.label } : null, input.notes ?? []);
     const at: Attempt = { attempt: n, arm: input.arm, model, prompt, image_url: null, size: null, verdict: null, after: null, similarity: null, style: null, cost_usd: 0 };
     try {
       // B2b: nano-banana-pro gets the photo padded to its 9 : 16 frame, and its

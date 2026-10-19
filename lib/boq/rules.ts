@@ -559,6 +559,54 @@ export const RATE_RULES: Record<string, RateRule> = {
     allowance_aed: 1100,
     allowance_note: "B5 option — take down the curved plaster bulkhead over the shower, make good to a flat ceiling, re-site its downlight, AED 1,100 lump allowance; check what it conceals first. QS to confirm.",
   },
+  // --- Client comments (19 Oct): a storage cabinet for the bidet, and the
+  // value-engineered choices a wet room can take (rooms.spec.wet_room). Each
+  // is a SPEC change at its own allowance — no existing rate is cut.
+  "joinery.storage_cabinet": {
+    rule_id: "R-66",
+    allowance_aed: 750,
+    allowance_note: "White floor-standing storage cabinet ~400 × 450 × 850, moisture-resistant carcass, one door + shelves, supply + install, AED 750 allowance. QS to confirm.",
+  },
+  "alum.shower_panel_fixed": {
+    rule_id: "R-67",
+    allowance_aed: 2000,
+    allowance_note: "Fixed walk-in glass panel, 10 mm clear toughened, up to ~1.4 m, wall profile + stay bar, brushed-brass fittings, supply + install, AED 2,000 allowance (the hinged 2-panel enclosure is 2 × 2,200, R-47). QS to confirm.",
+  },
+  "san.shower_manual": {
+    rule_id: "R-68",
+    allowance_aed: 2200,
+    allowance_note: "Concealed manual shower mixer with diverter, rain head + hand shower, brushed brass, supply + install at the existing position, AED 2,200 allowance (thermostatic set R-21 is 3,500). QS to confirm.",
+  },
+  "joinery.vanity_ready": {
+    rule_id: "R-69",
+    allowance_aed: 2000,
+    allowance_note: "Ready-made wall-hung vanity unit ~800–900 mm, two drawers, integrated ceramic basin top, supply + install, AED 2,000 allowance (the floating unit + stone top is 1,800 + 1,450). QS to confirm.",
+  },
+  "san.basin_mixer_mid": {
+    rule_id: "R-70",
+    allowance_aed: 600,
+    allowance_note: "Basin mixer, mid-range, brushed brass, supply + install on the vanity's own basin, AED 600 allowance (R-20's 1,800 includes a separate basin). QS to confirm.",
+  },
+  "san.wc_floor_mid": {
+    rule_id: "R-71",
+    allowance_aed: 1200,
+    allowance_note: "Floor-standing close-coupled WC, mid-range, supply + install at the existing soil position, AED 1,200 allowance (R-57 is 1,600). QS to confirm.",
+  },
+  "alum.mirror_led_mid": {
+    rule_id: "R-72",
+    allowance_aed: 900,
+    allowance_note: "LED-lit mirror ~700 mm, mid-range, no demister, supply + install, AED 900 allowance (R-59 is 1,400). QS to confirm.",
+  },
+  "prelim.waste_bagged": {
+    rule_id: "R-73",
+    allowance_aed: 600,
+    allowance_note: "Strip-out waste of ONE room bagged and carried out by hand, carted away, AED 600 lump allowance — instead of a skip (R-29, 1,500). Check the community allows it. QS to confirm.",
+  },
+  "wall.shower_niche_plain": {
+    rule_id: "R-74",
+    allowance_aed: 600,
+    allowance_note: "Recessed shower niche ~600 × 300, formed, waterproofed, tiled — no LED strip, AED 600 allowance (R-56 with the LED is 950). QS to confirm.",
+  },
   "san.bath": {
     rule_id: "R-65",
     labour: {

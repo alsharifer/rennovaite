@@ -63,7 +63,7 @@ const LABOUR: LabourRate[] = [
 ];
 const SKUS: PricingSku[] = [{ sku: "T1", brand: "X", category: "Tiles", subcategory: "Marble Effect Porcelain", description_en: "porcelain", unit: "m2", price_aed: 90, vendor: "v" }];
 
-function pilotBoq(room: Record<string, unknown> = RAW) {
+function pilotBoq(room: Record<string, unknown> = RAW, fixtures: typeof FIXTURES = FIXTURES) {
   const graph = graphOf(room);
   const items = quantifyPlan(graph).filter((i) => i.work_item_key !== "ceiling_finish");
   const { boq } = generateDeterministicBoq({ rooms: [{ id: "bath", name: "Bathroom", room_type: "bathroom", area_m2: 7, polygon: ROOM.polygon, ceiling_h_m: 2.8 }], labourRates: LABOUR, skus: SKUS, styleKey: null });
@@ -72,7 +72,7 @@ function pilotBoq(room: Record<string, unknown> = RAW) {
   // The P2 overlay as assemble appends it (the heater's TBC line included).
   joined.sections.push({ work_section: "Plumbing & Sanitary", lines: [{ description: "Electric water heater — supply & install", quantity: 1, unit: "no", rate_aed: 0, total_aed: 0, vendor_or_source: "TBC", notes: null, rule_id: "P2/overlay/water_heater", kind: "supply_and_install", rate_band: "allowance", wastage_pct: 0, rate_status: "needs_qs" } as never], section_total_aed: 0 } as never);
   const wallTile = items.filter((i) => i.work_item_key === "wet_tiling").reduce((s, i) => s + i.qty, 0);
-  const ctx = wetRoomContextFrom(graph, "bath", FIXTURES, wallTile)!;
+  const ctx = wetRoomContextFrom(graph, "bath", fixtures, wallTile)!;
   const resolver = new RateResolver(LABOUR, SKUS, boq.engine.tier, {});
   const out = priceOptions(applyWetRoomPackage(joined as never, ctx, (item) => priceScopeItem(item, resolver)) as never) as ReturnType<typeof applyWetRoomPackage>;
   return { out, ctx, items };
@@ -205,5 +205,58 @@ describe("B5 — footprint sides and rate basis", () => {
     expect(rateBasisOf({ rule_id: "Q-17/R-14", rate_aed: 180, rate_tier: "labour_book" })).toBe("market");
     expect(rateBasisOf({ rule_id: "W-02", rate_aed: 0, rate_status: "needs_qs" })).toBe("tbc");
     expect(rateBasisOf({ rule_id: "Q-17/R-14", rate_aed: 150, rate_tier: "firm_private" })).toBe("firm");
+  });
+});
+
+describe("client comments (19 Oct) — a cabinet for the bidet, a shattaf beside the WC, the spec choices", () => {
+  const CLIENT_FIXTURES = [
+    ...FIXTURES.filter((f) => f.type !== "bidet_point"),
+    { id: "cabinet", type: "storage_cabinet", room_id: "bath", position: n(28, 212), spec: { width_mm: 400, depth_mm: 450, rotation_deg: 90, replaces: "bidet_point" } },
+    { id: "shattaf", type: "shattaf_point", room_id: "bath", position: n(2, 152), spec: null },
+  ] as typeof FIXTURES;
+  const CHOICES = { shower_screen: "fixed_panel", shower_valve: "manual", vanity: "ready_made", fittings: "mid", waste: "bagged", niche_led: false, existing_fixtures: "1 WC, 1 bidet, 1 basin + vanity, shower set" };
+  const base = pilotBoq().out;
+  const client = pilotBoq({ ...RAW, spec: { bulkhead: { over: "shower" }, wet_room: CHOICES } }, CLIENT_FIXTURES).out;
+  const by = (doc: typeof base, rule: string) => lines(doc).filter((l) => (l.rule_id ?? "").split("/")[0] === rule);
+
+  it("no bidet; a white storage cabinet as joinery; the existing bidet is still stripped out", () => {
+    expect(by(client, "W-16")).toHaveLength(0);
+    expect(by(client, "W-25")[0]).toMatchObject({ quantity: 1, rate_aed: 750, total_aed: 750, rate_basis: "allowance" });
+    expect(by(client, "W-06")[0]!.description).toContain("existing sanitaryware (1 WC, 1 bidet, 1 basin + vanity, shower set)");
+  });
+
+  it("each choice is a different product at its own allowance — the base lines go, none is re-rated", () => {
+    expect(by(client, "S6-06")).toHaveLength(0);
+    expect(by(client, "W-26")[0]).toMatchObject({ quantity: 1, rate_aed: 2000 });
+    expect(by(client, "Q-24")).toHaveLength(0);
+    expect(by(client, "W-27")[0]).toMatchObject({ rate_aed: 2200 });
+    expect(lines(client).some((l) => l.rule_id === "GT/joinery/vanity" || (l.rule_id ?? "").startsWith("S6-05"))).toBe(false);
+    expect(by(client, "W-28")[0]).toMatchObject({ rate_aed: 2000 });
+    expect(by(client, "Q-23")).toHaveLength(0);
+    expect(by(client, "W-29")[0]!.description).toContain("on the vanity's own basin");
+    expect(by(client, "W-15")[0]).toMatchObject({ rate_aed: 1200 });
+    expect(by(client, "W-18")[0]).toMatchObject({ rate_aed: 900 });
+    expect(by(client, "W-13")[0]).toMatchObject({ rate_aed: 600 });
+    expect(by(client, "Q-34")).toHaveLength(0);
+    expect(by(client, "W-30")[0]).toMatchObject({ rate_aed: 600 });
+    // Every line that stays keeps its rate.
+    for (const l of lines(client)) {
+      const was = lines(base).find((b) => b.rule_id === l.rule_id && b.description === l.description);
+      if (was) expect(l.rate_aed).toBe(was.rate_aed);
+    }
+  });
+
+  it("the subtotal moves by exactly the lines changed", () => {
+    const gone = (rules: string[]) => sumMoney(lines(base).filter((l) => rules.includes((l.rule_id ?? "").split("/")[0]!) || (rules.includes("GT-vanity") && l.rule_id === "GT/joinery/vanity")).map((l) => l.total_aed));
+    const removed = gone(["W-16", "S6-06", "Q-24", "S6-05", "Q-23", "W-15", "W-18", "W-13", "Q-34", "GT-vanity"]);
+    const added = 750 + 2000 + 2200 + 2000 + 600 + 1200 + 900 + 600 + 600;
+    expect(client.subtotal_aed).toBeCloseTo(base.subtotal_aed - removed + added, 2);
+    const c = chainTotals({ subtotal_aed: client.subtotal_aed, contingency_pct: client.contingency_pct, vat_pct: client.vat_pct });
+    expect(client.grand_total_aed).toBe(c.grand_total_aed);
+  });
+
+  it("no choices = the base case, byte for byte", () => {
+    const strip = (d: typeof base) => JSON.stringify({ ...d, engine: { ...(d as unknown as { engine: object }).engine, generated_at: null } });
+    expect(strip(pilotBoq({ ...RAW, spec: { bulkhead: { over: "shower" }, wet_room: {} } }).out)).toBe(strip(base));
   });
 });

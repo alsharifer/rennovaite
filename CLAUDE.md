@@ -1116,6 +1116,29 @@ Report `docs/BATHROOM_PILOT_B6.md`. No migration.
     - `spec.column_wall` / `niche_wall` place the shower valve and niche;
       `water_heater` takes `spec.height_mm`.
   - Every dim carries `data-dim` / `data-mm` / `data-src`.
+- **Client comments (19 Oct)** — report: the B6 doc, "Client comments"; applied
+  with `scripts/b6-client-comments.ts`; anchor edits with
+  `scripts/b6-client-renders.ts --change-only --request "…"`.
+  - **New fixture types**:
+    - `storage_cabinet`: a footprint with no services, `pointLine: false` in
+      the catalog, priced as joinery W-25 / R-66.
+    - `shattaf_point`: a plumbing point, 350.
+  - **A fixture can REPLACE another in place** (`spec.replaces`, e.g.
+    `"bidet_point"`). The check reads the old item in the photo and the new one
+    in the render, held to the old footprint. The replaced item is a `gone` item
+    that fails the render if it is still there. The restyle prompt swaps it.
+  - **Spec choices** in `rooms.spec.wet_room` (`WetRoomChoices`): screen,
+    valve, vanity, fittings, waste, niche LED. Each is its own product at
+    R-67…R-74; absent = the base case. `existing_fixtures` names what the
+    strip-out removes.
+  - **"Ask for a change"**:
+    - checked against the plan's current items (`carryLocated`);
+    - a refused change keeps its candidate URL and both readings;
+    - `request_done: "no"` = unchanged, never a version;
+    - change prompts forbid adding a window, door or opening.
+  - **Re-locking another version of the anchor view moves the anchor** back to
+    it (its stored spec when it held it before).
+  - **Where the shattaf goes in each view**: `lib/render/fitting-notes.ts`.
 - **Checks**: `lib/drawings/__tests__/room-sheets.test.ts`; live
   `scripts/b6-room-pack-check.ts [port]`. It checks every dimension against the
   graph to the mm, that the chains and setting-out close, the hinge, the total,

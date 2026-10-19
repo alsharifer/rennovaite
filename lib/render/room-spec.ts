@@ -105,15 +105,16 @@ export async function checkFollows(render: ImageInput, anchor: ImageInput, eleme
 const CHANGE_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["changed", "summary"],
+  required: ["changed", "summary", "request_done"],
   properties: {
     changed: { type: "array", items: { type: "string", enum: [...CHANGE_ELEMENTS] } },
     summary: { type: "string" },
+    request_done: { type: "string", enum: ["yes", "partly", "no"] },
   },
 } as const;
 
 /** Before / after an "Ask for a change": which elements changed (from CHANGE_ELEMENTS) and in a few words. */
-export async function describeChange(before: ImageInput, after: ImageInput, request: string): Promise<{ changed: string[]; summary: string; usage: { input_tokens: number; output_tokens: number } }> {
+export async function describeChange(before: ImageInput, after: ImageInput, request: string): Promise<{ changed: string[]; summary: string; request_done: "yes" | "partly" | "no"; usage: { input_tokens: number; output_tokens: number } }> {
   const res = await client().messages.create({
     model: CHECK_MODEL,
     max_tokens: 4000,
@@ -126,11 +127,12 @@ export async function describeChange(before: ImageInput, after: ImageInput, requ
           block(before),
           { type: "text", text: "IMAGE 2 — the same render after the edit:" },
           block(after),
-          { type: "text", text: `The client asked for: "${request}". Which elements VISIBLY changed between IMAGE 1 and IMAGE 2 (only what really changed, from the list), and a summary of at most 10 words of what changed.` },
+          { type: "text", text: `The client asked for: "${request}". Which elements VISIBLY changed between IMAGE 1 and IMAGE 2 (only what really changed, from the list), and a summary of at most 10 words of what changed, and whether IMAGE 2 carries out what the client asked: "yes", "partly", or "no" (it did not happen).` },
         ],
       },
     ],
   });
-  const j = JSON.parse(textOf(res)) as { changed: string[]; summary: string };
-  return { changed: [...new Set(j.changed)].filter((c) => c !== "other" || j.changed.length === 1), summary: j.summary.trim(), usage: usageOf(res) };
+  const j = JSON.parse(textOf(res)) as { changed: string[]; summary: string; request_done?: string };
+  const done = j.request_done === "no" || j.request_done === "partly" ? j.request_done : "yes";
+  return { changed: [...new Set(j.changed)].filter((c) => c !== "other" || j.changed.length === 1), summary: j.summary.trim(), request_done: done, usage: usageOf(res) };
 }
