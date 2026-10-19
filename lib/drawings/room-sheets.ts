@@ -492,7 +492,8 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
           const col = typeof g.f.spec?.column_wall === "string" ? (g.f.spec.column_wall as string).toUpperCase()[0] : null;
           const niche = typeof g.f.spec?.niche_wall === "string" ? (g.f.spec.niche_wall as string).toUpperCase()[0] : null;
           const isCol = col ? w.side[0] === col : on === g.onWalls[0];
-          const isNiche = niche ? w.side[0] === niche : on === g.onWalls[0];
+          // B7: no niche when the wet-room panel says none.
+          const isNiche = g.f.spec?.niche !== "none" && (niche ? w.side[0] === niche : on === g.onWalls[0]);
           body += L(X(s0), Y(0), X(s0), Y(2.0), { stroke: INK_700, w: 0.3, dash: "1.2 0.8" }) + L(X(s1), Y(0), X(s1), Y(2.0), { stroke: INK_700, w: 0.3, dash: "1.2 0.8" }) + T((X(s0) + X(s1)) / 2, Y(0.15), "SHOWER", { anchor: "middle", size: 2.3 });
           if (isCol) {
             body += `<circle cx="${n2(X(sc))}" cy="${n2(Y(FH.shower_valve / 1000))}" r="1.6" fill="none" stroke="${INK_900}" stroke-width="0.3" data-fixture="${esc(g.f.id)}:valve"/>` + T(X(sc) + 2.4, Y(FH.shower_valve / 1000) + 0.8, "VALVE", { size: 2.2 });
@@ -500,8 +501,12 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
             body += `<rect x="${n2(X(sc) - 4)}" y="${n2(Y(FH.rain_head / 1000) - 0.6)}" width="8" height="1.2" fill="${INK_700}" data-fixture="${esc(g.f.id)}:rain_head"/>` + T(X(sc) + 5, Y(FH.rain_head / 1000) + 0.8, `RAIN HEAD ≈ ${FH.rain_head}`, { size: 2.2, attrs: `data-mm="${FH.rain_head}" data-src="standard:rain_head" data-approx="true"` });
           }
           if (isNiche) {
-            const nc = sc + (isCol ? 0.35 : 0), nw = 0.3;
-            body += `<rect x="${n2(X(nc - nw))}" y="${n2(Y(FH.niche_top / 1000))}" width="${n2(nw * 2 * S)}" height="${n2(((FH.niche_top - FH.niche_bottom) / 1000) * S)}" fill="none" stroke="${INK_700}" stroke-width="0.3" stroke-dasharray="0.8 0.6" data-fixture="${esc(g.f.id)}:niche"/>` + T(X(nc), Y(FH.niche_top / 1000) - 1.2, `NICHE ≈ ${FH.niche_bottom}–${FH.niche_top}`, { anchor: "middle", size: 2.2, attrs: `data-mm="${FH.niche_bottom}" data-src="standard:niche_bottom" data-approx="true"` });
+            // Its size from the wet-room panel (spec.niche_width_mm / niche_height_mm), else ~600 × 300.
+            const nWmm = typeof g.f.spec?.niche_width_mm === "number" ? (g.f.spec.niche_width_mm as number) : 600;
+            const nHmm = typeof g.f.spec?.niche_height_mm === "number" ? (g.f.spec.niche_height_mm as number) : FH.niche_top - FH.niche_bottom;
+            const nTop = FH.niche_bottom + nHmm;
+            const nc = sc + (isCol ? 0.35 : 0), nw = nWmm / 2000;
+            body += `<rect x="${n2(X(nc - nw))}" y="${n2(Y(nTop / 1000))}" width="${n2(nw * 2 * S)}" height="${n2((nHmm / 1000) * S)}" fill="none" stroke="${INK_700}" stroke-width="0.3" stroke-dasharray="0.8 0.6" data-fixture="${esc(g.f.id)}:niche"/>` + T(X(nc), Y(nTop / 1000) - 1.2, `NICHE ${nWmm} × ${nHmm} · ≈ ${FH.niche_bottom}–${nTop}`, { anchor: "middle", size: 2.2, attrs: `data-mm="${FH.niche_bottom}" data-src="standard:niche_bottom" data-approx="true"` });
           }
           break;
         }

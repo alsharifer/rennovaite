@@ -278,3 +278,18 @@ describe("B7 3 — a fixture that replaces another, picked on 01 Plan", () => {
     expect(lines(picked).find((l) => (l.rule_id ?? "").startsWith("W-06"))!.description).toContain("1 bidet");
   });
 });
+
+describe("B7 4 — the wet-room panel's choices reach the BoQ", () => {
+  const PANEL = FIXTURES.map((f) =>
+    f.type === "shower_mixer" ? { ...f, spec: { ...f.spec, niche: "none" } } : f.type === "water_heater" ? { ...f, spec: { ...f.spec, height_mm: 2100, action: "relocate" } } : f,
+  ) as typeof FIXTURES;
+  const out = pilotBoq({ ...RAW, spec: { bulkhead: { over: "shower" }, extractor: false } }, PANEL).out;
+  const has = (rule: string) => lines(out).some((l) => (l.rule_id ?? "").split("/")[0] === rule);
+  it("no niche → no niche line; no extractor → no extractor line", () => {
+    expect(has("W-13")).toBe(false);
+    expect(has("W-20")).toBe(false);
+  });
+  it("the heater is relocated, at the height the panel gave", () => {
+    expect(lines(out).find((l) => (l.rule_id ?? "").startsWith("W-23"))!.description).toMatch(/^Water heater — relocate locally \(existing heater kept; N wall at ~2\.10 m/);
+  });
+});
