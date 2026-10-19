@@ -17,6 +17,9 @@ import { rechain, type ChainedDoc } from "./totals";
 
 // H7: section order is the canonical one (lib/boq/section-order.ts), applied by rechain.
 
+/** Engine lines in a mapped section that the take-off does not measure, kept on rebuild. */
+const KEPT_RULE_PREFIXES = ["Q-11b", "Q-11/", "Q-10/"] as const;
+
 interface BoqSectionLike {
   work_section: string;
   lines: unknown[];
@@ -54,14 +57,20 @@ export function applyElementMapping<T extends BoqLike>(boq: T, items: TakeoffIte
   // fixing labour and LED nosing. It is labour only (R-36's note: the material
   // is Q-11b alone) and the take-off prices nothing on the stairs, so it is kept
   // too — never a second tile supply.
-  const stairTileLines = boq.sections
+  //
+  // Bathroom-pilot pre-flight (18 Oct): the SKIRTING (Q-10, R-10 — F-04: dry
+  // rooms + terrace perimeter − doors; wet rooms take none) was dropped the
+  // same way. The take-off measures no skirting and floor_finish is the floor
+  // only, so the engine's line is kept as it was priced.
+  const keptLines = boq.sections
+    .filter((s) => MAPPED_SECTIONS.includes(s.work_section))
     .flatMap((s) => s.lines as { rule_id?: string; total_aed?: number }[])
-    .filter((l) => typeof l.rule_id === "string" && (l.rule_id.startsWith("Q-11b") || l.rule_id.startsWith("Q-11/")));
-  if (stairTileLines.length > 0) {
-    const ff = mapped.find((m) => m.work_section === "Floor Finishes");
-    if (ff) {
-      ff.lines.push(...(stairTileLines as unknown as (typeof ff.lines)));
-    }
+    .filter((l) => typeof l.rule_id === "string" && KEPT_RULE_PREFIXES.some((p) => l.rule_id!.startsWith(p)));
+  if (keptLines.length > 0) {
+    let ff = mapped.find((m) => m.work_section === "Floor Finishes");
+    // A take-off with no floor_finish item still keeps them (rechain totals it).
+    if (!ff) mapped.push((ff = { work_section: "Floor Finishes", lines: [], section_total_aed: 0 }));
+    ff.lines.push(...(keptLines as unknown as (typeof ff.lines)));
   }
 
   const kept = boq.sections.filter((s) => !MAPPED_SECTIONS.includes(s.work_section));

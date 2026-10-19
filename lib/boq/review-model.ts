@@ -43,6 +43,8 @@ export interface ReviewBoq {
     undecided?: unknown[];
   } | null;
   programme?: ReviewModel["programme"];
+  /** B5 (lib/boq/wet-room.ts). */
+  options?: { key: string; label: string; note: string; net_aed: number; delta_total_aed?: number; adds: { description: string; quantity: number; unit: string; rate_aed: number; total_aed: number; rate_basis?: string }[]; replaces: { description: string; total_aed: number }[] }[];
 }
 
 export interface ReviewInputs {
@@ -123,6 +125,8 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
         tiers,
         unpriced,
         derivedNote: derivedLineNote(l),
+        confirm: typeof (l as unknown as { confirm_on_site?: unknown }).confirm_on_site === "string" ? (l as unknown as { confirm_on_site: string }).confirm_on_site : null,
+        basis: typeof (l as unknown as { rate_basis?: unknown }).rate_basis === "string" ? (l as unknown as { rate_basis: string }).rate_basis : null,
         itemKey,
         elementRefs: l.element_refs ?? [],
         unpricedReason: unpriced ? (aside ?? "no rate in any book") : null,
@@ -224,5 +228,17 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
       by: u.by,
     })),
     programme: b.programme ?? null,
+    options: (b.options ?? []).map((o) => ({ key: o.key, label: o.label, note: o.note, net: o.net_aed, delta: o.delta_total_aed ?? null, adds: o.adds.map((a) => ({ description: splitAside(a.description).title, quantity: a.quantity, unit: a.unit, rate: a.rate_aed, amount: a.total_aed, basis: a.rate_basis ?? null })), replaces: o.replaces.map((r) => ({ description: splitAside(r.description).title, amount: r.total_aed })) })),
+    rateBasis: (() => {
+      const all = sections.flatMap((s) => s.lines);
+      if (!all.some((l) => l.basis)) return null;
+      const by = new Map<string, { lines: number; amount: number }>();
+      for (const l of all) {
+        const k = l.basis ?? "market";
+        const c = by.get(k) ?? { lines: 0, amount: 0 };
+        by.set(k, { lines: c.lines + 1, amount: Math.round((c.amount + l.amount) * 100) / 100 });
+      }
+      return ["calibrated", "market", "firm", "allowance", "tbc"].filter((k) => by.has(k)).map((k) => ({ basis: k, ...by.get(k)! }));
+    })(),
   };
 }

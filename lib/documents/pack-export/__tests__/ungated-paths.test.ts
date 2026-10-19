@@ -29,6 +29,8 @@ const DOCUMENT_ROUTES = [
   "app/api/projects/[id]/boq-pdf/route.ts",
   // L4: the firm's client proposal — a pack document like the BoQ PDF.
   "app/api/projects/[id]/proposal/route.ts",
+  // B6: one room's client pack.
+  "app/api/projects/[id]/room-pack/route.ts",
 ];
 
 describe("every document route is gated", () => {

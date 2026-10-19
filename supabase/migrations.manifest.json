@@ -368,6 +368,30 @@
       "version": "20260101006100",
       "name": "room_ceiling_height",
       "sha256": "46ac00137a24be858f556aede35df6c4c4619b749a4218ee9b5e816bf98d21d6"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006200",
+      "name": "room_photo_views",
+      "sha256": "ef1cb2fc64148277422372d25b8721bb30e8155a7c414c6f8fdfba44a8ed2dc3"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006300",
+      "name": "photo_view_check_spend",
+      "sha256": "68f6ee298e3e19ac24a270c991115c08869609d9f5bd7f6f877f80112f193600"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006400",
+      "name": "room_design_anchor",
+      "sha256": "475df6eb2c94cb48d7d9c8404a67b8e6b868f9414ae7969ddfc0413f3dc92017"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006500",
+      "name": "room_tiled_height",
+      "sha256": "905ac72d19c261619d9c684ac6818dab03eb8e45b063985fec53038495e804df"
     }
   ]
 }

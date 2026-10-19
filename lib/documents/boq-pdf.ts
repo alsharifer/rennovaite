@@ -43,6 +43,9 @@ export interface BoqPdfLine {
   notes?: string | null;
   rate_status?: string;
   qty_derived?: boolean;
+  /** B5: what the rate rests on (lib/boq/rate-basis.ts) and a zero that is the answer. */
+  rate_basis?: string;
+  stated_zero?: boolean;
 }
 
 export interface BoqPdfInput {
@@ -69,6 +72,8 @@ export interface BoqPdfInput {
     } | null;
     /** G5d: the indicative delivery programme (lib/boq/programme.ts). */
     programme?: { total_days: number; phases: { name: string; start_day: number; days: number }[]; basis: string } | null;
+    /** B5: options, priced outside the total (lib/boq/wet-room.ts). */
+    options?: { key: string; label: string; note: string; net_aed: number; delta_total_aed?: number }[];
   };
 }
 

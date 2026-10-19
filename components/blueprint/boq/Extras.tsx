@@ -115,3 +115,74 @@ export function Furniture({ furniture }: { furniture: FurnitureView }) {
     </section>
   );
 }
+
+const BASIS_WORD: Record<string, string> = { calibrated: "calibrated (reference villa)", market: "market rate book", firm: "your rate book", allowance: "allowance", tbc: "to be priced" };
+
+/** B5: what the rates rest on — one line, by count and amount. */
+export function RateBasisLine({ rateBasis }: { rateBasis: NonNullable<ReviewModel["rateBasis"]> }) {
+  return (
+    <p className="t-label-md mt-4 font-bp-mono tabular-nums text-bp-ink-secondary" data-rate-basis="">
+      RATE BASIS ·{" "}
+      {rateBasis.map((b, i) => (
+        <span key={b.basis} data-basis={b.basis}>
+          {i > 0 ? " · " : ""}
+          {BASIS_WORD[b.basis] ?? b.basis} {b.lines} {b.lines === 1 ? "line" : "lines"}
+          {b.basis === "tbc" ? "" : ` AED ${formatAED(b.amount)}`}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/** B5: options — priced, never in the project total. */
+export function Options({ options }: { options: ReviewModel["options"] }) {
+  return (
+    <section aria-labelledby="boq-options" className="mt-10 border border-dashed border-bp-line-strong p-4" data-boq-options={options.length}>
+      <p className="t-label-caps text-bp-ink-tertiary">OPTIONS — PRICED SEPARATELY · NOT IN THE PROJECT TOTAL</p>
+      <h2 id="boq-options" className="t-heading-md mt-1 text-bp-ink-primary">
+        Options
+      </h2>
+      <ul className="mt-3">
+        {options.map((o) => (
+          <li key={o.key} className="border-t border-bp-line-hairline py-3" data-option={o.key}>
+            <details>
+              <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <span className="t-heading-sm text-bp-ink-primary">{o.label}</span>
+                <span className="t-num-md text-bp-ink-primary" data-option-delta={o.delta ?? ""}>
+                  {o.delta != null ? `+ AED ${formatAED(o.delta)}` : `+ AED ${formatAED(o.net)}`}
+                  <span className="t-label-md ml-2 font-bp-sans text-bp-ink-secondary">{o.delta != null ? "incl. contingency + VAT" : "before contingency + VAT"}</span>
+                </span>
+              </summary>
+              <p className="t-body-sm mt-2 text-bp-ink-secondary">{o.note}</p>
+              <table className="mt-2 w-full">
+                <tbody>
+                  {o.adds.map((a, i) => (
+                    <tr key={`a${i}`} className="border-t border-bp-line-hairline">
+                      <td className="t-body-sm py-1.5 pr-4 text-bp-ink-primary">+ {a.description}</td>
+                      <td className="t-num-sm py-1.5 pr-4 text-right text-bp-ink-secondary">
+                        {formatQty(a.quantity)} {displayUnit(a.unit)}
+                      </td>
+                      <td className="t-num-sm py-1.5 text-right text-bp-ink-primary">{formatAED(a.amount)}</td>
+                    </tr>
+                  ))}
+                  {o.replaces.map((r, i) => (
+                    <tr key={`r${i}`} className="border-t border-bp-line-hairline">
+                      <td className="t-body-sm py-1.5 pr-4 text-bp-ink-secondary">− {r.description} (in the base)</td>
+                      <td />
+                      <td className="t-num-sm py-1.5 text-right text-bp-ink-secondary">−{formatAED(r.amount)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-bp-line-strong">
+                    <td className="t-label-caps py-1.5 pr-4 text-bp-ink-tertiary">NET, BEFORE CONTINGENCY + VAT</td>
+                    <td />
+                    <td className="t-num-sm py-1.5 text-right text-bp-ink-primary">{formatAED(o.net)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </details>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

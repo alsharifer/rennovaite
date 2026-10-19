@@ -52,6 +52,9 @@ const LEGEND: [PaperTier, string][] = [
 ];
 
 /** The section's REF code: the prefix of its lines' REFs ("HRD-01" → "HRD"). */
+/** B5: the rate basis in words (lib/boq/rate-basis.ts RATE_BASIS_LABEL). */
+const BASIS_WORD: Record<string, string> = { calibrated: "calibrated (reference villa)", market: "market rate book", firm: "your rate book", allowance: "allowance", tbc: "to be priced" };
+
 const codeOf = (ref: string | undefined) => (ref ? ref.replace(/-\d+$/, "") : "");
 
 export function buildBoqPdfPages(input: BoqPdfInput & { revision?: number | null; qsValidated?: TierContext["qsValidated"] }): string[] {
@@ -124,17 +127,20 @@ export function buildBoqPdfPages(input: BoqPdfInput & { revision?: number | null
   svg += label(M, y, "Ref") + label(X.desc, y, "Section") + label(X.rate, y, "Lines", { anchor: "end" }) + label(X.amount, y, "Amount", { anchor: "end" }) + label(X.basis, y, "Basis");
   y += 2.4;
   svg += hline(M, R, y, DOC.STRONG, 0.5);
+  // B5: the summary is ONE page — a BoQ with many sections (a wet room has 14) gets tighter rows.
+  const ROW = sections.length > 10 ? 5.0 : 7.5;
+  const BASE_Y = ROW * 0.67;
   const sumRow = (ref: string, k: string, count: string, v: string, tier: ProvTier | null, attrs = "", bold = false) => {
-    if (y + 7.5 > BOTTOM) flush();
-    svg += text(M, y + 5, ref, { size: 2.8, fill: DOC.INK_3, font: DOC.MONO });
-    svg += text(X.desc, y + 5, k, { size: 3, weight: bold ? 600 : undefined });
-    if (count) svg += text(X.rate, y + 5, count, { size: 2.8, fill: DOC.INK_2, font: DOC.MONO, anchor: "end" });
-    svg += text(X.amount, y + 5, v, { size: 3, font: DOC.MONO, anchor: "end", weight: bold ? 600 : undefined, attrs });
+    if (y + ROW > BOTTOM) flush();
+    svg += text(M, y + BASE_Y, ref, { size: 2.8, fill: DOC.INK_3, font: DOC.MONO });
+    svg += text(X.desc, y + BASE_Y, k, { size: 3, weight: bold ? 600 : undefined });
+    if (count) svg += text(X.rate, y + BASE_Y, count, { size: 2.8, fill: DOC.INK_2, font: DOC.MONO, anchor: "end" });
+    svg += text(X.amount, y + BASE_Y, v, { size: 3, font: DOC.MONO, anchor: "end", weight: bold ? 600 : undefined, attrs });
     if (tier) {
-      svg += markGlyph(X.basis + 1.3, y + 4, tier as PaperTier);
-      svg += text(X.basis + 4, y + 5, tierLabel(tier).toLowerCase(), { size: 2.8, fill: DOC.INK_2, font: DOC.MONO });
+      svg += markGlyph(X.basis + 1.3, y + BASE_Y - 1, tier as PaperTier);
+      svg += text(X.basis + 4, y + BASE_Y, tierLabel(tier).toLowerCase(), { size: 2.8, fill: DOC.INK_2, font: DOC.MONO });
     }
-    y += 7.5;
+    y += ROW;
     svg += hline(M, R, y);
   };
   for (const x of sections) sumRow(x.code, x.s.work_section, `${x.lines.length}`, aed(x.s.section_total_aed), x.tier, `data-section-total="${esc(x.s.work_section)}"`);
@@ -143,11 +149,48 @@ export function buildBoqPdfPages(input: BoqPdfInput & { revision?: number | null
   sumRow("", `Contingency ${boq.contingency_pct}%`, "", aed(boq.contingency_aed), null, 'data-summary="contingency"');
   sumRow("", `VAT ${boq.vat_pct}%`, "", aed(boq.vat_aed), null, 'data-summary="vat"');
   sumRow("", "Grand total", "", `AED ${aed(boq.grand_total_aed)}`, null, `data-grand-total="${boq.grand_total_aed}"`, true);
-  y += 4;
+  // B5: options — priced, never in the total. "Total moves by" runs the same chain (contingency, VAT).
+  const options = boq.options ?? [];
+  if (options.length) {
+    if (y + 10 + options.length * ROW > BOTTOM) flush();
+    y += 6;
+    svg += label(M, y, "Options — priced separately, not in the total", { fill: DOC.INK });
+    svg += label(X.rate, y, "Net", { anchor: "end" }) + label(X.amount, y, "Total moves by", { anchor: "end" });
+    y += 2.4;
+    svg += hline(M, R, y, DOC.STRONG, 0.5);
+    for (const o of options) {
+      svg += text(M, y + BASE_Y, o.label, { size: 3, weight: 500 });
+      svg += text(X.rate, y + BASE_Y, aed(o.net_aed), { size: 3, font: DOC.MONO, anchor: "end" });
+      svg += text(X.amount, y + BASE_Y, o.delta_total_aed != null ? `+ ${aed(o.delta_total_aed)}` : "—", { size: 3, font: DOC.MONO, anchor: "end", attrs: `data-option="${esc(o.key)}" data-option-delta="${o.delta_total_aed ?? ""}"` });
+      svg += text(X.basis, y + BASE_Y, "incl. contingency + VAT", { size: 2.7, fill: DOC.INK_2, font: DOC.MONO });
+      y += ROW;
+      svg += hline(M, R, y);
+    }
+    y += 2;
+  }
+
+  y += 3;
   if (total.excluded.length) {
-    if (y + 12 > BOTTOM) flush();
+    if (y + 5 > BOTTOM) flush();
     note(`Not in the total — to be priced: ${total.excluded.map((x) => `${x.description} (${x.work_section})`).join(" · ")}`, { fill: DOC.INK });
   }
+
+  // B5: what the rates rest on, by line count and amount.
+  const allLines = boq.sections.flatMap((s) => s.lines);
+  if (allLines.some((l) => l.rate_basis)) {
+    const by = new Map<string, { n: number; aed: number }>();
+    for (const l of allLines) {
+      const k = l.rate_basis ?? "market";
+      const c = by.get(k) ?? { n: 0, aed: 0 };
+      by.set(k, { n: c.n + 1, aed: c.aed + l.total_aed });
+    }
+    const SHORT: Record<string, string> = { calibrated: "calibrated", market: "market", firm: "your book", allowance: "allowance", tbc: "to be priced" };
+    const words = ["calibrated", "market", "firm", "allowance", "tbc"].filter((k) => by.has(k)).map((k) => `${SHORT[k]} ${by.get(k)!.n}${k === "tbc" ? "" : ` · AED ${aed(by.get(k)!.aed)}`}`);
+    // A one-line note may use the footer's margin above the legend rule (H − 23).
+    if (y > H - 27) flush();
+    note(`Rate basis (lines · amount) — ${words.join(" | ")}`, { fill: DOC.INK });
+  }
+
 
   // G5d: an INDICATIVE delivery programme, never a line. Ink bars — brass draws lines only.
   const prog = boq.programme;
@@ -200,7 +243,7 @@ export function buildBoqPdfPages(input: BoqPdfInput & { revision?: number | null
     sectionHead(x, false);
     for (const { line: l, ref, tiers } of x.lines) {
       const desc = wrapWords(l.description, 64).slice(0, 3);
-      const sub = derivedLineNote(l);
+      const sub = [derivedLineNote(l), l.stated_zero && l.notes ? l.notes : null, l.rate_basis && l.rate_basis !== "market" ? `rate: ${BASIS_WORD[l.rate_basis] ?? l.rate_basis}` : null].filter(Boolean).join(" · ");
       const subLines = sub ? wrapWords(sub, 80) : [];
       const h = 4.6 * desc.length + 3.8 * subLines.length + 4.4;
       if (y + h > BOTTOM) {

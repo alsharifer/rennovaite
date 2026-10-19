@@ -367,6 +367,8 @@ describe("nothing interior moves", () => {
       "Demolition",
       "Blockwork",
       "Plaster",
+      // B5: the wet-room package's tanking — emitted only for a one-bathroom project.
+      "Waterproofing",
       "Floor Finishes",
       "Wall Finishes",
       "Ceilings",

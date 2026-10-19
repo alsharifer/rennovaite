@@ -44,6 +44,13 @@ export const PLUMBING_TYPES = [
   // G5c. An outdoor hose bib on the garden's water supply — a garden carries one
   // or two, and a BoQ without them has quietly assumed the client has none.
   "water_tap",
+  // Bathroom pilot (client comments, 19 Oct): the shattaf (health faucet) is a
+  // supply point of its own, placed beside the WC — its position is the design.
+  "shattaf_point",
+  // A white storage cabinet standing where a bidet was: a footprint on the
+  // wet-room layer with no services. It has no plumbing point line; the
+  // wet-room package prices it as joinery.
+  "storage_cabinet",
 ] as const;
 
 /**

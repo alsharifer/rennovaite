@@ -49,3 +49,9 @@ next-env.d.ts
 # ground-truth client documents (real contract/quotation data + PII) — the
 # code-shaped source of truth lives in lib/ground-truth/, not the raw workbook.
 /data/
+
+# Bathroom pilot B2+: screenshots show the client's own photos — never in git (like data/).
+/screenshots/bathroom-pilot/b2/
+/screenshots/bathroom-pilot/b4/
+/screenshots/bathroom-pilot/b5/
+/screenshots/bathroom-pilot/b6/

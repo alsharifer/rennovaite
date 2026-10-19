@@ -59,6 +59,12 @@ export interface Room {
    */
   ceiling_h_source?: "measured" | "derived";
   /**
+   * B5 (065): how high the walls are tiled, when the room STORES it. Absent =
+   * the type default (full height for a wet room — what the take-off tiles; none
+   * for a dry one). Wall paint is measured only above it (quantify.ts).
+   */
+  tiled_height_m?: number;
+  /**
    * G1 enclosure model: this zone is open to the sky. An unroofed zone has no
    * ceiling, and its polygon edges emit NO wall — a garden is bounded by what
    * somebody drew, not by where two lawns happen to meet. Defaults false, so
@@ -326,6 +332,8 @@ export interface RawRoom {
   /** B1 (migration 061): the room's own ceiling height (m) and how it was got. */
   ceiling_h_m?: number | null;
   ceiling_h_source?: string | null;
+  /** B5 (065). */
+  tiled_height_m?: number | string | null;
 }
 
 /**
@@ -701,6 +709,7 @@ export function buildPlanGraph(input: BuildPlanGraphInput): PlanGraph {
       // would believe it.
       ceiling_h_m: unroofed ? 0 : stored ? stored.h : DEFAULT_CEILING_H_M,
       ...(stored ? { ceiling_h_source: stored.source } : {}),
+      ...(raw.tiled_height_m != null && Number.isFinite(Number(raw.tiled_height_m)) && Number(raw.tiled_height_m) >= 0 ? { tiled_height_m: Number(raw.tiled_height_m) } : {}),
       unroofed,
       ...(raw.in_scope === false ? { in_scope: false as const } : {}),
       area_derived_m2:

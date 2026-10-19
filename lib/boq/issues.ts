@@ -25,7 +25,7 @@ import { STAIRS_ASSUMED_NOTE } from "@/lib/plan/scope";
 
 import type { ReviewModel } from "./review-types";
 
-export type IssueGroupKey = "unmatched" | "unpriced" | "assumed" | "duplicates" | "derived" | "basis" | "step" | "plan_blocks" | "plan_hard" | "plan_soft";
+export type IssueGroupKey = "unmatched" | "unpriced" | "assumed" | "confirm" | "duplicates" | "derived" | "basis" | "step" | "plan_blocks" | "plan_hard" | "plan_soft";
 
 export interface IssueRow {
   id: string;
@@ -63,6 +63,7 @@ export interface IssueList {
 export const GROUP_TITLE: Record<IssueGroupKey, string> = {
   unmatched: "YOUR PRICES — NO LONGER MATCHED",
   assumed: "ASSUMED — CONFIRM",
+  confirm: "ALLOWANCE — CONFIRM ON SITE",
   unpriced: "NOT PRICED — LEFT OUT OF THE TOTAL",
   duplicates: "POSSIBLY COUNTED TWICE",
   derived: "DERIVED — CONFIRM ON SITE",
@@ -128,6 +129,17 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
     });
   }
 
+  // B5: an allowance that asks a question before its figure is firm (the ceiling's leak, the heater).
+  const confirm = lines.filter((l) => l.confirm && !l.unpriced);
+  if (confirm.length > 0) {
+    groups.push({
+      key: "confirm",
+      title: GROUP_TITLE.confirm,
+      count: confirm.length,
+      rows: confirm.map((l) => ({ id: `confirm:${l.key}`, ref: l.ref, title: l.confirm!, detail: l.description, action: "Open the line", lineKey: l.key, open: "line" as const, href: null })),
+    });
+  }
+
   const dups = model.notices.duplicates;
   if (dups.length > 0) {
     groups.push({
@@ -183,7 +195,7 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
     });
   }
 
-  const keys = new Set<string>([...unpriced.map((l) => l.key), ...assumed.map((l) => l.key), ...dups.flatMap((d) => (d.lineKeys ?? []).filter((k) => order.has(k))), ...derived.map((l) => l.key)]);
+  const keys = new Set<string>([...unpriced.map((l) => l.key), ...assumed.map((l) => l.key), ...confirm.map((l) => l.key), ...dups.flatMap((d) => (d.lineKeys ?? []).filter((k) => order.has(k))), ...derived.map((l) => l.key)]);
   return {
     groups,
     count: groups.reduce((n, g) => n + g.rows.length, 0),

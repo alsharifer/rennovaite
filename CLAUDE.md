@@ -900,6 +900,251 @@ references. Pre-flight: `BATHROOM_PILOT_PREFLIGHT.md`. One flag for the pack:
   3096: intake form → door + window → fixtures → reload → BoQ; shots in
   `screenshots/bathroom-pilot/b1/`).
 
+### Bathroom pilot B2 — photo views that keep the layout (18 Oct)
+
+- **Every photo of a room is a view** (migration **062**): `room_photos` always
+  held many rows per room but the render route reads only the latest; the
+  studio's "Your photos" (`components/blueprint/renders/PhotoViews.tsx`, behind
+  `MULTIVIEW_RENDERS_ENABLED`) lists ALL of them, oldest first, as "Photo N ·
+  your photo" (`lib/render/photo-views.ts`, pure; the same file assigned twice
+  is one view). Add photos takes several at once (the H9 direct upload, client
+  compression keeps the portrait frame). Each photo is placed on the room plan —
+  press where it was taken, drag toward what it shows, or type X / Y (m) and the
+  heading — → `PATCH /api/room-photos` (`camera_position` in normalised plan
+  space, `camera_heading_deg` compass, 0 = plan up, clockwise; a camera outside
+  the room is 422 `outside_room`). Placing a photo is not a plan edit (no
+  `design_edit`; the BoQ is not stale). `renders.room_photo_id` links a render to
+  its photo view. `room_photo_id` is a project reference kind
+  (`lib/projects/access.ts`).
+- **Checks**: `lib/render/__tests__/photo-views.test.ts` (the sheet's §4
+  cameras); live `node --env-file=.env.local scripts/b2-photo-views-check.mjs
+  [port]` on the dev test project a2661f34 (five photos through the real file
+  input, P1 by drag, P2 by keyboard, P1–P5 at §4, axe light + dark, phone).
+- **Restyle with the layout held** (migration **063**; report
+  `docs/BATHROOM_PILOT_B2.md`): `POST /api/render/photo-view { room_photo_id }`
+  → `lib/render/photo-view-run.ts` → `photo-restyle.ts restyleWithCheck`:
+  `google/nano-banana` edits the photo (`PHOTO_VIEW_ARM = "edit"` — chosen by
+  measured pass rate over depth / canny / kontext / nano-banana-pro: the
+  conditioned paths kept the layout by keeping the OLD finishes, or invented
+  detail), prompted PER VIEW: the fixtures the photo shows with where they are,
+  the ones it does not ("This photo shows no vanity — do not add any"), and only
+  the style elements in view (`styleElementsFor` — a brief that mentions a vanity
+  gets one painted into the window wall). Then the **placement check**
+  (`lib/render/photo-check.ts`, pure `judgePhotoPlacement`; vision reads by
+  `claude-opus-5-5` with structured output): the room's door / window /
+  sanitary fixtures from the plan, read in the BEFORE photo once
+  (`room_photos.before_detection`, keyed by `CHECK_VERSION`) and in the render
+  beside it; every item the photo shows must be there, centre within max(12%,
+  60% of its extent), once, same left/right order, nothing added. One
+  re-render with the findings, then the honest failure "The render moved the
+  vanity — see what differs." (the studio draws both readings). A passed view
+  also gets the **style check** (`checkStyle` v2 — the render BESIDE its photo;
+  an old finish still showing counts "no"; ≥ 0.75 → "Style follows your
+  references ✓", else which elements do not; a layout failure reads "Style not
+  checked — the layout check comes first"). Size and fittings are not checked
+  yet. Live, one render per photo: layout 5/5, style 2/5 — nano-banana holds the
+  layout partly by restyling too little. `PHOTO_VIEW_MAX_ATTEMPTS=1` caps a
+  deployment at one paid render per view (default: re-render once). Photo-view
+  renders are `mode "photo_view"`, `room_photo_id` set, **`room_id` NULL** — so
+  no room-level reader (chains, Generate all, lock progress) mistakes one for the
+  room's day render.
+- **Style from references, text first**: `POST /api/projects/:id/reference-style`
+  reads the project's References (02 Design board images) into one style brief —
+  style only, never layout — on `project_briefs.reference_style`
+  (`lib/render/reference-style.ts`; screenshots are cropped to their photo by
+  `referenceCropBox` in the eval). The first three reference images also go to
+  the edit model after the photo: `PHOTO_VIEW_IMAGE_REFS = true` (ruled 18 Oct —
+  R5 measured style 4/5 vs 5/15 text-only at layout 4/5 vs 13/15; the style gain
+  is worth the possible one-in-five layout cost; docs/BATHROOM_PILOT_B2.md).
+- **B2b — frame-pinned pro, size check** (SUPERSEDES "`PHOTO_VIEW_ARM = "edit"`"
+  and "size not checked"): the model is `photoViewArm()` —
+  `PHOTO_VIEW_MODEL` = `pro` (default, `google/nano-banana-pro`) | `edit`
+  (nano-banana, the fallback). Pro takes only an aspect enum, so
+  `lib/render/frame-pin.ts` pads the photo to 9 : 16 with mirrored edges
+  (`padToAspect`), and cuts the output back to the photo's frame. The cut uses
+  the pad geometry, refined from the fixtures read in both images (`fitMap`):
+  one scale + offset, accepted only within `FIT_BOUNDS` (15 % / 10 %), so a
+  recomposition fails instead of being cropped into passing. The placement
+  check and the style check run on the cut-back image. **Size**: every item's
+  box area must stay within ±`SIZE_TOLERANCE` (25 %) of the photo's ("the render
+  shrank the WC (−59 % of its area)"). Every photo view's check line ends
+  "· fittings may differ" (`FITTINGS_NOTE`, `photo-check-vocab.ts` — the
+  client-safe strings). Small fittings (taps, rails, hooks, riser) stay
+  unchecked: stated, not fixed. Live (P1–P5, refs on, 2 attempts):
+  - pro: layout + style **3/5** at ≈ US$0.21 per render;
+  - nano-banana under the size rule: 2/5 at ≈ US$0.09 per render;
+  - P2 and P3 still recompose (the vanity grows to the references' size).
+
+  ±25 % is near the reading noise. `scripts/b2b-rejudge.ts` re-judges eval
+  images without rendering.
+- **B4 — one design across a room's views** (migration **064**; spec §7.5,
+  Figma 82:48 / dark 82:2438; report `docs/BATHROOM_PILOT_B4.md`):
+  - **Lock and anchor.** `POST /api/render/photo-view/lock { render_id }` locks
+    a version that passed its layout check (`room_photos.locked_render_id`).
+    The room's FIRST lock anchors it (`room_anchors`): a room design spec is
+    read from that render (`lib/render/room-spec.ts extractRoomSpec`). It
+    holds floor tile, wall tile + tiled height, vanity, mirror, WC, shower
+    screen, fittings finish and palette. The WC's mounting is never in the
+    spec (`withoutMounting`): the plan decides it.
+  - **Other views render against the anchor.** Every other view of the room
+    sends the anchor's image after the photo, in place of the references, and
+    uses the spec as the look. A follows check (`checkFollows`, the render
+    beside the anchor) writes "Finishes follow Photo 2 (locked) ✓".
+    `renders.anchor_render_id` records which anchor version the render
+    followed.
+  - **What never moves the anchor.** Re-rendering a non-anchor view never
+    touches it, and a locked view is never re-rendered (409 `view_locked`).
+  - **"Ask for a change"** (`POST /api/render/photo-view/change`,
+    `lib/render/photo-view-change.ts`) keeps the edit-model path: nano-banana
+    edits the current image, then:
+    - a structural request goes to the plan (422);
+    - an unchanged image is kept as `status: "unchanged"`, never a version,
+      with R10a's message;
+    - an edit that moves a fixture is not kept;
+    - otherwise it becomes version N, with "Last change: “…” → version N ·
+      changed: <what>" (`describeChange`).
+  - **A change on the anchor moves the anchor.** The spec is read again,
+    history kept in `room_anchors.history`. Every other view then shows TO
+    UPDATE ("Photo 2 changed after this view was rendered"); none is
+    re-rendered automatically.
+  - **The studio** (`components/blueprint/renders/PhotoViewStudio.tsx`,
+    `usePhotoViews`):
+    - a room with photos lists its photo views in a left list grouped by
+      room; its one-photo day render is superseded;
+    - the centre shows the eyebrow, the image (Restyled / Your photo), the
+      views strip with Add photos and Add a view (disabled with its reason:
+      no 3D interior scene in this pilot), the design checks, Lock / Render
+      again / versions, Ask for a change and the last change;
+    - the right column shows VIEWS ON THE PLAN (room, openings, fixtures, P
+      markers; press and drag to place), the design checks per view, render
+      spend and the references.
+  - **"Render remaining" is the cost guard's default scope**
+    (`viewsToRender`): positioned, unlocked views not yet rendered against
+    the current anchor. It shows "N positioned photos · ≈ AED a–b"
+    (`photoViewCostAed`) and renders two at a time.
+  - **Next step (not wired):** the spec feeds 03 Specification and the BoQ.
+  - **Checks:** `lib/render/__tests__/room-spec.test.ts`; live
+    `node --env-file=.env.local scripts/b4-anchor-check.mjs [port] --phase=look|lock|render|change|shots`.
+- **Cost guard**: every paid call a photo view makes (image model per image,
+  each vision reading per token) is a `render_spend` row (model, size,
+  cost_usd/aed; `lib/render/render-spend.ts`, prices from the Replicate model
+  pages); `projectRenderSpend` = render_spend_aed, shown in the studio.
+- **Checks**: `lib/render/__tests__/photo-check.test.ts`; the eval
+  `scripts/b2-restyle-eval.ts` + `scripts/b2-style-rescore.ts`; live
+  `scripts/b2-photo-view-check.mjs` (studio, five views) and
+  `scripts/b2-deliberate-failure.ts` (a moved vanity must fail honestly).
+
+### Bathroom pilot B5 — a wet-room BoQ (19 Oct)
+
+Report `docs/BATHROOM_PILOT_B5.md` (the audit table). Migration **065**.
+
+- **Painting by rule (every project).** `rooms.tiled_height_m` (null = the
+  type default: full height for a wet room). The element take-off
+  (`quantify.ts`): wet tiling runs to the tiled height, net of each opening's
+  part in that band. Wall paint is measured only above it, on walls that bound
+  only wet rooms (one face per wall; a wall with a dry room keeps its paint).
+  `tiled_m2` names what is not painted, and a zero line is `stated_zero`.
+  - Editable on 01 Plan (`TiledHeights`, `PATCH /api/plan-tiling`); a
+    `design_edit` on layer "tiling" is the revision cause "Tiled height — …".
+  - The Mudon golden lost 35.5 m² of wet-wall paint.
+- **Wet-room package** (`lib/boq/wet-room.ts`) — only when
+  `plans.intake = 'room_dimensions'` and the one room is a bathroom, ensuite
+  or powder room (villas are untouched until R10). Applied in `assemble.ts`
+  after joinery:
+  - **removes** villa lines: Q-05, the GT aluminium package, the GT door
+    joinery and bath cabinet, Q-19 re-pipe, Q-20 heater supply, Q-22 wall-hung
+    WC, Q-24d actuator, villa prelims, the plain mirror; ceiling_finish is
+    filtered from the take-off;
+  - **adds** W-01…W-24, priced through the engine's resolver
+    (`priceScopeItem`, exported from engine.ts) on rules R-49, R-51–R-65:
+    strip-out, waterproofing (a new POMI section, REF WPR, after Plaster),
+    screed, skirting 0 stated, lit niche, ceiling repair (allowance), WC / bidet
+    / bath, backlit mirror, shaver, extractor, cove on the bulkhead, heater
+    box-in, ceiling paint;
+  - **one TBC line** (community NOC) at 0, never in the total;
+  - **options** (`boq.options`, outside the sections): wall-hung WC and
+    bulkhead removal. `priceOptions` runs LAST, putting each option's delta
+    through the chain;
+  - **every line has `rate_basis`** (`lib/boq/rate-basis.ts`: calibrated |
+    market | allowance | tbc | firm);
+  - **`confirm_on_site` questions** appear in the Issues navigator under
+    "ALLOWANCE — CONFIRM ON SITE".
+  - The heater (a plumbing `water_heater` fixture) and the bulkhead
+    (`rooms.spec.bulkhead`) come from the plan.
+- **Where it shows:**
+  - the BoQ page `RateBasisLine` + `Options` (Extras);
+  - the BoQ PDF page 1 — a one-page summary with options and basis; rows
+    tighten above 10 sections;
+  - the proposal — options under the price summary, no provenance.
+- **Bidet and bath points are priced** (650 / 750, `lib/overlays/catalog.ts`).
+- **Pilot:** AED 202,645.35 → **49,267.88**; options + 2,778.30 / + 905.38.
+- **Checks:** `lib/boq/__tests__/wet-room.test.ts`, `scripts/b5-bathroom-boq.ts`
+  (in-process dump), live `scripts/b5-bathroom-check.ts`.
+
+### Bathroom pilot B6 — the room's client pack (19 Oct)
+
+Report `docs/BATHROOM_PILOT_B6.md`. No migration.
+
+- **The document**: `GET /api/projects/:id/room-pack` — a DOCUMENT route
+  (`guardDocumentRoute`, in `DOCUMENT_ROUTES`, `DRAWINGS_ENABLED`, fonts in
+  `outputFileTracingIncludes`). `?format=json` gives the contents;
+  `?format=pages` gives the page SVGs plus `images` (where each photograph sits).
+  - Loader: `lib/documents/room-pack-pdf.ts` (`generateRoomPack`).
+  - Pages: `lib/documents/room-pack.ts` (`buildRoomPack`, pure).
+  - Page order: cover (anchor render, total) → the room with every photo's camera
+    → a page per view (the locked / latest passed version beside the photo, the
+    studio's check lines) → the drawings → materials (the anchor's spec) → BoQ →
+    price (chain to the fil, to-be-priced, options) → indicative programme
+    (`loadTimeline`, labelled derived).
+  - Export pack adds it when the plan is a room intake with one room (`run.ts`
+    `roomPack`), with two checks: the total equals the BoQ's, and no withheld
+    identity.
+- **The drawings**: `lib/drawings/room-sheets.ts`, 1:20, numbered **R-** so they
+  never collide with the drawing set's A- sheets.
+  - R-101 plan: walls; the door's leaf and swing from `plan_openings.spec.hinge`
+    (`"W"` etc. — no swing and "hinge not stated" without it; set by API, no
+    editor control yet); fixture codes; a chain per wall that closes; fixture
+    centres.
+  - R-201…R-204 elevations, one per wall from inside:
+    - tile setting-out `settingOut` (joint vs centred tile, larger equal cuts,
+      dimensioned joint to joint) on the anchor's tile (`wallTileFrom`, default
+      600 × 1200 assumed);
+    - openings from the graph;
+    - fixtures at `FIXTURE_HEIGHTS_MM` with ≈, face-on only on the wall their
+      back is against (`backWallOf`), else a side profile;
+    - the mirror round only when the spec says so (`mirrorIsRound`);
+    - `spec.column_wall` / `niche_wall` place the shower valve and niche;
+      `water_heater` takes `spec.height_mm`.
+  - Every dim carries `data-dim` / `data-mm` / `data-src`.
+- **Client comments (19 Oct)** — report: the B6 doc, "Client comments"; applied
+  with `scripts/b6-client-comments.ts`; anchor edits with
+  `scripts/b6-client-renders.ts --change-only --request "…"`.
+  - **New fixture types**:
+    - `storage_cabinet`: a footprint with no services, `pointLine: false` in
+      the catalog, priced as joinery W-25 / R-66.
+    - `shattaf_point`: a plumbing point, 350.
+  - **A fixture can REPLACE another in place** (`spec.replaces`, e.g.
+    `"bidet_point"`). The check reads the old item in the photo and the new one
+    in the render, held to the old footprint. The replaced item is a `gone` item
+    that fails the render if it is still there. The restyle prompt swaps it.
+  - **Spec choices** in `rooms.spec.wet_room` (`WetRoomChoices`): screen,
+    valve, vanity, fittings, waste, niche LED. Each is its own product at
+    R-67…R-74; absent = the base case. `existing_fixtures` names what the
+    strip-out removes.
+  - **"Ask for a change"**:
+    - checked against the plan's current items (`carryLocated`);
+    - a refused change keeps its candidate URL and both readings;
+    - `request_done: "no"` = unchanged, never a version;
+    - change prompts forbid adding a window, door or opening.
+  - **Re-locking another version of the anchor view moves the anchor** back to
+    it (its stored spec when it held it before).
+  - **Where the shattaf goes in each view**: `lib/render/fitting-notes.ts`.
+- **Checks**: `lib/drawings/__tests__/room-sheets.test.ts`; live
+  `scripts/b6-room-pack-check.ts [port]`. It checks every dimension against the
+  graph to the mm, that the chains and setting-out close, the hinge, the total,
+  and identity, and writes review PNGs with the photos to
+  `screenshots/bathroom-pilot/b6/pack/`.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic
@@ -2867,7 +3112,9 @@ surface: the rail keeps the step you came from, `shell/step-memory.ts`).
 | `UPLOAD_SWEEP_APPLY`              | server — H9: `"true"` lets the daily sweep DELETE stale pending uploads / staged downloads. Unset = dry-run (logs what it would delete) |
 | `PROJECT_PURGE_APPLY`             | server — K10: `"true"` lets the daily purge remove projects deleted > 30 days ago (rows + Storage). Unset = dry-run (logs ids and counts) |
 | `GARDEN_PILOT_ENABLED`            | server — `"true"` turns on G1: drawing a plan from scratch, outdoor zone types, the unroofed/open-edge enclosure model, and the linear-element layer |
-| `MULTIVIEW_RENDERS_ENABLED`       | server — the bathroom pilot's one flag (B1–B6). B1: `"true"` adds "One room from its dimensions" to the intake. Off = the intake is exactly as before |
+| `MULTIVIEW_RENDERS_ENABLED`       | server — the bathroom pilot's one flag (B1–B6). B1: `"true"` adds "One room from its dimensions" to the intake; B2: the studio's photo views. Off = intake and studio exactly as before |
+| `PHOTO_VIEW_MAX_ATTEMPTS`         | server — B2: `1` = one paid render per photo view (no re-render after a failed check). Unset = the first render and one re-render |
+| `PHOTO_VIEW_MODEL`                | server — B2b: the photo-view restyle model. Unset / `"pro"` = frame-pinned `google/nano-banana-pro`; `"edit"` = `google/nano-banana` (the fallback) |
 
 ### Feature flags — read at server start (flip → restart)
 

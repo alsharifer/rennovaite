@@ -28,7 +28,7 @@ import { pointToSegment } from "@/lib/plan/polygon";
 import type { FixtureType } from "./types";
 
 /** The fixtures that stand on the floor against a wall and have a size. */
-export const FOOTPRINT_TYPES = ["wc_point", "bidet_point", "basin_point", "shower_mixer", "bath_point"] as const;
+export const FOOTPRINT_TYPES = ["wc_point", "bidet_point", "basin_point", "shower_mixer", "bath_point", "storage_cabinet"] as const;
 export type FootprintType = (typeof FOOTPRINT_TYPES)[number];
 
 export const isFootprintType = (t: FixtureType | string): t is FootprintType => (FOOTPRINT_TYPES as readonly string[]).includes(t);
@@ -44,6 +44,7 @@ export const DEFAULT_FOOTPRINT_MM: Record<FootprintType, { width_mm: number; dep
   basin_point: { width_mm: 900, depth_mm: 600 },
   shower_mixer: { width_mm: 900, depth_mm: 900 },
   bath_point: { width_mm: 1700, depth_mm: 750 },
+  storage_cabinet: { width_mm: 400, depth_mm: 450 },
 };
 
 export interface Footprint {

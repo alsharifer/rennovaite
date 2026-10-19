@@ -472,6 +472,148 @@ export const RATE_RULES: Record<string, RateRule> = {
     allowance_note:
       "G21 — bathroom mirror, AED 650/no indicative (5mm silvered, polished edge, concealed fixing, ~900x700). Excluded from the aluminum package; the sanitary accessory set carries no mirror either. QS to confirm.",
   },
+
+  // --- B5: the wet-room package (one bathroom from its dimensions) -----------
+  //
+  // Lines a QS expects for a bathroom refit that the villa engine never priced.
+  // No transaction backs any of these: each is an ALLOWANCE with its reasoning,
+  // QS to confirm. Where a market or Mudon-calibrated rate exists the package
+  // reuses that rule instead (R-01/02/03 strip-out, R-05 screed, R-13 paint,
+  // R-18 drain, R-19/20/21 sanitaryware, R-31/R-45 cove, R-40–43 accessories).
+  "prelim.room_protection": {
+    rule_id: "R-49",
+    allowance_aed: 1200,
+    allowance_note:
+      "B5 — protection of the access route + dust screens, daily clean, ONE room in an occupied home, AED 1,200 lump allowance. R-27 (12,000) is a whole first-floor refit. QS to confirm.",
+  },
+  "prelim.room_clean": {
+    rule_id: "R-51",
+    allowance_aed: 400,
+    allowance_note: "B5 — final clean of one room and its access route, AED 400 lump allowance (R-39 is 1,500 for a whole floor). QS to confirm.",
+  },
+  "demo.shower_screen": {
+    rule_id: "R-52",
+    allowance_aed: 250,
+    allowance_note: "B5 — take down + dispose of the existing shower screen and its fixings, AED 250 per screen allowance. QS to confirm.",
+  },
+  "demo.ceiling_strip": {
+    rule_id: "R-53",
+    allowance_aed: 25,
+    allowance_note: "B5 — strip the damaged ceiling finish (flaking paint, failed skim) back to sound plaster, AED 25/m² allowance. QS to confirm.",
+  },
+  "ceiling.repair": {
+    rule_id: "R-54",
+    allowance_aed: 45,
+    allowance_note:
+      "B5 — ceiling repair: fungicidal wash, stain-block primer, skim to a paint finish, AED 45/m² ALLOWANCE until the cause of the water damage is known (a leak from above is a different job). QS to confirm.",
+  },
+  "wp.membrane": {
+    rule_id: "R-55",
+    allowance_aed: 50,
+    allowance_note:
+      "B5 — liquid-applied waterproofing membrane, 2 coats with reinforcing tape at corners, upstands and drains, AED 50/m² (as the terrace membrane R-34). QS to confirm.",
+  },
+  "wall.shower_niche": {
+    rule_id: "R-56",
+    allowance_aed: 950,
+    allowance_note: "B5 — recessed shower niche ~600 × 300: forming, waterproofing, tiling and an LED strip, AED 950 per niche allowance. QS to confirm.",
+  },
+  "san.wc_floor": {
+    rule_id: "R-57",
+    allowance_aed: 1600,
+    allowance_note:
+      "B5 — floor-standing close-coupled rimless WC, supply + install at the existing soil position, AED 1,600 allowance. R-19 (2,400) is the market band for a WC suite and was used for the reference villa's wall-hung WCs with concealed cisterns — the option prices that. QS to confirm.",
+  },
+  "san.bidet": {
+    rule_id: "R-58",
+    allowance_aed: 1400,
+    allowance_note: "B5 — floor-standing bidet with mixer, supply + install at the existing position, AED 1,400 allowance. QS to confirm.",
+  },
+  "alum.mirror_backlit": {
+    rule_id: "R-59",
+    allowance_aed: 1400,
+    allowance_note: "B5 — backlit LED mirror ~700 mm, round or pill, demister, supply + install, AED 1,400 allowance (R-48 is a plain 650 mirror). QS to confirm.",
+  },
+  "elec.shaver": {
+    rule_id: "R-60",
+    allowance_aed: 250,
+    allowance_note: "B5 — shaver supply unit (BS EN 61558 isolating) by the mirror, supply + install, AED 250 allowance. QS to confirm.",
+  },
+  "elec.extractor": {
+    rule_id: "R-61",
+    allowance_aed: 650,
+    allowance_note: "B5 — ceiling extractor fan with run-on timer / humidistat and isolator, ducted to the existing outlet, AED 650 allowance. QS to confirm the duct route.",
+  },
+  "plumb.heater_box": {
+    rule_id: "R-62",
+    allowance_aed: 900,
+    allowance_note: "B5 — box in the retained water heater (MR board on frame, access panel, tiled or painted to match), or relocate it locally, AED 900 allowance. QS to confirm on site.",
+  },
+  "san.wc_duct_wall": {
+    rule_id: "R-63",
+    allowance_aed: 1200,
+    allowance_note: "B5 option — duct wall for a wall-hung WC: MR board on the concealed-cistern frame, waterproofed and tiled, ~1.2 m wide, AED 1,200 allowance. QS to confirm.",
+  },
+  "ceiling.bulkhead_removal": {
+    rule_id: "R-64",
+    allowance_aed: 1100,
+    allowance_note: "B5 option — take down the curved plaster bulkhead over the shower, make good to a flat ceiling, re-site its downlight, AED 1,100 lump allowance; check what it conceals first. QS to confirm.",
+  },
+  // --- Client comments (19 Oct): a storage cabinet for the bidet, and the
+  // value-engineered choices a wet room can take (rooms.spec.wet_room). Each
+  // is a SPEC change at its own allowance — no existing rate is cut.
+  "joinery.storage_cabinet": {
+    rule_id: "R-66",
+    allowance_aed: 750,
+    allowance_note: "White floor-standing storage cabinet ~400 × 450 × 850, moisture-resistant carcass, one door + shelves, supply + install, AED 750 allowance. QS to confirm.",
+  },
+  "alum.shower_panel_fixed": {
+    rule_id: "R-67",
+    allowance_aed: 2000,
+    allowance_note: "Fixed walk-in glass panel, 10 mm clear toughened, up to ~1.4 m, wall profile + stay bar, brushed-brass fittings, supply + install, AED 2,000 allowance (the hinged 2-panel enclosure is 2 × 2,200, R-47). QS to confirm.",
+  },
+  "san.shower_manual": {
+    rule_id: "R-68",
+    allowance_aed: 2200,
+    allowance_note: "Concealed manual shower mixer with diverter, rain head + hand shower, brushed brass, supply + install at the existing position, AED 2,200 allowance (thermostatic set R-21 is 3,500). QS to confirm.",
+  },
+  "joinery.vanity_ready": {
+    rule_id: "R-69",
+    allowance_aed: 2000,
+    allowance_note: "Ready-made wall-hung vanity unit ~800–900 mm, two drawers, integrated ceramic basin top, supply + install, AED 2,000 allowance (the floating unit + stone top is 1,800 + 1,450). QS to confirm.",
+  },
+  "san.basin_mixer_mid": {
+    rule_id: "R-70",
+    allowance_aed: 600,
+    allowance_note: "Basin mixer, mid-range, brushed brass, supply + install on the vanity's own basin, AED 600 allowance (R-20's 1,800 includes a separate basin). QS to confirm.",
+  },
+  "san.wc_floor_mid": {
+    rule_id: "R-71",
+    allowance_aed: 1200,
+    allowance_note: "Floor-standing close-coupled WC, mid-range, supply + install at the existing soil position, AED 1,200 allowance (R-57 is 1,600). QS to confirm.",
+  },
+  "alum.mirror_led_mid": {
+    rule_id: "R-72",
+    allowance_aed: 900,
+    allowance_note: "LED-lit mirror ~700 mm, mid-range, no demister, supply + install, AED 900 allowance (R-59 is 1,400). QS to confirm.",
+  },
+  "prelim.waste_bagged": {
+    rule_id: "R-73",
+    allowance_aed: 600,
+    allowance_note: "Strip-out waste of ONE room bagged and carried out by hand, carted away, AED 600 lump allowance — instead of a skip (R-29, 1,500). Check the community allows it. QS to confirm.",
+  },
+  "wall.shower_niche_plain": {
+    rule_id: "R-74",
+    allowance_aed: 600,
+    allowance_note: "Recessed shower niche ~600 × 300, formed, waterproofed, tiled — no LED strip, AED 600 allowance (R-56 with the LED is 950). QS to confirm.",
+  },
+  "san.bath": {
+    rule_id: "R-65",
+    labour: {
+      work_section: "Sanitaryware",
+      description: "Bathtub — supply and install",
+    },
+  },
 };
 
 // --- P: project-level percentages (rule IDs P-xx) -----------------------------

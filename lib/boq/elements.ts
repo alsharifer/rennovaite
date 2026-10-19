@@ -52,6 +52,8 @@ export interface MappedLine {
   rate_tier?: "firm_private" | "firm_correction";
   /** R10b: the quantity is net of an opening whose size is derived. */
   qty_derived?: boolean;
+  /** B5: a zero that is the answer, not a gap (no wall paint where every wall is tiled). */
+  stated_zero?: true;
 }
 
 export interface MappedSection {
@@ -95,10 +97,19 @@ export function assembleMappedSections(items: TakeoffItem[], price?: ElementPric
     const deducted = r2(grossTotal - quantity);
     // R10b: a deduction resting on a derived opening size makes the quantity derived.
     const derivedOpenings = Array.from(new Set(its.flatMap((i) => i.derived_opening_refs ?? [])));
-    const notes =
+    const base =
       openingRefs.length > 0
         ? `Aggregated from ${its.length} element take-off items. NET of ${openingRefs.length} opening${openingRefs.length === 1 ? "" : "s"}: gross ${grossTotal} m² − ${deducted} m² (doors/windows) = ${quantity} m², floored at 0 per element.${derivedOpenings.length > 0 ? ` ${derivedOpenings.length} of these opening sizes ${derivedOpenings.length === 1 ? "is" : "are"} derived, not measured — check on the plan.` : ""}`
         : `Aggregated from ${its.length} element take-off items.`;
+    // B5: wall paint names the tiled wall it leaves out; a line that is zero
+    // because every wall is tiled says so — a stated zero, never a silent one.
+    const tiled = r2(its.reduce((s, i) => s + (i.tiled_m2 ?? 0), 0));
+    const statedZero = key === "wall_paint" && quantity === 0 && tiled > 0;
+    const notes = statedZero
+      ? `No wall painting: every wall here is tiled to its full height (${tiled} m² tiled — wet rooms are painted only above their tiled height).`
+      : tiled > 0
+        ? `${base} Wet-room walls are painted only above their tiled height: ${tiled} m² of wall is tiled instead.`
+        : base;
 
     const unit = its[0]!.unit;
     const book = price?.(key, unit) ?? null;
@@ -121,6 +132,7 @@ export function assembleMappedSections(items: TakeoffItem[], price?: ElementPric
       work_item_key: key,
       ...(book ? { rate_tier: book.rate_tier } : {}),
       ...(derivedOpenings.length > 0 ? { qty_derived: true } : {}),
+      ...(statedZero ? { stated_zero: true as const } : {}),
     });
   }
 

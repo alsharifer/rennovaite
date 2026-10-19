@@ -29,6 +29,8 @@ import { PlanNotAnalysed } from "./_components/plan-not-analysed";
 import { planGate } from "@/lib/plan/plan-gate";
 import { RoomsInScope } from "@/components/blueprint/plan/RoomsInScope";
 import { CeilingHeights, type CeilingRoom } from "@/components/blueprint/plan/CeilingHeights";
+import { TiledHeights, type TiledRoom } from "@/components/blueprint/plan/TiledHeights";
+import { isTiledRoomType } from "@/lib/plan/tiling";
 import { storedCeiling } from "@/lib/plan/geometry";
 import { ROOM_INTAKE_OPENING_DIMS } from "@/lib/plan/room-intake";
 import { isOutdoorType } from "@/lib/plan/zones";
@@ -327,6 +329,14 @@ export default async function PlanPage({
       const s = storedCeiling(r);
       return { id: r.id, name: r.name_en ?? "(unnamed)", ceiling_h_m: s?.h ?? null, source: s?.source ?? null };
     });
+  // B5 (065): every wet room's tiled height (empty = full height). Best-effort before 065.
+  const tiledRes = await sb.from("rooms").select("id, tiled_height_m").eq("plan_id", plan.id).returns<{ id: string; tiled_height_m: number | null }[]>();
+  const tiledById = new Map((tiledRes.error ? [] : tiledRes.data ?? []).map((r) => [r.id, r.tiled_height_m == null ? null : Number(r.tiled_height_m)]));
+  const tiledRooms: TiledRoom[] = tiledRes.error
+    ? []
+    : ceilingRooms
+        .filter((c) => isTiledRoomType(roomList.find((r) => r.id === c.id)?.room_type))
+        .map((c) => ({ id: c.id, name: c.name, tiled_height_m: tiledById.get(c.id) ?? null, ceiling_h_m: c.ceiling_h_m ?? 2.9 }));
   const next =
     persona === "firm"
       ? { label: "Continue to 03 Specification", href: `/project/${projectId}/accessories` }
@@ -414,6 +424,7 @@ export default async function PlanPage({
             </section>
 
             {ceilingRooms.length > 0 ? <CeilingHeights planId={plan.id} rooms={ceilingRooms} /> : null}
+            {tiledRooms.length > 0 ? <TiledHeights planId={plan.id} rooms={tiledRooms} /> : null}
 
             {process.env.DRAWINGS_ENABLED === "true" || process.env.VIEWER_3D_ENABLED === "true" ? (
               <section aria-label="From this plan" className="flex flex-col items-start gap-3 border-t border-bp-line-hairline pt-4">
