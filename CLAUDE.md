@@ -1206,6 +1206,30 @@ Report `docs/BATHROOM_PILOT_B9.md`. Migration **066**.
     (rev 15, AED 37,601.29). Room protection stays an allowance — no per-room
     figure exists.
 
+### Bathroom pilot B10 — masked per-fixture edits (20 Oct)
+
+Report `docs/BATHROOM_PILOT_B10.md`. No migration.
+
+- **Masked edit** (`lib/render/masked-edit.ts`):
+  - `black-forest-labs/flux-fill-pro` inpaints inside a mask built from the
+    check's boxes;
+  - `compositeInside` pastes the original back outside it — nothing outside the
+    mask can change, by construction;
+  - `raiseToTop` raises a replacement's mask to its STATED height from the
+    reading's top share.
+- **Measured on the pilot:**
+  - Photo 2's four client comments: 5 masked edits, 3 kept, every layout held
+    (B6: 16 edits, 10 kept). The fixed glass panel was not done in two tries;
+    the three kept were each "partly" done.
+  - The vanity: ×0.98 masked vs ×2.68 with its size stated in the prompt.
+  - A masked RESTYLE is not viable: the shell barely restyles and invents.
+- **Not wired**: "Ask for a change" and the restyle pipeline are unchanged,
+  pending a ruling on masked edits for in-place requests.
+- **Hard spend cap** (`lib/render/spend-cap.ts` `SpendCap`): every paid call
+  reserves its worst case (`WORST_CASE_USD`) against the session's tagged
+  render_spend (`detail.session_ref`) and is refused past the cap. Every render
+  session uses one; the cap is never raised mid-session.
+
 ### Sprint C1 — ground truth never emits a line; glazing from the plan (20 Oct)
 
 Root cause: `docs/SPRINT_C_ROOT_CAUSE.md` (C0). Jumeirah's BoQ carried the
