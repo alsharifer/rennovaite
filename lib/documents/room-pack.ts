@@ -12,8 +12,8 @@
 //   materials      the room design spec read from the locked view
 //   BoQ            by section, every line; to-be-priced lines named
 //   price          the chain to the fil and the options, outside the total
-//   programme      the interior phase model scaled from the reference villa —
-//                  indicative, derived, labelled
+//   programme      the room's own programme from its quantities
+//                  (lib/timeline/room-programme.ts) — dropped when it cannot
 //
 // Photographs are image SLOTS the PDF step fills (`src` = the image URL); the
 // page chrome is SVG. No rate, source, tier, supplier or contractor reaches a
@@ -63,6 +63,8 @@ export interface RoomPackView {
 }
 
 export interface RoomPackLine {
+  /** B5: what the rate rests on — calibrated | market | allowance | tbc | firm. */
+  rate_basis?: string;
   description: string;
   quantity: number;
   unit: string;
@@ -97,7 +99,8 @@ export interface RoomPackInput {
     grand_total_aed: number;
     options?: { key: string; label: string; note: string; net_aed: number; delta_total_aed?: number }[];
   };
-  programme: { total_days: number; low_days: number; high_days: number; phases: { label: string; start_day: number; days: number }[]; basis: string } | null;
+  /** B7: the room-scoped programme (lib/timeline/room-programme.ts) — null drops the page. */
+  programme: { total_days: number; low_days: number; high_days: number; phases: { label: string; start_day: number; days: number; basis?: string }[]; basis: string } | null;
 }
 
 const unpriced = (l: RoomPackLine) => l.rate_status === "needs_qs" && (l.rate_aed ?? 0) === 0;
@@ -334,17 +337,18 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     row(`Contingency ${input.boq.contingency_pct}%`, aed(input.boq.contingency_aed));
     row(`VAT ${input.boq.vat_pct}%`, aed(input.boq.vat_aed));
     row("Total", `AED ${aed(input.boq.grand_total_aed)}`, `data-grand-total="${input.boq.grand_total_aed}"`, true);
+    // B7 1d: a line still to be priced is on the page, beside the total, never inside it.
+    for (const l of unpricedLines) row(l.description, "TBC — not in total", `data-tbc="${esc(l.description)}"`);
+    // B7 1e: how much of the price rests on our own estimates.
+    const counted = input.boq.sections.flatMap((sec) => sec.lines).filter((l) => unpriced(l) || (Number(l.quantity) || 0) > 0);
+    const allowances = counted.filter((l) => l.rate_basis === "allowance").length;
+    y += 2;
+    for (const line of wrapWords(`${allowances} of ${counted.length} lines are our estimates (allowances), for the QS to confirm.`, 80)) {
+      s += text(M, y, line, { size: 3.3, weight: 600, attrs: `data-allowances="${allowances}" data-lines="${counted.length}"` });
+      y += 5;
+    }
     let oy = 46;
     const ox = 240;
-    if (unpricedLines.length) {
-      s += label(ox, oy, "Not in the total — to be priced");
-      oy += 6;
-      for (const l of unpricedLines) for (const line of wrapWords(l.description, 70)) {
-        s += text(ox, oy, line, { size: 3.2 });
-        oy += 4.8;
-      }
-      oy += 6;
-    }
     const opts = input.boq.options ?? [];
     if (opts.length) {
       s += label(ox, oy, "Options — priced separately, not in the total");
@@ -367,16 +371,17 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
   if (input.programme?.phases.length) {
     const p = input.programme;
     let s = frame(input, "Indicative programme", pages.length + 1);
-    s += text(M, 40, `≈ ${p.total_days} working days (${p.low_days}–${p.high_days}) — indicative, derived`, { size: 4, font: DOC.MONO, attrs: `data-programme-days="${p.total_days}"` });
+    s += text(M, 40, `≈ ${p.total_days} working days (${p.low_days}–${p.high_days}) — derived from this room's quantities`, { size: 4, font: DOC.MONO, attrs: `data-programme-days="${p.total_days}"` });
     const barX = 150, barW = R - barX;
     let y = 52;
     for (const ph of p.phases) {
       s += text(M, y + 3.2, ph.label, { size: 3.2 });
+      if (ph.basis) s += text(M, y + 7.4, ph.basis, { size: 2.6, fill: DOC.INK_2, font: DOC.MONO });
       s += text(barX - 4, y + 3.2, `${ph.days} d`, { size: 3, fill: DOC.INK_2, font: DOC.MONO, anchor: "end" });
       s += hline(barX, R, y + 2.2);
       const x0 = barX + (ph.start_day / p.total_days) * barW; // start_day is 0-based
       s += `<rect x="${x0.toFixed(1)}" y="${(y + 0.6).toFixed(1)}" width="${Math.max(0.8, (ph.days / p.total_days) * barW).toFixed(1)}" height="3.2" fill="${DOC.INK}" data-programme-phase="${esc(ph.label)}"/>`;
-      y += 8;
+      y += ph.basis ? 12 : 8;
     }
     y += 6;
     for (const line of wrapWords(`${p.basis} A conversation starter for your contractor's own programme — never a commitment.`, 150)) {
