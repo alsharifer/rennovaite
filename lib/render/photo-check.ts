@@ -31,7 +31,7 @@ import type { PhotoCamera } from "./photo-views";
 
 export const CHECK_MODEL = "claude-opus-5-5";
 /** Bumped when what the check asks changes — a kept before-reading of an older version is read again. */
-export const CHECK_VERSION = "c2";
+export const CHECK_VERSION = "c3";
 /** USD per million tokens (Anthropic first-party, 6 Oct 2026). */
 export const CHECK_PRICE = { input: 4, output: 20 } as const;
 
@@ -59,6 +59,15 @@ export interface CheckItem {
    * keep, never "added".
    */
   gone?: true;
+  /**
+   * B8: where the item's top should reach, as a share of floor-to-ceiling height —
+   * set only when the plan STATES its height (spec.height_mm) and the room's
+   * ceiling is known. A replacement's size is free, its height is not (a
+   * 1.2 m cabinet drawn 2 m tall passed B7's check).
+   */
+  top_share?: number;
+  /** The stated height, mm (for the failure line). */
+  height_mm?: number;
 }
 
 const FIXTURE_KIND: Record<string, Pick<CheckItem, "kind" | "short" | "description">> = {
@@ -71,6 +80,8 @@ const FIXTURE_KIND: Record<string, Pick<CheckItem, "kind" | "short" | "descripti
 };
 
 export interface PlanLite {
+  /** The room's ceiling height, m (B1's stored value) — with a stated fixture height it gives the item's expected top. */
+  ceiling_h_m?: number | null;
   openings: { id: string; kind: string; position: [number, number]; width_mm: number }[];
   fixtures: { id: string; type: string; position: [number, number]; spec: Record<string, unknown> | null }[];
 }
@@ -89,7 +100,8 @@ export function checkItemsFor(plan: PlanLite): CheckItem[] {
     // A stated height reaches the words the model reads (a cabinet ~1.2 m tall, not a low unit).
     const hmm = typeof fx.spec?.height_mm === "number" ? Number(fx.spec.height_mm) : null;
     const tall = hmm ? (fx.type === "storage_cabinet" ? `, about ${(hmm / 1000).toFixed(1)} m tall — well above the WC cistern` : `, about ${(hmm / 1000).toFixed(2)} m to its top`) : "";
-    if (k) out.push({ ref: `F${++f}`, plan_id: fx.id, ...k, description: k.description + tall, ...(was ? { replaces: { short: was.short, description: was.description } } : {}) });
+    const top = hmm && plan.ceiling_h_m && plan.ceiling_h_m > 0 ? Math.round((hmm / 1000 / plan.ceiling_h_m) * 100) / 100 : null;
+    if (k) out.push({ ref: `F${++f}`, plan_id: fx.id, ...k, description: k.description + tall, ...(was ? { replaces: { short: was.short, description: was.description } } : {}), ...(top ? { top_share: top, height_mm: hmm! } : {}) });
   }
   // What each replacement removes, so a render that keeps it fails.
   let x = 0;
@@ -166,6 +178,8 @@ export interface Located {
   /** % of the frame, [x0, y0, x1, y1]; null when not present. */
   box: Box | null;
   instances: number;
+  /** B8: how high its top reaches, as a share of the floor-to-ceiling height of the wall behind it (0–1); null when not read. */
+  top?: number | null;
   note?: string;
 }
 
@@ -174,6 +188,8 @@ export interface Detection {
   model: string;
   at: string;
   usage?: { input_tokens: number; output_tokens: number };
+  /** B8: the separate readings the agreed one was made from (two, or three when the first two disagreed). */
+  reads?: Located[][];
 }
 
 const centre = (b: Box): [number, number] => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
@@ -194,8 +210,8 @@ export interface PlacementVerdict {
   line: string;
 }
 
-import { FITTINGS_NOTE, FITTINGS_NOTE_FULL, LAYOUT_OK_LINE, SIZE_TOLERANCE } from "./photo-check-vocab";
-export { FITTINGS_NOTE, FITTINGS_NOTE_FULL, LAYOUT_OK_LINE, SIZE_TOLERANCE };
+import { FITTINGS_NOTE, FITTINGS_NOTE_FULL, HEIGHT_TOLERANCE, LAYOUT_OK_LINE, SIZE_TOLERANCE, TOP_TOLERANCE } from "./photo-check-vocab";
+export { FITTINGS_NOTE, FITTINGS_NOTE_FULL, HEIGHT_TOLERANCE, LAYOUT_OK_LINE, SIZE_TOLERANCE, TOP_TOLERANCE };
 
 /** The honest failure: the first thing that moved, said plainly. */
 export function failureLine(failures: readonly PlacementFailure[]): string {
@@ -242,12 +258,21 @@ export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<De
     // A change that asks for this item to change (a fixed panel instead of a hinged
     // screen) changes its size on purpose: its place is still held.
     if (it.replaces || opts.resizable?.has(it.ref)) {
-      if (a.instances > 1) failures.push({ ref: it.ref, short: it.short, reason: "duplicated", message: `the render added a second ${it.short}` });
+      const tall = topFailure(it, a);
+      if (tall) failures.push(tall);
+      else if (a.instances > 1) failures.push({ ref: it.ref, short: it.short, reason: "duplicated", message: `the render added a second ${it.short}` });
       continue;
     }
     const ratio = area(b.box!) > 0 ? area(a.box) / area(b.box!) : 1;
-    if (ratio < 1 - SIZE_TOLERANCE || ratio > 1 + SIZE_TOLERANCE) {
+    if (outside(ratio, SIZE_TOLERANCE)) {
       failures.push({ ref: it.ref, short: it.short, reason: "resized", message: `the render ${ratio < 1 ? "shrank" : "enlarged"} the ${it.short} (${Math.round((ratio - 1) * 100)}% of its area)` });
+      continue;
+    }
+    // B8: height on its own — a fixture can keep its area and still grow tall and narrow.
+    const hb = b.box![3] - b.box![1], ha = a.box[3] - a.box[1];
+    const hRatio = hb > 0 ? ha / hb : 1;
+    if (outside(hRatio, HEIGHT_TOLERANCE)) {
+      failures.push({ ref: it.ref, short: it.short, reason: "resized", message: `the render made the ${it.short} ${hRatio < 1 ? "shorter" : "taller"} (${Math.round((hRatio - 1) * 100)}% of its height)` });
       continue;
     }
     if (a.instances > Math.max(1, b.instances)) failures.push({ ref: it.ref, short: it.short, reason: "duplicated", message: `the render added a second ${it.short}` });
@@ -272,6 +297,19 @@ export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<De
     }
   }
   return { passed: failures.length === 0, checked: checked.map((c) => c.ref), failures, line: failureLine(failures) };
+}
+
+/** A ratio outside ×(1 + t) either way (symmetric in log terms: ×1.5 and ÷1.5 are the same size of change). */
+function outside(ratio: number, t: number): boolean {
+  return ratio > 1 + t || ratio < 1 / (1 + t);
+}
+
+/** B8: an item whose plan states its height, drawn too tall or too short against the wall behind it. */
+function topFailure(it: CheckItem, a: Located): PlacementFailure | null {
+  if (it.top_share == null || a.top == null) return null;
+  if (Math.abs(a.top - it.top_share) <= TOP_TOLERANCE) return null;
+  const planned = it.height_mm ? ` (about ${((a.top / it.top_share) * it.height_mm / 1000).toFixed(1)} m; ${(it.height_mm / 1000).toFixed(1)} m planned)` : "";
+  return { ref: it.ref, short: it.short, reason: "resized", message: `the render made the ${it.short} too ${a.top > it.top_share ? "tall" : "short"}${planned}` };
 }
 
 /** Boxes into % of the frame, ordered and clamped (pixels and fractions recognised — the G5d lesson). */
@@ -303,7 +341,7 @@ const DETECTION_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["ref", "present", "x0", "y0", "x1", "y1", "instances", "note"],
+        required: ["ref", "present", "x0", "y0", "x1", "y1", "instances", "top", "note"],
         properties: {
           ref: { type: "string" },
           present: { type: "boolean" },
@@ -312,6 +350,7 @@ const DETECTION_SCHEMA = {
           x1: { type: "number" },
           y1: { type: "number" },
           instances: { type: "integer" },
+          top: { type: "number" },
           note: { type: "string" },
         },
       },
@@ -328,6 +367,7 @@ export function detectionPrompt(items: readonly CheckItem[], role: "before" | "a
     "- present: is any part of it visible in the frame (count it even if partly cut off at an edge or partly behind glass)?",
     "- x0, y0, x1, y1: the box around the VISIBLE part, in PERCENT of the image width and height (0–100; x from the left, y from the top). All 0 when not present.",
     "- instances: how many separate such items are visible (0 when not present).",
+    "- top: how high the item's top reaches, as a share of the floor-to-ceiling height of the wall right behind it (0–1: a WC cistern about 0.3, a vanity counter about 0.3, a door about 0.75). 0 when not present.",
     "- note: a few words on where it is, or why not present.",
     "Judge what the item is by its role in the room, not its design: a restyled vanity is still the vanity even if it is now floating oak; a new frameless screen is still the shower glass.",
     "Mirrors, towels, rugs, bins and toiletries are not items.",
@@ -370,17 +410,90 @@ Answer for IMAGE 2 only. Find the SAME physical items there: an item is the same
   });
   if (res.stop_reason === "refusal") throw new Error("check unavailable: the model declined to read the image");
   const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  const parsed = JSON.parse(text) as { items: { ref: string; present: boolean; x0: number; y0: number; x1: number; y1: number; instances: number; note: string }[] };
+  const parsed = JSON.parse(text) as { items: { ref: string; present: boolean; x0: number; y0: number; x1: number; y1: number; instances: number; top?: number; note: string }[] };
   const refs = new Set(items.map((i) => i.ref));
   const located: Located[] = parsed.items
     .filter((i) => refs.has(i.ref))
-    .map((i) => ({ ref: i.ref, present: !!i.present, box: i.present ? ([i.x0, i.y0, i.x1, i.y1] as Box) : null, instances: Math.max(0, Math.round(i.instances || 0)), note: i.note }));
+    .map((i) => ({ ref: i.ref, present: !!i.present, box: i.present ? ([i.x0, i.y0, i.x1, i.y1] as Box) : null, instances: Math.max(0, Math.round(i.instances || 0)), top: i.present && typeof i.top === "number" && i.top > 0 && i.top <= 1.2 ? Math.min(1, i.top) : null, note: i.note }));
   for (const it of items) if (!located.some((l) => l.ref === it.ref)) located.push({ ref: it.ref, present: false, box: null, instances: 0, note: "not assessed" });
   return { items: normaliseLocated(located, size), model: CHECK_MODEL, at: new Date().toISOString(), usage: { input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens } };
 }
 
 /** USD for one check call. */
 export const checkCostUsd = (u: { input_tokens: number; output_tokens: number } | undefined) => (u ? (u.input_tokens * CHECK_PRICE.input + u.output_tokens * CHECK_PRICE.output) / 1e6 : 0);
+
+// --- B8: read twice, use the agreement ------------------------------------------------
+//
+// The same image read twice put P1's door 31 % apart (B2b): the size rule sat
+// inside the reading's own noise. Every image is now read twice; where the two
+// readings disagree on whether an item is there, or how many, a third decides.
+// The agreed reading averages the boxes of the readings that saw the item, so
+// its noise is a single reading's over √2. The tolerances in
+// photo-check-vocab.ts come from the measured spread (scripts/b8-check-noise.ts).
+
+/** Do two readings disagree on presence or count for any item? */
+export function readingsDisagree(a: readonly Located[], b: readonly Located[]): boolean {
+  const B = new Map(b.map((x) => [x.ref, x]));
+  return a.some((x) => {
+    const y = B.get(x.ref);
+    return !y || x.present !== y.present || (x.present && x.instances !== y.instances);
+  });
+}
+
+/** The agreed reading: majority on presence and count (a tie counts as present), boxes and tops averaged over the readings that saw the item. Pure. */
+export function agreeReadings(reads: readonly (readonly Located[])[]): Located[] {
+  const refs = [...new Set(reads.flatMap((r) => r.map((x) => x.ref)))];
+  return refs.map((ref) => {
+    const all = reads.map((r) => r.find((x) => x.ref === ref) ?? { ref, present: false, box: null, instances: 0 });
+    const seen = all.filter((x) => x.present && x.box);
+    if (seen.length * 2 < all.length || seen.length === 0) return { ref, present: false, box: null, instances: 0, top: null, note: all.find((x) => !x.present)?.note };
+    const mean = (k: 0 | 1 | 2 | 3) => Math.round((seen.reduce((s, x) => s + x.box![k], 0) / seen.length) * 10) / 10;
+    const counts = seen.map((x) => x.instances).sort((p, q) => p - q);
+    const mode = counts.find((c) => counts.filter((d) => d === c).length * 2 > counts.length) ?? counts[0]!;
+    const tops = seen.map((x) => x.top).filter((t): t is number => typeof t === "number");
+    return { ref, present: true, box: [mean(0), mean(1), mean(2), mean(3)] as Box, instances: mode, top: tops.length ? Math.round((tops.reduce((s, t) => s + t, 0) / tops.length) * 100) / 100 : null, note: seen[0]!.note };
+  });
+}
+
+export interface Spread {
+  ref: string;
+  /** |ln(area ratio)| between the two readings. */
+  ln_area: number;
+  /** |ln(height ratio)|. */
+  ln_height: number;
+  /** |difference in the top share|, when both read it. */
+  top: number | null;
+  /** Centre distance, % of the frame. */
+  centre: number;
+}
+
+/** One image read twice: how far apart the readings are for each item both saw. Pure — the noise measurement. */
+export function readingSpread(a: readonly Located[], b: readonly Located[]): Spread[] {
+  const out: Spread[] = [];
+  const ar = (q: Box) => Math.max(0.01, (q[2] - q[0]) * (q[3] - q[1]));
+  for (const x of a) {
+    const y = b.find((z) => z.ref === x.ref);
+    if (!x.present || !x.box || !y?.present || !y.box) continue;
+    const [cx, cy] = centre(x.box), [dx, dy] = centre(y.box);
+    out.push({
+      ref: x.ref,
+      ln_area: Math.abs(Math.log(ar(x.box) / ar(y.box))),
+      ln_height: Math.abs(Math.log(Math.max(0.1, x.box[3] - x.box[1]) / Math.max(0.1, y.box[3] - y.box[1]))),
+      top: typeof x.top === "number" && typeof y.top === "number" ? Math.abs(x.top - y.top) : null,
+      centre: Math.hypot(cx - dx, cy - dy),
+    });
+  }
+  return out;
+}
+
+/** Read an image twice (a third time when the two disagree on presence or count) and return the agreed reading, the readings and the summed usage. */
+export async function detectAgreed(image: ImageInput, items: readonly CheckItem[], role: "before" | "after", size: { width: number; height: number } | null, reference?: { image: ImageInput; located: readonly Located[] }): Promise<Detection> {
+  const two = await Promise.all([detectItems(image, items, role, size, reference), detectItems(image, items, role, size, reference)]);
+  const reads: Detection[] = [...two];
+  if (readingsDisagree(two[0].items, two[1].items)) reads.push(await detectItems(image, items, role, size, reference));
+  const usage = reads.reduce((u, r) => ({ input_tokens: u.input_tokens + (r.usage?.input_tokens ?? 0), output_tokens: u.output_tokens + (r.usage?.output_tokens ?? 0) }), { input_tokens: 0, output_tokens: 0 });
+  return { items: agreeReadings(reads.map((r) => r.items)), model: CHECK_MODEL, at: new Date().toISOString(), usage, reads: reads.map((r) => r.items) };
+}
 
 // --- the style check ----------------------------------------------------------------
 //

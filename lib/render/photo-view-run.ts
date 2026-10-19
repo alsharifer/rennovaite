@@ -41,8 +41,8 @@ export function photoViewMaxAttempts(env: Record<string, string | undefined> = p
   return Number.isInteger(n) && n >= 1 && n <= 2 ? n : 2;
 }
 
-/** Vision readings per attempt (the after reading + the style or follows check), US$ — measured in B2b at ≈ 0.03 each. */
-const CHECKS_PER_ATTEMPT_USD = 0.065;
+/** Vision readings per attempt (the after reading twice, B8, + the style or follows check), US$ — measured at ≈ 0.03 each. */
+const CHECKS_PER_ATTEMPT_USD = 0.09;
 
 /** B4 cost guard: what one view costs to render, AED — one attempt … `maxAttempts` (the studio's estimate). */
 export function photoViewCostAed(maxAttempts: number, env: Record<string, string | undefined> = process.env): { low: number; high: number } {

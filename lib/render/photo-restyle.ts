@@ -11,6 +11,10 @@
 //            the photo's — the room's geometry is a control signal, the finishes
 //            come from the prompt.
 //   canny  — black-forest-labs/flux-canny-pro: the same, from the photo's edges.
+//   structure — B8: flux-canny-pro from a texture-suppressed copy of the photo
+//            (structureControl): the walls, door, window and fixture outlines
+//            are the control; the old tile grid and frosted stripes are not —
+//            canny on the raw photo kept the old finishes (style 0/5 in B2).
 //
 // Whichever runs, the placement check (photo-check.ts) holds it to the photo:
 // re-render once with the check's findings, then an honest failure — the
@@ -22,12 +26,14 @@ import { imageSize } from "@/lib/scene-render/gate";
 import { fetchSceneBytes, runRenderModel } from "@/lib/scene-render/pipeline";
 import { compareImages, type Similarity } from "@/lib/render/similarity";
 
-import { checkCostUsd, checkStyle, detectItems, judgePhotoPlacement, styleLine, type StyleVerdict, type Box, type CheckItem, type Detection, type PlacementFailure, type PlacementVerdict } from "./photo-check";
+import sharp from "sharp";
+
+import { checkCostUsd, checkStyle, detectAgreed, judgePhotoPlacement, styleLine, type StyleVerdict, type Box, type CheckItem, type Detection, type PlacementFailure, type PlacementVerdict } from "./photo-check";
 import { cropToFrame, fitMap, frameRect, geometricMap, padToAspect, toPhotoBoxes, type FrameMap } from "./frame-pin";
 import { IMAGE_PRICE_USD, type SpendRow } from "./render-spend";
 import { anchorPromptLine, checkFollows, followsLine } from "./room-spec";
 
-export type RestyleArm = "edit" | "edit_pro" | "kontext" | "depth" | "canny";
+export type RestyleArm = "edit" | "edit_pro" | "kontext" | "depth" | "canny" | "structure";
 
 export const ARM_MODEL: Record<RestyleArm, string> = {
   edit: "google/nano-banana",
@@ -35,7 +41,22 @@ export const ARM_MODEL: Record<RestyleArm, string> = {
   kontext: "black-forest-labs/flux-kontext-pro",
   depth: "black-forest-labs/flux-depth-pro",
   canny: "black-forest-labs/flux-canny-pro",
+  structure: "black-forest-labs/flux-canny-pro",
 };
+
+/**
+ * B8: the photo with its fine texture removed — tile joints, grout, frosted
+ * stripes, mould on the ceiling — so an edge-conditioned model takes the room's
+ * structure from it (walls, door, window, fixture outlines) and not its finishes.
+ * The texture goes at an eighth of the width, where a stripe or a joint is a
+ * few pixels: a median filter erases it while a wall edge survives.
+ */
+export async function structureControl(photo: Uint8Array): Promise<Buffer> {
+  const meta = await sharp(photo).rotate().metadata();
+  const w = meta.autoOrient?.width ?? meta.width ?? 946, h = meta.autoOrient?.height ?? meta.height ?? 2048;
+  const small = await sharp(photo).rotate().resize({ width: Math.round(w / 8) }).median(5).blur(0.6).toBuffer();
+  return sharp(small).resize({ width: w, height: h, fit: "fill" }).jpeg({ quality: 90 }).toBuffer();
+}
 
 /**
  * THE photo-view path's default model, chosen by measured pass rate on the
@@ -135,17 +156,25 @@ export function restylePrompt(arm: RestyleArm, style: StyleBrief, inViewAll: rea
   }
   return [
     "A photorealistic photograph of a renovated bathroom, taken on a phone held upright (portrait), wide angle, from the same spot and angle as the structure shows.",
+    arm === "structure" ? "Every surface gets a NEW finish: the structure gives only the room's shape and where things stand — none of its old tiles, grout lines, stripes or stains." : "",
     list ? `In the frame, exactly where the structure shows them: ${list}.` : "",
     ...swaps,
     none,
     ...notes,
-    "Floor-standing WC and bidet. The door and window as they are. No text or logos.",
+    `${kept.some((v) => v.item.kind === "bidet") ? "Floor-standing WC and bidet." : "Floor-standing WC."} The door and window as they are. No text or logos.`,
     `Finishes and fixtures: ${look}`,
     "Where clutter stood, plain wall and floor — never a new fixture.",
     "Clean and tidy, no clutter. Interior photography, warm 2700 K light.",
     retry,
   ].filter(Boolean).join(" ");
 }
+
+/**
+ * B8: what the model is told about FINISH-ONLY reference images (close-ups of a
+ * tile, a vanity front, a mirror, a tap) — the hypothesis being that pro copies
+ * layout from whole-room references, and a close-up has no layout to copy.
+ */
+export const FINISH_REFS_LINE = "The images after the photo are close-ups of finishes only — a tile, a vanity front, a mirror, a tap and mixer. Copy their materials, colours and surface finish onto this room's own fixtures and walls; never copy their size, shape, proportions or arrangement.";
 
 export function restyleInput(arm: RestyleArm, prompt: string, photoUrl: string, extraImages: readonly string[] = [], seed?: number): Record<string, unknown> {
   if (arm === "edit") return { prompt, image_input: [photoUrl, ...extraImages], aspect_ratio: "match_input_image", output_format: "jpg" };
@@ -192,9 +221,9 @@ const sizeOf = (bytes: Uint8Array) => {
   return s ? `${s.width}x${s.height}` : null;
 };
 
-/** Read the before photo once (kept per photo by the caller). */
+/** Read the before photo once (kept per photo by the caller) — twice, B8: the agreed reading. */
 export async function readBefore(photoBytes: Uint8Array, items: readonly CheckItem[]): Promise<Detection> {
-  return detectItems({ mediaType: mime(photoBytes), data: b64(photoBytes) }, items, "before", imageSize(photoBytes));
+  return detectAgreed({ mediaType: mime(photoBytes), data: b64(photoBytes) }, items, "before", imageSize(photoBytes));
 }
 
 /**
@@ -220,6 +249,14 @@ export async function restyleWithCheck(input: {
   notes?: readonly string[];
   /** Items the DESIGN changes the size of (a fixed panel for a hinged screen): their place is held, not their size. */
   resizable?: ReadonlySet<string>;
+  /**
+   * B8: an attempt 1 that already exists (a render made earlier with the same
+   * arm, already in the photo's frame) — judged by the current check instead
+   * of rendered again; attempt 2, if needed, is a new render.
+   */
+  firstImage?: { bytes: Uint8Array; url: string; prompt: string };
+  /** B8: the extra images are finish close-ups, not the anchor — the prompt says so, the follows check still holds the render to the anchor. */
+  referencesLine?: string;
 }): Promise<RestyleResult> {
   const model = ARM_MODEL[input.arm];
   const inView = input.items
@@ -232,27 +269,36 @@ export async function restyleWithCheck(input: {
   const spend: SpendRow[] = [];
   let final: RestyleResult["final"] = null;
   const pinned = input.arm === "edit_pro" ? await padToAspect(input.photoBytes) : null;
+  const control = input.arm === "structure" ? `data:image/jpeg;base64,${(await structureControl(input.photoBytes)).toString("base64")}` : null;
   const photoSize = imageSize(input.photoBytes);
   for (let n = 1; n <= (input.maxAttempts ?? 2); n++) {
-    const prompt = input.promptOverride?.(n) ?? restylePrompt(input.arm, input.style, inView, absent, attempts.at(-1)?.verdict?.failures ?? [], input.anchor ? { label: input.anchor.label } : null, input.notes ?? []);
+    const given = n === 1 ? input.firstImage : undefined;
+    const prompt = given?.prompt ?? input.promptOverride?.(n) ?? restylePrompt(input.arm, input.style, inView, absent, attempts.at(-1)?.verdict?.failures ?? [], input.anchor && !input.referencesLine ? { label: input.anchor.label } : null, input.referencesLine ? [...(input.notes ?? []), input.referencesLine] : input.notes ?? []);
     const at: Attempt = { attempt: n, arm: input.arm, model, prompt, image_url: null, size: null, verdict: null, after: null, similarity: null, style: null, cost_usd: 0 };
     try {
       // B2b: nano-banana-pro gets the photo padded to its 9 : 16 frame, and its
       // output is cut back to the photo's frame before anything is checked.
-      const source = pinned ? `data:image/jpeg;base64,${pinned.bytes.toString("base64")}` : input.photoUrl;
-      const url = await runRenderModel(model, restyleInput(input.arm, prompt, source, input.extraImages ?? []));
-      const raw = await fetchSceneBytes(url);
+      const source = control ?? (pinned ? `data:image/jpeg;base64,${pinned.bytes.toString("base64")}` : input.photoUrl);
+      let raw: Uint8Array;
+      let url: string;
+      if (given) {
+        raw = given.bytes;
+        url = given.url;
+      } else {
+        url = await runRenderModel(model, restyleInput(input.arm, prompt, source, input.extraImages ?? []));
+        raw = await fetchSceneBytes(url);
+        at.cost_usd += IMAGE_PRICE_USD[model] ?? 0;
+        spend.push({ project_id: input.project_id, purpose: "photo_view", model, size: sizeOf(raw), cost_usd: IMAGE_PRICE_USD[model] ?? null, detail: { attempt: n, arm: input.arm } });
+      }
       at.image_url = url;
-      at.cost_usd += IMAGE_PRICE_USD[model] ?? 0;
-      spend.push({ project_id: input.project_id, purpose: "photo_view", model, size: sizeOf(raw), cost_usd: IMAGE_PRICE_USD[model] ?? null, detail: { attempt: n, arm: input.arm } });
       const reference = { image: { mediaType: mime(input.photoBytes), data: b64(input.photoBytes) }, located: input.before.items };
-      const read = await detectItems({ mediaType: mime(raw), data: b64(raw) }, input.items, "after", imageSize(raw), reference);
+      const read = await detectAgreed({ mediaType: mime(raw), data: b64(raw) }, input.items, "after", imageSize(raw), reference);
       const checkUsd = checkCostUsd(read.usage);
       at.cost_usd += checkUsd;
       spend.push({ project_id: input.project_id, purpose: "photo_check", model: read.model, size: null, cost_usd: checkUsd, detail: { attempt: n, usage: read.usage } });
       let bytes: Uint8Array = raw;
       let after = read;
-      if (pinned) {
+      if (pinned && !given) {
         const out = imageSize(raw)!;
         const map = fitMap(input.before.items, read.items, photoSize!, out, geometricMap(pinned.plan, out));
         const rect = frameRect(map, photoSize!, out);

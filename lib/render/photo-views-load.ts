@@ -15,6 +15,8 @@ export interface MiniPlan {
   polygon: [number, number][];
   /** Metres per plan unit — so a fixture's footprint draws at its size. */
   m_per_u: number | null;
+  /** B8: the room's stored ceiling height, m (061) — gives a stated fixture height its share of the wall. */
+  ceiling_h_m: number | null;
   openings: { id: string; kind: string; position: [number, number]; width_mm: number }[];
   fixtures: { id: string; type: string; position: [number, number]; spec: Record<string, unknown> | null }[];
 }
@@ -35,11 +37,11 @@ export async function loadMiniPlans(db: SupabaseClient, projectId: string, plan:
   const out: Record<string, MiniPlan> = {};
   if (roomIds.length === 0) return out;
   const [roomsRes, openRes, fixRes] = await Promise.all([
-    db.from("rooms").select("id, polygon, area_m2").eq("plan_id", plan.id),
+    db.from("rooms").select("id, polygon, area_m2, ceiling_h_m").eq("plan_id", plan.id),
     db.from("plan_openings").select("id, kind, position, width_mm, room_id").eq("plan_id", plan.id),
     db.from("plan_fixtures").select("id, type, position, spec, room_id, layer").eq("project_id", projectId).eq("layer", "plumbing"),
   ]);
-  const rooms = (roomsRes.data ?? []) as { id: string; polygon: unknown; area_m2: number | null }[];
+  const rooms = (roomsRes.error ? (await db.from("rooms").select("id, polygon, area_m2").eq("plan_id", plan.id)).data ?? [] : roomsRes.data ?? []) as { id: string; polygon: unknown; area_m2: number | null; ceiling_h_m?: number | null }[];
   const mPerU = metresPerUnit(rooms, plan.total_area_m2, plan.source === "user_drawn" ? plan.plot_width_m ?? null : null);
   for (const r of rooms) {
     if (!roomIds.includes(r.id) || !Array.isArray(r.polygon)) continue;
@@ -47,6 +49,7 @@ export async function loadMiniPlans(db: SupabaseClient, projectId: string, plan:
       room_id: r.id,
       polygon: (r.polygon as unknown[]).map(asPt).filter((p): p is [number, number] => !!p),
       m_per_u: mPerU,
+      ceiling_h_m: r.ceiling_h_m != null ? Number(r.ceiling_h_m) : null,
       openings: ((openRes.data ?? []) as { id: string; kind: string; position: unknown; width_mm: number | null; room_id: string | null }[])
         .filter((o) => o.room_id === r.id && asPt(o.position))
         .map((o) => ({ id: o.id, kind: o.kind, position: asPt(o.position)!, width_mm: Number(o.width_mm ?? 0) })),

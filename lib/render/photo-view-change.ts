@@ -31,7 +31,7 @@ import { imageSize } from "@/lib/scene-render/gate";
 
 import { classifyChangeRequest, planOpeningsHref, STRUCTURAL_MESSAGE } from "./change-request";
 import { cropToFrame, fitMap, frameRect, geometricMap, padToAspect, toPhotoBoxes } from "./frame-pin";
-import { carryLocated, checkCostUsd, checkItemsFor, detectItems, itemsNamedBy, judgePhotoPlacement } from "./photo-check";
+import { carryLocated, checkCostUsd, checkItemsFor, detectAgreed, itemsNamedBy, judgePhotoPlacement } from "./photo-check";
 import { ARM_MODEL, photoViewArm, restyleInput } from "./photo-restyle";
 import { loadMiniPlans } from "./photo-views-load";
 import { designKey } from "@/lib/documents/render-consistency";
@@ -114,7 +114,7 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   let cost = IMAGE_PRICE_USD[model] ?? 0;
   spend.push({ project_id: input.projectId, purpose: "photo_view", model, size: (() => { const s = imageSize(raw); return s ? `${s.width}x${s.height}` : null; })(), cost_usd: IMAGE_PRICE_USD[model] ?? null, detail: { step: "change", request, arm } });
   // Read where everything is in the model's own frame first: a pinned output is cut back by it.
-  const readRaw = await detectItems({ mediaType: mime(raw), data: b64(raw) }, items, "after", imageSize(raw), { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: carried });
+  const readRaw = await detectAgreed({ mediaType: mime(raw), data: b64(raw) }, items, "after", imageSize(raw), { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: carried });
   const readUsd = checkCostUsd(readRaw.usage);
   cost += readUsd;
   spend.push({ project_id: input.projectId, purpose: "photo_check", model: readRaw.model, cost_usd: readUsd, detail: { step: "change_layout", usage: readRaw.usage } });

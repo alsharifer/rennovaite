@@ -1145,6 +1145,39 @@ Report `docs/BATHROOM_PILOT_B6.md`. No migration.
   and identity, and writes review PNGs with the photos to
   `screenshots/bathroom-pilot/b6/pack/`.
 
+### Bathroom pilot B8 — the check calibrated, the render arms measured (19 Oct)
+
+Report `docs/BATHROOM_PILOT_B8.md`. No migration.
+
+- **The placement check reads every image twice** (`detectAgreed`,
+  `CHECK_VERSION` c3):
+  - a third reading when the first two disagree on presence or count;
+  - the agreed reading takes the majority and averages the boxes.
+- **Tolerances are measured, not chosen** (`scripts/b8-check-noise.ts`; 24
+  images, p95 of single-reading pairs ÷ √2):
+  - **size** ×1.27, symmetric in log terms;
+  - **height** ×1.19 (new);
+  - an item whose plan **states its height** (`spec.height_mm`, the room's
+    `ceiling_h_m`) is held to its top as a share of floor-to-ceiling, ±0.10 —
+    the reading's new `top` field (`CheckItem.top_share`). It catches a 1.2 m
+    cabinet drawn 2 m tall; a replacement's size stays free.
+- **Measured ceiling ≈ 40 % on both checks.** Two attempts each:
+  - baseline (frame-pinned nano-banana-pro) 2/5;
+  - finish-only references (`FINISH_REFS_LINE`) 0/5;
+  - `structure` arm (flux-canny-pro on `structureControl`, a texture-suppressed
+    photo) 0/5.
+
+  The baseline stays the default.
+- **The room pack carries only the views that pass BOTH checks.** Layout, plus
+  style / follows where judged (`room-pack-pdf.ts` candidates). A view with
+  none gets no page: it is named on the room page with why
+  (`data-view-omitted`). The cover says "N of M views … in this pack".
+- **Scripts**:
+  - `scripts/b8-check-noise.ts --read | --judge [--apply]` (re-scores stored
+    renders in place, `gate.rescored`);
+  - `scripts/b8-render-experiment.ts --arms=… [--photos=…] [--publish=<arm>]`
+    (one result file per arm × photo, so photos run as parallel processes).
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic
