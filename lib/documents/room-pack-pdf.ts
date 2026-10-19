@@ -18,7 +18,7 @@ import { curateBoq, curateText, loadWithheldNames } from "@/lib/identity/curatio
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { loadStudioState, type PhotoViewVersion } from "@/lib/render/photo-view-anchor";
-import { loadPhotoViews } from "@/lib/render/photo-views-load";
+import { loadMiniPlans, loadPhotoViews } from "@/lib/render/photo-views-load";
 import { followsLine, followsStateOf, specElements, specFieldsChanged } from "@/lib/render/room-spec-vocab";
 import { loadTimeline } from "@/lib/timeline/load";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -27,6 +27,7 @@ import { documentFontOptions } from "./doc-fonts";
 import { stampPdfDay } from "./pdf-date";
 import { loadDocumentProject } from "./project-name";
 import { containFit } from "./render-pack";
+import { boqFixtureKinds, designKey, renderConsistency, type CurrentDesign } from "./render-consistency";
 import { buildRoomPack, PACK_H, PACK_W, type RoomPackInput, type RoomPackView } from "./room-pack";
 
 const MM_TO_PT = 72 / 25.4;
@@ -69,6 +70,8 @@ export interface RoomPackSummary {
   views: { label: string; render: string | null; locked: boolean; anchor: boolean }[];
   sheets: string[];
   missing_images: string[];
+  /** B7: views shown as "view pending" — why each render was held back. */
+  pending_views: { view: string; reason: string }[];
   grand_total_aed: number;
   boq_id: string;
 }
@@ -93,18 +96,50 @@ export async function generateRoomPack(projectId: string, opts: { brand?: string
   const state = await loadStudioState(db, [room.id], views.map((v) => v.id));
   const anchor = state.anchors[room.id] ?? null;
   const k = graph.meta.unit_to_m, o = graph.meta.norm_origin;
+  const consistency: { view: string; reason: string }[] = [];
   const toM = (p: [number, number]): [number, number] => [(p[0] - o[0]) * k, (p[1] - o[1]) * k];
 
+  // B7 1a: a render goes in only when it matches the CURRENT design — the fixtures
+  // the BoQ prices, the current anchor, the same finishes and product choices.
+  const { data: planRow } = await db.from("plans").select("id, total_area_m2, source, plot_width_m").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; total_area_m2: number | null; source: string | null; plot_width_m: number | null }>();
+  const mini = planRow ? (await loadMiniPlans(db, projectId, planRow, [room.id]))[room.id] : undefined;
+  const { data: revRows } = await db.from("boqs").select("created_at").eq("project_id", projectId).order("created_at", { ascending: true });
+  const current: CurrentDesign = {
+    fixtures: boqFixtureKinds(boqRes.data.sections.sections.flatMap((s) => s.lines)),
+    anchor: anchor?.room_photo_id ? { render_id: anchor.render_id, room_photo_id: anchor.room_photo_id } : null,
+    design_key: designKey(mini?.fixtures ?? [], (room.spec as Record<string, unknown> | undefined)?.wet_room ?? null),
+    revisions: ((revRows ?? []) as { created_at: string }[]).map((r) => r.created_at),
+  };
+  const consistencyOf = (photoId: string, x: PhotoViewVersion) =>
+    renderConsistency(
+      {
+        render_id: x.render_id,
+        created_at: x.created_at,
+        items: x.gate.items ?? [],
+        anchor_render_id: x.anchor_render_id,
+        follows: x.gate.anchor ? (x.gate.attempts.at(-1)?.style?.elements ?? null) : null,
+        design_key: x.gate.design_key ?? null,
+      },
+      photoId,
+      current,
+    );
   const packViews: RoomPackView[] = views.map((v) => {
     const vs = state.versions[v.id] ?? [];
     const lockedId = state.locked[v.id];
-    const shown = (lockedId ? vs.find((x) => x.render_id === lockedId) : null) ?? [...vs].reverse().find((x) => x.gate.outcome === "passed" && x.image_url) ?? null;
+    const locked = lockedId ? (vs.find((x) => x.render_id === lockedId) ?? null) : null;
+    // The locked version is the client's pick: shown only if it matches. Else the latest passed one that does.
+    const candidates = locked ? [locked] : [...vs].reverse().filter((x) => x.gate.outcome === "passed" && x.image_url);
+    const verdicts = candidates.map((x) => ({ x, c: consistencyOf(v.id, x) }));
+    const shown = verdicts.find((d) => d.c.ok)?.x ?? null;
+    const refused = verdicts[0] && !verdicts[0].c.ok ? verdicts[0].c : null;
     const latest = (lockedId ? vs.find((x) => x.render_id === lockedId) : vs.at(-1)) ?? null;
+    if (!shown) consistency.push({ view: v.label.split(" · ")[0]!, reason: refused && !refused.ok ? refused.reason : "no passed render" });
     return {
       n: v.n,
       label: v.label,
       origin: "from your photo",
       render: shown?.image_url ? { src: shown.image_url, version: vs.indexOf(shown) + 1 } : null,
+      pending: shown ? null : refused && !refused.ok ? refused.placeholder : null,
       photo: { src: v.url },
       checks: shown ? checksOf(shown, v.id, anchor, latest?.anchor_render_id ?? null) : [],
       locked: !!lockedId,
@@ -191,6 +226,7 @@ export async function generateRoomPack(projectId: string, opts: { brand?: string
       views: packViews.map((v) => ({ label: v.label, render: v.render?.src ?? null, locked: v.locked, anchor: v.anchor })),
       sheets: sheets.map((s) => `${s.number} ${s.title}`),
       missing_images: missing,
+      pending_views: consistency,
       grand_total_aed: boq.grand_total_aed,
       boq_id: boqRes.data.id,
     },

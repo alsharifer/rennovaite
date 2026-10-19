@@ -51,8 +51,10 @@ export interface RoomPackView {
   n: number;
   label: string;
   origin: "from your photo" | "concept";
-  /** The render shown (the locked version, else the latest that passed). */
+  /** The render shown (the locked version, else the latest that passed) — null when none matches the current design. */
   render: { src: string; version: number } | null;
+  /** B7: why no render is shown — "View pending — design changed in rev N" (render-consistency.ts). */
+  pending?: string | null;
   photo: { src: string } | null;
   checks: { text: string; ok: boolean }[];
   locked: boolean;
@@ -168,7 +170,7 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     if (excludes) s += text(M, 120, excludes, { size: 3.2, weight: 600 });
     const facts = [
       `Floor ${input.room.area_m2.toFixed(2)} m² · ceiling ${input.room.ceiling_mm} mm · walls tiled ${input.room.tiled}`,
-      `${input.views.length} views from your photos${input.anchorLabel ? ` · finishes follow ${input.anchorLabel} (locked)` : ""}`,
+      `${input.views.filter((v) => v.render).length} of ${input.views.length} views from your photos match this design${input.anchorLabel ? ` · finishes follow ${input.anchorLabel} (locked)` : ""}`,
       `${input.sheets.length} drawings · ${input.boq.sections.reduce((n, s) => n + s.lines.length, 0)} lines in the bill of quantities`,
       ...(input.boq.options?.length ? [`${input.boq.options.length} options priced separately`] : []),
     ];
@@ -212,7 +214,12 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     let s = frame(input, `${v.label.split(" · ")[0]} — ${v.origin}`, pages.length + 1);
     const slots: PackSlot[] = [];
     if (v.render) slots.push({ src: v.render.src, x: M, y: 36, w: 150, h: 240 });
-    else s += text(M + 75, 150, "Not rendered", { size: 4, fill: DOC.INK_3, anchor: "middle" });
+    else {
+      // B7: never a render that contradicts the BoQ — a labelled placeholder instead.
+      s += `<rect x="${M}" y="36" width="150" height="240" fill="#F5F2EA" stroke="${DOC.INK_3}" stroke-width="0.3" stroke-dasharray="1.2 0.8" data-view-pending="${esc(v.pending ?? "not rendered")}"/>`;
+      s += text(M + 75, 152, v.pending ?? "Not rendered", { size: 3.6, fill: DOC.INK_2, anchor: "middle" });
+      if (v.pending) s += text(M + 75, 159, "A new render follows the current design.", { size: 2.8, fill: DOC.INK_3, anchor: "middle" });
+    }
     if (v.photo) {
       slots.push({ src: v.photo.src, x: 176, y: 36, w: 70, h: 112 });
       s += text(176 + 35, 154, "Your photo", { size: 2.8, fill: DOC.INK_2, font: DOC.MONO, anchor: "middle" });
@@ -224,7 +231,7 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     y += 18;
     s += label(cx, y, "Design checks");
     y += 6;
-    for (const c of v.checks) {
+    for (const c of v.render ? v.checks : []) {
       for (const [i, line] of wrapWords(`${c.ok ? "✓" : "·"} ${c.text.replace(/ ✓$/, "")}`, 52).entries()) {
         s += text(cx + (i ? 3 : 0), y, line, { size: 3.1, fill: c.ok ? DOC.INK : DOC.INK_2 });
         y += 4.8;

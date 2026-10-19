@@ -34,6 +34,7 @@ import { cropToFrame, fitMap, frameRect, geometricMap, padToAspect, toPhotoBoxes
 import { carryLocated, checkCostUsd, checkItemsFor, detectItems, itemsNamedBy, judgePhotoPlacement } from "./photo-check";
 import { ARM_MODEL, photoViewArm, restyleInput } from "./photo-restyle";
 import { loadMiniPlans } from "./photo-views-load";
+import { designKey } from "@/lib/documents/render-consistency";
 import { moveAnchor } from "./photo-view-anchor";
 import { PhotoViewError, type PhotoViewChange, type PhotoViewGate } from "./photo-view-run";
 import { IMAGE_PRICE_USD, recordSpend, type SpendRow } from "./render-spend";
@@ -167,7 +168,9 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   const stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, next, mime(next));
   // The version's own reading is what the next change is held to.
   const attempts = parent.gate.attempts.length ? [...parent.gate.attempts.slice(0, -1), { ...parent.gate.attempts.at(-1)!, after: read.items }] : parent.gate.attempts;
-  const gate: PhotoViewGate = { ...parent.gate, items, attempts, outcome: "passed", line: verdict.line, change, cost_usd: change.cost_usd };
+  const { data: roomRow } = await db.from("rooms").select("spec").eq("id", photo.room_id).maybeSingle<{ spec: Record<string, unknown> | null }>();
+  const design_key = mini ? designKey(mini.fixtures, roomRow?.spec?.wet_room ?? null) : parent.gate.design_key;
+  const gate: PhotoViewGate = { ...parent.gate, items, attempts, outcome: "passed", line: verdict.line, change, cost_usd: change.cost_usd, ...(design_key ? { design_key } : {}) };
   const id = await record("succeeded", gate as unknown as Record<string, unknown>, stored);
 
   // The lock follows the version the user changed; on the anchor view, so does the anchor.

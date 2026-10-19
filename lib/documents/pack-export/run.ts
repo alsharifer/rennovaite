@@ -230,7 +230,11 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
 
   // B6: the room pack prints the BoQ's total and no withheld identity.
   if (roomPack) {
-    const rp = (await t.get<{ pages?: string[] }>(`/api/projects/${P}/room-pack?format=pages`)).body.pages ?? [];
+    const rpBody = (await t.get<{ pages?: string[]; summary?: { pending_views?: { view: string; reason: string }[] } }>(`/api/projects/${P}/room-pack?format=pages`)).body;
+    const rp = rpBody.pages ?? [];
+    // B7 1a: a render that does not match the current design is a placeholder, never shipped.
+    const pendingViews = rpBody.summary?.pending_views ?? [];
+    check("room pack: every render shown matches the current design (BoQ fixtures, anchor, products)", rp.join("").split("data-view-pending=").length - 1 === pendingViews.length, pendingViews.length ? `${pendingViews.length} view(s) pending: ${pendingViews.map((p) => `${p.view} — ${p.reason}`).join("; ")}` : "all views match");
     const joined = rp.join("");
     check("room pack: the total is the BoQ's, to the fil", joined.includes(`data-grand-total="${boq.grand_total_aed}"`), `AED ${boq.grand_total_aed}`);
     const leaks = withheldNames.filter((n) => n.length >= 3 && new RegExp(esc(n), "i").test(joined.replace(/<[^>]+>/g, " ")));
