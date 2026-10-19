@@ -25,6 +25,7 @@
 // =============================================================================
 
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
+import { hingeLabel, resolveHinge } from "@/lib/plan/door-hinge";
 import type { Opening, PlanGraph, Point, Room } from "@/lib/plan/geometry";
 
 import { esc, FONT_MONO, FONT_UI, INK_100, INK_500, INK_700, INK_900, PAPER, PAPER_100, renderSheet, type SheetMeta } from "./sheet";
@@ -207,12 +208,6 @@ function openingsOf(graph: PlanGraph, roomId: string): Opening[] {
 }
 
 /** The door's hinge end: "W" | "E" | "N" | "S" → the jamb nearer that side; absent = not stated. */
-function hingeJamb(o: Opening, j0: V, j1: V): { hinge: V; free: V; stated: boolean } {
-  const h = typeof o.spec?.hinge === "string" ? (o.spec.hinge as string).toUpperCase() : null;
-  const dir: Record<string, V> = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
-  if (!h || !dir[h]) return { hinge: j0, free: j1, stated: false };
-  return dot(j0, dir[h]!) >= dot(j1, dir[h]!) ? { hinge: j0, free: j1, stated: true } : { hinge: j1, free: j0, stated: true };
-}
 
 // --- R-101: the dimensioned plan -----------------------------------------------------------
 
@@ -271,7 +266,9 @@ export function renderRoomPlan(input: RoomSheetsInput): RoomSheet {
       }
       body += `<g data-opening="${esc(o.id)}" data-opening-type="window"></g>`;
     } else {
-      const { hinge, free, stated } = hingeJamb(o, j0, j1);
+      // B7: the hinge side as entered (left/right from the room), the legacy compass, or the estimate.
+      const hr = resolveHinge(j0, j1, w.inward, w.left, w.right, o.spec);
+      const hinge: V = hr.hinge, free: V = hr.free, stated = hr.source === "entered";
       const swingIn = (o.spec?.swing as string | undefined) !== "out";
       const into = swingIn ? w.inward : outward;
       const leafTip = add(hinge, mul(into, o.width_mm / 1000));
@@ -280,9 +277,9 @@ export function renderRoomPlan(input: RoomSheetsInput): RoomSheet {
       // Sweep: the arc from the leaf tip back to the free jamb, the short way.
       const cross = (pt[0] - ph[0]) * (pf[1] - ph[1]) - (pt[1] - ph[1]) * (pf[0] - ph[0]);
       body += L(ph[0], ph[1], pt[0], pt[1], { stroke: INK_900, w: 0.4 });
-      body += `<path d="M ${n2(pt[0])} ${n2(pt[1])} A ${n2(rad)} ${n2(rad)} 0 0 ${cross > 0 ? 1 : 0} ${n2(pf[0])} ${n2(pf[1])}" fill="none" stroke="${INK_500}" stroke-width="0.25"${stated ? "" : ' stroke-dasharray="1 0.8"'} data-opening="${esc(o.id)}" data-opening-type="door" data-hinge="${stated ? esc(String(o.spec!.hinge)) : "not stated"}"/>`;
-      if (!stated) notes.push("Door hinge side not stated — swing drawn dashed; confirm on site.");
-      else notes.push(`Door: hinge ${String(o.spec!.hinge).toUpperCase()}, opens ${swingIn ? "in" : "out"}.`);
+      body += `<path d="M ${n2(pt[0])} ${n2(pt[1])} A ${n2(rad)} ${n2(rad)} 0 0 ${cross > 0 ? 1 : 0} ${n2(pf[0])} ${n2(pf[1])}" fill="none" stroke="${INK_500}" stroke-width="0.25"${stated ? "" : ' stroke-dasharray="1 0.8"'} data-opening="${esc(o.id)}" data-opening-type="door" data-hinge="${esc(hr.compass ?? (stated ? hr.side : `estimate-${hr.side}`))}"/>`;
+      if (!stated) notes.push(`Door: ${hingeLabel(hr)} — swing drawn dashed.`);
+      else notes.push(hr.compass ? `Door: hinge ${hr.compass}, opens ${swingIn ? "in" : "out"}.` : `Door: hinge ${hr.side} (as seen from the room), opens ${swingIn ? "in" : "out"}.`);
     }
     void p0;
     void p1;

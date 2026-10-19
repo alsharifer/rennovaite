@@ -97,7 +97,9 @@ try {
   });
   check("every elevation's tile setting-out closes on its wall", tileBad.length === 0, tileBad.map((w) => w.side).join(", "));
   const door = graph.openings.find((o) => o.type === "door");
-  if (door) check(`the door swings from its stored hinge (${String(door.spec?.hinge ?? "not stated")})`, joined.includes(`data-hinge="${String(door.spec?.hinge ?? "not stated")}"`));
+  // B7: the side entered on 01 Plan (left/right from the room) wins; else the B6 compass letter; else an estimate.
+  const hinge = door ? String(door.spec?.hinge_side ?? door.spec?.hinge ?? "estimate") : "";
+  if (door) check(`the door swings from its stored hinge (${hinge})`, hinge === "estimate" ? /data-hinge="estimate-/.test(joined) : joined.includes(`data-hinge="${hinge}"`));
 
   // No withheld identity on any page.
   const withheld = await loadWithheldNames(sb as never, P);

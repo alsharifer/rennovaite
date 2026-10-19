@@ -62,6 +62,7 @@ import {
   TAG,
   TOOL_BTN,
 } from "./editor-chrome";
+import { hingeSideOf, resolveHinge } from "@/lib/plan/door-hinge";
 
 export type OpeningKind = "door" | "window" | "archway";
 
@@ -83,6 +84,8 @@ export interface PlanOpening {
   /** R10b: when a detected opening was confirmed; null = not confirmed (derived, never priced). */
   confirmed_at: string | null;
   detection: DetectionMeta | null;
+  /** B7: spec.hinge_side ("left" | "right" as seen from the room) and its source. */
+  spec: Record<string, unknown> | null;
 }
 
 const KINDS: { key: OpeningKind; label: string; glyph: string }[] = [
@@ -313,7 +316,7 @@ export function OpeningsEditor({
       wall.a[0] + (wall.b[0] - wall.a[0]) * t,
       wall.a[1] + (wall.b[1] - wall.a[1]) * t,
     ];
-    const no = refusal({ id: "new", plan_id: planId, room_id: wall.roomIds[0] ?? null, wall_ref: wall.id, kind, ...def, position, along_offset: t, source: "user_drawn", derived: true, confirmed_at: null, detection: null });
+    const no = refusal({ id: "new", plan_id: planId, room_id: wall.roomIds[0] ?? null, wall_ref: wall.id, kind, ...def, position, along_offset: t, source: "user_drawn", derived: true, confirmed_at: null, detection: null, spec: null });
     if (no) {
       setError(no);
       return;
@@ -718,6 +721,7 @@ export function OpeningsEditor({
               <OpeningGlyph
                 key={o.id}
                 opening={o}
+                roomPts={fit.rooms.find((r) => r.id === o.room_id)?.pts ?? null}
                 wall={wall}
                 fit={fit}
                 rawPerM={rawPerM}
@@ -816,6 +820,7 @@ export function OpeningsEditor({
  */
 function OpeningGlyph({
   opening: o,
+  roomPts,
   wall,
   fit,
   rawPerM,
@@ -825,6 +830,8 @@ function OpeningGlyph({
   onPointerDown,
 }: {
   opening: PlanOpening;
+  /** The opening's room in viewBox space — which side of the wall is "inside". */
+  roomPts: Pt[] | null;
   wall: RawWallSegment;
   fit: ReturnType<typeof fitRooms>;
   rawPerM: number;
@@ -855,6 +862,16 @@ function OpeningGlyph({
 
   // Leaf length = opening width (a door leaf is as long as its clear opening).
   const leafLen = halfPx * 2;
+  // B7: the leaf hangs on the resolved hinge jamb and swings into the room.
+  let inward: Pt = [nx, ny];
+  if (roomPts?.length) {
+    const cx = roomPts.reduce((t, p) => t + p[0], 0) / roomPts.length, cy = roomPts.reduce((t, p) => t + p[1], 0) / roomPts.length;
+    if ((cx - centre[0]) * nx + (cy - centre[1]) * ny < 0) inward = [-nx, -ny];
+  }
+  const hr = resolveHinge(p0, p1, inward, a, b, o.spec);
+  const into: Pt = o.spec?.swing === "out" ? [-inward[0], -inward[1]] : inward;
+  const tip: Pt = [hr.hinge[0] + into[0] * leafLen, hr.hinge[1] + into[1] * leafLen];
+  const sweep = (tip[0] - hr.hinge[0]) * (hr.free[1] - hr.hinge[1]) - (tip[1] - hr.hinge[1]) * (hr.free[0] - hr.hinge[0]) > 0 ? 1 : 0;
 
   return (
     <g
@@ -888,20 +905,21 @@ function OpeningGlyph({
       {o.kind === "door" && (
         <>
           <line
-            x1={p0[0]}
-            y1={p0[1]}
-            x2={p0[0] + nx * leafLen}
-            y2={p0[1] + ny * leafLen}
+            x1={hr.hinge[0]}
+            y1={hr.hinge[1]}
+            x2={tip[0]}
+            y2={tip[1]}
             stroke={accent}
             strokeWidth={1.6}
             strokeDasharray={dash}
+            data-hinge={hr.source === "estimate" ? `estimate-${hr.side}` : hr.side}
           />
           <path
-            d={`M ${p0[0] + nx * leafLen} ${p0[1] + ny * leafLen} A ${leafLen} ${leafLen} 0 0 1 ${p1[0]} ${p1[1]}`}
+            d={`M ${tip[0]} ${tip[1]} A ${leafLen} ${leafLen} 0 0 ${sweep} ${hr.free[0]} ${hr.free[1]}`}
             fill="none"
             stroke={accent}
             strokeWidth={1}
-            strokeDasharray={dash ?? "2 2"}
+            strokeDasharray={hr.source === "estimate" ? "2 2" : (dash ?? undefined)}
             opacity={0.75}
           />
         </>
@@ -1030,6 +1048,28 @@ function OpeningProperties({
           Delete
         </button>
       </div>
+      {o.kind === "door" && (
+        <div className="mb-3 flex flex-wrap items-center gap-2" role="group" aria-label="Hinge side, as seen from inside the room" data-hinge-control="">
+          <span className="t-label-caps text-bp-ink-tertiary">Hinge, seen from the room</span>
+          {(["left", "right"] as const).map((side) => (
+            <button
+              key={side}
+              type="button"
+              aria-pressed={hingeSideOf(o.spec) === side}
+              onClick={() => onChange({ spec: { ...(o.spec ?? {}), hinge_side: side, hinge_source: "entered" } })}
+              className={`${CHIP_BTN} ${chipState(hingeSideOf(o.spec) === side)}`}
+              data-testid={`hinge-${side}`}
+            >
+              {side === "left" ? "Left" : "Right"}
+            </button>
+          ))}
+          {!hingeSideOf(o.spec) && !o.spec?.hinge && (
+            <span className={TAG} title="Not entered: drawn on the jamb nearer the corner. Choose Left or Right to record it.">
+              estimate — nearer the corner
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         {(
           [
@@ -1091,6 +1131,7 @@ function normalise(row: unknown): PlanOpening | null {
     derived: r.derived === true,
     confirmed_at: typeof r.confirmed_at === "string" ? r.confirmed_at : null,
     detection: r.detection && typeof r.detection === "object" ? (r.detection as DetectionMeta) : null,
+    spec: r.spec && typeof r.spec === "object" ? (r.spec as Record<string, unknown>) : null,
   };
 }
 
