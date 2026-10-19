@@ -16,6 +16,7 @@ import { roomSheets, roomWalls, wallTileFrom } from "@/lib/drawings/room-sheets"
 import { sheetRev } from "@/lib/drawings/sheet";
 import { curateBoq, curateText, loadWithheldNames } from "@/lib/identity/curation";
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
+import { withoutReplaced } from "@/lib/overlays/replaces";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { loadStudioState, type PhotoViewVersion } from "@/lib/render/photo-view-anchor";
 import { loadMiniPlans, loadPhotoViews } from "@/lib/render/photo-views-load";
@@ -90,7 +91,7 @@ export async function generateRoomPack(projectId: string, opts: { brand?: string
   if (!boqRes.data) throw new RoomPackError(409, "no_boq", "Generate the BoQ first — the pack prints its bill and price.");
 
   const { data: fxRows } = await db.from("plan_fixtures").select("id, type, position, spec, room_id").eq("project_id", projectId).eq("room_id", room.id);
-  const fixtures = ((fxRows ?? []) as { id: string; type: string; position: [number, number]; spec: Record<string, unknown> | null }[]).filter((f) => Array.isArray(f.position));
+  const fixtures = withoutReplaced(((fxRows ?? []) as { id: string; type: string; position: [number, number]; spec: Record<string, unknown> | null }[]).filter((f) => Array.isArray(f.position)));
 
   const views = (await loadPhotoViews(db, [room.id]))[room.id] ?? [];
   const state = await loadStudioState(db, [room.id], views.map((v) => v.id));

@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { FIXTURE_META } from "@/lib/overlays/catalog";
-import { DEFAULT_FOOTPRINT_MM, footprintCorners, footprintOf, isFootprintType, snapToWall } from "@/lib/overlays/footprint";
+import { DEFAULT_FOOTPRINT_MM, footprintCorners, footprintOf, heightOf, isFootprintType, snapToWall } from "@/lib/overlays/footprint";
 import { deriveWallSegments } from "@/lib/plan/geometry";
 import { metresPerUnit } from "@/lib/plan/plan-rules";
 import {
@@ -319,6 +319,7 @@ export function OverlayEditor({
         <FixtureInspector
           key={`${selectedFixture.id}:${JSON.stringify(selectedFixture.spec ?? null)}`}
           f={selectedFixture}
+          roomFixtures={fixtures.filter((x) => x.id !== selectedFixture.id && x.room_id === selectedFixture.room_id && isFootprintType(x.type))}
           readOnly={readOnly}
           onSpec={(spec) => saveSpec(selectedFixture, spec)}
         />
@@ -371,6 +372,8 @@ export function OverlayEditor({
           {/* Fixtures */}
           {layerFixtures.map((f) => {
             const [vx, vy] = fit.toViewBox(f.position);
+            // B7: a fixture another one replaces stays as what is on site, faded.
+            const replacedBy = fixtures.find((x) => x.spec?.replaces_fixture_id === f.id);
             const selected = selectedId === f.id;
             // B1: a sized fixture draws its footprint, turned to face the room.
             const fp = mPerU && f.spec && typeof f.spec.width_mm === "number" ? footprintOf(f.type, f.spec) : null;
@@ -382,7 +385,10 @@ export function OverlayEditor({
                 onPointerDown={readOnly ? undefined : (e) => onFixturePointerDown(e, f)}
                 data-fixture-type={f.type}
                 data-footprint={fp ? `${fp.width_mm}x${fp.depth_mm}@${fp.rotation_deg}` : undefined}
+                data-replaced={replacedBy ? replacedBy.id : undefined}
+                opacity={replacedBy ? 0.35 : undefined}
               >
+                {replacedBy && <title>{`Replaced by the ${(FIXTURE_NAME[replacedBy.type] ?? FIXTURE_META[replacedBy.type].label).toLowerCase()} — on site today, not in the design`}</title>}
                 {outline ? (
                   <polygon
                     points={outline.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}
@@ -438,15 +444,20 @@ export function OverlayEditor({
   );
 }
 
+/** B7: what a person calls each footprint fixture (the Replaces picker, a replaced fixture's title). */
+const FIXTURE_NAME: Partial<Record<FixtureType, string>> = { wc_point: "WC", bidet_point: "Bidet", basin_point: "Vanity", shower_mixer: "Shower", bath_point: "Bath", storage_cabinet: "Cabinet" };
+
 /** G5: the selected item's size (landscape units, trees) or fitting (garden lights). */
-function FixtureInspector({ f, readOnly, onSpec }: { f: Fixture; readOnly: boolean; onSpec: (spec: Record<string, unknown>) => void }) {
+function FixtureInspector({ f, roomFixtures = [], readOnly, onSpec }: { f: Fixture; roomFixtures?: Fixture[]; readOnly: boolean; onSpec: (spec: Record<string, unknown>) => void }) {
   const spec = (f.spec ?? {}) as Record<string, unknown>;
   const name = typeof spec.name === "string" ? spec.name : FIXTURE_META[f.type].label;
   // B1: a sanitary fixture's footprint — width along its wall, depth into the room, gap to the wall.
   const fp = footprintOf(f.type, spec);
   const sizeKeys: [string, string][] =
-    f.type === "tree" ? [["height_mm", "H"], ["canopy_mm", "Canopy"]] : f.type === "planter_box" || f.type === "wall_feature" ? [["width_mm", "W"], ["depth_mm", "D"], ["height_mm", "H"]] : fp ? [["width_mm", "W"], ["depth_mm", "D"], ["wall_gap_mm", "Gap"]] : [];
-  const [draft, setDraft] = useState<Record<string, number>>(() => Object.fromEntries(sizeKeys.map(([k]) => [k, Number(spec[k] ?? (fp ? fp[k as "width_mm" | "depth_mm" | "wall_gap_mm"] : 0))])));
+    f.type === "tree" ? [["height_mm", "H"], ["canopy_mm", "Canopy"]] : f.type === "planter_box" || f.type === "wall_feature" ? [["width_mm", "W"], ["depth_mm", "D"], ["height_mm", "H"]] : fp ? [["width_mm", "W"], ["depth_mm", "D"], ["height_mm", "H"], ["wall_gap_mm", "Gap"]] : [];
+  const height = heightOf(f.type, spec);
+  const replaces = typeof spec.replaces_fixture_id === "string" ? spec.replaces_fixture_id : "";
+  const [draft, setDraft] = useState<Record<string, number>>(() => Object.fromEntries(sizeKeys.map(([k]) => [k, Number(spec[k] ?? (k === "height_mm" && height ? height.mm : fp ? fp[k as "width_mm" | "depth_mm" | "wall_gap_mm"] : 0))])));
   const isLight = f.type === "garden_light";
   return (
     <div className={INSPECTOR_BAR}>
@@ -464,6 +475,32 @@ function FixtureInspector({ f, readOnly, onSpec }: { f: Fixture; readOnly: boole
       )}
       {fp ? <span className="t-label-md font-bp-mono text-bp-ink-secondary">faces {fp.rotation_deg}°{f.wall_id ? ` · on ${f.wall_id}` : ""}</span> : null}
       {fp?.footprint === "default" && <span className={TAG}>Size default</span>}
+      {height && !height.stated && <span className={TAG} title="The type's usual height — type the real one and Set size.">Height default</span>}
+      {fp && roomFixtures.length > 0 && (
+        <label className="flex items-center gap-1.5">
+          <span className="t-label-md text-bp-ink-tertiary">Replaces</span>
+          <select
+            disabled={readOnly}
+            value={replaces}
+            data-testid="fixture-replaces"
+            onChange={(e) => {
+              const target = roomFixtures.find((x) => x.id === e.target.value);
+              const { replaces_fixture_id: _a, replaces: _b, ...rest } = spec;
+              void _a;
+              void _b;
+              onSpec(target ? { ...rest, replaces_fixture_id: target.id, replaces: target.type } : rest);
+            }}
+            className={FIELD}
+          >
+            <option value="">nothing</option>
+            {roomFixtures.map((x) => (
+              <option key={x.id} value={x.id}>
+                {FIXTURE_NAME[x.type] ?? FIXTURE_META[x.type].label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {isLight && (
         <label className="flex items-center gap-1.5">
           <span className="t-label-md text-bp-ink-tertiary">Fitting</span>

@@ -344,6 +344,12 @@ export function mirrorIsRound(spec: string | null | undefined): boolean {
   return !!spec && /\b(round|circular|circle|oval|pill)\b/i.test(spec) && !/\b(rectangular|rectangle|square)\b/i.test(spec);
 }
 
+/** B7: a fixture's typed height (spec.height_mm), else the standard one — and where the figure came from. */
+function ht(g: { f: RoomFixtureIn }, standard: number): { mm: number; src: string } {
+  const h = typeof g.f.spec?.height_mm === "number" ? (g.f.spec.height_mm as number) : null;
+  return h ? { mm: h, src: "fixture.spec.height_mm" } : { mm: standard, src: `standard:${g.f.type}` };
+}
+
 const SIDE_NAME: Record<string, string> = { wc_point: "WC", bidet_point: "Bidet", basin_point: "Vanity", bath_point: "Bath", storage_cabinet: "Cabinet" };
 
 /** The wall a fixture's back is against: the side whose span is its width along the wall. */
@@ -372,7 +378,7 @@ export const FIXTURE_HEIGHTS_MM = {
   niche_bottom: 1100,
   niche_top: 1400,
   heater_bottom: 2100,
-  cabinet_top: 850,
+  cabinet_top: 1200,
   shattaf: 600,
 } as const;
 
@@ -449,18 +455,25 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
         continue;
       }
       switch (g.f.type) {
-        case "wc_point":
+        case "wc_point": {
           // The cistern first, so its label is not covered by the pan's fill.
-          body += box(s0, s1, FH.wc_pan, FH.wc_cistern_top, "WC", "standard:wc_cistern_top", `${g.f.id}:cistern`) + box(s0, s1, 0, FH.wc_pan, "", "standard:wc_pan", g.f.id);
+          const top = ht(g, FH.wc_cistern_top);
+          body += box(s0, s1, FH.wc_pan, top.mm, "WC", top.src, `${g.f.id}:cistern`) + box(s0, s1, 0, FH.wc_pan, "", "standard:wc_pan", g.f.id);
           break;
-        case "bidet_point":
-          body += box(s0, s1, 0, FH.bidet, "BIDET", "standard:bidet", g.f.id);
+        }
+        case "bidet_point": {
+          const top = ht(g, FH.bidet);
+          body += box(s0, s1, 0, top.mm, "BIDET", top.src, g.f.id);
           break;
-        case "bath_point":
-          body += box(s0, s1, 0, 550, "BATH", "standard:bath", g.f.id);
+        }
+        case "bath_point": {
+          const top = ht(g, 550);
+          body += box(s0, s1, 0, top.mm, "BATH", top.src, g.f.id);
           break;
+        }
         case "basin_point": {
-          body += box(s0, s1, FH.vanity_underside, FH.vanity_top, "VANITY", "standard:vanity_top", g.f.id);
+          const vt = ht(g, FH.vanity_top);
+          body += box(s0, s1, FH.vanity_underside, vt.mm, "VANITY", vt.src, g.f.id);
           body += dim([X(s1), Y(0)], [X(s1), Y(FH.vanity_underside / 1000)], [3.2, 0], FH.vanity_underside, "standard:vanity_underside", { approx: true });
           const mc = FH.mirror_centre / 1000;
           const round = mirrorIsRound(input.mirror);

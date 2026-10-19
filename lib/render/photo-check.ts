@@ -87,7 +87,8 @@ export function checkItemsFor(plan: PlanLite): CheckItem[] {
     const k = FIXTURE_KIND[fx.type];
     const was = typeof fx.spec?.replaces === "string" ? FIXTURE_KIND[fx.spec.replaces] : undefined;
     // A stated height reaches the words the model reads (a cabinet ~1.2 m tall, not a low unit).
-    const tall = typeof fx.spec?.height_mm === "number" && fx.type === "storage_cabinet" ? `, about ${(Number(fx.spec.height_mm) / 1000).toFixed(1)} m tall — well above the WC cistern` : "";
+    const hmm = typeof fx.spec?.height_mm === "number" ? Number(fx.spec.height_mm) : null;
+    const tall = hmm ? (fx.type === "storage_cabinet" ? `, about ${(hmm / 1000).toFixed(1)} m tall — well above the WC cistern` : `, about ${(hmm / 1000).toFixed(2)} m to its top`) : "";
     if (k) out.push({ ref: `F${++f}`, plan_id: fx.id, ...k, description: k.description + tall, ...(was ? { replaces: { short: was.short, description: was.description } } : {}) });
   }
   // What each replacement removes, so a render that keeps it fails.

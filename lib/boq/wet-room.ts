@@ -36,6 +36,7 @@
 // =============================================================================
 
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
+import { replacedIds } from "@/lib/overlays/replaces";
 import type { PlanGraph, Point } from "@/lib/plan/geometry";
 
 import { lineTotal, money2, sumMoney } from "./money";
@@ -118,6 +119,12 @@ export function wetRoomChoicesOf(spec: unknown): WetRoomChoices {
   };
 }
 
+/** What is on site: every sanitary fixture on the plan, the replaced ones included ("1 WC, 1 bidet, 1 basin + vanity, shower set"). */
+function onSiteList(own: readonly { type: string }[]): string {
+  const n = (t: string) => own.filter((f) => f.type === t).length;
+  return [n("wc_point") ? `${n("wc_point")} WC` : "", n("bidet_point") ? `${n("bidet_point")} bidet` : "", n("basin_point") ? `${n("basin_point")} basin + vanity` : "", n("bath_point") ? `${n("bath_point")} bath` : "", n("shower_mixer") ? "shower set" : ""].filter(Boolean).join(", ");
+}
+
 function existingFixturesOf(spec: unknown): string | null {
   const w = spec && typeof spec === "object" ? ((spec as Record<string, unknown>).wet_room as Record<string, unknown> | undefined) : undefined;
   return w && typeof w.existing_fixtures === "string" && w.existing_fixtures.trim() ? w.existing_fixtures.trim() : null;
@@ -173,8 +180,10 @@ export function wetRoomContextFrom(graph: PlanGraph, roomId: string, fixtures: r
     perim += Math.hypot(b[0] - a[0], b[1] - a[1]);
   }
   const own = fixtures.filter((f) => f.room_id === roomId);
+  // B7: a fixture another one replaces is on site today (the strip-out names it) but not in the design.
+  const gone = replacedIds(own);
   const fx: WetRoomFixture[] = own
-    .filter((f) => f.type !== "water_heater")
+    .filter((f) => f.type !== "water_heater" && !gone.has(f.id))
     .map((f) => {
       const fp = footprintOf(f.type, f.spec);
       const sides = fp ? footprintSides(footprintCorners(f.position, fp, k).map((p) => toM(p as [number, number])), room.polygon) : { onWall: [], free: [] };
@@ -197,7 +206,7 @@ export function wetRoomContextFrom(graph: PlanGraph, roomId: string, fixtures: r
     heater: h ? { id: h.id, where: `${wallWord(toM(h.position), room.polygon)}${typeof h.spec?.note === "string" ? ` — ${h.spec.note}` : ""}` } : null,
     bulkhead: room.spec?.bulkhead != null && room.spec.bulkhead !== false,
     choices: wetRoomChoicesOf(room.spec),
-    existing_fixtures: existingFixturesOf(room.spec),
+    existing_fixtures: existingFixturesOf(room.spec) ?? (gone.size ? onSiteList(own) : null),
   };
 }
 

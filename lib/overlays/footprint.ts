@@ -47,6 +47,27 @@ export const DEFAULT_FOOTPRINT_MM: Record<FootprintType, { width_mm: number; dep
   storage_cabinet: { width_mm: 400, depth_mm: 450 },
 };
 
+/**
+ * B7: how tall each footprint fixture stands (mm, floor to its top) — the WC to
+ * its cistern, the vanity to its top, the shower to its glass. A default until
+ * someone types the real one (spec.height_mm).
+ */
+export const DEFAULT_HEIGHT_MM: Record<FootprintType, number> = {
+  wc_point: 800,
+  bidet_point: 400,
+  basin_point: 850,
+  shower_mixer: 2000,
+  bath_point: 550,
+  storage_cabinet: 1200,
+};
+
+/** The fixture's height and whether it was typed. null for a type with no footprint. */
+export function heightOf(type: string, spec: Record<string, unknown> | null | undefined): { mm: number; stated: boolean } | null {
+  if (!isFootprintType(type)) return null;
+  const h = num(spec?.height_mm);
+  return h != null && h > 0 ? { mm: h, stated: true } : { mm: DEFAULT_HEIGHT_MM[type], stated: false };
+}
+
 export interface Footprint {
   width_mm: number;
   depth_mm: number;
