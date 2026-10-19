@@ -56,7 +56,9 @@ try {
   const order = ["cover", "room_plan", "view", "drawing", "materials", "boq", "price", "programme"];
   const firstIdx = order.map((k) => kinds.indexOf(k));
   check("the order: cover → room + photos → views → drawings → materials → BoQ → price → programme", firstIdx.every((i) => i >= 0) && firstIdx.every((v, i, a) => i === 0 || v > a[i - 1]!), JSON.stringify(firstIdx));
-  check("one page per photo view, each with its render + the photo", summary.pages.filter((p) => p.kind === "view").length === summary.views.length && summary.views.every((v) => !!v.render), summary.views.map((v) => `${v.label.split(" · ")[0]}${v.anchor ? " (anchor)" : v.locked ? " (locked)" : ""}`).join(", "));
+  // B7 1a: a view shows a render that matches the current design, or a labelled placeholder — never a stale render.
+  const pendingN = pages.join("").split("data-view-pending=").length - 1;
+  check(`one page per photo view: a matching render or a labelled placeholder (${pendingN} pending)`, summary.pages.filter((p) => p.kind === "view").length === summary.views.length && summary.views.filter((v) => !v.render).length === pendingN, summary.views.map((v) => `${v.label.split(" · ")[0]}${v.anchor ? " (anchor)" : v.locked ? " (locked)" : ""}`).join(", "));
   check("the drawings: the plan + one elevation per wall, in the room series (R-)", summary.sheets.length === 5 && summary.sheets.every((s) => s.startsWith("R-")), summary.sheets.join(" · "));
   check("no missing image", summary.missing_images.length === 0, summary.missing_images.join(", "));
 

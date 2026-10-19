@@ -55,16 +55,37 @@ export interface CurrentDesign {
   anchor: { render_id: string; room_photo_id: string } | null;
   /** Today's design fingerprint (designKey of the plan's items + the room's choices). */
   design_key: string;
-  /** Every BoQ revision's created_at, oldest first — rev N = the N-th. */
-  revisions: readonly string[];
+  /** Every BoQ revision, oldest first (rev N = the N-th): when, and its design signature (designSignature). */
+  revisions: readonly { created_at: string; signature: string }[];
 }
 
 export type Consistency = { ok: true } | { ok: false; reason: string; placeholder: string };
 
-/** The revision the design changed in, for a render made at `at`: the first one after it, else the latest. */
-function revAfter(at: string, revisions: readonly string[]): number | null {
+/** Products a client chooses between (a product swap): their item keys mark a design choice. Engine changes never do. */
+export const CHOICE_ITEM_KEYS = new Set([
+  "alum.shower_panel_fixed", "san.shower_manual", "joinery.vanity_ready", "san.basin_mixer_mid", "san.wc_floor_mid",
+  "alum.mirror_led_mid", "wall.shower_niche_plain", "prelim.waste_bagged", "joinery.storage_cabinet",
+]);
+
+/**
+ * What a revision says the room LOOKS like: the fixtures it prices and the
+ * client-chosen products on it. Two revisions with the same signature show the
+ * same design (a regeneration or an engine change does not move it); the first
+ * that differs is where the design changed.
+ */
+export function designSignature(sections: readonly { work_section: string; lines: readonly { rule_id?: string; item_key?: string; quantity?: number }[] }[]): string {
+  const lines = sections.flatMap((s) => s.lines);
+  const kinds = [...boqFixtureKinds(lines)].sort();
+  const chosen = [...new Set(lines.filter((l) => (l.quantity ?? 1) > 0 && l.item_key && CHOICE_ITEM_KEYS.has(l.item_key)).map((l) => l.item_key!))].sort();
+  return `${kinds.join(",")}|${chosen.join(",")}`;
+}
+
+/** The revision the design changed in after a render made at `at`: the first whose signature differs from the one current then. */
+function revAfter(at: string, revisions: CurrentDesign["revisions"]): number | null {
   if (revisions.length === 0) return null;
-  const i = revisions.findIndex((r) => r > at);
+  const then = [...revisions].reverse().find((r) => r.created_at <= at) ?? null;
+  if (!then) return 1;
+  const i = revisions.findIndex((r) => r.created_at > at && r.signature !== then.signature);
   return i >= 0 ? i + 1 : revisions.length;
 }
 

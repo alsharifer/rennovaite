@@ -24,7 +24,12 @@ const CURRENT: CurrentDesign = {
   fixtures: boqFixtureKinds(BOQ_LINES),
   anchor: { render_id: "p2-v13", room_photo_id: "P2" },
   design_key: designKey(FIXTURES, CHOICES),
-  revisions: ["2026-10-18T10:00:00Z", "2026-10-19T08:00:00Z"],
+  // rev 1 (the bidet), rev 2 (unchanged design, a regeneration), rev 3 (the cabinet).
+  revisions: [
+    { created_at: "2026-10-18T10:00:00Z", signature: "bidet,shower,vanity,wc|" },
+    { created_at: "2026-10-18T14:00:00Z", signature: "bidet,shower,vanity,wc|" },
+    { created_at: "2026-10-19T08:00:00Z", signature: "cabinet,shower,vanity,wc|joinery.storage_cabinet" },
+  ],
 };
 const AFTER_ITEMS = [{ kind: "door" }, { kind: "wc" }, { kind: "vanity" }, { kind: "shower" }, { kind: "cabinet" }, { kind: "bidet", gone: true }];
 const BIDET_ERA = [{ kind: "door" }, { kind: "wc" }, { kind: "bidet" }, { kind: "vanity" }, { kind: "shower" }];
@@ -39,7 +44,7 @@ describe("B7 1a — no pack ships a render that contradicts its BoQ", () => {
     const c = renderConsistency(view({ items: BIDET_ERA, created_at: "2026-10-18T12:00:00Z", design_key: null }), "P1", CURRENT);
     expect(c.ok).toBe(false);
     expect(c.ok ? "" : c.reason).toContain("has bidet");
-    expect(c.ok ? "" : c.placeholder).toBe("View pending — design changed in rev 2");
+    expect(c.ok ? "" : c.placeholder).toBe("View pending — design changed in rev 3"); // not rev 2: that one only regenerated
   });
 
   it("a render that matches the fixtures, the current anchor and its finishes goes in", () => {
