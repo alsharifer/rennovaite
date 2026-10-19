@@ -20,6 +20,7 @@
 // =============================================================================
 
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { ProductPicker } from "./ProductPicker";
 
 import { formatAED, formatQty } from "@/lib/format/aed";
 import type { ReviewLine, ReviewModel } from "@/lib/boq/review-types";
@@ -248,6 +249,12 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
                 )
               ) : null}
             </Block>
+
+            {line.product ? (
+              <Block>
+                <ProductPicker projectId={model.projectId} product={line.product} />
+              </Block>
+            ) : null}
 
             <Block>
               <div className="flex flex-wrap items-center gap-6">

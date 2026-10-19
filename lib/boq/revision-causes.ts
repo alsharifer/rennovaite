@@ -27,6 +27,7 @@ import { netTilingChange, TILING_ITEM_KEYS, tilingChangeSummary, type TilingEdit
 import { netScopeChange, scopeChangeSummary } from "@/lib/plan/scope";
 
 import { appliedHeadline, basisText, type BasisKind, type CorrectionOrigin } from "./own-basis-vocab";
+import { productChangeSummary } from "./product-swaps";
 
 import type { RecordedCause } from "./revision-diff";
 
@@ -169,6 +170,17 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
         }
         if (layer === "ceiling") {
           ceilingEvents.push({ at, rooms: Array.isArray(d.rooms) ? (d.rooms as Row[]).map((r) => ({ id: str(r.id), name: r.name == null ? null : str(r.name), from: num(r.from), to: num(r.to) })) : [] });
+          break;
+        }
+        // B7 5: a product swapped from a BoQ line — "Product changed by <name>", on the lines it touches.
+        if (layer === "product") {
+          const keys = Array.isArray(d.line_keys) ? d.line_keys.map(str) : [];
+          out.push({ kind: "product_change", at, summary: productChangeSummary(d.by_name ? str(d.by_name) : null, str(d.group), str(d.from_label), str(d.to_label)), item_keys: keys, line_keys: keys });
+          break;
+        }
+        // B7 4: the wet-room panel (bulkhead, heater, niche, valve, extractor) — one cause for the window.
+        if (layer === "wet_room") {
+          out.push({ kind: "wet_room", at, summary: "Wet room changed on 01 Plan — bulkhead, water heater, niche or extractor", item_keys: ["light.led_strip", "ceiling.led_cove", "plumb.heater_box", "wall.shower_niche", "wall.shower_niche_plain", "elec.extractor"] });
           break;
         }
         if (layer === "scope") {
