@@ -11,7 +11,8 @@
 // =============================================================================
 
 import { boqDerivedInfo, derivedLineNote, isUnpricedLine } from "@/lib/documents/boq-derived";
-import { productGroupOf } from "./product-swaps";
+import { optionBasis, productGroupOf } from "./product-swaps";
+import { RATE_BASIS_ORDER } from "./rate-basis";
 import type { ProposalGateVerdict, ReferenceBasis, ReferenceBasisAcceptance } from "@/lib/documents/reference-basis-types";
 import { REFERENCE_BASIS_BANNER } from "@/lib/documents/reference-basis-types";
 import { summaryChainOf } from "./totals";
@@ -95,7 +96,7 @@ function draftNotice(statement: string): { key: string; sentence: string } {
 function productOf(l: { item_key?: string | null; rule_id?: string | null }): ReviewLine["product"] {
   const g = productGroupOf(l);
   if (!g) return null;
-  return { field: g.group.field, group: g.group.label, current: g.current.value, options: g.group.options.map((o) => ({ value: o.value, label: o.label, rate: o.rate_aed, unit: o.unit })) };
+  return { field: g.group.field, group: g.group.label, current: g.current.value, options: g.group.options.map((o) => ({ value: o.value, label: o.label, rate: o.rate_aed, unit: o.unit, basis: optionBasis(o) })) };
 }
 
 export function buildReviewModel(i: ReviewInputs): ReviewModel {
@@ -249,7 +250,7 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
         const c = by.get(k) ?? { lines: 0, amount: 0 };
         by.set(k, { lines: c.lines + 1, amount: Math.round((c.amount + l.amount) * 100) / 100 });
       }
-      return ["calibrated", "market", "firm", "allowance", "tbc"].filter((k) => by.has(k)).map((k) => ({ basis: k, ...by.get(k)! }));
+      return [...RATE_BASIS_ORDER, ...[...by.keys()].filter((k) => !(RATE_BASIS_ORDER as readonly string[]).includes(k))].filter((k) => by.has(k)).map((k) => ({ basis: k, ...by.get(k)! }));
     })(),
   };
 }

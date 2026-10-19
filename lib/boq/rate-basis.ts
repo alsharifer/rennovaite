@@ -8,6 +8,8 @@
 //               ceiling, cove, civil and stair rates (R-30, R-31, R-35, R-36, R-44)
 //   market      the market rate book: the labour book bands, the catalogue, the
 //               take-off and point-rate constants, a calibrated reference row
+//   catalogue   B9: a retail catalogue price (+ its fitting from the labour
+//               book) for a named product — R-67, R-69, R-71
 //   allowance   a judgement figure pending the QS — rule allowances, S6-pre
 //               indicatives, site-assessment allowances
 //   tbc         no rate in any book — a visible line at 0 ("to be priced")
@@ -16,17 +18,23 @@
 
 import { isFirmTier } from "@/lib/rates/tiers";
 
-export type RateBasis = "calibrated" | "market" | "allowance" | "tbc" | "firm";
+export type RateBasis = "calibrated" | "catalogue" | "market" | "allowance" | "tbc" | "firm";
+
+/** B9: THE order every summary lists the bases in — a summary that hard-codes its own list drops a new basis. */
+export const RATE_BASIS_ORDER: readonly RateBasis[] = ["calibrated", "catalogue", "market", "firm", "allowance", "tbc"];
 
 export const RATE_BASIS_LABEL: Record<RateBasis, string> = {
   calibrated: "calibrated (reference villa)",
+  catalogue: "catalogue price",
   market: "market rate book",
   allowance: "allowance",
   tbc: "to be priced",
   firm: "your rate book",
 };
 
-const CALIBRATED_RULES = new Set(["R-30", "R-31", "R-35", "R-36", "R-40", "R-41", "R-42", "R-43", "R-44"]);
+// B9: R-68 / R-70 are the reference villa's sanitary order; R-67 / R-69 / R-71 the catalogue.
+const CALIBRATED_RULES = new Set(["R-30", "R-31", "R-35", "R-36", "R-40", "R-41", "R-42", "R-43", "R-44", "R-68", "R-70"]);
+const CATALOGUE_RULES = new Set(["R-67", "R-69", "R-71"]);
 
 interface LineLike {
   rule_id?: string | null;
@@ -42,6 +50,7 @@ export function rateBasisOf(line: LineLike): RateBasis {
   if (rule.startsWith("GT/")) return line.rate_status === "actual_transaction" ? "calibrated" : "allowance";
   const r = rule.match(/R-\d+/)?.[0];
   if (r && CALIBRATED_RULES.has(r)) return "calibrated";
+  if (r && CATALOGUE_RULES.has(r)) return "catalogue";
   if (line.rate_tier === "allowance" || line.rate_tier === "indicative" || line.rate_status === "site_assessment" || line.rate_status === "indicative") return "allowance";
   return "market";
 }

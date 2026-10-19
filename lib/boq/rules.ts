@@ -136,6 +136,14 @@ export type RateRule = {
   /** AED/unit used when neither labour row nor SKU pool resolves. */
   allowance_aed?: number;
   allowance_note?: string;
+  /**
+   * B9: the figure is no longer a judgement — it is sourced (allowance_aed then
+   * holds the sourced rate, and allowance_note says how it was built). The
+   * source itself stays private: the note names the role, never the vendor.
+   *   calibrated  transacted on the reference villa (Mudon's sanitary order)
+   *   catalogue   a retail catalogue price (pricing_skus), + a labour-book band to fit it
+   */
+  sourced?: { basis: "calibrated" | "catalogue"; as_of: string };
 };
 
 export const RATE_RULES: Record<string, RateRule> = {
@@ -567,30 +575,38 @@ export const RATE_RULES: Record<string, RateRule> = {
     allowance_aed: 750,
     allowance_note: "White floor-standing storage cabinet ~400 × 450 × 850, moisture-resistant carcass, one door + shelves, supply + install, AED 750 allowance. QS to confirm.",
   },
+  // B9 (19 Oct): the five big items, sourced without the contractor. Each was
+  // an allowance (shown after "was"); the figure is now a transaction or a
+  // catalogue price, with its fitting where the point rate does not carry it.
   "alum.shower_panel_fixed": {
     rule_id: "R-67",
-    allowance_aed: 2000,
-    allowance_note: "Fixed walk-in glass panel, 10 mm clear toughened, up to ~1.4 m, wall profile + stay bar, brushed-brass fittings, supply + install, AED 2,000 allowance (the hinged 2-panel enclosure is 2 × 2,200, R-47). QS to confirm.",
+    allowance_aed: 2139,
+    allowance_note: "Fixed walk-in glass panel 1200 × 2000, clear toughened — retail catalogue 1,299.00 (verified 28 Apr 2026) + fitting 2.40 m² × 350.00 (labour book, mirror / feature glass install, mid) = 2,139.00. Catalogue profile is chrome/steel; a brushed-brass profile may cost more. Was a 2,000 allowance.",
+    sourced: { basis: "catalogue", as_of: "2026-04-28" },
   },
   "san.shower_manual": {
     rule_id: "R-68",
-    allowance_aed: 2200,
-    allowance_note: "Concealed manual shower mixer with diverter, rain head + hand shower, brushed brass, supply + install at the existing position, AED 2,200 allowance (thermostatic set R-21 is 3,500). QS to confirm.",
+    allowance_aed: 1750,
+    allowance_note: "Concealed shower set (mixer with diverter, rain head, hand shower), supply — 1,750.00 as transacted on the reference villa (sanitaryware supplier, Jun 2026; matt black there, brushed brass here — same GROHE colour range). Fitting is the shower point's second fix (Plumbing & Sanitary). Was a 2,200 allowance.",
+    sourced: { basis: "calibrated", as_of: "2026-06-13" },
   },
   "joinery.vanity_ready": {
     rule_id: "R-69",
-    allowance_aed: 2000,
-    allowance_note: "Ready-made wall-hung vanity unit ~800–900 mm, two drawers, integrated ceramic basin top, supply + install, AED 2,000 allowance (the floating unit + stone top is 1,800 + 1,450). QS to confirm.",
+    allowance_aed: 1474,
+    allowance_note: "Ready-made vanity unit with seamless basin, 80 × 50 — retail catalogue 1,299.00 (verified 28 Apr 2026) + fixing ½ day × 350.00 (labour book, carpenter, mid) = 1,474.00. Plumbing is the basin point's second fix. Was a 2,000 allowance.",
+    sourced: { basis: "catalogue", as_of: "2026-04-28" },
   },
   "san.basin_mixer_mid": {
     rule_id: "R-70",
-    allowance_aed: 600,
-    allowance_note: "Basin mixer, mid-range, brushed brass, supply + install on the vanity's own basin, AED 600 allowance (R-20's 1,800 includes a separate basin). QS to confirm.",
+    allowance_aed: 400,
+    allowance_note: "Basin mixer, supply — 400.00 as transacted on the reference villa (sanitaryware supplier, Jun 2026). Fitting is the basin point's second fix. Was a 600 allowance.",
+    sourced: { basis: "calibrated", as_of: "2026-06-13" },
   },
   "san.wc_floor_mid": {
     rule_id: "R-71",
-    allowance_aed: 1200,
-    allowance_note: "Floor-standing close-coupled WC, mid-range, supply + install at the existing soil position, AED 1,200 allowance (R-57 is 1,600). QS to confirm.",
+    allowance_aed: 1199,
+    allowance_note: "Close-coupled WC, dual flush, white, supply — retail catalogue 1,199.00 (verified 28 Apr 2026). Fitting is the WC point's second fix (Plumbing & Sanitary). Was a 1,200 allowance.",
+    sourced: { basis: "catalogue", as_of: "2026-04-28" },
   },
   "alum.mirror_led_mid": {
     rule_id: "R-72",

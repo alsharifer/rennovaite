@@ -1178,6 +1178,34 @@ Report `docs/BATHROOM_PILOT_B8.md`. No migration.
   - `scripts/b8-render-experiment.ts --arms=… [--photos=…] [--publish=<arm>]`
     (one result file per arm × photo, so photos run as parallel processes).
 
+### Bathroom pilot B9 — pricing credibility before the itemised quote (19 Oct)
+
+Report `docs/BATHROOM_PILOT_B9.md`. Migration **066**.
+
+- **Frozen revisions** (`boq_snapshots`): a revision kept for a purpose
+  (`pre_comparison`) with its pricing fingerprint and document. The pilot
+  bathroom's rev 14 (AED 38,778.38) is the snapshot every contractor figure is
+  compared against.
+- **Benchmarks are not ground truth.** `boq_outcomes.kind` is ground_truth |
+  benchmark; a row also carries `scope` and `platform_snapshot_id`.
+  - A single total with no lines is a benchmark: no rate is ever calibrated from
+    it.
+  - `lib/boq/benchmark.ts compareBenchmark` (pure) rebuilds the engine's total
+    on the contractor's scope (contingency, VAT; NOC is TBC in the engine).
+  - Labour only = not comparable; an unstated scope = a range.
+- **Allowances are read by value** (`lib/boq/allowance-share.ts`): the
+  allowance AED over the base total. The room pack's price page, the BoQ page's
+  rate-basis line and `scripts/b9-pricing.ts` all use it.
+- **Sourced rules** (`RateRule.sourced: { basis: "calibrated" | "catalogue" }`):
+  - the figure is in `allowance_aed`, its arithmetic in the note, the vendor
+    never named;
+  - the resolver answers tier `catalog` for a catalogue figure;
+  - the rate basis gains `catalogue` (R-67 / R-69 / R-71); R-68 / R-70 are
+    calibrated (the reference villa's sanitary order).
+  - The pilot bathroom's allowances: 46.5 % → 23.8 % of the work
+    (rev 15, AED 37,601.29). Room protection stays an allowance — no per-room
+    figure exists.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

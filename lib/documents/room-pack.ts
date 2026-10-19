@@ -21,6 +21,7 @@
 // =============================================================================
 
 import { esc } from "@/lib/drawings/sheet";
+import { allowanceShare } from "@/lib/boq/allowance-share";
 import { formatAed } from "@/lib/format/aed";
 
 import { DOC, hline, label, text, wrapWords } from "./doc-style";
@@ -341,12 +342,11 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     row("Total", `AED ${aed(input.boq.grand_total_aed)}`, `data-grand-total="${input.boq.grand_total_aed}"`, true);
     // B7 1d: a line still to be priced is on the page, beside the total, never inside it.
     for (const l of unpricedLines) row(l.description, "TBC — not in total", `data-tbc="${esc(l.description)}"`);
-    // B7 1e: how much of the price rests on our own estimates.
-    const counted = input.boq.sections.flatMap((sec) => sec.lines).filter((l) => unpriced(l) || (Number(l.quantity) || 0) > 0);
-    const allowances = counted.filter((l) => l.rate_basis === "allowance").length;
+    // B7 1e → B9: how much of the price rests on our own estimates — by VALUE, the line count beside it.
+    const share = allowanceShare(input.boq.sections);
     y += 2;
-    for (const line of wrapWords(`${allowances} of ${counted.length} lines are our estimates (allowances), for the QS to confirm.`, 80)) {
-      s += text(M, y, line, { size: 3.3, weight: 600, attrs: `data-allowances="${allowances}" data-lines="${counted.length}"` });
+    for (const line of wrapWords(`AED ${aed(share.allowance_aed)} of the AED ${aed(share.base_aed)} of work (${share.pct.toFixed(1)}%) is priced on our own estimates (allowances, ${share.allowance_lines} of ${share.lines} lines), for the QS to confirm.`, 80)) {
+      s += text(M, y, line, { size: 3.3, weight: 600, attrs: `data-allowances="${share.allowance_lines}" data-lines="${share.lines}" data-allowance-aed="${share.allowance_aed}" data-allowance-pct="${share.pct}"` });
       y += 5;
     }
     let oy = 46;

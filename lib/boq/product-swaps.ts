@@ -41,6 +41,13 @@ const allowance = (key: string): number | null => {
   return typeof r?.allowance_aed === "number" ? r.allowance_aed : null;
 };
 
+/** B9: what an option's figure is — sourced (catalogue / reference villa), a judgement allowance, or a market rate (null). */
+export function optionBasis(o: Pick<ProductOption, "lines">): "catalogue" | "calibrated" | "allowance" | null {
+  const r = RATE_RULES[o.lines[0] ?? ""];
+  if (!r || typeof r.allowance_aed !== "number") return null;
+  return r.sourced?.basis ?? "allowance";
+}
+
 export const PRODUCT_GROUPS: readonly ProductGroup[] = [
   {
     field: "shower_screen",

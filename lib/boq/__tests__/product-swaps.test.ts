@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { GRADEABLE_ITEMS } from "@/lib/whatif/grades";
-import { groupLineKeys, isProductValue, lineProductKey, PRODUCT_GROUPS, productChangeSummary, productGroupOf } from "@/lib/boq/product-swaps";
+import { groupLineKeys, isProductValue, lineProductKey, optionBasis, PRODUCT_GROUPS, productChangeSummary, productGroupOf } from "@/lib/boq/product-swaps";
 import { summarizeChanges } from "@/lib/boq/changes-since";
 
 describe("B7 5 — the what-if grades cannot express the pilot's savings", () => {
@@ -22,7 +22,9 @@ describe("B7 5 — a BoQ line's product group", () => {
   });
   it("prices an alternative from its rule's allowance; a market-rate one is priced on regenerate", () => {
     const glass = PRODUCT_GROUPS.find((g) => g.field === "shower_screen")!;
-    expect(glass.options.find((o) => o.value === "fixed_panel")!.rate_aed).toBe(2000);
+    expect(glass.options.find((o) => o.value === "fixed_panel")!.rate_aed).toBe(2139);
+    expect(optionBasis(glass.options.find((o) => o.value === "fixed_panel")!)).toBe("catalogue"); // B9
+    expect(optionBasis(PRODUCT_GROUPS.find((g) => g.field === "niche_led")!.options.find((o) => o.value === false)!)).toBe("allowance");
     expect(PRODUCT_GROUPS.find((g) => g.field === "shower_valve")!.options.find((o) => o.value === "thermostatic")!.rate_aed).toBeNull();
   });
   it("only a group's own values are accepted", () => {
