@@ -25,6 +25,7 @@
 // =============================================================================
 
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
+import { hingeLabel, resolveHinge } from "@/lib/plan/door-hinge";
 import type { Opening, PlanGraph, Point, Room } from "@/lib/plan/geometry";
 
 import { esc, FONT_MONO, FONT_UI, INK_100, INK_500, INK_700, INK_900, PAPER, PAPER_100, renderSheet, type SheetMeta } from "./sheet";
@@ -207,12 +208,6 @@ function openingsOf(graph: PlanGraph, roomId: string): Opening[] {
 }
 
 /** The door's hinge end: "W" | "E" | "N" | "S" → the jamb nearer that side; absent = not stated. */
-function hingeJamb(o: Opening, j0: V, j1: V): { hinge: V; free: V; stated: boolean } {
-  const h = typeof o.spec?.hinge === "string" ? (o.spec.hinge as string).toUpperCase() : null;
-  const dir: Record<string, V> = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
-  if (!h || !dir[h]) return { hinge: j0, free: j1, stated: false };
-  return dot(j0, dir[h]!) >= dot(j1, dir[h]!) ? { hinge: j0, free: j1, stated: true } : { hinge: j1, free: j0, stated: true };
-}
 
 // --- R-101: the dimensioned plan -----------------------------------------------------------
 
@@ -271,7 +266,9 @@ export function renderRoomPlan(input: RoomSheetsInput): RoomSheet {
       }
       body += `<g data-opening="${esc(o.id)}" data-opening-type="window"></g>`;
     } else {
-      const { hinge, free, stated } = hingeJamb(o, j0, j1);
+      // B7: the hinge side as entered (left/right from the room), the legacy compass, or the estimate.
+      const hr = resolveHinge(j0, j1, w.inward, w.left, w.right, o.spec);
+      const hinge: V = hr.hinge, free: V = hr.free, stated = hr.source === "entered";
       const swingIn = (o.spec?.swing as string | undefined) !== "out";
       const into = swingIn ? w.inward : outward;
       const leafTip = add(hinge, mul(into, o.width_mm / 1000));
@@ -280,9 +277,9 @@ export function renderRoomPlan(input: RoomSheetsInput): RoomSheet {
       // Sweep: the arc from the leaf tip back to the free jamb, the short way.
       const cross = (pt[0] - ph[0]) * (pf[1] - ph[1]) - (pt[1] - ph[1]) * (pf[0] - ph[0]);
       body += L(ph[0], ph[1], pt[0], pt[1], { stroke: INK_900, w: 0.4 });
-      body += `<path d="M ${n2(pt[0])} ${n2(pt[1])} A ${n2(rad)} ${n2(rad)} 0 0 ${cross > 0 ? 1 : 0} ${n2(pf[0])} ${n2(pf[1])}" fill="none" stroke="${INK_500}" stroke-width="0.25"${stated ? "" : ' stroke-dasharray="1 0.8"'} data-opening="${esc(o.id)}" data-opening-type="door" data-hinge="${stated ? esc(String(o.spec!.hinge)) : "not stated"}"/>`;
-      if (!stated) notes.push("Door hinge side not stated — swing drawn dashed; confirm on site.");
-      else notes.push(`Door: hinge ${String(o.spec!.hinge).toUpperCase()}, opens ${swingIn ? "in" : "out"}.`);
+      body += `<path d="M ${n2(pt[0])} ${n2(pt[1])} A ${n2(rad)} ${n2(rad)} 0 0 ${cross > 0 ? 1 : 0} ${n2(pf[0])} ${n2(pf[1])}" fill="none" stroke="${INK_500}" stroke-width="0.25"${stated ? "" : ' stroke-dasharray="1 0.8"'} data-opening="${esc(o.id)}" data-opening-type="door" data-hinge="${esc(hr.compass ?? (stated ? hr.side : `estimate-${hr.side}`))}"/>`;
+      if (!stated) notes.push(`Door: ${hingeLabel(hr)} — swing drawn dashed.`);
+      else notes.push(hr.compass ? `Door: hinge ${hr.compass}, opens ${swingIn ? "in" : "out"}.` : `Door: hinge ${hr.side} (as seen from the room), opens ${swingIn ? "in" : "out"}.`);
     }
     void p0;
     void p1;
@@ -347,6 +344,12 @@ export function mirrorIsRound(spec: string | null | undefined): boolean {
   return !!spec && /\b(round|circular|circle|oval|pill)\b/i.test(spec) && !/\b(rectangular|rectangle|square)\b/i.test(spec);
 }
 
+/** B7: a fixture's typed height (spec.height_mm), else the standard one — and where the figure came from. */
+function ht(g: { f: RoomFixtureIn }, standard: number): { mm: number; src: string } {
+  const h = typeof g.f.spec?.height_mm === "number" ? (g.f.spec.height_mm as number) : null;
+  return h ? { mm: h, src: "fixture.spec.height_mm" } : { mm: standard, src: `standard:${g.f.type}` };
+}
+
 const SIDE_NAME: Record<string, string> = { wc_point: "WC", bidet_point: "Bidet", basin_point: "Vanity", bath_point: "Bath", storage_cabinet: "Cabinet" };
 
 /** The wall a fixture's back is against: the side whose span is its width along the wall. */
@@ -375,7 +378,7 @@ export const FIXTURE_HEIGHTS_MM = {
   niche_bottom: 1100,
   niche_top: 1400,
   heater_bottom: 2100,
-  cabinet_top: 850,
+  cabinet_top: 1200,
   shattaf: 600,
 } as const;
 
@@ -452,18 +455,25 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
         continue;
       }
       switch (g.f.type) {
-        case "wc_point":
+        case "wc_point": {
           // The cistern first, so its label is not covered by the pan's fill.
-          body += box(s0, s1, FH.wc_pan, FH.wc_cistern_top, "WC", "standard:wc_cistern_top", `${g.f.id}:cistern`) + box(s0, s1, 0, FH.wc_pan, "", "standard:wc_pan", g.f.id);
+          const top = ht(g, FH.wc_cistern_top);
+          body += box(s0, s1, FH.wc_pan, top.mm, "WC", top.src, `${g.f.id}:cistern`) + box(s0, s1, 0, FH.wc_pan, "", "standard:wc_pan", g.f.id);
           break;
-        case "bidet_point":
-          body += box(s0, s1, 0, FH.bidet, "BIDET", "standard:bidet", g.f.id);
+        }
+        case "bidet_point": {
+          const top = ht(g, FH.bidet);
+          body += box(s0, s1, 0, top.mm, "BIDET", top.src, g.f.id);
           break;
-        case "bath_point":
-          body += box(s0, s1, 0, 550, "BATH", "standard:bath", g.f.id);
+        }
+        case "bath_point": {
+          const top = ht(g, 550);
+          body += box(s0, s1, 0, top.mm, "BATH", top.src, g.f.id);
           break;
+        }
         case "basin_point": {
-          body += box(s0, s1, FH.vanity_underside, FH.vanity_top, "VANITY", "standard:vanity_top", g.f.id);
+          const vt = ht(g, FH.vanity_top);
+          body += box(s0, s1, FH.vanity_underside, vt.mm, "VANITY", vt.src, g.f.id);
           body += dim([X(s1), Y(0)], [X(s1), Y(FH.vanity_underside / 1000)], [3.2, 0], FH.vanity_underside, "standard:vanity_underside", { approx: true });
           const mc = FH.mirror_centre / 1000;
           const round = mirrorIsRound(input.mirror);
@@ -482,7 +492,8 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
           const col = typeof g.f.spec?.column_wall === "string" ? (g.f.spec.column_wall as string).toUpperCase()[0] : null;
           const niche = typeof g.f.spec?.niche_wall === "string" ? (g.f.spec.niche_wall as string).toUpperCase()[0] : null;
           const isCol = col ? w.side[0] === col : on === g.onWalls[0];
-          const isNiche = niche ? w.side[0] === niche : on === g.onWalls[0];
+          // B7: no niche when the wet-room panel says none.
+          const isNiche = g.f.spec?.niche !== "none" && (niche ? w.side[0] === niche : on === g.onWalls[0]);
           body += L(X(s0), Y(0), X(s0), Y(2.0), { stroke: INK_700, w: 0.3, dash: "1.2 0.8" }) + L(X(s1), Y(0), X(s1), Y(2.0), { stroke: INK_700, w: 0.3, dash: "1.2 0.8" }) + T((X(s0) + X(s1)) / 2, Y(0.15), "SHOWER", { anchor: "middle", size: 2.3 });
           if (isCol) {
             body += `<circle cx="${n2(X(sc))}" cy="${n2(Y(FH.shower_valve / 1000))}" r="1.6" fill="none" stroke="${INK_900}" stroke-width="0.3" data-fixture="${esc(g.f.id)}:valve"/>` + T(X(sc) + 2.4, Y(FH.shower_valve / 1000) + 0.8, "VALVE", { size: 2.2 });
@@ -490,8 +501,12 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
             body += `<rect x="${n2(X(sc) - 4)}" y="${n2(Y(FH.rain_head / 1000) - 0.6)}" width="8" height="1.2" fill="${INK_700}" data-fixture="${esc(g.f.id)}:rain_head"/>` + T(X(sc) + 5, Y(FH.rain_head / 1000) + 0.8, `RAIN HEAD ≈ ${FH.rain_head}`, { size: 2.2, attrs: `data-mm="${FH.rain_head}" data-src="standard:rain_head" data-approx="true"` });
           }
           if (isNiche) {
-            const nc = sc + (isCol ? 0.35 : 0), nw = 0.3;
-            body += `<rect x="${n2(X(nc - nw))}" y="${n2(Y(FH.niche_top / 1000))}" width="${n2(nw * 2 * S)}" height="${n2(((FH.niche_top - FH.niche_bottom) / 1000) * S)}" fill="none" stroke="${INK_700}" stroke-width="0.3" stroke-dasharray="0.8 0.6" data-fixture="${esc(g.f.id)}:niche"/>` + T(X(nc), Y(FH.niche_top / 1000) - 1.2, `NICHE ≈ ${FH.niche_bottom}–${FH.niche_top}`, { anchor: "middle", size: 2.2, attrs: `data-mm="${FH.niche_bottom}" data-src="standard:niche_bottom" data-approx="true"` });
+            // Its size from the wet-room panel (spec.niche_width_mm / niche_height_mm), else ~600 × 300.
+            const nWmm = typeof g.f.spec?.niche_width_mm === "number" ? (g.f.spec.niche_width_mm as number) : 600;
+            const nHmm = typeof g.f.spec?.niche_height_mm === "number" ? (g.f.spec.niche_height_mm as number) : FH.niche_top - FH.niche_bottom;
+            const nTop = FH.niche_bottom + nHmm;
+            const nc = sc + (isCol ? 0.35 : 0), nw = nWmm / 2000;
+            body += `<rect x="${n2(X(nc - nw))}" y="${n2(Y(nTop / 1000))}" width="${n2(nw * 2 * S)}" height="${n2((nHmm / 1000) * S)}" fill="none" stroke="${INK_700}" stroke-width="0.3" stroke-dasharray="0.8 0.6" data-fixture="${esc(g.f.id)}:niche"/>` + T(X(nc), Y(nTop / 1000) - 1.2, `NICHE ${nWmm} × ${nHmm} · ≈ ${FH.niche_bottom}–${nTop}`, { anchor: "middle", size: 2.2, attrs: `data-mm="${FH.niche_bottom}" data-src="standard:niche_bottom" data-approx="true"` });
           }
           break;
         }

@@ -11,6 +11,7 @@
 // =============================================================================
 
 import { boqDerivedInfo, derivedLineNote, isUnpricedLine } from "@/lib/documents/boq-derived";
+import { productGroupOf } from "./product-swaps";
 import type { ProposalGateVerdict, ReferenceBasis, ReferenceBasisAcceptance } from "@/lib/documents/reference-basis-types";
 import { REFERENCE_BASIS_BANNER } from "@/lib/documents/reference-basis-types";
 import { summaryChainOf } from "./totals";
@@ -90,6 +91,13 @@ function draftNotice(statement: string): { key: string; sentence: string } {
   return { key: statement.slice(0, i), sentence: rest.charAt(0).toUpperCase() + rest.slice(1) };
 }
 
+/** B7 5: the product group a stored line belongs to, as the inspector offers it. */
+function productOf(l: { item_key?: string | null; rule_id?: string | null }): ReviewLine["product"] {
+  const g = productGroupOf(l);
+  if (!g) return null;
+  return { field: g.group.field, group: g.group.label, current: g.current.value, options: g.group.options.map((o) => ({ value: o.value, label: o.label, rate: o.rate_aed, unit: o.unit })) };
+}
+
 export function buildReviewModel(i: ReviewInputs): ReviewModel {
   const sorted = sortSections(i.boq.sections);
   const refs = assignRefs(sorted);
@@ -97,6 +105,8 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
   const allAmountTiers: ProvTier[] = [];
   const counted: { tier: ProvTier; amount: number }[] = [];
 
+  // B7 5: product choices exist only on a wet-room BoQ (lib/boq/wet-room.ts).
+  const wetRoomBoq = !!(i.boq as unknown as { wet_room?: unknown }).wet_room;
   const sections: ReviewSection[] = sorted.map((s) => {
     const lines: ReviewLine[] = s.lines.map((l, idx) => {
       const key = `${s.work_section}-${idx}`;
@@ -132,6 +142,7 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
         unpricedReason: unpriced ? (aside ?? "no rate in any book") : null,
         prov: i.provenance?.lines[key] ?? null,
         book,
+        product: wetRoomBoq ? productOf(l) : null,
       };
     });
     return {

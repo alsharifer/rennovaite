@@ -30,6 +30,9 @@ import { planGate } from "@/lib/plan/plan-gate";
 import { RoomsInScope } from "@/components/blueprint/plan/RoomsInScope";
 import { CeilingHeights, type CeilingRoom } from "@/components/blueprint/plan/CeilingHeights";
 import { TiledHeights, type TiledRoom } from "@/components/blueprint/plan/TiledHeights";
+import { WetRoomPanel } from "@/components/blueprint/plan/WetRoomPanel";
+import { WET_ROOM_TYPES } from "@/lib/boq/wet-room";
+import { setupOf } from "@/lib/plan/wet-room-setup";
 import { isTiledRoomType } from "@/lib/plan/tiling";
 import { storedCeiling } from "@/lib/plan/geometry";
 import { ROOM_INTAKE_OPENING_DIMS } from "@/lib/plan/room-intake";
@@ -312,6 +315,16 @@ export default async function PlanPage({
     planM2PerUnit2(roomList, totalArea),
   );
   const intakeRoom = roomIntake && roomList.length === 1 ? roomList[0]! : null;
+  // B7 4: a one-room bathroom gets the wet-room panel (bulkhead, heater, niche, valve wall, extractor).
+  let wetRoom: { id: string; name: string; setup: ReturnType<typeof setupOf>; hasShower: boolean } | null = null;
+  if (intakeRoom && WET_ROOM_TYPES.has(intakeRoom.room_type ?? "")) {
+    const [{ data: wr }, { data: wfx }] = await Promise.all([
+      planSb.from("rooms").select("spec, polygon").eq("id", intakeRoom.id).maybeSingle<{ spec: Record<string, unknown> | null; polygon: [number, number][] }>(),
+      planSb.from("plan_fixtures").select("id, type, position, spec").eq("project_id", projectId).eq("room_id", intakeRoom.id).eq("layer", "plumbing"),
+    ]);
+    const fx = ((wfx ?? []) as { id: string; type: string; position: [number, number]; spec: Record<string, unknown> | null }[]).filter((x) => Array.isArray(x.position));
+    if (wr?.polygon) wetRoom = { id: intakeRoom.id, name: intakeRoom.name_en ?? "Bathroom", setup: setupOf(wr.spec, fx, wr.polygon), hasShower: fx.some((x) => x.type === "shower_mixer") };
+  }
   const meta = [
     intakeRoom ? `1 room · ${(intakeRoom.area_m2 ?? 0).toFixed(2)} m²` : `${roomList.length} ${unit} · ${formatM2(totalArea)}`,
     // K10: say where the rooms came from — never "parsed from the drawing" when there is no drawing.
@@ -425,6 +438,7 @@ export default async function PlanPage({
 
             {ceilingRooms.length > 0 ? <CeilingHeights planId={plan.id} rooms={ceilingRooms} /> : null}
             {tiledRooms.length > 0 ? <TiledHeights planId={plan.id} rooms={tiledRooms} /> : null}
+            {wetRoom ? <WetRoomPanel roomId={wetRoom.id} roomName={wetRoom.name} initial={wetRoom.setup} hasShower={wetRoom.hasShower} /> : null}
 
             {process.env.DRAWINGS_ENABLED === "true" || process.env.VIEWER_3D_ENABLED === "true" ? (
               <section aria-label="From this plan" className="flex flex-col items-start gap-3 border-t border-bp-line-hairline pt-4">

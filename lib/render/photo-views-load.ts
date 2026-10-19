@@ -3,6 +3,7 @@
 // (a database before 062 lists the photos without cameras).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { withoutReplaced } from "@/lib/overlays/replaces";
 
 import { metresPerUnit } from "@/lib/plan/plan-rules";
 
@@ -49,7 +50,8 @@ export async function loadMiniPlans(db: SupabaseClient, projectId: string, plan:
       openings: ((openRes.data ?? []) as { id: string; kind: string; position: unknown; width_mm: number | null; room_id: string | null }[])
         .filter((o) => o.room_id === r.id && asPt(o.position))
         .map((o) => ({ id: o.id, kind: o.kind, position: asPt(o.position)!, width_mm: Number(o.width_mm ?? 0) })),
-      fixtures: ((fixRes.data ?? []) as { id: string; type: string; position: unknown; spec: Record<string, unknown> | null; room_id: string | null }[])
+      // B7: a fixture another one replaces is not rendered — its replacement is.
+      fixtures: withoutReplaced((fixRes.data ?? []) as { id: string; type: string; position: unknown; spec: Record<string, unknown> | null; room_id: string | null }[])
         .filter((f) => f.room_id === r.id && asPt(f.position))
         .map((f) => ({ id: f.id, type: f.type, position: asPt(f.position)!, spec: f.spec })),
     };

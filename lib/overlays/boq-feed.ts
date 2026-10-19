@@ -23,6 +23,7 @@ import { rechain, type ChainedDoc } from "@/lib/boq/totals";
 import { buildOverlaySections } from "./boq";
 import { POMI_ELECTRICAL, POMI_PLUMBING } from "./catalog";
 import type { FixtureType } from "./types";
+import { withoutReplaced } from "./replaces";
 
 interface BoqSectionLike {
   work_section: string;
@@ -54,13 +55,14 @@ export async function appendOverlaySections<T extends BoqLike>(
   try {
     const { data, error } = await supabase
       .from("plan_fixtures")
-      .select("id, type, room_id")
+      .select("id, type, room_id, spec")
       .eq("project_id", projectId);
     if (error || !data) return boq; // table missing / error → no-op
     // K12 (058): a fixture placed IN a room that is not in this renovation goes
     // with the room; one placed in no room (mains, a DB) is whole-home and stays.
     const out = await outOfScopeRoomIds(supabase, projectId);
-    fixtures = (data as { id: string; type: FixtureType; room_id?: string | null }[]).filter((f) => !f.room_id || !out.has(f.room_id));
+    // B7: a fixture another one replaces (the bidet a cabinet replaces) is not in the design.
+    fixtures = withoutReplaced(data as { id: string; type: FixtureType; room_id?: string | null; spec?: Record<string, unknown> | null }[]).filter((f) => !f.room_id || !out.has(f.room_id));
   } catch {
     return boq;
   }

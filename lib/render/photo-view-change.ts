@@ -34,6 +34,7 @@ import { cropToFrame, fitMap, frameRect, geometricMap, padToAspect, toPhotoBoxes
 import { carryLocated, checkCostUsd, checkItemsFor, detectItems, itemsNamedBy, judgePhotoPlacement } from "./photo-check";
 import { ARM_MODEL, photoViewArm, restyleInput } from "./photo-restyle";
 import { loadMiniPlans } from "./photo-views-load";
+import { designKey } from "@/lib/documents/render-consistency";
 import { moveAnchor } from "./photo-view-anchor";
 import { PhotoViewError, type PhotoViewChange, type PhotoViewGate } from "./photo-view-run";
 import { IMAGE_PRICE_USD, recordSpend, type SpendRow } from "./render-spend";
@@ -52,10 +53,21 @@ export function changePrompt(request: string, pinned = false): string {
   ].filter(Boolean).join(" ");
 }
 
+/** B7 6: a change the check refused — its image and reading, shown beside the kept version. */
+export interface RefusedChange {
+  render_id: string;
+  image_url: string;
+  request: string;
+  message: string;
+  failures: { ref: string; short: string; reason: string; message: string }[];
+  after: { ref: string; present: boolean; box: [number, number, number, number] | null; instances: number }[];
+  created_at: string;
+}
+
 export type ChangeOutcome =
   | { kind: "version"; render_id: string; image_url: string; gate: PhotoViewGate; change: PhotoViewChange; anchor: RoomAnchor | null }
   | { kind: "unchanged"; render_id: string; message: string }
-  | { kind: "moved"; render_id: string; message: string };
+  | { kind: "moved"; render_id: string; message: string; refused: RefusedChange };
 
 const mime = (b: Uint8Array): "image/jpeg" | "image/png" => (b[0] === 0x89 ? "image/png" : "image/jpeg");
 const b64 = (b: Uint8Array) => Buffer.from(b).toString("base64");
@@ -134,9 +146,10 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   if (!verdict.passed) {
     const first = verdict.failures[0];
     const message = `That change ${first ? first.message.replace(/^the render /, "") : "moved the layout"} — it was not kept. Try asking for it differently.`;
-    // Kept for "see what differs": the candidate (the model URL, short-lived) and both readings.
-    const id = await record("unchanged", { unchanged: false, layout_failed: true, request, failures: verdict.failures, similarity: sim, candidate_url: url, items, before: carried, after: read.items }, null);
-    return { kind: "moved", render_id: id, message };
+    // B7 6: kept for "see what differs" — the refused image (stored: the model's URL expires) and its reading.
+    const refused_image_url = await uploadRenderBytes(`projects/${input.projectId}/photo-views/refused-${photo.id}-${Date.now()}.jpg`, next, mime(next)).catch(() => null);
+    const id = await record("unchanged", { unchanged: false, layout_failed: true, request, failures: verdict.failures, similarity: sim, candidate_url: url, refused_image_url, items, before: carried, after: read.items }, null);
+    return { kind: "moved", render_id: id, message, refused: { render_id: id, image_url: refused_image_url ?? url, request, message, failures: verdict.failures, after: read.items, created_at: new Date().toISOString() } };
   }
 
   const what = await describeChange({ mediaType: mime(parentBytes), data: b64(parentBytes) }, { mediaType: mime(next), data: b64(next) }, request);
@@ -167,7 +180,9 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   const stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, next, mime(next));
   // The version's own reading is what the next change is held to.
   const attempts = parent.gate.attempts.length ? [...parent.gate.attempts.slice(0, -1), { ...parent.gate.attempts.at(-1)!, after: read.items }] : parent.gate.attempts;
-  const gate: PhotoViewGate = { ...parent.gate, items, attempts, outcome: "passed", line: verdict.line, change, cost_usd: change.cost_usd };
+  const { data: roomRow } = await db.from("rooms").select("spec").eq("id", photo.room_id).maybeSingle<{ spec: Record<string, unknown> | null }>();
+  const design_key = mini ? designKey(mini.fixtures, roomRow?.spec?.wet_room ?? null) : parent.gate.design_key;
+  const gate: PhotoViewGate = { ...parent.gate, items, attempts, outcome: "passed", line: verdict.line, change, cost_usd: change.cost_usd, ...(design_key ? { design_key } : {}) };
   const id = await record("succeeded", gate as unknown as Record<string, unknown>, stored);
 
   // The lock follows the version the user changed; on the anchor view, so does the anchor.

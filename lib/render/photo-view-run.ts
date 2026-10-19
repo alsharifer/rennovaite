@@ -24,6 +24,7 @@ import { PHOTO_VIEW_IMAGE_REFS, styleBriefFrom, type ReferenceStyle } from "./re
 import { IMAGE_PRICE_USD, recordSpend, USD_TO_AED } from "./render-spend";
 import { loadRoomAnchor } from "./photo-view-anchor";
 import { wetRoomChoicesOf } from "@/lib/boq/wet-room";
+import { designKey } from "@/lib/documents/render-consistency";
 import { fittingNotes } from "./fitting-notes";
 import { followsLine, specElements } from "./room-spec";
 
@@ -80,6 +81,8 @@ export interface PhotoViewGate {
   cost_usd: number;
   /** B4: the room anchor this render was made against (absent = none, or this view is the anchor). */
   anchor?: { render_id: string; label: string } | null;
+  /** B7: the design fingerprint when it was made (designKey — fixtures + the room's product choices). */
+  design_key?: string;
   /** B4: set on a version made by "Ask for a change". */
   change?: PhotoViewChange | null;
 }
@@ -198,6 +201,7 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
     })),
     cost_usd: Math.round((res.attempts.reduce((s, a) => s + a.cost_usd, 0) + spend.reduce((s, r) => s + (r.cost_usd ?? 0), 0)) * 10000) / 10000,
     ...(anchorInput && anchor ? { anchor: { render_id: anchor.render_id, label: anchor.label } } : {}),
+    design_key: designKey(mini.fixtures, (roomRow?.spec as Record<string, unknown> | null)?.wet_room ?? null),
   };
   const { data: row, error } = await db
     .from("renders")

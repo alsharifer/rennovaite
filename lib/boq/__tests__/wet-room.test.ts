@@ -260,3 +260,36 @@ describe("client comments (19 Oct) — a cabinet for the bidet, a shattaf beside
     expect(strip(pilotBoq({ ...RAW, spec: { bulkhead: { over: "shower" }, wet_room: {} } }).out)).toBe(strip(base));
   });
 });
+
+describe("B7 3 — a fixture that replaces another, picked on 01 Plan", () => {
+  // The bidet stays on the plan (it is on site today); the cabinet names it.
+  const PICKED = [
+    ...FIXTURES,
+    { id: "cabinet", type: "storage_cabinet", room_id: "bath", position: n(28, 212), spec: { width_mm: 400, depth_mm: 450, rotation_deg: 90, replaces_fixture_id: "bidet", replaces: "bidet_point" } },
+  ] as typeof FIXTURES;
+  const picked = pilotBoq(RAW, PICKED).out;
+  const rules = (doc: typeof picked) => lines(doc).map((l) => (l.rule_id ?? "").split("/")[0]);
+
+  it("the replaced bidet leaves the design in the same revision: no bidet line, the cabinet priced", () => {
+    expect(rules(picked)).not.toContain("W-16");
+    expect(rules(picked)).toContain("W-25");
+  });
+  it("the strip-out still names it — it is on site", () => {
+    expect(lines(picked).find((l) => (l.rule_id ?? "").startsWith("W-06"))!.description).toContain("1 bidet");
+  });
+});
+
+describe("B7 4 — the wet-room panel's choices reach the BoQ", () => {
+  const PANEL = FIXTURES.map((f) =>
+    f.type === "shower_mixer" ? { ...f, spec: { ...f.spec, niche: "none" } } : f.type === "water_heater" ? { ...f, spec: { ...f.spec, height_mm: 2100, action: "relocate" } } : f,
+  ) as typeof FIXTURES;
+  const out = pilotBoq({ ...RAW, spec: { bulkhead: { over: "shower" }, extractor: false } }, PANEL).out;
+  const has = (rule: string) => lines(out).some((l) => (l.rule_id ?? "").split("/")[0] === rule);
+  it("no niche → no niche line; no extractor → no extractor line", () => {
+    expect(has("W-13")).toBe(false);
+    expect(has("W-20")).toBe(false);
+  });
+  it("the heater is relocated, at the height the panel gave", () => {
+    expect(lines(out).find((l) => (l.rule_id ?? "").startsWith("W-23"))!.description).toMatch(/^Water heater — relocate locally \(existing heater kept; N wall at ~2\.10 m/);
+  });
+});

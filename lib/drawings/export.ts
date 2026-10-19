@@ -12,6 +12,7 @@
 // =============================================================================
 
 import { documentFontOptions } from "@/lib/documents/doc-fonts";
+import { withoutReplaced } from "@/lib/overlays/replaces";
 import { stampPdfDay } from "@/lib/documents/pdf-date";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -226,10 +227,11 @@ async function loadOverlayFixtures(projectId: string): Promise<OverlayFixtureFor
     const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
     const { data, error } = await supabase
       .from("plan_fixtures")
-      .select("type, position")
+      .select("id, type, position, spec")
       .eq("project_id", projectId);
     if (error || !data) return [];
-    return (data as { type: FixtureType; position: [number, number] }[]).map((r) => ({
+    // B7: a fixture another one replaces is not drawn.
+    return withoutReplaced(data as { id: string; type: FixtureType; position: [number, number]; spec: Record<string, unknown> | null }[]).map((r) => ({
       type: r.type,
       position: r.position,
     }));

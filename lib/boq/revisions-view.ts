@@ -111,6 +111,8 @@ export function revisionOptions(revisions: readonly RevisionSummary[]): Revision
 /** Where a recorded cause can be looked at — the record's own page. */
 function causeHref(projectId: string, kind: CauseKind): string | null {
   if (kind === "firm_rate") return `/project/${projectId}/rates`;
+  if (kind === "product_change") return `/project/${projectId}/boq`;
+  if (kind === "wet_room") return `/project/${projectId}/plan`;
   if (kind === "correction" || kind === "applied_correction" || kind === "reverted_correction") return `/project/${projectId}/boq`;
   if (kind === "plan_edit" || kind === "scope_change" || kind === "openings_confirmed" || kind === "openings_need_wall" || kind === "ceiling_height" || kind === "tiled_height" || kind === "session_decision") return `/project/${projectId}/plan`;
   return null;

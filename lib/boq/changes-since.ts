@@ -52,6 +52,8 @@ export function summarizeChanges(causes: readonly Pick<RecordedCause, "kind">[],
   const openingsConfirmed = count("openings_confirmed");
   const ceilingChanges = count("ceiling_height");
   const tilingChanges = count("tiled_height");
+  const productChanges = count("product_change");
+  const wetRoomChanges = count("wet_room");
   const planEdits = count("plan_edit");
   const bookChanges = count("firm_rate");
   const decisions = count("session_decision");
@@ -61,6 +63,8 @@ export function summarizeChanges(causes: readonly Pick<RecordedCause, "kind">[],
   if (openingsConfirmed) parts.push("Openings confirmed");
   if (ceilingChanges) parts.push("Ceiling height changed");
   if (tilingChanges) parts.push("Tiled height changed");
+  if (productChanges) parts.push(`${plural(productChanges, "product")} changed`);
+  if (wetRoomChanges) parts.push("Wet room changed");
   if (planEdits) parts.push("plan edited");
   if (bookChanges) parts.push(`${plural(bookChanges, "book entry", "book entries")} changed`);
   if (decisions) parts.push(`${plural(decisions, "decision")} recorded`);

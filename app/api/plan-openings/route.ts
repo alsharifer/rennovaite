@@ -26,7 +26,7 @@ function db(): SupabaseClient {
 const BASE_COLS =
   "id, plan_id, room_id, wall_ref, kind, width_mm, height_mm, sill_mm, position, along_offset, source, derived, created_at";
 /** R10b (059): whether a detected opening was confirmed, and what the detector said. */
-const SELECT_COLS = `${BASE_COLS}, confirmed_at, detection`;
+const SELECT_COLS = `${BASE_COLS}, confirmed_at, detection, spec`;
 
 /** R10b: an edit to an opening the BoQ counts (anything but an unconfirmed find) is a plan edit. */
 async function recordOpeningsEdit(projectId: string, actor: string, detail: Record<string, unknown>) {

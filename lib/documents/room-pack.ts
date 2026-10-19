@@ -12,8 +12,8 @@
 //   materials      the room design spec read from the locked view
 //   BoQ            by section, every line; to-be-priced lines named
 //   price          the chain to the fil and the options, outside the total
-//   programme      the interior phase model scaled from the reference villa —
-//                  indicative, derived, labelled
+//   programme      the room's own programme from its quantities
+//                  (lib/timeline/room-programme.ts) — dropped when it cannot
 //
 // Photographs are image SLOTS the PDF step fills (`src` = the image URL); the
 // page chrome is SVG. No rate, source, tier, supplier or contractor reaches a
@@ -51,8 +51,10 @@ export interface RoomPackView {
   n: number;
   label: string;
   origin: "from your photo" | "concept";
-  /** The render shown (the locked version, else the latest that passed). */
+  /** The render shown (the locked version, else the latest that passed) — null when none matches the current design. */
   render: { src: string; version: number } | null;
+  /** B7: why no render is shown — "View pending — design changed in rev N" (render-consistency.ts). */
+  pending?: string | null;
   photo: { src: string } | null;
   checks: { text: string; ok: boolean }[];
   locked: boolean;
@@ -61,6 +63,8 @@ export interface RoomPackView {
 }
 
 export interface RoomPackLine {
+  /** B5: what the rate rests on — calibrated | market | allowance | tbc | firm. */
+  rate_basis?: string;
   description: string;
   quantity: number;
   unit: string;
@@ -95,7 +99,8 @@ export interface RoomPackInput {
     grand_total_aed: number;
     options?: { key: string; label: string; note: string; net_aed: number; delta_total_aed?: number }[];
   };
-  programme: { total_days: number; low_days: number; high_days: number; phases: { label: string; start_day: number; days: number }[]; basis: string } | null;
+  /** B7: the room-scoped programme (lib/timeline/room-programme.ts) — null drops the page. */
+  programme: { total_days: number; low_days: number; high_days: number; phases: { label: string; start_day: number; days: number; basis?: string }[]; basis: string } | null;
 }
 
 const unpriced = (l: RoomPackLine) => l.rate_status === "needs_qs" && (l.rate_aed ?? 0) === 0;
@@ -168,7 +173,7 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     if (excludes) s += text(M, 120, excludes, { size: 3.2, weight: 600 });
     const facts = [
       `Floor ${input.room.area_m2.toFixed(2)} m² · ceiling ${input.room.ceiling_mm} mm · walls tiled ${input.room.tiled}`,
-      `${input.views.length} views from your photos${input.anchorLabel ? ` · finishes follow ${input.anchorLabel} (locked)` : ""}`,
+      `${input.views.filter((v) => v.render).length} of ${input.views.length} views from your photos match this design${input.anchorLabel ? ` · finishes follow ${input.anchorLabel} (locked)` : ""}`,
       `${input.sheets.length} drawings · ${input.boq.sections.reduce((n, s) => n + s.lines.length, 0)} lines in the bill of quantities`,
       ...(input.boq.options?.length ? [`${input.boq.options.length} options priced separately`] : []),
     ];
@@ -212,7 +217,12 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     let s = frame(input, `${v.label.split(" · ")[0]} — ${v.origin}`, pages.length + 1);
     const slots: PackSlot[] = [];
     if (v.render) slots.push({ src: v.render.src, x: M, y: 36, w: 150, h: 240 });
-    else s += text(M + 75, 150, "Not rendered", { size: 4, fill: DOC.INK_3, anchor: "middle" });
+    else {
+      // B7: never a render that contradicts the BoQ — a labelled placeholder instead.
+      s += `<rect x="${M}" y="36" width="150" height="240" fill="#F5F2EA" stroke="${DOC.INK_3}" stroke-width="0.3" stroke-dasharray="1.2 0.8" data-view-pending="${esc(v.pending ?? "not rendered")}"/>`;
+      s += text(M + 75, 152, v.pending ?? "Not rendered", { size: 3.6, fill: DOC.INK_2, anchor: "middle" });
+      if (v.pending) s += text(M + 75, 159, "A new render follows the current design.", { size: 2.8, fill: DOC.INK_3, anchor: "middle" });
+    }
     if (v.photo) {
       slots.push({ src: v.photo.src, x: 176, y: 36, w: 70, h: 112 });
       s += text(176 + 35, 154, "Your photo", { size: 2.8, fill: DOC.INK_2, font: DOC.MONO, anchor: "middle" });
@@ -224,7 +234,7 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     y += 18;
     s += label(cx, y, "Design checks");
     y += 6;
-    for (const c of v.checks) {
+    for (const c of v.render ? v.checks : []) {
       for (const [i, line] of wrapWords(`${c.ok ? "✓" : "·"} ${c.text.replace(/ ✓$/, "")}`, 52).entries()) {
         s += text(cx + (i ? 3 : 0), y, line, { size: 3.1, fill: c.ok ? DOC.INK : DOC.INK_2 });
         y += 4.8;
@@ -327,17 +337,18 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     row(`Contingency ${input.boq.contingency_pct}%`, aed(input.boq.contingency_aed));
     row(`VAT ${input.boq.vat_pct}%`, aed(input.boq.vat_aed));
     row("Total", `AED ${aed(input.boq.grand_total_aed)}`, `data-grand-total="${input.boq.grand_total_aed}"`, true);
+    // B7 1d: a line still to be priced is on the page, beside the total, never inside it.
+    for (const l of unpricedLines) row(l.description, "TBC — not in total", `data-tbc="${esc(l.description)}"`);
+    // B7 1e: how much of the price rests on our own estimates.
+    const counted = input.boq.sections.flatMap((sec) => sec.lines).filter((l) => unpriced(l) || (Number(l.quantity) || 0) > 0);
+    const allowances = counted.filter((l) => l.rate_basis === "allowance").length;
+    y += 2;
+    for (const line of wrapWords(`${allowances} of ${counted.length} lines are our estimates (allowances), for the QS to confirm.`, 80)) {
+      s += text(M, y, line, { size: 3.3, weight: 600, attrs: `data-allowances="${allowances}" data-lines="${counted.length}"` });
+      y += 5;
+    }
     let oy = 46;
     const ox = 240;
-    if (unpricedLines.length) {
-      s += label(ox, oy, "Not in the total — to be priced");
-      oy += 6;
-      for (const l of unpricedLines) for (const line of wrapWords(l.description, 70)) {
-        s += text(ox, oy, line, { size: 3.2 });
-        oy += 4.8;
-      }
-      oy += 6;
-    }
     const opts = input.boq.options ?? [];
     if (opts.length) {
       s += label(ox, oy, "Options — priced separately, not in the total");
@@ -360,16 +371,17 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
   if (input.programme?.phases.length) {
     const p = input.programme;
     let s = frame(input, "Indicative programme", pages.length + 1);
-    s += text(M, 40, `≈ ${p.total_days} working days (${p.low_days}–${p.high_days}) — indicative, derived`, { size: 4, font: DOC.MONO, attrs: `data-programme-days="${p.total_days}"` });
+    s += text(M, 40, `≈ ${p.total_days} working days (${p.low_days}–${p.high_days}) — derived from this room's quantities`, { size: 4, font: DOC.MONO, attrs: `data-programme-days="${p.total_days}"` });
     const barX = 150, barW = R - barX;
     let y = 52;
     for (const ph of p.phases) {
       s += text(M, y + 3.2, ph.label, { size: 3.2 });
+      if (ph.basis) s += text(M, y + 7.4, ph.basis, { size: 2.6, fill: DOC.INK_2, font: DOC.MONO });
       s += text(barX - 4, y + 3.2, `${ph.days} d`, { size: 3, fill: DOC.INK_2, font: DOC.MONO, anchor: "end" });
       s += hline(barX, R, y + 2.2);
       const x0 = barX + (ph.start_day / p.total_days) * barW; // start_day is 0-based
       s += `<rect x="${x0.toFixed(1)}" y="${(y + 0.6).toFixed(1)}" width="${Math.max(0.8, (ph.days / p.total_days) * barW).toFixed(1)}" height="3.2" fill="${DOC.INK}" data-programme-phase="${esc(ph.label)}"/>`;
-      y += 8;
+      y += ph.basis ? 12 : 8;
     }
     y += 6;
     for (const line of wrapWords(`${p.basis} A conversation starter for your contractor's own programme — never a commitment.`, 150)) {

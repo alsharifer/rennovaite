@@ -15,6 +15,7 @@
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RefusedChange } from "./photo-view-change";
 
 import { checkCostUsd } from "./photo-check";
 import type { PhotoViewGate } from "./photo-view-run";
@@ -125,15 +126,25 @@ export interface PhotoViewState {
   locked: Record<string, string>;
   /** Each room's anchor. */
   anchors: Record<string, RoomAnchor>;
+  /** B7 6: each view's latest refused change, when newer than its latest kept version. */
+  refused: Record<string, RefusedChange>;
 }
 
 export async function loadStudioState(db: SupabaseClient, roomIds: readonly string[], photoIds: readonly string[]): Promise<PhotoViewState> {
-  const out: PhotoViewState = { versions: {}, locked: {}, anchors: {} };
+  const out: PhotoViewState = { versions: {}, locked: {}, anchors: {}, refused: {} };
   if (photoIds.length > 0) {
     let res: { data: unknown[] | null; error: unknown } = await db.from("renders").select("id, room_photo_id, image_url, gate, created_at, parent_render_id, anchor_render_id, status").in("room_photo_id", [...photoIds]).eq("mode", "photo_view").order("created_at", { ascending: true });
     if (res.error) res = await db.from("renders").select("id, room_photo_id, image_url, gate, created_at, parent_render_id, status").in("room_photo_id", [...photoIds]).eq("mode", "photo_view").order("created_at", { ascending: true });
     for (const r of (res.data ?? []) as { id: string; room_photo_id: string; image_url: string | null; gate: PhotoViewGate; created_at: string; parent_render_id: string | null; anchor_render_id?: string | null; status: string | null }[]) {
+      const rg = r.gate as unknown as Record<string, unknown> | null;
+      // The model's own URL lives about an hour; a refusal is shown from its stored image, or while that URL is fresh.
+      const fresh = Date.now() - Date.parse(r.created_at) < 50 * 60 * 1000;
+      if (r.status === "unchanged" && rg?.layout_failed && (rg.refused_image_url || (fresh && rg.candidate_url))) {
+        out.refused[r.room_photo_id] = { render_id: r.id, image_url: String(rg.refused_image_url ?? rg.candidate_url), request: String(rg.request ?? ""), message: "", failures: (rg.failures as RefusedChange["failures"]) ?? [], after: (rg.after as RefusedChange["after"]) ?? [], created_at: r.created_at };
+        continue;
+      }
       if (r.status !== "succeeded" || !r.gate) continue;
+      if (out.refused[r.room_photo_id] && out.refused[r.room_photo_id]!.created_at < r.created_at) delete out.refused[r.room_photo_id];
       (out.versions[r.room_photo_id] ??= []).push({ render_id: r.id, image_url: r.image_url, gate: r.gate, created_at: r.created_at, parent_render_id: r.parent_render_id, anchor_render_id: r.anchor_render_id ?? null });
     }
     const locks = await db.from("room_photos").select("id, locked_render_id").in("id", [...photoIds]);

@@ -36,6 +36,7 @@
 // =============================================================================
 
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
+import { replacedIds } from "@/lib/overlays/replaces";
 import type { PlanGraph, Point } from "@/lib/plan/geometry";
 
 import { lineTotal, money2, sumMoney } from "./money";
@@ -74,8 +75,12 @@ export interface WetRoomContext {
   /** The wall tiling the take-off measured (m²) — the existing tiling assumed to the same height. */
   wall_tile_m2: number;
   fixtures: WetRoomFixture[];
-  /** A water heater placed on the plan (kept; boxed in or relocated). */
-  heater: { id: string; where: string } | null;
+  /** A water heater placed on the plan (kept; boxed in or relocated — the wet-room panel says which). */
+  heater: { id: string; where: string; action: "box_in" | "relocate" | null } | null;
+  /** B7: the shower niche (null = none); size only when the panel stated it. */
+  niche: { width_mm: number | null; height_mm: number | null } | null;
+  /** B7: an extractor fan (the panel; default yes). */
+  extractor: boolean;
   /** room spec: a bulkhead over the shower (kept by default; removal is an option). */
   bulkhead: boolean;
   /** room spec: the value-engineered choices the room takes (rooms.spec.wet_room). */
@@ -116,6 +121,12 @@ export function wetRoomChoicesOf(spec: unknown): WetRoomChoices {
     waste: w.waste === "bagged" ? "bagged" : "skip",
     niche_led: w.niche_led !== false,
   };
+}
+
+/** What is on site: every sanitary fixture on the plan, the replaced ones included ("1 WC, 1 bidet, 1 basin + vanity, shower set"). */
+function onSiteList(own: readonly { type: string }[]): string {
+  const n = (t: string) => own.filter((f) => f.type === t).length;
+  return [n("wc_point") ? `${n("wc_point")} WC` : "", n("bidet_point") ? `${n("bidet_point")} bidet` : "", n("basin_point") ? `${n("basin_point")} basin + vanity` : "", n("bath_point") ? `${n("bath_point")} bath` : "", n("shower_mixer") ? "shower set" : ""].filter(Boolean).join(", ");
 }
 
 function existingFixturesOf(spec: unknown): string | null {
@@ -173,8 +184,10 @@ export function wetRoomContextFrom(graph: PlanGraph, roomId: string, fixtures: r
     perim += Math.hypot(b[0] - a[0], b[1] - a[1]);
   }
   const own = fixtures.filter((f) => f.room_id === roomId);
+  // B7: a fixture another one replaces is on site today (the strip-out names it) but not in the design.
+  const gone = replacedIds(own);
   const fx: WetRoomFixture[] = own
-    .filter((f) => f.type !== "water_heater")
+    .filter((f) => f.type !== "water_heater" && !gone.has(f.id))
     .map((f) => {
       const fp = footprintOf(f.type, f.spec);
       const sides = fp ? footprintSides(footprintCorners(f.position, fp, k).map((p) => toM(p as [number, number])), room.polygon) : { onWall: [], free: [] };
@@ -194,10 +207,23 @@ export function wetRoomContextFrom(graph: PlanGraph, roomId: string, fixtures: r
     door_widths_m: r2(doors.reduce((s, d) => s + (d.width_mm || 0) / 1000, 0)),
     wall_tile_m2: r2(wallTileM2),
     fixtures: fx,
-    heater: h ? { id: h.id, where: `${wallWord(toM(h.position), room.polygon)}${typeof h.spec?.note === "string" ? ` — ${h.spec.note}` : ""}` } : null,
+    heater: h
+      ? {
+          id: h.id,
+          where: `${wallWord(toM(h.position), room.polygon)}${typeof h.spec?.height_mm === "number" ? ` at ~${(Number(h.spec.height_mm) / 1000).toFixed(2)} m` : ""}${typeof h.spec?.note === "string" ? ` — ${h.spec.note}` : ""}`,
+          action: h.spec?.action === "relocate" ? "relocate" : h.spec?.action === "box_in" ? "box_in" : null,
+        }
+      : null,
+    niche: (() => {
+      const sh = own.find((f) => f.type === "shower_mixer");
+      if (!sh || sh.spec?.niche === "none") return null;
+      const n = (v: unknown) => (typeof v === "number" && v > 0 ? v : null);
+      return { width_mm: n(sh.spec?.niche_width_mm), height_mm: n(sh.spec?.niche_height_mm) };
+    })(),
+    extractor: room.spec?.extractor !== false,
     bulkhead: room.spec?.bulkhead != null && room.spec.bulkhead !== false,
     choices: wetRoomChoicesOf(room.spec),
-    existing_fixtures: existingFixturesOf(room.spec),
+    existing_fixtures: existingFixturesOf(room.spec) ?? (gone.size ? onSiteList(own) : null),
   };
 }
 
@@ -292,10 +318,11 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
   add("Floor Finishes", { ...W("W-12", "Floor Finishes", "floor.skirting", "Skirting — none: the walls are tiled from the floor", 0, "lm", `walls tiled to ${ctx.tiled_m >= ctx.ceiling_m - 1e-9 ? "full height" : `${ctx.tiled_m.toFixed(2)} m`} — no skirting (R-10; F-04 takes no wet room)`), stated_zero: true });
 
   // --- Wall finishes: the lit niche.
-  if (shower)
+  const nicheSize = ctx.niche?.width_mm && ctx.niche.height_mm ? ` ~${ctx.niche.width_mm} × ${ctx.niche.height_mm} mm` : "";
+  if (shower && ctx.niche)
     add("Wall Finishes", ch.niche_led
-      ? W("W-13", "Wall Finishes", "wall.shower_niche", "Recessed shower niche with LED strip — formed, waterproofed, tiled", 1, "no", "one niche (R-56)", { element_refs: [shower.id] })
-      : W("W-13", "Wall Finishes", "wall.shower_niche_plain", "Recessed shower niche — formed, waterproofed, tiled (no LED strip)", 1, "no", "one niche (R-74)", { element_refs: [shower.id] }));
+      ? W("W-13", "Wall Finishes", "wall.shower_niche", `Recessed shower niche${nicheSize} with LED strip — formed, waterproofed, tiled`, 1, "no", "one niche (R-56)", { element_refs: [shower.id] })
+      : W("W-13", "Wall Finishes", "wall.shower_niche_plain", `Recessed shower niche${nicheSize} — formed, waterproofed, tiled (no LED strip)`, 1, "no", "one niche (R-74)", { element_refs: [shower.id] }));
 
   // --- Ceilings: the existing ceiling is repaired, not replaced.
   add("Ceilings", W("W-14", "Ceilings", "ceiling.repair", `Ceiling repair — fungicidal wash, stain-block, skim${ctx.bulkhead ? "; the curved bulkhead over the shower made good with it" : ""}. Allowance until the cause of the water damage is known`, ctx.floor_m2, "m2", `ceiling = floor area ${ctx.floor_m2} m² (R-54) — is the leak fixed?`, { element_refs: room, rate_status: "site_assessment", confirm_on_site: "Ceiling repair is an allowance until the cause of the water damage is known — is the leak fixed?" }));
@@ -356,7 +383,7 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
   edit("Electrical", (l) => ruleOf(l) === "Q-17", () => ({ description: "LED downlights, IP65 — supply and install" }));
   edit("Electrical", (l) => ruleOf(l) === "Q-18", () => ({ description: "Switches and switched spurs (lights, cove, mirror backlight) — supply and install" }));
   add("Electrical", W("W-19", "Electrical", "elec.shaver", "Shaver supply unit by the mirror — supply and install", 1, "no", "one (R-60)", { element_refs: room }));
-  add("Electrical", W("W-20", "Electrical", "elec.extractor", "Ceiling extractor fan with run-on timer / humidistat — supply and install, ducted to the existing outlet", 1, "no", "one (R-61) — duct route to confirm", { element_refs: room }));
+  if (ctx.extractor) add("Electrical", W("W-20", "Electrical", "elec.extractor", "Ceiling extractor fan with run-on timer / humidistat — supply and install, ducted to the existing outlet", 1, "no", "one (R-61) — duct route to confirm", { element_refs: room }));
 
   // --- Lighting: cove LED along the bulkhead's open edges.
   const coveLm = ctx.bulkhead ? r2(glassSides.reduce((s, v) => s + v, 0)) : 0;
@@ -368,7 +395,7 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
   // --- Plumbing: reconnections only (the P2 points); the heater is kept and boxed in.
   remove("Plumbing", (l) => ["Q-19", "Q-20"].includes(ruleOf(l)));
   edit("Plumbing", (l) => ruleOf(l) === "Q-21", () => ({ description: "Shower drain (linear) at the existing position — supply and install", ...(shower ? { element_refs: [shower.id] } : {}) }));
-  if (ctx.heater) add("Plumbing", W("W-23", "Plumbing", "plumb.heater_box", `Water heater — box in or relocate locally (existing heater kept; ${ctx.heater.where})`, 1, "no", `heater on the plan: ${ctx.heater.where} (R-62)`, { element_refs: [ctx.heater.id], rate_status: "site_assessment", confirm_on_site: `Water heater: confirm it stays and where (${ctx.heater.where}) — box-in is an allowance` }));
+  if (ctx.heater) add("Plumbing", W("W-23", "Plumbing", "plumb.heater_box", `Water heater — ${ctx.heater.action === "relocate" ? "relocate locally" : ctx.heater.action === "box_in" ? "box in" : "box in or relocate locally"} (existing heater kept; ${ctx.heater.where})`, 1, "no", `heater on the plan: ${ctx.heater.where} (R-62)`, { element_refs: [ctx.heater.id], rate_status: "site_assessment", confirm_on_site: `Water heater: confirm it stays and where (${ctx.heater.where}) — box-in is an allowance` }));
   remove("Plumbing & Sanitary", (l) => l.rule_id === "P2/overlay/water_heater");
 
   // --- Blockwork: the layout stays — no civil alterations.

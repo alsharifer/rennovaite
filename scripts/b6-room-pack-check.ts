@@ -56,7 +56,9 @@ try {
   const order = ["cover", "room_plan", "view", "drawing", "materials", "boq", "price", "programme"];
   const firstIdx = order.map((k) => kinds.indexOf(k));
   check("the order: cover → room + photos → views → drawings → materials → BoQ → price → programme", firstIdx.every((i) => i >= 0) && firstIdx.every((v, i, a) => i === 0 || v > a[i - 1]!), JSON.stringify(firstIdx));
-  check("one page per photo view, each with its render + the photo", summary.pages.filter((p) => p.kind === "view").length === summary.views.length && summary.views.every((v) => !!v.render), summary.views.map((v) => `${v.label.split(" · ")[0]}${v.anchor ? " (anchor)" : v.locked ? " (locked)" : ""}`).join(", "));
+  // B7 1a: a view shows a render that matches the current design, or a labelled placeholder — never a stale render.
+  const pendingN = pages.join("").split("data-view-pending=").length - 1;
+  check(`one page per photo view: a matching render or a labelled placeholder (${pendingN} pending)`, summary.pages.filter((p) => p.kind === "view").length === summary.views.length && summary.views.filter((v) => !v.render).length === pendingN, summary.views.map((v) => `${v.label.split(" · ")[0]}${v.anchor ? " (anchor)" : v.locked ? " (locked)" : ""}`).join(", "));
   check("the drawings: the plan + one elevation per wall, in the room series (R-)", summary.sheets.length === 5 && summary.sheets.every((s) => s.startsWith("R-")), summary.sheets.join(" · "));
   check("no missing image", summary.missing_images.length === 0, summary.missing_images.join(", "));
 
@@ -95,7 +97,9 @@ try {
   });
   check("every elevation's tile setting-out closes on its wall", tileBad.length === 0, tileBad.map((w) => w.side).join(", "));
   const door = graph.openings.find((o) => o.type === "door");
-  if (door) check(`the door swings from its stored hinge (${String(door.spec?.hinge ?? "not stated")})`, joined.includes(`data-hinge="${String(door.spec?.hinge ?? "not stated")}"`));
+  // B7: the side entered on 01 Plan (left/right from the room) wins; else the B6 compass letter; else an estimate.
+  const hinge = door ? String(door.spec?.hinge_side ?? door.spec?.hinge ?? "estimate") : "";
+  if (door) check(`the door swings from its stored hinge (${hinge})`, hinge === "estimate" ? /data-hinge="estimate-/.test(joined) : joined.includes(`data-hinge="${hinge}"`));
 
   // No withheld identity on any page.
   const withheld = await loadWithheldNames(sb as never, P);

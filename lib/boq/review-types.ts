@@ -35,6 +35,8 @@ export interface ReviewLine {
   prov: LineProvenance | null;
   /** Firm persona only: the firm's book has no active entry for this item; `canAdd` = it is in the entry vocabulary. */
   book: { hasEntry: boolean; canAdd: boolean; unit: string | null } | null;
+  /** B7 5: on a wet-room BoQ, the product group this line belongs to and what else it could be (lib/boq/product-swaps.ts). */
+  product: { field: string; group: string; current: string | boolean; options: { value: string | boolean; label: string; rate: number | null; unit: string }[] } | null;
 }
 
 export interface ReviewSection {
