@@ -218,6 +218,8 @@ export async function restyleWithCheck(input: {
   anchor?: { label: string; bytes: Uint8Array } | null;
   /** Lines from the plan the prompt must carry (where a fitting goes in this view). */
   notes?: readonly string[];
+  /** Items the DESIGN changes the size of (a fixed panel for a hinged screen): their place is held, not their size. */
+  resizable?: ReadonlySet<string>;
 }): Promise<RestyleResult> {
   const model = ARM_MODEL[input.arm];
   const inView = input.items
@@ -262,7 +264,7 @@ export async function restyleWithCheck(input: {
       final = { bytes, url, size: at.size };
       at.similarity = await compareImages(Buffer.from(input.photoBytes), Buffer.from(bytes)).catch(() => null);
       at.after = after;
-      at.verdict = judgePhotoPlacement(input.items, input.before, after);
+      at.verdict = judgePhotoPlacement(input.items, input.before, after, { resizable: input.resizable });
       const els = styleElementsFor(input.style, kinds);
       if (at.verdict.passed && els.length) {
         // B4: an anchored view is judged beside the anchor (the same finishes?), not the references.

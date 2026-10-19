@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { fittingNotes } from "@/lib/render/fitting-notes";
-import { carryLocated, checkItemsFor, detectionPrompt, judgePhotoPlacement, type PlanLite } from "@/lib/render/photo-check";
+import { carryLocated, checkItemsFor, detectionPrompt, itemsNamedBy, judgePhotoPlacement, type PlanLite } from "@/lib/render/photo-check";
 import { restylePrompt } from "@/lib/render/photo-restyle";
 
 // The pilot bathroom in normalised space (2.66 m across): WC on the west wall at
@@ -95,5 +95,26 @@ describe("a replacement that leaves the old item in place fails", () => {
     const p = restylePrompt("edit_pro", { text: "warm stone.", source: "references", line: "", elements: [] } as never, [{ item: cab, box: [83, 70, 100, 85] }, { item: gone, box: [83, 70, 100, 85] }]);
     expect(p).not.toMatch(/stays exactly where it is[^.]*bidet/);
     expect(p).toContain("Replace the bidet");
+  });
+});
+
+describe("a stated cabinet height reaches the render's words", () => {
+  it("1,200 mm → 'about 1.2 m tall — well above the WC cistern'; none stated → the plain cabinet", () => {
+    const tall: PlanLite = { ...PLAN, fixtures: PLAN.fixtures.map((f) => (f.type === "storage_cabinet" ? { ...f, spec: { ...f.spec, height_mm: 1200 } } : f)) };
+    expect(checkItemsFor(tall).find((i) => i.plan_id === "cabinet")!.description).toBe("a white floor-standing storage cabinet, about 1.2 m tall — well above the WC cistern");
+    expect(checkItemsFor(PLAN).find((i) => i.plan_id === "cabinet")!.description).toBe("a white floor-standing storage cabinet");
+  });
+});
+
+describe("a change may resize only what it names", () => {
+  it("'make the shower glass one fixed panel' names the glass, not the WC", () => {
+    const items = checkItemsFor({ ...PLAN, fixtures: [...PLAN.fixtures, { id: "shower", type: "shower_mixer", position: n(195, 45), spec: null }] });
+    const named = itemsNamedBy("Make the shower glass one fixed frameless glass panel", items);
+    expect([...named].map((r) => items.find((i) => i.ref === r)!.kind)).toEqual(["shower"]);
+    const sh = items.find((i) => i.kind === "shower")!;
+    const before = { items: [{ ref: sh.ref, present: true, box: [0, 12, 31, 100] as [number, number, number, number], instances: 1 }] };
+    const smaller = { items: [{ ref: sh.ref, present: true, box: [0, 12, 22, 100] as [number, number, number, number], instances: 1 }] };
+    expect(judgePhotoPlacement([sh], before, smaller).passed).toBe(false);
+    expect(judgePhotoPlacement([sh], before, smaller, { resizable: named }).passed).toBe(true);
   });
 });

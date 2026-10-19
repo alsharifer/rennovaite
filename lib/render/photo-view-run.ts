@@ -23,6 +23,7 @@ import { loadMiniPlans } from "./photo-views-load";
 import { PHOTO_VIEW_IMAGE_REFS, styleBriefFrom, type ReferenceStyle } from "./reference-style";
 import { IMAGE_PRICE_USD, recordSpend, USD_TO_AED } from "./render-spend";
 import { loadRoomAnchor } from "./photo-view-anchor";
+import { wetRoomChoicesOf } from "@/lib/boq/wet-room";
 import { fittingNotes } from "./fitting-notes";
 import { followsLine, specElements } from "./room-spec";
 
@@ -156,7 +157,15 @@ export async function runPhotoView(db: SupabaseClient, input: { projectId: strin
   const arm = photoViewArm();
   const wcInView = items.some((it) => it.kind === "wc" && before!.items.find((l) => l.ref === it.ref)?.present);
   const notes = fittingNotes(cameraOf(photo), mini, wcInView);
-  const res: RestyleResult = await restyleWithCheck({ notes, project_id: input.projectId, arm, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts(), anchor: anchorInput });
+  // The room's spec choices that change a fixture's form: a fixed walk-in panel
+  // for the photo's hinged screen is smaller ON PURPOSE — said, and its size freed.
+  const { data: roomRow } = await db.from("rooms").select("spec").eq("id", photo.room_id).maybeSingle<{ spec: Record<string, unknown> | null }>();
+  const resizable = new Set<string>();
+  if (wetRoomChoicesOf(roomRow?.spec ?? null).shower_screen === "fixed_panel") {
+    for (const it of items) if (it.kind === "shower") resizable.add(it.ref);
+    notes.push("The shower has ONE fixed frameless walk-in glass panel — no hinged glass door, no second panel; the shower is open at its end. Keep the shower where it is.");
+  }
+  const res: RestyleResult = await restyleWithCheck({ notes, resizable, project_id: input.projectId, arm, photoUrl: photo.public_url, photoBytes, items, before, style, extraImages: extra, promptOverride: input.promptOverride, maxAttempts: photoViewMaxAttempts(), anchor: anchorInput });
   let stored: string | null = null;
   if (res.final) stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, res.final.bytes, res.final.bytes[0] === 0x89 ? "image/png" : "image/jpeg");
 

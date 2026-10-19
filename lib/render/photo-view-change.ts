@@ -4,8 +4,11 @@
 //
 //   1. A structural request ("move the WC", "bigger window") goes to the plan —
 //      422 before any model is paid (lib/render/change-request.ts).
-//   2. The edit model edits the view's CURRENT image (google/nano-banana, the
-//      R10a tweak path: the parent's own frame, nothing else re-composed).
+//   2. The edit model edits the view's CURRENT image — the photo-view model
+//      (photoViewArm: nano-banana-pro by default, the parent padded to 9 : 16
+//      and the output cut back to its frame, as the restyle does; nano-banana
+//      edits the parent's own frame). Ruled 19 Oct: nano-banana invented a
+//      window wherever it erased something, edit after edit.
 //   3. Perceptual difference vs the parent (similarity.ts): below the R10a
 //      threshold the row is kept as `status: "unchanged"` — never a version —
 //      and the studio says "That change didn't come through — the image is the
@@ -27,7 +30,9 @@ import { fetchSceneBytes, runRenderModel } from "@/lib/scene-render/pipeline";
 import { imageSize } from "@/lib/scene-render/gate";
 
 import { classifyChangeRequest, planOpeningsHref, STRUCTURAL_MESSAGE } from "./change-request";
-import { carryLocated, checkCostUsd, checkItemsFor, detectItems, judgePhotoPlacement } from "./photo-check";
+import { cropToFrame, fitMap, frameRect, geometricMap, padToAspect, toPhotoBoxes } from "./frame-pin";
+import { carryLocated, checkCostUsd, checkItemsFor, detectItems, itemsNamedBy, judgePhotoPlacement } from "./photo-check";
+import { ARM_MODEL, photoViewArm, restyleInput } from "./photo-restyle";
 import { loadMiniPlans } from "./photo-views-load";
 import { moveAnchor } from "./photo-view-anchor";
 import { PhotoViewError, type PhotoViewChange, type PhotoViewGate } from "./photo-view-run";
@@ -35,13 +40,16 @@ import { IMAGE_PRICE_USD, recordSpend, type SpendRow } from "./render-spend";
 import { changeLine, describeChange, type RoomAnchor } from "./room-spec";
 import { compareImages, isUnchangedEdit, UNCHANGED_MESSAGE } from "./similarity";
 
+/** The nano-banana edit model (PHOTO_VIEW_MODEL=edit). The default is the photo-view model — see changeModel(). */
 export const CHANGE_MODEL = "google/nano-banana";
+export const changeModel = (env: Record<string, string | undefined> = process.env) => ARM_MODEL[photoViewArm(env)];
 
-export function changePrompt(request: string): string {
+export function changePrompt(request: string, pinned = false): string {
   return [
     `Edit this photo of a renovated bathroom: ${request.trim()}.`,
+    pinned ? "The narrow strips at the left and right edges are a mirrored copy of the photo's own edges, added only to fill the frame: keep the room itself exactly where the photo has it." : "",
     "Change ONLY that. Keep everything else exactly as it is: the same camera, framing and crop, the same room, door, window and every fixture in the same place and size, and every finish the request does not mention. Do not add any window, door or opening — where something is removed, leave plain tiled wall. Photorealistic.",
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 export type ChangeOutcome =
@@ -66,24 +74,6 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
 
   const spend: SpendRow[] = [];
   const parentBytes = await fetchSceneBytes(parent.image_url);
-  const url = await runRenderModel(CHANGE_MODEL, { prompt: changePrompt(request), image_input: [parent.image_url], aspect_ratio: "match_input_image", output_format: "jpg" });
-  const next = await fetchSceneBytes(url);
-  let cost = IMAGE_PRICE_USD[CHANGE_MODEL] ?? 0;
-  spend.push({ project_id: input.projectId, purpose: "photo_view", model: CHANGE_MODEL, size: (() => { const s = imageSize(next); return s ? `${s.width}x${s.height}` : null; })(), cost_usd: IMAGE_PRICE_USD[CHANGE_MODEL] ?? null, detail: { step: "change", request } });
-
-  const sim = await compareImages(Buffer.from(parentBytes), Buffer.from(next)).catch(() => null);
-  const record = async (status: string, gate: Record<string, unknown>, image: string | null) => {
-    const { data: row, error } = await db.from("renders").insert({ project_id: input.projectId, room_id: null, room_photo_id: photo.id, parent_render_id: parent.id, prompt: changePrompt(request), image_url: image, source_image_url: parent.image_url, model: CHANGE_MODEL, mode: "photo_view", gate, status, ...(parent.anchor_render_id ? { anchor_render_id: parent.anchor_render_id } : {}) }).select("id").single<{ id: string }>();
-    if (error || !row) throw new Error(`could not save the change: ${error?.message}`);
-    await recordSpend(db, spend.map((s) => ({ ...s, render_id: row.id, room_photo_id: photo.id, detail: { ...(s.detail ?? {}), actor: input.actor } })));
-    return row.id;
-  };
-
-  // R10a: an edit that came back the same image is on record, never a version.
-  if (sim && isUnchangedEdit(sim)) {
-    const id = await record("unchanged", { unchanged: true, request, similarity: sim }, null);
-    return { kind: "unchanged", render_id: id, message: UNCHANGED_MESSAGE };
-  }
 
   // The layout still holds: a change is held to the VERSION it edits — the edit
   // read beside its parent, against the parent's own reading (which already
@@ -102,11 +92,45 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   const items = mini ? checkItemsFor(mini) : parent.gate.items;
   const carried = mini ? carryLocated(parent.gate.items, reference.items, items) : reference.items;
   const before = { items: carried };
-  const read = await detectItems({ mediaType: mime(next), data: b64(next) }, items, "after", imageSize(next), { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: carried });
-  const readUsd = checkCostUsd(read.usage);
+
+  const arm = photoViewArm();
+  const model = ARM_MODEL[arm];
+  const pinned = arm === "edit_pro" ? await padToAspect(parentBytes) : null;
+  const prompt = changePrompt(request, !!pinned);
+  const url = await runRenderModel(model, pinned ? restyleInput("edit_pro", prompt, `data:image/jpeg;base64,${pinned.bytes.toString("base64")}`) : { prompt, image_input: [parent.image_url], aspect_ratio: "match_input_image", output_format: "jpg" });
+  const raw = await fetchSceneBytes(url);
+  let cost = IMAGE_PRICE_USD[model] ?? 0;
+  spend.push({ project_id: input.projectId, purpose: "photo_view", model, size: (() => { const s = imageSize(raw); return s ? `${s.width}x${s.height}` : null; })(), cost_usd: IMAGE_PRICE_USD[model] ?? null, detail: { step: "change", request, arm } });
+  // Read where everything is in the model's own frame first: a pinned output is cut back by it.
+  const readRaw = await detectItems({ mediaType: mime(raw), data: b64(raw) }, items, "after", imageSize(raw), { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: carried });
+  const readUsd = checkCostUsd(readRaw.usage);
   cost += readUsd;
-  spend.push({ project_id: input.projectId, purpose: "photo_check", model: read.model, cost_usd: readUsd, detail: { step: "change_layout", usage: read.usage } });
-  const verdict = judgePhotoPlacement(items, before, read);
+  spend.push({ project_id: input.projectId, purpose: "photo_check", model: readRaw.model, cost_usd: readUsd, detail: { step: "change_layout", usage: readRaw.usage } });
+  let next: Uint8Array = raw;
+  let read = readRaw;
+  if (pinned) {
+    const parentSize = imageSize(parentBytes)!;
+    const out = imageSize(raw)!;
+    const map = fitMap(carried, readRaw.items, parentSize, out, geometricMap(pinned.plan, out));
+    next = new Uint8Array(await cropToFrame(raw, frameRect(map, parentSize, out)));
+    read = { ...readRaw, items: toPhotoBoxes(readRaw.items, map, parentSize, out) };
+  }
+
+  const sim = await compareImages(Buffer.from(parentBytes), Buffer.from(next)).catch(() => null);
+  const record = async (status: string, gate: Record<string, unknown>, image: string | null) => {
+    const { data: row, error } = await db.from("renders").insert({ project_id: input.projectId, room_id: null, room_photo_id: photo.id, parent_render_id: parent.id, prompt, image_url: image, source_image_url: parent.image_url, model, mode: "photo_view", gate, status, ...(parent.anchor_render_id ? { anchor_render_id: parent.anchor_render_id } : {}) }).select("id").single<{ id: string }>();
+    if (error || !row) throw new Error(`could not save the change: ${error?.message}`);
+    await recordSpend(db, spend.map((s) => ({ ...s, render_id: row.id, room_photo_id: photo.id, detail: { ...(s.detail ?? {}), actor: input.actor } })));
+    return row.id;
+  };
+
+  // R10a: an edit that came back the same image is on record, never a version.
+  if (sim && isUnchangedEdit(sim)) {
+    const id = await record("unchanged", { unchanged: true, request, similarity: sim }, null);
+    return { kind: "unchanged", render_id: id, message: UNCHANGED_MESSAGE };
+  }
+
+  const verdict = judgePhotoPlacement(items, before, read, { resizable: itemsNamedBy(request, items) });
   if (!verdict.passed) {
     const first = verdict.failures[0];
     const message = `That change ${first ? first.message.replace(/^the render /, "") : "moved the layout"} — it was not kept. Try asking for it differently.`;

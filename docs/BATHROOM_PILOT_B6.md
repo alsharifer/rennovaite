@@ -153,6 +153,45 @@ The anchor is now **v8**: cabinet ✓, ceramic vanity top ✓, but the shattaf i
 still by the door and the glass is still the hinged screen. The other four views
 are not re-rendered yet.
 
+### Second round: pro for edits and a taller cabinet (19 Oct)
+
+BoQ and pricing untouched: revision 09745967 stays at AED 38,778.38.
+
+- **"Ask for a change" uses the photo-view model** (`photoViewArm`:
+  nano-banana-pro). The parent is padded to 9 : 16 and the output cut back to
+  its frame (`fitMap` on the carried reading).
+- **A change may resize only what it names** (`itemsNamedBy`: "glass" frees the
+  shower glass's size). Its place is still held.
+- **Cabinet height** is `plan_fixtures.spec.height_mm` = 1,200. It reaches the
+  check's words ("about 1.2 m tall — well above the WC cistern") and the west
+  elevation.
+- **Photo-view renders know the room's screen choice.** With `fixed_panel` the
+  prompt says one fixed walk-in panel and the shower glass's size is freed.
+
+Photo 2 (anchor), pro edits:
+
+| version | result |
+|---|---|
+| v9 | taller cabinet — came out ~2 m |
+| v10 | shattaf by the door removed ✓ |
+| fixed panel | refused ("shrank the shower glass", before `itemsNamedBy`) |
+| v11 | cabinet down to ~1.2 m ✓ |
+| v12 | fixed panel ✓, rain head lost |
+| v13 | rain head back ✓ — **the anchor** |
+
+Photos 1, 3, 4 and 5 were rendered once each (US$0.92):
+- **P4 passed**, but it shows the hinged enclosure; the glass size rule held it
+  to the photo, before the screen choice reached the check.
+- **P1 failed**: reframed, door −58%. The shattaf is beside the WC and the bidet
+  is gone, but the cabinet is ~2 m.
+- **P3 failed**: recomposed again, WC moved.
+- **P5 failed**: the fixed panel is right by design, now freed; it also read an
+  invented vanity.
+
+The pack shows each view's latest PASSED version. Until P1, P3 and P5 pass
+again, their pages are the older renders (with the bidet), marked "Photo 2
+changed after this view was rendered".
+
 ## Part 2 — the client project (not started)
 
 The brief's second half: create the client's project from the room sheet,

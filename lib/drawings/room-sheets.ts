@@ -446,7 +446,7 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
       // A fixture is drawn face-on only on the wall its back is against; on a
       // wall it merely touches by its side it is a profile (no mirror, no shaver).
       if (g.f.type !== "shower_mixer" && backWallOf(g) !== on) {
-        const top = g.f.type === "wc_point" ? FH.wc_cistern_top : g.f.type === "bidet_point" ? FH.bidet : g.f.type === "basin_point" ? FH.vanity_top : g.f.type === "bath_point" ? 550 : g.f.type === "storage_cabinet" ? FH.cabinet_top : null;
+        const top = g.f.type === "wc_point" ? FH.wc_cistern_top : g.f.type === "bidet_point" ? FH.bidet : g.f.type === "basin_point" ? FH.vanity_top : g.f.type === "bath_point" ? 550 : g.f.type === "storage_cabinet" ? (typeof g.f.spec?.height_mm === "number" ? (g.f.spec.height_mm as number) : FH.cabinet_top) : null;
         const bottom = g.f.type === "basin_point" ? FH.vanity_underside : 0;
         if (top !== null) body += box(s0, s1, bottom, top, `${(SIDE_NAME[g.f.type] ?? g.f.type).toUpperCase()} (SIDE)`, `standard:${g.f.type}_side`, `${g.f.id}:side`);
         continue;
@@ -496,7 +496,7 @@ export function renderRoomElevations(input: RoomSheetsInput): RoomSheet[] {
           break;
         }
         case "storage_cabinet":
-          body += box(s0, s1, 0, FH.cabinet_top, "STORAGE CABINET", "standard:cabinet_top", g.f.id);
+          body += box(s0, s1, 0, typeof g.f.spec?.height_mm === "number" ? (g.f.spec.height_mm as number) : FH.cabinet_top, "STORAGE CABINET", typeof g.f.spec?.height_mm === "number" ? "fixture.spec.height_mm" : "standard:cabinet_top", g.f.id);
           break;
         case "shattaf_point": {
           const z = FH.shattaf / 1000;

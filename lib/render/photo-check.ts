@@ -86,7 +86,9 @@ export function checkItemsFor(plan: PlanLite): CheckItem[] {
   for (const fx of plan.fixtures) {
     const k = FIXTURE_KIND[fx.type];
     const was = typeof fx.spec?.replaces === "string" ? FIXTURE_KIND[fx.spec.replaces] : undefined;
-    if (k) out.push({ ref: `F${++f}`, plan_id: fx.id, ...k, ...(was ? { replaces: { short: was.short, description: was.description } } : {}) });
+    // A stated height reaches the words the model reads (a cabinet ~1.2 m tall, not a low unit).
+    const tall = typeof fx.spec?.height_mm === "number" && fx.type === "storage_cabinet" ? `, about ${(Number(fx.spec.height_mm) / 1000).toFixed(1)} m tall — well above the WC cistern` : "";
+    if (k) out.push({ ref: `F${++f}`, plan_id: fx.id, ...k, description: k.description + tall, ...(was ? { replaces: { short: was.short, description: was.description } } : {}) });
   }
   // What each replacement removes, so a render that keeps it fails.
   let x = 0;
@@ -112,6 +114,19 @@ export function carryLocated(prevItems: readonly CheckItem[], prevLocated: reado
     const l = same ?? was;
     return l ? { ...l, ref: it.ref } : { ref: it.ref, present: false, box: null, instances: 0 };
   });
+}
+
+/** The items a change request names — their size may change, never their place. */
+export function itemsNamedBy(request: string, items: readonly CheckItem[]): Set<string> {
+  const words: Partial<Record<CheckItem["kind"], RegExp>> = {
+    shower: /\b(glass|screen|panel|enclosure)\b/i,
+    vanity: /\b(vanity|counter|basin|worktop)\b/i,
+    cabinet: /\bcabinet\b/i,
+    wc: /\b(wc|toilet)\b/i,
+    bidet: /\bbidet\b/i,
+    bath: /\b(bath|tub)\b/i,
+  };
+  return new Set(items.filter((it) => !it.gone && words[it.kind]?.test(request)).map((it) => it.ref));
 }
 
 /** The phone's horizontal field of view, portrait, ultrawide-ish (the sheet: "~24 mm-equivalent ultrawide feel"). */
@@ -195,7 +210,7 @@ export function failureLine(failures: readonly PlacementFailure[]): string {
  * once, in the same left/right order — and nothing the photo does not have was
  * added.
  */
-export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<Detection, "items">, after: Pick<Detection, "items">): PlacementVerdict {
+export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<Detection, "items">, after: Pick<Detection, "items">, opts: { resizable?: ReadonlySet<string> } = {}): PlacementVerdict {
   const B = new Map(before.items.map((x) => [x.ref, x]));
   const A = new Map(after.items.map((x) => [x.ref, x]));
   const failures: PlacementFailure[] = [];
@@ -223,7 +238,9 @@ export function judgePhotoPlacement(items: readonly CheckItem[], before: Pick<De
     }
     const area = (x: Box) => Math.max(0, x[2] - x[0]) * Math.max(0, x[3] - x[1]);
     // A replacement is a different object in the same spot: its size is its own.
-    if (it.replaces) {
+    // A change that asks for this item to change (a fixed panel instead of a hinged
+    // screen) changes its size on purpose: its place is still held.
+    if (it.replaces || opts.resizable?.has(it.ref)) {
       if (a.instances > 1) failures.push({ ref: it.ref, short: it.short, reason: "duplicated", message: `the render added a second ${it.short}` });
       continue;
     }
