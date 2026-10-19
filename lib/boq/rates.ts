@@ -347,6 +347,19 @@ export class RateResolver {
       };
     }
 
+    // B9: a sourced figure — a catalogue price or a reference-villa transaction — is not an allowance.
+    if (rule.allowance_aed != null && rule.sourced) {
+      return {
+        rate_aed: rule.allowance_aed,
+        vendor_or_source: rule.sourced.basis === "catalogue" ? "retail catalogue" : "reference villa — sanitaryware supplier",
+        kind: "supply_and_install",
+        rate_band: rule.sourced.basis === "catalogue" ? "sku" : "book",
+        wastage: 0,
+        notes: `${rule.rule_id}: ${rule.allowance_note ?? ""}`,
+        rate_tier: rule.sourced.basis === "catalogue" ? "catalog" : "allowance",
+      };
+    }
+
     if (rule.allowance_aed != null) {
       return {
         rate_aed: rule.allowance_aed,

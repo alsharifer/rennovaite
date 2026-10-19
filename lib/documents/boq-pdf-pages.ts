@@ -19,6 +19,7 @@
 
 import { assignRefs, refMigration } from "@/lib/boq/refs";
 import { sortSections } from "@/lib/boq/section-order";
+import { RATE_BASIS_ORDER } from "@/lib/boq/rate-basis";
 import { esc } from "@/lib/drawings/sheet";
 import { formatAed } from "@/lib/format/aed";
 import { tierOf, type TierContext } from "@/lib/provenance/tier";
@@ -53,7 +54,7 @@ const LEGEND: [PaperTier, string][] = [
 
 /** The section's REF code: the prefix of its lines' REFs ("HRD-01" → "HRD"). */
 /** B5: the rate basis in words (lib/boq/rate-basis.ts RATE_BASIS_LABEL). */
-const BASIS_WORD: Record<string, string> = { calibrated: "calibrated (reference villa)", market: "market rate book", firm: "your rate book", allowance: "allowance", tbc: "to be priced" };
+const BASIS_WORD: Record<string, string> = { calibrated: "calibrated (reference villa)", catalogue: "catalogue price", market: "market rate book", firm: "your rate book", allowance: "allowance", tbc: "to be priced" };
 
 const codeOf = (ref: string | undefined) => (ref ? ref.replace(/-\d+$/, "") : "");
 
@@ -184,8 +185,8 @@ export function buildBoqPdfPages(input: BoqPdfInput & { revision?: number | null
       const c = by.get(k) ?? { n: 0, aed: 0 };
       by.set(k, { n: c.n + 1, aed: c.aed + l.total_aed });
     }
-    const SHORT: Record<string, string> = { calibrated: "calibrated", market: "market", firm: "your book", allowance: "allowance", tbc: "to be priced" };
-    const words = ["calibrated", "market", "firm", "allowance", "tbc"].filter((k) => by.has(k)).map((k) => `${SHORT[k]} ${by.get(k)!.n}${k === "tbc" ? "" : ` · AED ${aed(by.get(k)!.aed)}`}`);
+    const SHORT: Record<string, string> = { calibrated: "calibrated", catalogue: "catalogue", market: "market", firm: "your book", allowance: "allowance", tbc: "to be priced" };
+    const words = [...RATE_BASIS_ORDER, ...[...by.keys()].filter((k) => !(RATE_BASIS_ORDER as readonly string[]).includes(k))].filter((k) => by.has(k)).map((k) => `${SHORT[k]} ${by.get(k)!.n}${k === "tbc" ? "" : ` · AED ${aed(by.get(k)!.aed)}`}`);
     // A one-line note may use the footer's margin above the legend rule (H − 23).
     if (y > H - 27) flush();
     note(`Rate basis (lines · amount) — ${words.join(" | ")}`, { fill: DOC.INK });

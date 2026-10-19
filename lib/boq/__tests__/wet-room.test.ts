@@ -227,14 +227,14 @@ describe("client comments (19 Oct) — a cabinet for the bidet, a shattaf beside
 
   it("each choice is a different product at its own allowance — the base lines go, none is re-rated", () => {
     expect(by(client, "S6-06")).toHaveLength(0);
-    expect(by(client, "W-26")[0]).toMatchObject({ quantity: 1, rate_aed: 2000 });
+    expect(by(client, "W-26")[0]).toMatchObject({ quantity: 1, rate_aed: 2139, rate_basis: "catalogue" }); // B9: sourced, was a 2,000 allowance
     expect(by(client, "Q-24")).toHaveLength(0);
-    expect(by(client, "W-27")[0]).toMatchObject({ rate_aed: 2200 });
+    expect(by(client, "W-27")[0]).toMatchObject({ rate_aed: 1750, rate_basis: "calibrated" });
     expect(lines(client).some((l) => l.rule_id === "GT/joinery/vanity" || (l.rule_id ?? "").startsWith("S6-05"))).toBe(false);
-    expect(by(client, "W-28")[0]).toMatchObject({ rate_aed: 2000 });
+    expect(by(client, "W-28")[0]).toMatchObject({ rate_aed: 1474, rate_basis: "catalogue" });
     expect(by(client, "Q-23")).toHaveLength(0);
     expect(by(client, "W-29")[0]!.description).toContain("on the vanity's own basin");
-    expect(by(client, "W-15")[0]).toMatchObject({ rate_aed: 1200 });
+    expect(by(client, "W-15")[0]).toMatchObject({ rate_aed: 1199, rate_basis: "catalogue" });
     expect(by(client, "W-18")[0]).toMatchObject({ rate_aed: 900 });
     expect(by(client, "W-13")[0]).toMatchObject({ rate_aed: 600 });
     expect(by(client, "Q-34")).toHaveLength(0);
@@ -249,7 +249,8 @@ describe("client comments (19 Oct) — a cabinet for the bidet, a shattaf beside
   it("the subtotal moves by exactly the lines changed", () => {
     const gone = (rules: string[]) => sumMoney(lines(base).filter((l) => rules.includes((l.rule_id ?? "").split("/")[0]!) || (rules.includes("GT-vanity") && l.rule_id === "GT/joinery/vanity")).map((l) => l.total_aed));
     const removed = gone(["W-16", "S6-06", "Q-24", "S6-05", "Q-23", "W-15", "W-18", "W-13", "Q-34", "GT-vanity"]);
-    const added = 750 + 2000 + 2200 + 2000 + 600 + 1200 + 900 + 600 + 600;
+    // B9: the panel, shower set, vanity, basin mixer and WC are sourced figures now.
+    const added = 750 + 2139 + 1750 + 1474 + 400 + 1199 + 900 + 600 + 600;
     expect(client.subtotal_aed).toBeCloseTo(base.subtotal_aed - removed + added, 2);
     const c = chainTotals({ subtotal_aed: client.subtotal_aed, contingency_pct: client.contingency_pct, vat_pct: client.vat_pct });
     expect(client.grand_total_aed).toBe(c.grand_total_aed);

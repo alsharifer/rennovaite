@@ -116,10 +116,12 @@ export function Furniture({ furniture }: { furniture: FurnitureView }) {
   );
 }
 
-const BASIS_WORD: Record<string, string> = { calibrated: "calibrated (reference villa)", market: "market rate book", firm: "your rate book", allowance: "allowance", tbc: "to be priced" };
+const BASIS_WORD: Record<string, string> = { calibrated: "calibrated (reference villa)", catalogue: "catalogue price", market: "market rate book", firm: "your rate book", allowance: "allowance", tbc: "to be priced" };
 
 /** B5: what the rates rest on — one line, by count and amount. */
 export function RateBasisLine({ rateBasis }: { rateBasis: NonNullable<ReviewModel["rateBasis"]> }) {
+  // B9: an allowance is read by its share of the work's value, not its line count.
+  const work = rateBasis.reduce((t, b) => t + b.amount, 0);
   return (
     <p className="t-label-md mt-4 font-bp-mono tabular-nums text-bp-ink-secondary" data-rate-basis="">
       RATE BASIS ·{" "}
@@ -128,6 +130,7 @@ export function RateBasisLine({ rateBasis }: { rateBasis: NonNullable<ReviewMode
           {i > 0 ? " · " : ""}
           {BASIS_WORD[b.basis] ?? b.basis} {b.lines} {b.lines === 1 ? "line" : "lines"}
           {b.basis === "tbc" ? "" : ` AED ${formatAED(b.amount)}`}
+          {b.basis === "allowance" && work > 0 ? ` (${((b.amount / work) * 100).toFixed(1)}% of the work)` : ""}
         </span>
       ))}
     </p>

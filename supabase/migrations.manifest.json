@@ -392,6 +392,12 @@
       "version": "20260101006500",
       "name": "room_tiled_height",
       "sha256": "905ac72d19c261619d9c684ac6818dab03eb8e45b063985fec53038495e804df"
+    },
+    {
+      "legacy": null,
+      "version": "20260101006600",
+      "name": "boq_snapshot_benchmark",
+      "sha256": "0833560d22921cd2f7ce8d9ba753dad6a208cb68e3e533c045fd5b15029451c3"
     }
   ]
 }

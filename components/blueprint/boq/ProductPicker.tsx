@@ -58,7 +58,7 @@ export function ProductPicker({ projectId, product }: { projectId: string; produ
               <span className="min-w-0 flex-1">
                 <span className="t-body-sm text-bp-ink-primary">{o.label}</span>
                 {o.value === product.current ? <span className="t-label-md ml-2 text-bp-ink-tertiary">in this BoQ</span> : null}
-                <span className="t-num-sm block text-bp-ink-secondary">{o.rate != null ? `AED ${formatAED(o.rate)} / ${o.unit} · estimate (allowance)` : "market rate — priced on regenerate"}</span>
+                <span className="t-num-sm block text-bp-ink-secondary">{o.rate != null ? `AED ${formatAED(o.rate)} / ${o.unit} · ${o.basis === "catalogue" ? "catalogue price" : o.basis === "calibrated" ? "reference-villa price" : "estimate (allowance)"}` : "market rate — priced on regenerate"}</span>
               </span>
             </label>
           );
