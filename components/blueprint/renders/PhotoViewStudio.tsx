@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { useCallback, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import type { RefusedChange } from "@/lib/render/photo-view-change";
 
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
@@ -59,6 +60,8 @@ export interface PhotoViewsInitial {
   referenceStyle: { text: string; at: string } | null;
   /** What one view costs to render (AED): one attempt … two (the cost guard's estimate). */
   costPerView: { low: number; high: number };
+  /** B7 6: each view's latest refused change (image + reading), newer than its kept version. */
+  refused?: Record<string, RefusedChange>;
 }
 
 type Busy = "render" | "lock" | "change" | "place";
@@ -87,6 +90,7 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
   const [versions, setVersions] = useState(initial?.versions ?? {});
   const [locked, setLocked] = useState(initial?.locked ?? {});
   const [anchors, setAnchors] = useState(initial?.anchors ?? {});
+  const [refused, setRefused] = useState<Record<string, RefusedChange>>(initial?.refused ?? {});
   const [spend, setSpend] = useState(initial?.spendAed ?? null);
   const [refStyle, setRefStyle] = useState(initial?.referenceStyle ?? null);
   const [readingRefs, setReadingRefs] = useState(false);
@@ -102,6 +106,7 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
   const say = (id: string, n: { text: string; href?: string | null; kind?: "info" | "error" } | null) => setNotice((p) => { const c = { ...p }; if (n) c[id] = { text: n.text, href: n.href ?? null, kind: n.kind ?? "info" }; else delete c[id]; return c; });
   const addVersion = (photoId: string, v: PhotoViewVersionLite) => {
     setVersions((p) => ({ ...p, [photoId]: [...(p[photoId] ?? []), v] }));
+    setRefused((p) => { const n = { ...p }; delete n[photoId]; return n; });
     setVersionIdx((p) => { const n = { ...p }; delete n[photoId]; return n; });
   };
 
@@ -180,7 +185,7 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
     setBusyFor(photo.id, "change");
     say(photo.id, null);
     try {
-      const { ok, status, json } = await postJson<{ kind: "version" | "unchanged" | "moved"; render_id: string; image_url?: string; gate?: PhotoViewGate; change?: PhotoViewChange; anchor?: RoomAnchor | null; message?: string; spend?: { render_spend_aed: number } }>("/api/render/photo-view/change", { render_id: renderId, request });
+      const { ok, status, json } = await postJson<{ kind: "version" | "unchanged" | "moved"; render_id: string; image_url?: string; gate?: PhotoViewGate; change?: PhotoViewChange; anchor?: RoomAnchor | null; message?: string; refused?: RefusedChange; spend?: { render_spend_aed: number } }>("/api/render/photo-view/change", { render_id: renderId, request });
       if (json?.spend) setSpend(json.spend.render_spend_aed);
       if (status === 422 && json?.code === "structural_change") {
         say(photo.id, { text: json.error ?? "Walls and windows come from your plan — adjust them there", href: json.plan_href ?? null });
@@ -188,6 +193,7 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
       }
       if (!ok || !json) throw new Error(json?.error ?? `The change did not render (${status}).`);
       if (json.kind !== "version") {
+        if (json.kind === "moved" && json.refused) setRefused((p) => ({ ...p, [photo.id]: json.refused! }));
         say(photo.id, { text: json.message ?? "That change didn't come through." });
         return false;
       }
@@ -291,7 +297,7 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
     }
   }
 
-  return { byRoom, plans, versions, locked, anchors, spend, refStyle, readingRefs, busy, uploading, notice, running, remaining, costPerView: initial?.costPerView ?? null, roomOf, viewInfo, setVersionIdx, render, lock, change, place, addPhotos, readRefs, renderRemaining, say };
+  return { byRoom, plans, versions, locked, anchors, refused, spend, refStyle, readingRefs, busy, uploading, notice, running, remaining, costPerView: initial?.costPerView ?? null, roomOf, viewInfo, setVersionIdx, render, lock, change, place, addPhotos, readRefs, renderRemaining, say };
 }
 
 export type PhotoViewsApi = ReturnType<typeof usePhotoViews>;
@@ -329,6 +335,44 @@ function Boxes({ boxes }: { boxes: { ref: string; box: Box; bad: boolean }[] }) 
         <rect key={b.ref} x={b.box[0]} y={b.box[1]} width={b.box[2] - b.box[0]} height={b.box[3] - b.box[1]} fill="none" stroke={b.bad ? "var(--color-alert-surface)" : "var(--color-ink-on-inverse)"} strokeWidth={b.bad ? 0.9 : 0.5} strokeDasharray={b.bad ? undefined : "1.5 1"} vectorEffect="non-scaling-stroke" />
       ))}
     </svg>
+  );
+}
+
+/**
+ * B7 6: a change the check refused, beside the version that was kept — the
+ * refused image with what the check read on it (the boxes it failed are solid),
+ * and why, in its own words.
+ */
+function RefusedBeside({ refusal, kept }: { refusal: RefusedChange; kept: { url: string; version: number } }) {
+  const bad = new Set(refusal.failures.map((x) => x.ref));
+  const boxes = refusal.after.filter((l) => l.present && l.box).map((l) => ({ ref: l.ref, box: l.box as Box, bad: bad.has(l.ref) }));
+  return (
+    <section className="mt-4 border border-bp-line-hairline bg-bp-surface-raised p-3" aria-label="The last change that was not kept" data-refused-change={refusal.render_id}>
+      <p className="t-label-caps text-bp-ink-tertiary">LAST CHANGE NOT KEPT</p>
+      <p className="t-body-sm mt-1 text-bp-ink-primary">“{refusal.request}”</p>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <figure className="min-w-0">
+          {/* eslint-disable-next-line @next/next/no-img-element -- the kept restyle */}
+          <img src={kept.url} alt={`Kept — version ${kept.version}`} className="block w-full" />
+          <figcaption className="t-label-md mt-1 font-bp-mono text-bp-ink-secondary">Kept · version {kept.version}</figcaption>
+        </figure>
+        <figure className="min-w-0">
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element -- the refused edit, as the check read it */}
+            <img src={refusal.image_url} alt="Refused — the edit the layout check did not keep" className="block w-full" data-refused-image="" />
+            <Boxes boxes={boxes} />
+          </div>
+          <figcaption className="t-label-md mt-1 font-bp-mono text-bp-ink-secondary">Refused · what the check read</figcaption>
+        </figure>
+      </div>
+      <ul className="mt-3 space-y-1" aria-label="Why it was not kept">
+        {refusal.failures.map((x, i) => (
+          <li key={`${x.ref}-${i}`} className="t-body-sm text-bp-ink-primary">
+            {x.message.replace(/^the render /, "The edit ").replace(/^./, (c) => c.toUpperCase())}.
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -400,6 +444,9 @@ export function PhotoViewCentre({ api, roomName, photo, onSelect }: { api: Photo
           ) : null}
         </div>
       </div>
+      {api.refused[photo.id] && info.latest?.image_url ? (
+        <RefusedBeside refusal={api.refused[photo.id]!} kept={{ url: info.latest.image_url, version: info.versions.length }} />
+      ) : null}
       {info.current?.image_url ? (
         <div className="mt-2 flex items-center gap-1" role="group" aria-label="Show">
           {(["render", "photo"] as const).map((k) => (
