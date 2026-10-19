@@ -8,6 +8,10 @@ this file has the numbers. Screenshots: `screenshots/bathroom-pilot/b2/`
 
 ## B2b — the pro model with its frame pinned (18 Oct, later)
 
+> **Restated in B8 (19 Oct, `docs/BATHROOM_PILOT_B8.md`):**
+> - **The check changed:** every image read twice, tolerances from the measured noise (size ×1.27, height ×1.19).
+> - **The table below becomes:** pro **2/5** both (P4's glass +30 % now fails); nano-banana R5 **1/5**.
+
 **Goal:** a full restyle AND the layout, by removing nano-banana-pro's re-frame
 rather than accepting nano-banana's under-restyling.
 

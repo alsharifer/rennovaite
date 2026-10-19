@@ -129,7 +129,8 @@ export async function generateRoomPack(projectId: string, opts: { brand?: string
     const lockedId = state.locked[v.id];
     const locked = lockedId ? (vs.find((x) => x.render_id === lockedId) ?? null) : null;
     // The locked version is the client's pick: shown only if it matches. Else the latest passed one that does.
-    const candidates = locked ? [locked] : [...vs].reverse().filter((x) => x.gate.outcome === "passed" && x.image_url);
+    // B8: "passed" means BOTH checks — a view whose finishes were judged and do not follow is not shipped.
+    const candidates = locked ? [locked] : [...vs].reverse().filter((x) => x.gate.outcome === "passed" && x.image_url && x.gate.attempts.at(-1)?.style?.passed !== false);
     const verdicts = candidates.map((x) => ({ x, c: consistencyOf(v.id, x) }));
     const shown = verdicts.find((d) => d.c.ok)?.x ?? null;
     const refused = verdicts[0] && !verdicts[0].c.ok ? verdicts[0].c : null;

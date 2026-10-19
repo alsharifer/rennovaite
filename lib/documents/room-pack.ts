@@ -173,7 +173,8 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     if (excludes) s += text(M, 120, excludes, { size: 3.2, weight: 600 });
     const facts = [
       `Floor ${input.room.area_m2.toFixed(2)} m² · ceiling ${input.room.ceiling_mm} mm · walls tiled ${input.room.tiled}`,
-      `${input.views.filter((v) => v.render).length} of ${input.views.length} views from your photos match this design${input.anchorLabel ? ` · finishes follow ${input.anchorLabel} (locked)` : ""}`,
+      // B8: the pack carries the views that passed both checks; the rest are named on page 2, never shown.
+      `${input.views.filter((v) => v.render).length} of ${input.views.length} views from your photos in this pack${input.anchorLabel ? ` · finishes follow ${input.anchorLabel} (locked)` : ""}`,
       `${input.sheets.length} drawings · ${input.boq.sections.reduce((n, s) => n + s.lines.length, 0)} lines in the bill of quantities`,
       ...(input.boq.options?.length ? [`${input.boq.options.length} options priced separately`] : []),
     ];
@@ -202,27 +203,28 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
       s += text(264, y, `${v.label.split(" · ")[0]} — ${v.origin}${v.anchor ? " · anchors the room" : v.locked ? " · locked" : ""}`, { size: 3.2 });
       y += 5;
       s += text(264, y, v.camera ? `taken facing ${Math.round(v.camera.heading_deg)}°` : "not placed on the plan", { size: 2.8, fill: DOC.INK_2, font: DOC.MONO });
+      if (!v.render) {
+        y += 4.6;
+        s += text(264, y, `Not in this pack — ${(v.pending ?? "no render kept this photo's layout").replace(/^View pending — /, "")}`, { size: 2.8, fill: DOC.INK_2, attrs: `data-view-omitted="P${v.n}"` });
+      }
       y += 7;
     }
     y += 4;
-    for (const line of wrapWords("Each view is your own photo, restyled — the layout of the room is the photo's; the finishes are the design's. The marker is where it was taken; the line, the way the phone faced.", 70)) {
+    const omitted = input.views.some((v) => !v.render);
+    for (const line of wrapWords(`Each view is your own photo, restyled — the layout of the room is the photo's; the finishes are the design's. The marker is where it was taken; the line, the way the phone faced.${omitted ? " This pack carries only the views that passed both checks — the layout of your photo and the finishes of the locked view. A render that moves, resizes or adds a fixture is never shown." : ""}`, 70)) {
       s += text(250, y, line, { size: 3, fill: DOC.INK_2 });
       y += 4.6;
     }
     push("room_plan", "The room and your photos", s);
   }
 
-  // --- one page per view ------------------------------------------------------------------------
-  for (const v of input.views) {
+  // --- one page per view that passed --------------------------------------------------------------
+  // B8: a view with no render that passed both checks has no page (B7 drew a
+  // placeholder): it is named on the room page, with why.
+  for (const v of input.views.filter((x) => x.render)) {
     let s = frame(input, `${v.label.split(" · ")[0]} — ${v.origin}`, pages.length + 1);
     const slots: PackSlot[] = [];
     if (v.render) slots.push({ src: v.render.src, x: M, y: 36, w: 150, h: 240 });
-    else {
-      // B7: never a render that contradicts the BoQ — a labelled placeholder instead.
-      s += `<rect x="${M}" y="36" width="150" height="240" fill="#F5F2EA" stroke="${DOC.INK_3}" stroke-width="0.3" stroke-dasharray="1.2 0.8" data-view-pending="${esc(v.pending ?? "not rendered")}"/>`;
-      s += text(M + 75, 152, v.pending ?? "Not rendered", { size: 3.6, fill: DOC.INK_2, anchor: "middle" });
-      if (v.pending) s += text(M + 75, 159, "A new render follows the current design.", { size: 2.8, fill: DOC.INK_3, anchor: "middle" });
-    }
     if (v.photo) {
       slots.push({ src: v.photo.src, x: 176, y: 36, w: 70, h: 112 });
       s += text(176 + 35, 154, "Your photo", { size: 2.8, fill: DOC.INK_2, font: DOC.MONO, anchor: "middle" });

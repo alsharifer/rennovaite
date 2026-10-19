@@ -137,9 +137,9 @@ describe("B2 — the style line and the render cap", () => {
 });
 
 describe("B2b — size, and the pro frame pinned back to the photo", () => {
-  it("a fixture whose box grows or shrinks by more than 25% fails as resized", async () => {
+  it("a fixture whose box grows or shrinks beyond the measured tolerance (B8: ×1.27) fails as resized", async () => {
     const { judgePhotoPlacement: judge, SIZE_TOLERANCE } = await import("../photo-check");
-    expect(SIZE_TOLERANCE).toBe(0.25);
+    expect(SIZE_TOLERANCE).toBe(0.27);
     const before = { items: [at("W1", [20, 30, 40, 50])] }; // 400
     expect(judge(ITEMS, before, { items: [at("W1", [21, 31, 39, 49])] }).passed).toBe(true); // 324 = −19%
     const small = judge(ITEMS, before, { items: [at("W1", [22, 33, 38, 47])] }); // 224 = −44%
@@ -188,5 +188,59 @@ describe("B2b — size, and the pro frame pinned back to the photo", () => {
     expect(photoViewArm({ PHOTO_VIEW_MODEL: "pro" })).toBe("edit_pro");
     expect(photoViewArm({ PHOTO_VIEW_MODEL: "edit" })).toBe("edit");
     expect(photoViewArm({})).toBe(PHOTO_VIEW_DEFAULT_MODEL === "pro" ? "edit_pro" : "edit");
+  });
+});
+
+describe("B8 — read twice, measured tolerances, height", () => {
+  it("two readings that agree average their boxes; a disagreement on presence or count is flagged for a third", async () => {
+    const { agreeReadings, readingsDisagree } = await import("../photo-check");
+    const r1 = [at("F1", [10, 60, 30, 90]), at("W1", null)];
+    const r2 = [at("F1", [12, 62, 32, 92]), at("W1", null)];
+    expect(readingsDisagree(r1, r2)).toBe(false);
+    expect(agreeReadings([r1, r2]).find((x) => x.ref === "F1")).toMatchObject({ present: true, box: [11, 61, 31, 91], instances: 1 });
+    const r3 = [at("F1", [11, 61, 31, 91], 2), at("W1", [20, 30, 40, 50])];
+    expect(readingsDisagree(r1, r3)).toBe(true);
+    // Three readings: the majority decides presence and count.
+    const agreed = agreeReadings([r1, r2, r3]);
+    expect(agreed.find((x) => x.ref === "W1")!.present).toBe(false);
+    expect(agreed.find((x) => x.ref === "F1")!.instances).toBe(1);
+  });
+
+  it("the spread between two readings is what the tolerances are measured from", async () => {
+    const { readingSpread } = await import("../photo-check");
+    const [s] = readingSpread([at("F3", [20, 40, 60, 60])], [at("F3", [20, 40, 60, 65])]);
+    expect(s!.ln_area).toBeCloseTo(Math.log(1.25), 6);
+    expect(s!.ln_height).toBeCloseTo(Math.log(1.25), 6);
+    expect(s!.centre).toBeCloseTo(2.5, 6);
+  });
+
+  it("size is symmetric in log terms: ×1.27 and ÷1.27 are the same change", async () => {
+    const { judgePhotoPlacement: judge } = await import("../photo-check");
+    const before = { items: [at("W1", [20, 30, 40, 50])] }; // 400
+    // Width alone, so the height rule stays out of it.
+    expect(judge(ITEMS, before, { items: [at("W1", [20, 30, 45, 50])] }).passed).toBe(true); // ×1.25
+    expect(judge(ITEMS, before, { items: [at("W1", [20, 30, 36, 50])] }).passed).toBe(true); // ÷1.25
+    expect(judge(ITEMS, before, { items: [at("W1", [20, 30, 47, 50])] }).failures[0]!.message).toBe("the render enlarged the window (35% of its area)");
+    expect(judge(ITEMS, before, { items: [at("W1", [20, 30, 34.8, 50])] }).failures[0]!.message).toBe("the render shrank the window (-26% of its area)"); // ÷1.35
+  });
+
+  it("a fixture that keeps its area but grows tall fails on height (×1.19)", async () => {
+    const { judgePhotoPlacement: judge } = await import("../photo-check");
+    const before = { items: [at("F1", [40, 60, 60, 80])] }; // 20 × 20
+    const tall = judge(ITEMS, before, { items: [at("F1", [42, 55, 58, 80])] }); // 16 × 25: area 400 → 400, height ×1.25
+    expect(tall.failures[0]).toMatchObject({ reason: "resized", message: "the render made the WC taller (25% of its height)" });
+  });
+
+  it("a replacement with a stated height is held to it against the wall: a 1.2 m cabinet drawn 2 m tall fails", () => {
+    const plan = { ...PLAN, ceiling_h_m: 2.8, fixtures: [...PLAN.fixtures, { id: "cab", type: "storage_cabinet", position: n(28, 212), spec: { replaces: "bidet_point", height_mm: 1200 } }] };
+    const items = checkItemsFor(plan);
+    const cab = items.find((i) => i.kind === "cabinet")!;
+    expect(cab).toMatchObject({ top_share: 0.43, height_mm: 1200 });
+    const before = { items: items.map((i) => (i.ref === cab.ref ? { ...at(i.ref, [80, 70, 95, 85]), top: 0.15 } : at(i.ref, null))) };
+    const ok = { items: items.map((i) => (i.ref === cab.ref ? { ...at(i.ref, [80, 50, 95, 85]), top: 0.46 } : at(i.ref, null))) };
+    const tall = { items: items.map((i) => (i.ref === cab.ref ? { ...at(i.ref, [80, 30, 95, 85]), top: 0.71 } : at(i.ref, null))) };
+    expect(judgePhotoPlacement(items, before, ok).passed).toBe(true);
+    const v = judgePhotoPlacement(items, before, tall);
+    expect(v.failures[0]).toMatchObject({ reason: "resized", message: "the render made the storage cabinet too tall (about 2.0 m; 1.2 m planned)" });
   });
 });

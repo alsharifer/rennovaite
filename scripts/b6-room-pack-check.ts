@@ -47,18 +47,19 @@ const vj = verificationJobs(sb, SCRIPT);
 try {
   const h = { ...(await vj.headers(P)), authorization: await app.authorization() };
   const res = await fetch(`${BASE}/api/projects/${P}/room-pack?format=pages`, { headers: h });
-  const body = (await res.json().catch(() => null)) as { pages?: string[]; images?: { src: string; x: number; y: number; w: number; h: number }[][]; summary?: { pages: { kind: string; title: string; images: number }[]; views: { label: string; render: string | null; locked: boolean; anchor: boolean }[]; sheets: string[]; missing_images: string[]; grand_total_aed: number; boq_id: string }; error?: string } | null;
+  const body = (await res.json().catch(() => null)) as { pages?: string[]; images?: { src: string; x: number; y: number; w: number; h: number }[][]; summary?: { pages: { kind: string; title: string; images: number }[]; views: { label: string; render: string | null; locked: boolean; anchor: boolean }[]; sheets: string[]; missing_images: string[]; grand_total_aed: number; boq_id: string; pending_views?: { view: string; reason: string }[] }; error?: string } | null;
   check("the room pack answers a verification job", res.ok && !!body?.pages?.length, `${res.status} ${body?.error ?? ""}`);
   if (!body?.pages || !body.summary) throw new Error("no pack");
   const { pages, summary } = body;
   const kinds = summary.pages.map((p) => p.kind);
+  for (const p of summary.pending_views ?? []) console.log(`  ·  not in the pack: ${p.view} — ${p.reason}`);
   console.log("  ·  pages:", summary.pages.map((p) => `${p.kind}${p.images ? `(${p.images} img)` : ""}`).join(" · "));
   const order = ["cover", "room_plan", "view", "drawing", "materials", "boq", "price", "programme"];
   const firstIdx = order.map((k) => kinds.indexOf(k));
   check("the order: cover → room + photos → views → drawings → materials → BoQ → price → programme", firstIdx.every((i) => i >= 0) && firstIdx.every((v, i, a) => i === 0 || v > a[i - 1]!), JSON.stringify(firstIdx));
   // B7 1a: a view shows a render that matches the current design, or a labelled placeholder — never a stale render.
-  const pendingN = pages.join("").split("data-view-pending=").length - 1;
-  check(`one page per photo view: a matching render or a labelled placeholder (${pendingN} pending)`, summary.pages.filter((p) => p.kind === "view").length === summary.views.length && summary.views.filter((v) => !v.render).length === pendingN, summary.views.map((v) => `${v.label.split(" · ")[0]}${v.anchor ? " (anchor)" : v.locked ? " (locked)" : ""}`).join(", "));
+  const pendingN = pages.join("").split("data-view-omitted=").length - 1;
+  check(`one page per view that passed; the others named on the room page (${pendingN} not in the pack)`, summary.pages.filter((p) => p.kind === "view").length === summary.views.filter((v) => v.render).length && summary.views.filter((v) => !v.render).length === pendingN, summary.views.map((v) => `${v.label.split(" · ")[0]}${v.anchor ? " (anchor)" : v.locked ? " (locked)" : ""}`).join(", "));
   check("the drawings: the plan + one elevation per wall, in the room series (R-)", summary.sheets.length === 5 && summary.sheets.every((s) => s.startsWith("R-")), summary.sheets.join(" · "));
   check("no missing image", summary.missing_images.length === 0, summary.missing_images.join(", "));
 
