@@ -49,6 +49,19 @@ export function maskedChangePrompt(item: CheckItem, request: string): string {
 }
 
 /**
+ * What the whole-image edit model is told on the paste arm: today's edit
+ * request, held to the one item — only the part of its output inside the item's
+ * box is kept, so the rest of the room is there for it to see, not to change.
+ */
+export function pasteChangePrompt(item: CheckItem, request: string): string {
+  return [
+    `Edit this photo of a renovated bathroom: ${request.trim()}.`,
+    `Change ONLY that, on the ${item.short}: every other part of the ${item.short} keeps exactly its colour, material, size and design.`,
+    "Keep everything else exactly as it is: the same camera, framing and crop, the same room, door, window and every fixture in the same place and size. Do not add any window, door or opening. Photorealistic.",
+  ].join(" ");
+}
+
+/**
  * Is a masked edit kept, or does today's edit run instead? The same honesty as
  * any change: an image that came back the same is no change; a layout the check
  * refuses is not kept; a request the reading says was not done is not kept

@@ -60,7 +60,7 @@ for (const request of REQUESTS) {
   check("the request named one item, so a masked edit was tried first", !!masked && masked.item === "vanity", masked ? masked.item : "no masked try recorded");
   if (body.kind === "version") {
     check("a kept version says which path made it", change?.path === "masked" || change?.path === "edit", change?.path);
-    check("a masked version was made by the inpainting model", change?.path !== "masked" || row.model === "black-forest-labs/flux-fill-pro", row?.model);
+    check("a masked version was made by a masked-arm model (paste: nano-banana; fill: flux-fill-pro)", change?.path !== "masked" || ["google/nano-banana", "black-forest-labs/flux-fill-pro"].includes(row.model), row?.model);
     check("a fallback version records why the masked try was not kept", change?.path !== "edit" || (masked && !masked.kept && !!masked.why), masked?.why ?? "");
   }
 }

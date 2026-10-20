@@ -65,12 +65,48 @@ export async function compositeInside(original: Uint8Array, edited: Uint8Array, 
   return sharp(out, { raw: { width: W, height: H, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
 }
 
+/**
+ * The edit model a masked change uses. "paste" (google/nano-banana) edits the
+ * WHOLE image, so it sees the room and knows what the item is, and only the part
+ * inside the mask is kept. "fill" (flux-fill-pro) inpaints only the mask and
+ * redraws the whole item from the prompt — live, it turned the oak vanity black
+ * when asked for a white top. The two arms are measured against each other in
+ * docs/BATHROOM_PILOT_B10.md.
+ */
+export type MaskedArm = "paste" | "fill";
+export const PASTE_MODEL = "google/nano-banana";
+export const MASKED_ARM_MODEL: Record<MaskedArm, string> = { paste: PASTE_MODEL, fill: MASK_MODEL };
+
+/**
+ * Which arm the masked change uses: MASKED_CHANGE_MODEL = "paste" (the default,
+ * measured 20 Oct: the parts of the item the request did not name kept in 5 of
+ * 10 against 0 of 10) | "fill" (flux-fill-pro, the B10 first wiring, kept as an
+ * option).
+ */
+export function maskedArm(env: Record<string, string | undefined> = process.env): MaskedArm {
+  return env.MASKED_CHANGE_MODEL === "fill" ? "fill" : "paste";
+}
+
+const uri = (b: Uint8Array | Buffer, t: string) => `data:${t};base64,${Buffer.from(b).toString("base64")}`;
+const typeOf = (b: Uint8Array) => (b[0] === 0x89 ? "image/png" : "image/jpeg");
+
 /** One masked edit: inpaint inside the mask, then paste the original back outside it. */
 export async function maskedEdit(image: Uint8Array, mask: Buffer, prompt: string): Promise<{ bytes: Buffer; model: string }> {
-  const uri = (b: Uint8Array | Buffer, t: string) => `data:${t};base64,${Buffer.from(b).toString("base64")}`;
-  const url = await runRenderModel(MASK_MODEL, { image: uri(image, image[0] === 0x89 ? "image/png" : "image/jpeg"), mask: uri(mask, "image/png"), prompt, output_format: "jpg", safety_tolerance: 2 });
+  const url = await runRenderModel(MASK_MODEL, { image: uri(image, typeOf(image)), mask: uri(mask, "image/png"), prompt, output_format: "jpg", safety_tolerance: 2 });
   const raw = await fetchSceneBytes(url);
   return { bytes: await compositeInside(image, raw, mask, 3), model: MASK_MODEL };
+}
+
+/** Edit the whole image, then keep only the part inside the mask: the original everywhere else. */
+export async function editThenPaste(image: Uint8Array, mask: Buffer, prompt: string): Promise<{ bytes: Buffer; model: string }> {
+  const url = await runRenderModel(PASTE_MODEL, { prompt, image_input: [uri(image, typeOf(image))], aspect_ratio: "match_input_image", output_format: "jpg" });
+  const raw = await fetchSceneBytes(url);
+  return { bytes: await compositeInside(image, raw, mask, 3), model: PASTE_MODEL };
+}
+
+/** The masked change on either arm. */
+export function maskedChange(arm: MaskedArm, image: Uint8Array, mask: Buffer, prompt: string): Promise<{ bytes: Buffer; model: string }> {
+  return arm === "paste" ? editThenPaste(image, mask, prompt) : maskedEdit(image, mask, prompt);
 }
 
 /**

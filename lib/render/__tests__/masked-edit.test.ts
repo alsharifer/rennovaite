@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
-import { compositeInside, maskPng, padBox, raiseBox, raiseToTop } from "../masked-edit";
+import { compositeInside, MASK_MODEL, MASKED_ARM_MODEL, maskedArm, maskPng, padBox, PASTE_MODEL, raiseBox, raiseToTop } from "../masked-edit";
 import { capAllows, SpendCap, SpendCapReached } from "../spend-cap";
 
 // B10 — masked per-fixture edits, and the session's hard spend cap.
@@ -34,6 +34,17 @@ describe("B10 — a masked edit changes nothing outside its mask, by constructio
     // wall at 100 % of the frame; a 1.2 m cabinet on a 2.8 m ceiling (0.43) tops out at 85 − 43 = 42.
     expect(raiseToTop([80, 70, 100, 85], 0.15, 0.43)).toEqual([80, 42, 100, 85]);
     expect(raiseToTop([80, 70, 100, 85], null, 0.43)).toEqual([80, 70, 100, 85]);
+  });
+});
+
+describe("B10 — the masked change's model (measured 20 Oct)", () => {
+  it("pastes nano-banana's whole-image edit back inside the box by default; flux-fill stays an option", () => {
+    expect(maskedArm({})).toBe("paste");
+    expect(maskedArm({ MASKED_CHANGE_MODEL: "paste" })).toBe("paste");
+    expect(maskedArm({ MASKED_CHANGE_MODEL: "fill" })).toBe("fill");
+    expect(maskedArm({ MASKED_CHANGE_MODEL: "something-else" })).toBe("paste");
+    expect(MASKED_ARM_MODEL).toEqual({ paste: PASTE_MODEL, fill: MASK_MODEL });
+    expect(PASTE_MODEL).toBe("google/nano-banana");
   });
 });
 

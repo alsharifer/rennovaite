@@ -24,8 +24,11 @@
 //
 // The masked path (ruled 20 Oct, B10): a request that names exactly ONE item is
 // first edited INSIDE that item's outline (masked-change.ts → masked-edit.ts:
-// flux-fill-pro, the parent pasted back outside the mask, so nothing else can
-// move). It is held to the same checks — unchanged, layout, "was it done". When
+// the parent pasted back outside the mask, so nothing else can move). The model
+// is maskedArm(): "paste" (default) — nano-banana edits the whole image, seeing
+// the room, and only its pixels inside the box are kept; "fill" — flux-fill-pro
+// inpaints the box, and redrew the parts of the item the request did not name
+// (the oak vanity turned black; docs/BATHROOM_PILOT_B10.md has the measurement). It is held to the same checks — unchanged, layout, "was it done". When
 // it falls short, today's edit runs as the fallback and the version records the
 // masked try and why it was not kept (`change.path`, `change.masked`).
 // =============================================================================
@@ -45,8 +48,8 @@ import { designKey } from "@/lib/documents/render-consistency";
 import { moveAnchor } from "./photo-view-anchor";
 import { PhotoViewError, type PhotoViewChange, type PhotoViewGate } from "./photo-view-run";
 import { IMAGE_PRICE_USD, recordSpend, type SpendRow } from "./render-spend";
-import { MASK_MODEL, maskedEdit, maskPng } from "./masked-edit";
-import { maskedChangePrompt, maskedChangeTarget, maskedVerdict } from "./masked-change";
+import { MASKED_ARM_MODEL, maskedArm, maskedChange, maskPng } from "./masked-edit";
+import { maskedChangePrompt, maskedChangeTarget, maskedVerdict, pasteChangePrompt } from "./masked-change";
 import { changeLine, describeChange, type RoomAnchor } from "./room-spec";
 import { compareImages, isUnchangedEdit, UNCHANGED_MESSAGE } from "./similarity";
 
@@ -163,12 +166,14 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   const target = maskedChangeTarget(request, items, carried);
   const parentSize = imageSize(parentBytes);
   if (target && parentSize) {
-    const maskedPrompt = maskedChangePrompt(target.item, request);
+    const marm = maskedArm();
+    const mModel = MASKED_ARM_MODEL[marm];
+    const maskedPrompt = marm === "paste" ? pasteChangePrompt(target.item, request) : maskedChangePrompt(target.item, request);
     const tried = { item: target.item.short, box: target.box };
     try {
-      const m = await maskedEdit(parentBytes, await maskPng(parentSize, [target.box]), maskedPrompt);
-      cost += IMAGE_PRICE_USD[MASK_MODEL] ?? 0;
-      spend.push({ project_id: input.projectId, purpose: "photo_view", model: MASK_MODEL, size: `${parentSize.width}x${parentSize.height}`, cost_usd: IMAGE_PRICE_USD[MASK_MODEL] ?? null, detail: { step: "change_masked", request, item: target.item.short } });
+      const m = await maskedChange(marm, parentBytes, await maskPng(parentSize, [target.box]), maskedPrompt);
+      cost += IMAGE_PRICE_USD[mModel] ?? 0;
+      spend.push({ project_id: input.projectId, purpose: "photo_view", model: mModel, size: `${parentSize.width}x${parentSize.height}`, cost_usd: IMAGE_PRICE_USD[mModel] ?? null, detail: { step: "change_masked", request, item: target.item.short, arm: marm } });
       const mNext = new Uint8Array(m.bytes);
       const mRead = await detectAgreed({ mediaType: mime(mNext), data: b64(mNext) }, items, "after", parentSize, { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: carried });
       const mReadUsd = checkCostUsd(mRead.usage);
@@ -184,7 +189,7 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
         cost += mWhatUsd;
         spend.push({ project_id: input.projectId, purpose: "photo_check", model: mRead.model, cost_usd: mWhatUsd, detail: { step: "change_masked_describe", usage: mWhat.usage } });
         const done = maskedVerdict({ unchanged: false, layout: mVerdict, requestDone: mWhat.request_done, summary: mWhat.summary });
-        if (done.keep) return keep({ next: mNext, read: mRead, sim: mSim, what: mWhat, line: mVerdict.line, used: { model: MASK_MODEL, prompt: maskedPrompt }, path: "masked", masked: { ...tried, kept: true } });
+        if (done.keep) return keep({ next: mNext, read: mRead, sim: mSim, what: mWhat, line: mVerdict.line, used: { model: mModel, prompt: maskedPrompt }, path: "masked", masked: { ...tried, kept: true } });
         masked = { ...tried, kept: false, why: done.why };
       }
     } catch (e) {

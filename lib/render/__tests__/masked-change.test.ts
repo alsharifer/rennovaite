@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { checkItemsFor, type Located } from "../photo-check";
-import { MASK_PAD, maskedChangePrompt, maskedChangeTarget, maskedVerdict } from "../masked-change";
+import { MASK_PAD, maskedChangePrompt, maskedChangeTarget, maskedVerdict, pasteChangePrompt } from "../masked-change";
 
 // Ruled 20 Oct (after B10): "Ask for a change" takes the masked path for a
 // request that names ONE item — that item's box is the mask — and today's edit
@@ -57,6 +57,13 @@ describe("masked changes — which requests take the masked path", () => {
     expect(p).toContain("\"a 'white' ceramic top\"");
     expect(p).toMatch(/no window, door or opening/);
     expect(p).toContain("every other part of the vanity keeps exactly its colour, material, size and design");
+  });
+
+  it("the paste prompt is today's edit request, held to the one item", () => {
+    const p = pasteChangePrompt(ITEMS.find((i) => i.kind === "vanity")!, "  a white ceramic top with an integrated basin ");
+    expect(p).toMatch(/^Edit this photo of a renovated bathroom: a white ceramic top with an integrated basin\./);
+    expect(p).toContain("Change ONLY that, on the vanity: every other part of the vanity keeps exactly its colour, material, size and design.");
+    expect(p).toMatch(/Do not add any window, door or opening/);
   });
 });
 
