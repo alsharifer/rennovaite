@@ -753,7 +753,7 @@
     "vat_aed": 16211.81,
     "grand_total_aed": 340447.93,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "value",
       "flooring": "engineered_wood",
       "style_key": "scandi-arabic"
@@ -1487,7 +1487,7 @@
     "vat_aed": 20740.86,
     "grand_total_aed": 435558.12,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "mid",
       "flooring": "porcelain",
       "style_key": "contemporary-majlis"
@@ -2221,7 +2221,7 @@
     "vat_aed": 29575.27,
     "grand_total_aed": 621080.65,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "premium",
       "flooring": "porcelain",
       "style_key": "luxe-minimal"
@@ -2955,7 +2955,7 @@
     "vat_aed": 20740.86,
     "grand_total_aed": 435558.12,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "mid",
       "flooring": "porcelain",
       "style_key": null

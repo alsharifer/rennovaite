@@ -419,3 +419,46 @@ scope unless the owner widens it.
 
 Order: C1 then C2, as two commits. `tsc --noEmit` before any push. No prod
 write (regenerate, migration) without the owner's instruction.
+
+---
+
+## 4. C1 — done (20 Oct), branch `fix/sprint-c1`
+
+The C1 brief (20 Oct) superseded §3's C1 plan in three places: no fallback
+allowance when a plan has no openings (a PLAN CHECK row instead), the rule
+"nothing under `lib/ground-truth/` emits a BoQ line" enforced by test, and the
+diff cause "Removed reference-project glazing lines (defect, C1)".
+
+| Brief item | Where |
+| --- | --- |
+| 1. Ground truth never emits a line | `lib/boq/__tests__/ground-truth-rule.test.ts` (static allowlist of what the pricing path imports from `lib/ground-truth/`, + no order record in an assembled BoQ). The aluminium order → R-75 `alum.window` 3,324.10 / m², R-76 `alum.external_door` 2,623.47 / m², calibrated, source private (`lib/boq/rules.ts`). |
+| 2. Glazing from the plan's openings | `lib/boq/glazing.ts`, priced in `lib/boq/assemble.ts` (`pricedGlazing`). No openings → `glazing_not_priced` → Issues navigator PLAN CHECK "No windows or doors drawn — glazing not priced." |
+| 3. Provenance names no project | `lib/provenance/boq.ts` (`module_reference` detail rewritten, `cur()` on every tier detail); the timeline note, the LLM prompt and the Documents placeholder too. |
+| 4. Regression tests | `lib/boq/__tests__/c1-scope-leak.test.ts` (no line names a room absent from its plan — Jumeirah AND Mudon, on their prod revisions); `lib/identity/__tests__/surface-scan.test.ts` (inspector, popovers, BoQ page, Issues navigator, revision diff, proposal, BoQ PDF). |
+| 5. Scan over every rendered surface, in the suite | `lib/identity/surface-scan.ts` (identities + other projects' names + reference-project markers + reference-order room labels absent from the plan); the test above; `scripts/read-path-leak-scan.ts` §6 runs it over every project's latest revision on any database (dev today: the demo villa's pre-C1 revision fails, every other project is clean). |
+| 6. Regeneration with its cause | Engine 0.4.0: a diff across it names removed reference-order lines "Removed reference-project glazing lines (defect, C1)" and shows them as "Reference-project glazing line (removed)" — amount and cause, never Mudon's room text — and the new glazing lines "Glazing priced from this plan's windows and doors (C1)" (`lib/boq/revision-diff.ts`). **The prod regenerations are not done** — see below. |
+
+### What regenerating will do (measured on the prod revisions, read-only)
+
+| | Stored | After C1 (aluminium post-pass on the stored revision) |
+| --- | --- | --- |
+| **Jumeirah** rev 1 `aacc3876` | subtotal 444,858.36 · total 504,469.38 | −92,449.00 reference-order lines; + 8 windows on its own rooms, 13.53 m² × 3,324.10 = 44,975.07 (sizes derived); no external door (every door opens to a room) → subtotal 397,384.43 · total 450,633.94 |
+| **Mudon** `c0beeaaf` (5 Sep) | subtotal 637,815.00 · total 723,282.00 | −92,449.00; + 1 window (Dressing Room / Master Bedroom, 1.44 m², 4,786.70 — its other 4 openings "need a wall"); + 10,700.00 of S6-pre lines the 5 Sep revision predates (vanity slab, shower glass, mirrors) → subtotal 560,852.70 · total 636,006.97 |
+
+A real regenerate re-runs the whole engine, so Mudon's will also carry
+everything else that changed since 5 Sep (H3 measured +15,247 at that time; the
+B5 painting rule since). Those lines will have their own causes or "no cause
+recorded" in the diff; the C1 lines are named. On dev, the demo villa's
+regenerate moves by exactly −92,449.00 against a pre-C1 regenerate, and
+Arabella is unchanged to the fil (116,679.56).
+
+### Still to do on production (owner's go-ahead)
+
+1. Ask Abdallah whether anyone outside saw a Jumeirah BoQ or pack carrying those
+   lines. Prod has no `pack_exports` row for any project (C0), so no pack
+   left through the app; a BoQ page, screenshot or PDF may still have been
+   shown. If anyone saw it, an erratum goes out with the regeneration.
+2. Merge + deploy (prod runs master), then regenerate Jumeirah and Mudon as new
+   revisions (never overwriting). The diff names the cause by itself.
+3. Re-export Jumeirah's pack. **Mudon's export still fails** on sheet A-102
+   (the C0 snapshot defect, §2) until C2 lands.

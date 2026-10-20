@@ -22,6 +22,12 @@
 //      names) and the plan page's garden payload (loadGardenSiteData). A
 //      wall's measurement note once named the firm that measured it on a
 //      project that is not that firm's; this is the check that catches it.
+//   6. (C1) every project's latest revision on every rendered surface — the
+//      inspector / popover chains, the BoQ page's review model, the Issues
+//      navigator, the proposal and BoQ PDF pages — scanned for another
+//      project (its name, the reference projects) and for reference-order room
+//      labels its plan does not have (lib/identity/surface-scan.ts). A revision
+//      stored before C1 fails until it is regenerated; that is the point.
 // REPORTED (findings, not failures): raw text elsewhere that a surface curates
 // on the way out — stored BoQ jsonb and plan notes before curation, and
 // catalogue tables.
@@ -38,6 +44,12 @@ import { curatePlanRows } from "../lib/plan/curate-notes.ts";
 import { loadGardenSiteData } from "../lib/plan/garden-site-data.ts";
 import { loadReferenceRows } from "../lib/rates/reference.ts";
 import { loadRateBook } from "../lib/whatif/rate-book.ts";
+import { boqIssues } from "../lib/boq/issues.ts";
+import { buildReviewModel } from "../lib/boq/review-model.ts";
+import { buildBoqPdfPages } from "../lib/documents/boq-pdf-pages.ts";
+import { buildProposalPages } from "../lib/documents/proposal.ts";
+import { scanSurface } from "../lib/identity/surface-scan.ts";
+import { buildBoqProvenance, EMPTY_CONTEXT } from "../lib/provenance/boq.ts";
 
 const LITERAL = ["KAME", "Atrium", "QTN20261407", "Global Creation", "3936/R1", "Laspinas", "46703", "Villa 94", "Villa94", "V94", "RAK tiles quotation"];
 
@@ -114,6 +126,38 @@ async function main() {
     if (h.length) planServed.push(`plan-page garden payload of plan ${p.id.slice(0, 8)}: ${h.join(", ")}`);
   }
   line(planServed.length === 0, `plan text as served (editor rows + plan-page garden payload): ${plans.length} plans, ${planRows} rows`, planServed.join(" | "));
+
+  // 6. (C1) another project on any rendered surface of a project's latest revision.
+  const projects = ((await sb.from("projects").select("id, name, display_name").is("deleted_at", null)).data ?? []) as { id: string; name: string | null; display_name: string | null }[];
+  const surfaceHits: string[] = [];
+  let scanned = 0;
+  for (const pr of projects) {
+    const { data: latest } = await sb.from("boqs").select("id, sections").eq("project_id", pr.id).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; sections: Record<string, unknown> }>();
+    if (!latest?.sections) continue;
+    const { data: plan } = await sb.from("plans").select("id").eq("project_id", pr.id).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string }>();
+    const rooms = plan ? (((await sb.from("rooms").select("name_en, room_type, area_m2").eq("plan_id", plan.id)).data ?? []) as { name_en: string | null; room_type: string | null; area_m2: number | null }[]) : [];
+    const withheld = await loadWithheldNames(sb, pr.id);
+    const boq = curateBoq(latest.sections, withheld) as never;
+    const ctx = {
+      ownNames: [pr.name ?? "", pr.display_name ?? ""].filter(Boolean),
+      ownRooms: rooms.map((r) => r.name_en ?? "").filter(Boolean),
+      otherProjectNames: projects.filter((o) => o.id !== pr.id).flatMap((o) => [o.name ?? "", o.display_name ?? ""]),
+      withheldNames: withheld,
+    };
+    const provenance = buildBoqProvenance(boq, { ...EMPTY_CONTEXT, withheldNames: withheld });
+    const model = buildReviewModel({ projectId: pr.id, boqId: latest.id, rev: 0, revDate: "", persona: "owner", boq, provenance, tierCtx: { qsValidated: {} }, firm: null, basis: null, duplicates: [], budget: null });
+    const doc = { projectName: pr.display_name ?? pr.name ?? "Project", community: "Dubai", dateISO: new Date().toISOString().slice(0, 10), boq };
+    const found = [
+      ...scanSurface("inspector + popovers", provenance, ctx),
+      ...scanSurface("BoQ page", model, ctx),
+      ...scanSurface("Issues navigator", boqIssues(model, null), ctx),
+      ...scanSurface("proposal pages", buildProposalPages({ ...doc, brand: "Contractor", logoDataUri: null, termsText: null, rooms: rooms.map((r) => ({ name: r.name_en ?? "", kind: r.room_type ?? "", area_m2: r.area_m2 })) }), ctx),
+      ...scanSurface("BoQ PDF pages", buildBoqPdfPages(doc), ctx),
+    ];
+    scanned++;
+    if (found.length) surfaceHits.push(`${pr.id.slice(0, 8)} rev ${latest.id.slice(0, 8)}: ${[...new Set(found.map((f) => `${f.kind} "${f.text}" on ${f.surface}`))].join("; ")}`);
+  }
+  line(surfaceHits.length === 0, `another project on a rendered surface (latest revision of ${scanned} projects)`, surfaceHits.join(" | "));
 
   console.log("\nfindings (curated on the way out; reported, not failed)");
   console.log(`  stored BoQ jsonb carrying a withheld name BEFORE curation: ${rawHits} of ${boqs.length}`);

@@ -211,11 +211,38 @@ function causesFor(line: RevisionLine, recorded: readonly RecordedCause[]): Caus
 export const H7_ENGINE_VERSION = "0.3.0";
 
 const semver = (v: string | null): number[] => (v ?? "0").split(".").map((x) => Number.parseInt(x, 10) || 0);
-const before3 = (v: string | null) => {
+/** Is version `v` (null = unrecorded = oldest) before `target`? */
+const versionBefore = (v: string | null, target: string) => {
   const [a = 0, b = 0, c = 0] = semver(v);
-  const [x = 0, y = 0, z = 0] = semver(H7_ENGINE_VERSION);
+  const [x = 0, y = 0, z = 0] = semver(target);
   return a !== x ? a < x : b !== y ? b < y : c < z;
 };
+const before3 = (v: string | null) => versionBefore(v, H7_ENGINE_VERSION);
+
+/** C1: the first engine version that prices glazing from the plan, not from the reference villa's order. */
+export const C1_ENGINE_VERSION = "0.4.0";
+export const C1_REMOVED_CAUSE = "Removed reference-project glazing lines (defect, C1)";
+export const C1_ADDED_CAUSE = "Glazing priced from this plan's windows and doors (C1)";
+/** How a removed reference-order line reads in the diff: its amount and cause stay, its room and item text do not. */
+export const C1_REMOVED_LABEL = "Reference-project glazing line (removed)";
+const C1_GLAZING_KEYS = new Set(["alum.window", "alum.external_door"]);
+/** The S6-pre lines that share the section and are NOT the reference order (shower glass, mirrors). */
+const NOT_THE_ORDER = /^(Frameless shower glass|Bathroom mirror)/i;
+
+/**
+ * C1: a line's movement is the glazing fix — and named so — only when the
+ * RECORDS say so: the two revisions' stored engine versions straddle 0.4.0,
+ * and the line is either an Aluminum & Glass line of the reference order that
+ * the later revision no longer has, or a glazing line (alum.window /
+ * alum.external_door) the earlier one did not have. Anything else keeps
+ * whatever cause a record gives it, or none.
+ */
+export function c1GlazingCause(beforeVersion: string | null, afterVersion: string | null, o: RevisionLine | null, n: RevisionLine | null): string | null {
+  if (!(versionBefore(beforeVersion, C1_ENGINE_VERSION) && !versionBefore(afterVersion, C1_ENGINE_VERSION))) return null;
+  if (o && !n && /^alumin/i.test(o.section) && !NOT_THE_ORDER.test(o.description) && !C1_GLAZING_KEYS.has(o.item_key ?? "")) return C1_REMOVED_CAUSE;
+  if (!o && n && C1_GLAZING_KEYS.has(n.item_key ?? "")) return C1_ADDED_CAUSE;
+  return null;
+}
 
 /** K10: was this revision priced before the H7 rounding? (No engine version recorded = yes.) */
 export const predatesRounding = (version: string | null | undefined): boolean => !version || before3(version);
@@ -251,20 +278,26 @@ export function diffRevisions(before: RevisionSnapshot, after: RevisionSnapshot,
   const lines: DiffLine[] = [];
   let unchanged = 0;
 
+  let c1Removed = 0;
   const emit = (o: RevisionLine | null, n: RevisionLine | null) => {
     const ref = (n ?? o)!;
     const oq = o?.quantity ?? 0;
     const nq = n?.quantity ?? 0;
     const cls: DiffClass = !o ? "added" : !n ? "removed" : o.quantity !== n.quantity && o.rate_aed !== n.rate_aed ? "both" : o.quantity !== n.quantity ? "quantity" : o.rate_aed !== n.rate_aed ? "rate" : "total";
     const rounding = !!o && !!n && isH7Rounding(before.engine_version, after.engine_version, o, n);
+    const c1 = c1GlazingCause(before.engine_version, after.engine_version, o, n);
+    // C1: a removed reference-order line is shown with its amount and its cause,
+    // never with the reference project's room or item text (nor in its key).
+    const masked = c1 === C1_REMOVED_CAUSE;
+    const shown = masked ? { ...o!, key: `${o!.section}|c1-removed-${++c1Removed}`, description: C1_REMOVED_LABEL, item_key: null } : null;
     lines.push({
-      key: ref.key,
+      key: masked ? shown!.key : ref.key,
       section: ref.section,
-      description: ref.description,
+      description: masked ? C1_REMOVED_LABEL : ref.description,
       unit: ref.unit,
-      item_key: ref.item_key ?? o?.item_key ?? null,
+      item_key: masked ? null : ref.item_key ?? o?.item_key ?? null,
       class: cls,
-      old: o,
+      old: masked ? shown : o,
       new: n,
       delta_qty: r2(nq - oq),
       delta_pct: o && o.quantity ? r2(((nq - oq) / o.quantity) * 100) : null,
@@ -275,6 +308,7 @@ export function diffRevisions(before: RevisionSnapshot, after: RevisionSnapshot,
         ...(rounding
           ? [{ kind: "engine_rounding" as const, at: after.created_at, summary: `H7 rounding — rate to 2 dp, total = quantity × rate to the fils (engine ${before.engine_version ?? "pre-0.3"} → ${after.engine_version})` }]
           : []),
+        ...(c1 ? [{ kind: "engine_change" as const, at: after.created_at, summary: c1 }] : []),
       ],
     });
   };

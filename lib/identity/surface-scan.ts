@@ -75,12 +75,16 @@ export function surfaceText(payload: unknown): string {
     .replace(/–|—/g, "-");
 }
 
-/** Is `label` a room on this plan? Equal names, or one contains the other ("Master Bath" ⊂ "Master Bathroom"). */
+/**
+ * Is `label` a room on this plan? Equal names, or one contains the other as
+ * whole words ("Office" ⊂ "Office (build-out)") — never a fragment: this plan's
+ * "Bath" does not make "Master bathroom" one of its rooms.
+ */
 function onPlan(label: string, ownRooms: readonly string[]): boolean {
   const l = norm(label);
   return ownRooms.some((r) => {
     const o = norm(r);
-    return o.length > 0 && (o === l || o.includes(l) || l.includes(o));
+    return o.length > 0 && (o === l || phraseRe(l).test(o) || phraseRe(o).test(l));
   });
 }
 

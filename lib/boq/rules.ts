@@ -18,7 +18,12 @@ import { CANONICAL_SECTION_ORDER } from "./section-order";
 // v0.3.0 (H7) — 2-dp rates at resolution, line totals round(qty × rate, 2),
 // contingency and VAT to the fils, the canonical section order. A revision
 // diff across 0.2.0 → 0.3.0 names that as the cause of the fils it moves.
-export const ENGINE_VERSION = "0.3.0";
+//
+// v0.4.0 (C1) — the reference villa's aluminium order no longer prints as
+// lines; glazing is priced from the plan's own windows and external doors. A
+// revision diff across 0.4.0 names the removed lines "Removed reference-project
+// glazing lines (defect, C1)" and the new ones by their plan.
+export const ENGINE_VERSION = "0.4.0";
 
 // --- C: dimensional constants (rule IDs C-xx) --------------------------------
 

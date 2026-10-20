@@ -1243,6 +1243,26 @@ quotations". No migration.
   per unit transacted on a comparable Dubai villa … its source stays private",
   and every tier detail passes `cur()`. The cove-LED line names only the room
   kinds the plan has; the timeline note and the LLM prompt say "reference villa".
+- **Scan over every rendered surface** (`lib/identity/surface-scan.ts`, pure):
+  withheld identities + every other project's name + the reference-project
+  markers (Mudon, Al Naseem, Villa 94, Arabella — allowed on that project's own
+  surfaces) + the reference orders' room labels (`REFERENCE_ROOM_LABELS`,
+  derived from the transcriptions) absent from THIS plan (whole-word match —
+  "Bath" does not make "Master bathroom" a room). In the suite:
+  `lib/identity/__tests__/surface-scan.test.ts` builds the inspector / popover
+  chains, the review model, the Issues navigator, the revision diff, the
+  proposal and BoQ PDF pages from the Jumeirah and Mudon prod fixtures. On any
+  database: `scripts/read-path-leak-scan.ts` §6 (every project's latest
+  revision; a pre-C1 revision fails until regenerated).
+- **Engine 0.4.0 + the diff cause**: across 0.4.0 (stored engine versions, like
+  H7), a removed Aluminum & Glass line of the reference order (not the S6 shower
+  glass / mirror) has cause `engine_change` "Removed reference-project glazing
+  lines (defect, C1)" and reads "Reference-project glazing line (removed)" — its
+  amount and cause, never the room text (key and item_key masked too); an added
+  `alum.window` / `alum.external_door` line reads "Glazing priced from this
+  plan's windows and doors (C1)" (`lib/boq/revision-diff.ts c1GlazingCause`).
+  Stored revisions are never rewritten — a prod regenerate makes the next one
+  (owner's go-ahead; docs/SPRINT_C_ROOT_CAUSE.md §4).
 - **Measured**: Jumeirah rev 1 re-run → −92,449.00 of quotation lines, + its 8
   windows (13.53 m² × 3,324.10 = 44,975.07, all derived sizes; no external door —
   every door opens to a room): subtotal 444,858.36 → 397,384.43. Mudon's 5 Sep
