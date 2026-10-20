@@ -21,7 +21,7 @@ import { derivePlanGraph } from "@/lib/plan/derive";
 import { loadStudioState, type PhotoViewVersion } from "@/lib/render/photo-view-anchor";
 import { loadMiniPlans, loadPhotoViews } from "@/lib/render/photo-views-load";
 import { followsLine, followsStateOf, specElements, specFieldsChanged } from "@/lib/render/room-spec-vocab";
-import { roomProgramme } from "@/lib/timeline/room-programme";
+import { programmeOf } from "@/lib/timeline/programme";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { documentFontOptions } from "./doc-fonts";
@@ -156,8 +156,8 @@ export async function generateRoomPack(projectId: string, opts: { brand?: string
   const dateISO = new Date().toISOString().slice(0, 10);
   const sheets = roomSheets({ graph, roomId: room.id, fixtures, tile: wallTileFrom(anchor?.spec.wall_tile ?? null), mirror: anchor?.spec.mirror ?? null, meta: { projectNameEn: project.name, community: project.city ?? "", level: graph.meta.level, scale: "1:20", dateISO, rev, projectId } });
 
-  // B7 1c: the room's own programme from its quantities — never the villa model's floor; none = no page.
-  const programme = roomProgramme(boq.sections);
+  // B7 1c / C4: THE programme (programmeOf) — the room's own quantities; none = no page.
+  const programme = programmeOf(boq as never);
   const tiled = typeof room.tiled_height_m === "number" && room.tiled_height_m < room.ceiling_h_m ? `to ${Math.round(room.tiled_height_m * 1000)} mm` : "to full height";
 
   const input: RoomPackInput = {

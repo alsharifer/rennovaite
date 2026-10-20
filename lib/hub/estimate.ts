@@ -11,6 +11,7 @@
 // =============================================================================
 
 import { sumMoney } from "@/lib/boq/money";
+import { programmeOf } from "@/lib/timeline/programme";
 import { assignRefs } from "@/lib/boq/refs";
 import type { RevisionBoq } from "@/lib/boq/revision-diff";
 import { sortSections } from "@/lib/boq/section-order";
@@ -82,6 +83,7 @@ export function estimateOf(sections: RevisionBoq, ctx: { withheldNames: string[]
     vatPct: boq.vat_pct,
     chain: { subtotal: boq.subtotal_aed, ohp: boq.ohp_aed ?? 0, contingency: boq.contingency_aed, vat: boq.vat_aed },
     basis,
-    programmeDays: boq.programme?.total_days ?? null,
+    // C4: THE programme's number (programmeOf), never a stored figure.
+    programmeDays: programmeOf(boq as never)?.total_days ?? null,
   };
 }

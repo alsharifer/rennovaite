@@ -228,7 +228,7 @@ describe("T3b — rulings applied and the own-firm rule", () => {
 
   it("no BoQ-emitting module still prints a ruled name", () => {
     const ROOT = path.resolve(__dirname, "../../..");
-    const files = ["lib/boq/rules.ts", "lib/boq/takeoff.ts", "lib/boq/joinery-aluminum.ts", "lib/accessories/seed-data.ts", "lib/whatif/grades.ts", "lib/timeline/estimate.ts"];
+    const files = ["lib/boq/rules.ts", "lib/boq/takeoff.ts", "lib/boq/joinery-aluminum.ts", "lib/accessories/seed-data.ts", "lib/whatif/grades.ts"];
     for (const f of files) {
       // Strings only: comments may cite the reference for engineers.
       const code = fs.readFileSync(path.join(ROOT, f), "utf8").replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");

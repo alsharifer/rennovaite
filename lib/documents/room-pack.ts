@@ -13,7 +13,7 @@
 //   BoQ            by section, every line; to-be-priced lines named
 //   price          the chain to the fil and the options, outside the total
 //   programme      the room's own programme from its quantities
-//                  (lib/timeline/room-programme.ts) — dropped when it cannot
+//                  (lib/timeline/programme.ts, C4: THE programme) — dropped when it cannot
 //
 // Photographs are image SLOTS the PDF step fills (`src` = the image URL); the
 // page chrome is SVG. No rate, source, tier, supplier or contractor reaches a
@@ -100,7 +100,7 @@ export interface RoomPackInput {
     grand_total_aed: number;
     options?: { key: string; label: string; note: string; net_aed: number; delta_total_aed?: number }[];
   };
-  /** B7: the room-scoped programme (lib/timeline/room-programme.ts) — null drops the page. */
+  /** B7 / C4: THE programme (lib/timeline/programme.ts programmeOf) — null drops the page. */
   programme: { total_days: number; low_days: number; high_days: number; phases: { label: string; start_day: number; days: number; basis?: string }[]; basis: string } | null;
 }
 

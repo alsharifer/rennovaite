@@ -24,6 +24,7 @@
 // =============================================================================
 
 import { assignRefs } from "@/lib/boq/refs";
+import { docProgramme, programmeLabel } from "@/lib/timeline/programme";
 import { sortSections } from "@/lib/boq/section-order";
 import { esc } from "@/lib/drawings/sheet";
 import { formatAed } from "@/lib/format/aed";
@@ -128,7 +129,8 @@ export function buildProposalPages(input: ProposalInput): string[] {
   // line in it is still to be priced — those lines are named under Exclusions & to be priced and
   // in the total's sentence, so nothing is lost; the price summary still adds up to the subtotal.
   const sections = clientSections(boq.sections);
-  const prog = boq.programme && boq.programme.phases.length ? boq.programme : null;
+  // C4: THE programme (docProgramme) — the number every surface prints.
+  const prog = docProgramme(boq as never);
   const hasTerms = !!(input.termsText && input.termsText.trim()) || !!input.validity || !!input.paymentTerms;
 
   // The numbered sections, as the cover lists them — only those this proposal has.
@@ -405,7 +407,7 @@ export function buildProposalPages(input: ProposalInput): string[] {
   if (prog) {
     ({ svg, y } = header());
     sectionHead("programme", "Programme");
-    para(`${prog.total_days} days, indicative — the phases are sized by the value of their work; dates are agreed at contract.`);
+    para(`${programmeLabel(prog)}, indicative — derived from this bill's quantities at stated productivities; lead times excluded; dates are agreed at contract.`);
     y += 3;
     const barX = 82;
     const barW = R - barX;

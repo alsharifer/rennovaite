@@ -12,6 +12,7 @@
 
 import { boqDerivedInfo, derivedLineNote, isUnpricedLine } from "@/lib/documents/boq-derived";
 import { optionBasis, productGroupsOf, type ProductGroup, type ProductOption } from "./product-swaps";
+import { docProgramme } from "@/lib/timeline/programme";
 import { RATE_BASIS_ORDER } from "./rate-basis";
 import type { ProposalGateVerdict, ReferenceBasis, ReferenceBasisAcceptance } from "@/lib/documents/reference-basis-types";
 import { REFERENCE_BASIS_BANNER } from "@/lib/documents/reference-basis-types";
@@ -248,7 +249,8 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
       basis: basisText(u.basis_kind, u.note),
       by: u.by,
     })),
-    programme: b.programme ?? null,
+    // C4: THE programme — derived from the lines (programmeOf), never a stored figure.
+    programme: docProgramme(b as never),
     options: (b.options ?? []).map((o) => ({ key: o.key, label: o.label, note: o.note, net: o.net_aed, delta: o.delta_total_aed ?? null, adds: o.adds.map((a) => ({ description: splitAside(a.description).title, quantity: a.quantity, unit: a.unit, rate: a.rate_aed, amount: a.total_aed, basis: a.rate_basis ?? null })), replaces: o.replaces.map((r) => ({ description: splitAside(r.description).title, amount: r.total_aed })) })),
     rateBasis: (() => {
       const all = sections.flatMap((s) => s.lines);

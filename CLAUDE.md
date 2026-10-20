@@ -429,7 +429,7 @@ items and rulings needed: `docs/K_BACKLOG.md` → "Found in K8".
   byte-exact). EVERY `new Resvg(` passes `font: documentFontOptions()` (a test
   greps for it); `next.config.ts` `outputFileTracingIncludes` ships the folder
   into the five document routes' functions.
-- **Garden timeline** (`lib/timeline/garden.ts`): a project whose every room
+- **Garden timeline** — SUPERSEDED by C4 (one quantity-derived programme). Was (`lib/timeline/garden.ts`): a project whose every room
   is an outdoor zone (balcony / terrace are interior) never runs the interior
   phase model — 05 Timeline and the Overview show the BoQ's stored
   `programme` (re-derived for an older revision), "≈ N days" with the derived
@@ -1357,6 +1357,35 @@ WC → wall-hung adds a frame, a concealed cistern and a duct wall). No migratio
   flags the supply point and blocks the export — never silently kept; within a
   class rate-only; WC recomputed; basin flagged; reviewed clears; the navigator).
   The pilot bathroom and Arabella regenerate identically to master.
+
+### Sprint C4 — one quantity-derived programme on every surface (21 Oct)
+
+`lib/timeline/programme.ts` (pure) is the ONLY schedule engine: `programmeOf(boq)`
+— the bathroom pilot's method (B7 1c) generalised — derives each phase from the
+BoQ's own quantities at the stated `PRODUCTIVITY` (strip-out m², points,
+ceilings, screed, membrane, tiling, wall paint alongside, fit-out items;
+garden: paving / structures / runs / units, then grass / planting / irrigation /
+points, on its own crew alongside the interior). One site team. Working days,
+**lead times excluded**, labelled indicative; `low_days` / `high_days` = ×0.8 /
+×1.3; `programmeLabel` = "≈ N working days (low–high)". Null only when the
+BoQ has nothing to programme.
+
+- **Every surface reads it**: the Overview (`overview-view.ts`), 05 Timeline
+  (`loadTimeline` → `TimelineView`), the BoQ page (`review-model` →
+  `docProgramme`), the BoQ PDF, the proposal (+ its setup view), the hub
+  (`estimateOf.programmeDays`), the room pack and the pack checks. No surface
+  reads a stored `boq.programme`; nothing stores one any more.
+- **Retired**: the villa phase model ("8–14 weeks" — `estimate.ts`,
+  `anchors.ts`, `drivers.ts`), the value-scaled garden programme (90 days ×
+  BoQ value, clamped at 1.5× — the 135-day output: `lib/boq/programme.ts`,
+  `lib/timeline/garden.ts`) and `room-programme.ts` (now `programmeOf`).
+- **Reconciled, not tuned** (`lib/timeline/__tests__/programme.test.ts`): the
+  pilot bathroom 14 days (unchanged); the reference villa (Mudon 5 Sep) 88
+  working days beside its recorded 82-day contract span — its strip-out (14)
+  and ceilings (12) reproduced exactly; Arabella 28 working days (the reference
+  garden's 90 days included fabrication and deliveries); Jumeirah rev 1 70
+  (was 8–14 weeks on the Overview and 135 days on the BoQ). One number per
+  project on every surface — tested, a stale stored programme included.
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 
