@@ -48,7 +48,7 @@ export interface JourneyFacts {
    * priced (isUnpricedLine, lib/documents/boq-derived.ts — the D4 rule).
    */
   /** K10: renderViews = renderable rooms / zones and how many of them have a locked design (lib/render-lock-progress.ts). */
-  owner: { brief: boolean; moodboardItems: number; renders: number; renderViews: { locked: number; total: number }; unpricedLines: number };
+  owner: { brief: boolean; moodboardItems: number; renders: number; renderViews: { locked: number; total: number }; unpricedLines: number; /** C2: the last export passed on the latest revision (exportedOn — by BoQ id). */ exported?: boolean };
   /** Firm-journey evidence — null for an owner project. */
   firm: {
     bookStatus: "draft" | "reviewed" | null;
@@ -60,7 +60,7 @@ export interface JourneyFacts {
     upstream: UpstreamChanges;
     /** approvalStatus(latest revision). */
     approval: { firm: boolean; client: boolean } | null;
-    /** Pack-export jobs that PASSED after the latest revision (any / with the proposal). */
+    /** C2: the last export (any / with the proposal) PASSED on the latest revision — exportedOn, matched by BoQ id. */
     exported: { pack: boolean; proposal: boolean };
   } | null;
 }
@@ -181,7 +181,9 @@ export function ownerStepStatuses(f: JourneyFacts): Record<OwnerStepKey, StepSta
         ? { state: "blocked", reason: `Price ${items} first`, fix: { label: "Open cost", href: `/project/${id}/boq` } }
         : planFails
           ? blockedByPlan(planFails)
-          : { state: "available" },
+          : f.owner.exported
+            ? { state: "done" }
+            : { state: "available" },
   };
 }
 

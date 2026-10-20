@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { derivePlanGraph } from "./derive";
-import type { PlanGraph } from "./geometry";
+import { normaliseGraph, type PlanGraph } from "./geometry";
 
 type SnapshotKind = "as_built" | "proposed";
 
@@ -34,7 +34,8 @@ async function latestSnapshot(
       .limit(1)
       .maybeSingle<{ id: string; graph: PlanGraph }>();
     if (error || !data) return null;
-    return data;
+    // C2: a graph stored before a field existed is read with it filled.
+    return { ...data, graph: normaliseGraph(data.graph).graph };
   } catch {
     return null;
   }

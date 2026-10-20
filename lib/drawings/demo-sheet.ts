@@ -5,8 +5,15 @@
 //   - walls in as-built but NOT proposed  → demolition: dashed + cross-hatch,
 //     ink (K9: drawings are ink only — dashed with hatch ticks).
 //   - walls in proposed but NOT as-built  → new work: solid ink-900 + NEW tag.
-// Deterministic; no LLM. When proposed === as-built (no locked design yet) the
-// diff is empty and the legend says so.
+// Deterministic; no LLM. When proposed === as-built the diff is empty and the
+// legend says so.
+//
+// C2 (ruled 21 Oct): demolition is never INFERRED from a snapshot. The drawing
+// set passes the CURRENT plan as both graphs (proposed = the plan at export,
+// "Proposed as of rev N · date" in the title block), so this sheet reads "No
+// demolition recorded on the plan" until walls can be marked for removal
+// explicitly. The frozen design-lock snapshots predate the parse corrections:
+// diffing against them drew hundreds of m² of walls nobody is demolishing.
 // =============================================================================
 
 import type { PlanGraph, Wall } from "@/lib/plan/geometry";
@@ -89,7 +96,7 @@ function legend(demolishedCount: number, addedCount: number): string {
     <text x="${x}" y="${y}" font-size="3.2" fill="${INK_900}" style="font-family:${FONT_UI};font-weight:600;letter-spacing:0.04em">DEMOLITION PLAN</text>
     ${
       none
-        ? `<text x="${x}" y="${y + 6}" font-size="2.7" fill="${INK_900}" style="font-family:${FONT_UI}">No changes — proposed matches as-built.</text>`
+        ? `<text x="${x}" y="${y + 6}" font-size="2.7" fill="${INK_900}" style="font-family:${FONT_UI}" data-no-demolition="true">No demolition recorded on the plan.</text>`
         : `<line x1="${x}" y1="${y + 5}" x2="${x + 8}" y2="${y + 5}" stroke="${INK_900}" stroke-width="0.7" stroke-dasharray="1.6 1.2"/>` +
           `<text x="${x + 10}" y="${y + 6}" font-size="2.7" fill="${INK_900}" style="font-family:${FONT_UI}">Demolish (${demolishedCount})</text>` +
           `<line x1="${x}" y1="${y + 10}" x2="${x + 8}" y2="${y + 10}" stroke="${INK_900}" stroke-width="0.8"/>` +

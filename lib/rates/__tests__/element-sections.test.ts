@@ -186,7 +186,8 @@ describe("element-section resolution across viewer flag states (U7)", () => {
     expect(src).not.toMatch(/process\.env\.VIEWER_3D_ENABLED/);
     // The mapping is applied unconditionally on both engine and LLM paths.
     expect((src.match(/applyElementMapping\(/g) ?? []).length).toBe(2);
-    expect(src).toMatch(/takeoffItems = quantifyPlan\(graph, \{ proposed \}\);/);
+    // C2: no demolition basis from a snapshot — the take-off reads the current plan only.
+    expect(src).toMatch(/takeoffItems = quantifyPlan\(graph\);/);
   });
 
   it("the resolver modules read no environment at all", () => {

@@ -32,11 +32,11 @@ describe("drawing sheets render deterministic, valid SVG", () => {
     expect(/>\d{3,5}</.test(svg)).toBe(true);
   });
 
-  it("demo sheet renders and reports no changes when proposed === as-built", () => {
+  it("demo sheet renders and reports no demolition when proposed === as-built", () => {
     const svg = renderDemoSheet(graph, graph, META, { sheetNumber: "A-102", title: "Proposed / Demolition Plan" });
     expect(svg.startsWith("<svg")).toBe(true);
     expect(svg).toContain("DEMOLITION PLAN");
-    expect(svg).toContain("proposed matches as-built");
+    expect(svg).toContain("No demolition recorded on the plan.");
   });
 
   it("finish schedule renders one group per room", () => {

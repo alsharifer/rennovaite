@@ -622,7 +622,8 @@ Spec §7.4, Figma 81:716 / dark 82:2244; migration **058** `rooms.in_scope`
   progress) and the Overview / hub ("11 of 13 rooms in scope") follow.
 - **Whole-home (kept)**: project lumps Q-05 civil alterations, Q-32 site set-up,
   Q-33 DM/DEWA permits, Q-36 scaffold, Q-37 handover clean (garden GL-01–03);
-  demolition from the proposed plan; fixtures in no room. (The aluminium &
+  fixtures in no room. (Demolition "from the proposed plan" was here —
+  SUPERSEDED by C2: no demolition is inferred from a snapshot.) (The aluminium &
   glazing allowance was ruled whole-home here — SUPERSEDED by C1: glazing comes
   from the plan's own openings and follows the rooms in scope.) Area-driven prelims (soft
   strip, floor removal, floor protection, skips — ceil'd) follow the rooms.
@@ -1272,6 +1273,53 @@ quotations". No migration.
   exactly −92,449.00 (no openings → the reason). Fixtures:
   `lib/boq/__fixtures__/c1-jumeirah-rev1.json`, `c1-mudon-latest.json` (prod,
   read-only, curated); test `lib/boq/__tests__/c1-scope-leak.test.ts`.
+
+### Sprint C2 — status = f(validation, revision); A-102 from the current plan (21 Oct)
+
+Root cause: `docs/SPRINT_C_ROOT_CAUSE.md` §2. No migration.
+
+- **One status rule** (`lib/documents/document-status.ts`, pure): a document
+  badge is `documentStatus({ available, current: { boqId, rev }, jobs })` —
+  **"Ready · rev N" only when the project's LAST export passed and ran on the
+  current revision, matched by BoQ id** (`manifest.boq.id`, `jobBoqId`); else
+  "Needs check: <why>" (not exported yet · the last export failed — <first
+  failing check / its error> · export blocked — <first open item> · the BoQ
+  changed since the last export); "Export running"; "Not available yet" when the
+  deployment cannot export (a flag decides availability, never readiness).
+  Read by the owner Overview's documents card, the firm hub's documents panel
+  ("Exported · rev N" for the proposal) and — through `exportedOn(jobs,
+  latestBoqId)` — the rail's firm 06 Documents / 08 Proposal and the owner's
+  06 Tender (now done when exported). **The timestamp comparison is gone**: an
+  in-app export regenerates the BoQ inside its job, so its revision is always
+  newer than the job and the step could never be done. 06 Documents
+  (`DocumentsExport`): the printed-check row says PASS only when the job's
+  `boq_id` (the job route returns it) is the current revision, else NEEDS
+  CHECK; a blocked job's stored checklist replaces the live gate only for a run
+  started on the page. Test: `lib/documents/__tests__/document-status.test.ts`.
+- **No demolition inferred from a snapshot** (ruled 21 Oct). The design-lock
+  ("proposed") and parse-confirm ("as-built") snapshots predate the parse
+  corrections: diffing the live plan against them priced walls nobody is
+  removing (Jumeirah rev 2: 342.75 m² = 30,847.50; Mudon 5 Sep: 555.9 m² =
+  50,031.00; as-found vs current would have been ~141 / ~401 m²). The BoQ's
+  take-off is `quantifyPlan(graph)` (no `proposed`), so the "Wall demolition +
+  cart away" line goes on the next regenerate; it returns when walls can be
+  marked for removal on the plan (backlog).
+- **A-102 from the current plan at export**: `buildInteriorSheets` (pure,
+  `lib/drawings/export.ts`) draws every interior sheet from ONE graph — the
+  plan at export; A-102's title block reads "Level: … · Proposed as of rev N ·
+  date" (`SheetMeta.basis`, `proposedBasis`, `data-basis`) and its legend "No
+  demolition recorded on the plan." The drawing set reads no `plan_snapshots`.
+  Old snapshots are read through `normaliseGraph` (`lib/plan/geometry.ts`:
+  every array field filled — `lib/plan/snapshots.ts`).
+- **Named sheet failures** (`lib/drawings/sheet-errors.ts`): every sheet (A-,
+  L-) is built through `drawSheet(number, title, [graph], build)` — a missing
+  graph field fails as 'Sheet A-102 "Proposed / Demolition Plan" could not be
+  drawn: the plan graph has no `elements`', any other error as the same prefix
+  + the value it read; no bare TypeError reaches the Documents page. Test:
+  `lib/drawings/__tests__/a102-current-plan.test.ts` (Mudon's current plan
+  builds; its 29 Jul snapshot fixture fails named, then draws normalised).
+- **Unchanged**: Arabella 116,679.56 and the pilot bathroom (byte-identical
+  dry-runs on master vs C2; dev demo villa too).
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 
