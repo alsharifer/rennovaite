@@ -26,12 +26,13 @@ import type { RefusedChange } from "@/lib/render/photo-view-change";
 
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
+import { designCheckHead, photoViewCheckRows, type DesignCheckRow } from "@/lib/render/design-check-items";
 import { approvalDrift, MATERIAL_LABEL_TEXT, type MaterialRow } from "@/lib/render/material-labels";
 import { FITTINGS_NOTE, FITTINGS_NOTE_FULL } from "@/lib/render/photo-check-vocab";
 import type { PhotoViewChange, PhotoViewGate } from "@/lib/render/photo-view-run";
 import { compassWord, headingBetween, type PhotoCamera, type PhotoView } from "@/lib/render/photo-views";
 import type { MiniPlan } from "@/lib/render/photo-views-load";
-import { followsLine, followsStateOf, specFieldsChanged, viewsToRender, type FollowsState, type RoomAnchor } from "@/lib/render/room-spec-vocab";
+import { followsStateOf, specFieldsChanged, viewsToRender, type FollowsState, type RoomAnchor } from "@/lib/render/room-spec-vocab";
 import { uploadFile } from "@/lib/uploads/client";
 
 import { Button } from "../Button";
@@ -106,8 +107,8 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
   const [versionIdx, setVersionIdx] = useState<Record<string, number>>({});
   const [running, setRunning] = useState(false);
   const plans = initial?.plans ?? {};
-  const materials = initial?.materials ?? {};
-  const designNow = initial?.designNow ?? {};
+  const [materials] = useState(initial?.materials ?? {});
+  const [designNow] = useState(initial?.designNow ?? {});
 
   const roomOf = useCallback((photoId: string) => Object.entries(byRoom).find(([, vs]) => vs.some((v) => v.id === photoId))?.[0] ?? null, [byRoom]);
   const setBusyFor = (id: string, b: Busy | null) => setBusy((p) => { const n = { ...p }; if (b) n[id] = b; else delete n[id]; return n; });
@@ -309,35 +310,23 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
     }
   }
 
-  return { byRoom, plans, materials, versions, locked, anchors, refused, spend, refStyle, readingRefs, busy, uploading, notice, running, remaining, costPerView: initial?.costPerView ?? null, roomOf, viewInfo, setVersionIdx, render, lock, change, place, addPhotos, readRefs, renderRemaining, say };
+  return { byRoom, plans, materials, designNow, versions, locked, anchors, refused, spend, refStyle, readingRefs, busy, uploading, notice, running, remaining, costPerView: initial?.costPerView ?? null, roomOf, viewInfo, setVersionIdx, render, lock, change, place, addPhotos, readRefs, renderRemaining, say };
 }
 
 export type PhotoViewsApi = ReturnType<typeof usePhotoViews>;
 
 const shortLabel = (v: PhotoView) => v.label.split(" · ")[0]!;
 
-function designHead(info: ReturnType<PhotoViewsApi["viewInfo"]>): string {
-  const g = info.current?.gate;
-  if (!g) return "DESIGN CHECK · NOT RENDERED";
-  if (g.outcome !== "passed") return "DESIGN CHECK · LAYOUT NOT KEPT";
-  const anchor = info.anchor?.label.toUpperCase();
-  if (!anchor) return "MATCHES YOUR PHOTO";
-  if (info.follows === "anchor") return "MATCHES YOUR PHOTO · ANCHORS THIS ROOM";
-  if (info.follows === "follows") return `MATCHES YOUR PHOTO · SAME DESIGN AS ${anchor}`;
-  if (info.follows === "differs") return `MATCHES YOUR PHOTO · DIFFERS FROM ${anchor}`;
-  return `MATCHES YOUR PHOTO · ${anchor} HAS CHANGED SINCE`;
-}
-
-/** The design check lines of one view (the centre block and the side list share them). */
-export function checkLines(info: ReturnType<PhotoViewsApi["viewInfo"]>): { text: string; ok: boolean }[] {
+/** C5 #2: the view's design check, itemised — the five rows the room pack prints too. */
+export function checkRows(info: ReturnType<PhotoViewsApi["viewInfo"]>, designNow: string | null): DesignCheckRow[] {
   const g = info.current?.gate;
   if (!g) return [];
-  const lines = [{ text: g.line, ok: g.outcome === "passed" }];
-  if (info.anchor && info.follows) {
-    const off = info.follows === "differs" ? (g.attempts.at(-1)?.style?.elements ?? []).filter((e) => e.verdict !== "yes").map((e) => e.element) : info.follows === "changed" ? (g.change?.changed ?? []) : [];
-    lines.push({ text: followsLine(info.follows, info.anchor.label, off), ok: info.follows === "follows" || info.follows === "anchor" });
-  } else if (g.outcome === "passed") lines.push({ text: g.style_line, ok: g.style_line.endsWith("✓") });
-  return lines;
+  const off = info.follows === "differs" ? (g.attempts.at(-1)?.style?.elements ?? []).filter((e) => e.verdict !== "yes").map((e) => e.element) : info.follows === "changed" ? (g.change?.changed ?? []) : [];
+  return photoViewCheckRows({ gate: g, follows: info.anchor ? info.follows : null, anchorLabel: info.anchor?.label ?? null, followsOff: off, designNow, styleLine: g.outcome === "passed" ? g.style_line : null });
+}
+
+function designHead(info: ReturnType<PhotoViewsApi["viewInfo"]>, rows: readonly DesignCheckRow[]): string {
+  return info.current?.gate ? designCheckHead(rows) : "DESIGN CHECK · NOT RENDERED";
 }
 
 function Boxes({ boxes }: { boxes: { ref: string; box: Box; bad: boolean }[] }) {
@@ -410,7 +399,7 @@ export function PhotoViewCentre({ api, roomName, photo, onSelect }: { api: Photo
   const afterBoxes = (last?.after ?? []).filter((l) => l.present && l.box && (checked.has(l.ref) || bad.has(l.ref))).map((l) => ({ ref: l.ref, box: l.box as Box, bad: bad.has(l.ref) }));
   const showPhoto = show === "photo" || !info.current?.image_url;
   const lockedHere = info.isLocked && api.locked[photo.id] === info.current?.render_id;
-  const lines = checkLines(info);
+  const rows = checkRows(info, api.designNow[photo.room_id] ?? null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -508,42 +497,28 @@ export function PhotoViewCentre({ api, roomName, photo, onSelect }: { api: Photo
         </div>
       ) : null}
 
-      {/* Design checks */}
+      {/* Design checks — C5 #2: itemised, each ✓ / ✗ with its reason */}
       {g ? (
-        failed ? (
-          <div role="status" className="surface-inverse mt-4 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink" data-design-check="failed">
-            <p className="t-label-caps">{designHead(info)}</p>
-            <p className="t-body-sm mt-1" data-check-line="layout">
-              {g.line} <span title={FITTINGS_NOTE_FULL}>· {FITTINGS_NOTE}</span>
-            </p>
+        <div role={failed ? "status" : undefined} className={`mt-4 px-4 py-3 ${failed ? "surface-inverse bg-bp-alert-surface text-bp-alert-ink" : "bg-bp-surface-sunken"}`} data-design-check={failed ? "failed" : "passed"}>
+          <p className={`t-label-caps ${failed ? "" : "text-bp-ink-primary"}`}>{designHead(info, rows)}</p>
+          <ul className="mt-1 space-y-0.5" data-design-check-rows="">
+            {rows.map((r) => (
+              <li key={r.key} className={`t-body-sm ${failed ? "" : r.state === "pass" ? "text-bp-ink-primary" : "text-bp-ink-secondary"}`} data-check-row={r.key} data-check-state={r.state}>
+                <span aria-hidden="true">{r.state === "pass" ? "✓ " : "✗ "}</span>
+                <span className="sr-only">{r.state === "pass" ? "Passed: " : r.state === "fail" ? "Failed: " : "Not checked: "}</span>
+                <span className="font-semibold">{r.label}</span> — {r.reason}
+              </li>
+            ))}
+          </ul>
+          <p className={`t-label-md mt-1 ${failed ? "" : "text-bp-ink-tertiary"}`} title={FITTINGS_NOTE_FULL}>
+            {FITTINGS_NOTE.replace(/^./, (c) => c.toUpperCase())}.
+          </p>
+          {failed ? (
             <button type="button" onClick={() => setDiff((v) => !v)} aria-pressed={diff} className={`t-nav-item-active mt-2 underline underline-offset-2 ${FOCUS}`}>
               {diff ? "Hide what differs" : "See what differs"}
             </button>
-            {diff ? (
-              <ul className="t-body-sm mt-2 list-disc pl-5">
-                {(last?.failures ?? []).map((f) => (
-                  <li key={`${f.ref}${f.reason}`}>{f.message.replace(/^./, (c) => c.toUpperCase())}.</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : (
-          <div className="mt-4 flex items-start gap-3 bg-bp-surface-sunken px-4 py-3" data-design-check="passed">
-            <Icon name="task_alt" className="text-[20px] text-bp-ink-primary" />
-            <div>
-              <p className="t-label-caps text-bp-ink-primary">{designHead(info)}</p>
-              <ul className="mt-1 space-y-0.5">
-                {lines.map((l, i) => (
-                  <li key={i} className={`t-body-sm ${l.ok ? "text-bp-ink-primary" : "text-bp-ink-secondary"}`} data-check-line={i === 0 ? "layout" : info.anchor ? "follows" : "style"}>
-                    {l.ok ? "✓ " : "· "}
-                    {l.text.replace(/ ✓$/, "")}
-                    {i === 0 ? <span className="text-bp-ink-secondary" title={FITTINGS_NOTE_FULL}> · {FITTINGS_NOTE}</span> : null}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )
+          ) : null}
+        </div>
       ) : (
         <div className="mt-4 bg-bp-surface-sunken px-4 py-3" data-design-check="none">
           <p className="t-body-sm text-bp-ink-secondary">{photo.camera ? `Not rendered yet. ${info.anchor && info.anchor.room_photo_id !== photo.id ? `It will follow ${info.anchor.label}'s finishes.` : "Restyled from your photo, so it keeps your real layout."}` : "Place this photo on the plan first — where you stood, and which way the phone faced."}</p>
@@ -758,17 +733,18 @@ export function PhotoViewSide({ api, roomName, photo, onSelect }: { api: PhotoVi
         <ul className="mt-2 border-t border-bp-line-hairline" data-design-checks="">
           {views.map((v) => {
             const vi = api.viewInfo(v);
-            const ls = checkLines(vi);
+            const ls = checkRows(vi, api.designNow[v.room_id] ?? null);
             return (
               <li key={v.id} className="border-b border-bp-line-hairline">
                 <button type="button" onClick={() => onSelect(v.id)} aria-current={v.id === photo.id ? "true" : undefined} className={`flex w-full items-start gap-3 px-1 py-2 text-left hover:bg-bp-surface-raised ${FOCUS}`} data-check-view={`P${v.n}`} data-view-state={vi.state}>
                   <span className="t-label-md w-7 shrink-0 font-bp-mono text-bp-ink-primary">P{v.n}</span>
                   <span className="min-w-0 flex-1">
                     {ls.length ? (
-                      ls.map((l, i) => (
-                        <span key={i} className={`t-body-sm block ${l.ok ? "text-bp-ink-primary" : "text-bp-ink-secondary"}`}>
-                          {l.ok ? "✓ " : "· "}
-                          {l.text.replace(/ ✓$/, "")}
+                      ls.map((r) => (
+                        <span key={r.key} className={`t-body-sm block ${r.state === "pass" ? "text-bp-ink-primary" : "text-bp-ink-secondary"}`} title={r.reason} data-check-row={r.key} data-check-state={r.state}>
+                          {r.state === "pass" ? "✓ " : "✗ "}
+                          {r.label}
+                          {r.state === "fail" ? ` — ${r.reason}` : ""}
                         </span>
                       ))
                     ) : (

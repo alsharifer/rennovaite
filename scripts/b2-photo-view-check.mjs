@@ -56,7 +56,7 @@ try {
       await b.evaluate(`document.querySelector('[data-render-photo-view="${id}"]').click()`);
       presses[i + 1]++;
       const done = await b.until(`(() => { const el = document.querySelector('[data-photo-view-render="${id}"]'); return el && el.getAttribute("data-outcome") !== "none" && !/Rendering/.test(el.querySelector("[data-render-photo-view]").innerText); })()`, 420000);
-      const out = await b.evaluate(`(() => { const el = document.querySelector('[data-photo-view-render="${id}"]'); return { outcome: el.getAttribute("data-outcome"), layout: el.querySelector('[data-check-line="layout"]')?.innerText ?? "", style: el.querySelector('[data-check-line="style"]')?.innerText ?? "", scores: el.querySelector("[data-scores]")?.innerText ?? "", error: el.querySelector('[role="alert"]')?.innerText ?? "" }; })()`);
+      const out = await b.evaluate(`(() => { const el = document.querySelector('[data-photo-view-render="${id}"]'); return { outcome: el.getAttribute("data-outcome"), layout: el.querySelector('[data-check-row="fixtures"]')?.innerText ?? "", style: el.querySelector('[data-check-row="finishes"]')?.innerText ?? "", scores: el.querySelector("[data-scores]")?.innerText ?? "", error: el.querySelector('[role="alert"]')?.innerText ?? "" }; })()`);
       console.log(`  ·  P${i + 1} press ${press + 1}: ${out.outcome} in ${Math.round((Date.now() - t0) / 1000)} s — ${out.layout.replace(/\s+/g, " ")} · ${out.scores}${out.error ? ` · ${out.error}` : ""}`);
       if (!done || out.outcome === "passed" || out.error) break;
     }

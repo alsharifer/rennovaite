@@ -238,7 +238,7 @@ export function buildRoomPack(input: RoomPackInput): RoomPackPage[] {
     s += label(cx, y, "Design checks");
     y += 6;
     for (const c of v.render ? v.checks : []) {
-      for (const [i, line] of wrapWords(`${c.ok ? "✓" : "·"} ${c.text.replace(/ ✓$/, "")}`, 52).entries()) {
+      for (const [i, line] of wrapWords(`${c.ok ? "✓" : "✗"} ${c.text.replace(/ ✓$/, "")}`, 52).entries()) {
         s += text(cx + (i ? 3 : 0), y, line, { size: 3.1, fill: c.ok ? DOC.INK : DOC.INK_2 });
         y += 4.8;
       }

@@ -25,6 +25,7 @@ import { loadStudioState } from "@/lib/render/photo-view-anchor";
 import { photoViewCostAed, photoViewMaxAttempts } from "@/lib/render/photo-view-run";
 import { projectRenderSpend } from "@/lib/render/render-spend";
 import { loadMaterialState } from "@/lib/render/material-labels-load";
+import { roomRenderCheckRows, type DesignCheckRow, type QaLike, type SceneGateLike } from "@/lib/render/design-check-items";
 
 export const dynamic = "force-dynamic";
 
@@ -339,13 +340,15 @@ export default async function RenderPage({
 
   // Every finished render's image and check verdict, by id: a garden camera or an
   // evening view shows its own render, with the gate's outcome (G4b) or the QA verdict.
-  const renderInfo: Record<string, { id: string; imageUrl: string; prompt: string; qa: "passed" | "failed" | null; qaReason: string | null; outcome: "passed" | "substituted" | null }> = {};
+  const renderInfo: Record<string, { id: string; imageUrl: string; prompt: string; qa: "passed" | "failed" | null; qaReason: string | null; outcome: "passed" | "substituted" | null; checks: DesignCheckRow[] | null }> = {};
   try {
-    const { data: infoRows } = await sbAny.from("renders").select("id, image_url, prompt, qa, gate").eq("project_id", projectId).not("image_url", "is", null);
-    for (const r of (infoRows ?? []) as { id: string; image_url: string; prompt: string | null; qa: unknown; gate: { outcome?: string } | null }[]) {
+    const { data: infoRows } = await sbAny.from("renders").select("id, image_url, prompt, qa, gate, mode").eq("project_id", projectId).not("image_url", "is", null);
+    for (const r of (infoRows ?? []) as { id: string; image_url: string; prompt: string | null; qa: unknown; gate: { outcome?: string } | null; mode: string | null }[]) {
       const outcome = r.gate?.outcome === "passed" || r.gate?.outcome === "substituted" ? r.gate.outcome : null;
       const q = qaFrom(r.qa);
-      renderInfo[r.id] = { id: r.id, imageUrl: r.image_url, prompt: r.prompt ?? "", qa: q.qa ?? null, qaReason: q.qaReason ?? null, outcome };
+      // C5 #2: the design check itemised (a photo view's rows are the studio's own — PhotoViewStudio).
+      const checks = r.mode === "photo_view" ? null : roomRenderCheckRows({ qa: (r.qa && typeof r.qa === "object" ? r.qa : null) as QaLike | null, scene: r.gate as SceneGateLike | null });
+      renderInfo[r.id] = { id: r.id, imageUrl: r.image_url, prompt: r.prompt ?? "", qa: q.qa ?? null, qaReason: q.qaReason ?? null, outcome, checks };
     }
   } catch {
     /* a pre-G4b table: chains and evenings still show */
