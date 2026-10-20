@@ -37,6 +37,7 @@ import {
   type AccessorySelections,
 } from "@/lib/accessories/types";
 import { formatAED, formatDelta } from "@/lib/format/aed";
+import { MATERIAL_LABEL_TEXT, type MaterialLabel } from "@/lib/render/material-labels";
 import { tierLabel, type ProvTier } from "@/lib/provenance/tier-vocab";
 
 import { Button } from "../Button";
@@ -80,6 +81,8 @@ export function Specification(props: {
   /** "rev 3" — the revision a regeneration would supersede. */
   rev: number | null;
   boqHref: string;
+  /** C5 #1: each item's label — changed since render approval · priced · specified · illustrative. */
+  labels?: Record<string, { label: MaterialLabel; why: string }>;
 }) {
   const { projectId, persona, catalog, defaults, quantities, measurements } = props;
   const [selections, setSelections] = useState<AccessorySelections>(props.initialSelections);
@@ -193,6 +196,12 @@ export function Specification(props: {
                 <h2 id={`item-${itemKey}`} className="t-heading-md flex-1 text-bp-ink-primary">
                   {label}
                 </h2>
+                {props.labels?.[itemKey] ? (
+                  <span className={`t-label-caps ${props.labels[itemKey]!.label === "changed" ? "text-bp-ink-primary underline decoration-bp-brass underline-offset-4" : "text-bp-ink-tertiary"}`} title={props.labels[itemKey]!.why} data-material-label={props.labels[itemKey]!.label}>
+                    {MATERIAL_LABEL_TEXT[props.labels[itemKey]!.label]}
+                    <span className="sr-only"> — {props.labels[itemKey]!.why}</span>
+                  </span>
+                ) : null}
                 <span className="t-label-md inline-flex items-center gap-1.5 font-bp-mono text-bp-ink-secondary" title={measurements[itemKey] ?? undefined}>
                   <Icon name="lock" className="text-[18px]" />
                   {qty !== undefined ? `${qty} no · quantity from the plan` : "not in this plan"}

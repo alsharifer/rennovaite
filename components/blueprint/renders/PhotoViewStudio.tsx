@@ -26,6 +26,7 @@ import type { RefusedChange } from "@/lib/render/photo-view-change";
 
 import { compressImage, ImageProcessingError } from "@/lib/image/compress";
 import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
+import { approvalDrift, MATERIAL_LABEL_TEXT, type MaterialRow } from "@/lib/render/material-labels";
 import { FITTINGS_NOTE, FITTINGS_NOTE_FULL } from "@/lib/render/photo-check-vocab";
 import type { PhotoViewChange, PhotoViewGate } from "@/lib/render/photo-view-run";
 import { compassWord, headingBetween, type PhotoCamera, type PhotoView } from "@/lib/render/photo-views";
@@ -62,12 +63,17 @@ export interface PhotoViewsInitial {
   costPerView: { low: number; high: number };
   /** B7 6: each view's latest refused change (image + reading), newer than its kept version. */
   refused?: Record<string, RefusedChange>;
+  /** C5 #1: per room with an anchor, every material its design shows, labelled. */
+  materials?: Record<string, MaterialRow[]>;
+  /** C5 #1: per room, the design fingerprint now — a locked view made under another is "changed since approval". */
+  designNow?: Record<string, string>;
 }
 
 type Busy = "render" | "lock" | "change" | "place";
-export type PhotoRowState = "locked" | "anchor" | "ready" | "rendering" | "not_yet" | "not_placed" | "failed" | "stale";
+export type PhotoRowState = "changed" | "locked" | "anchor" | "ready" | "rendering" | "not_yet" | "not_placed" | "failed" | "stale";
 
 export const PHOTO_STATE: Record<PhotoRowState, { icon: string; label: string }> = {
+  changed: { icon: "update", label: "CHANGED SINCE APPROVAL" },
   anchor: { icon: "anchor", label: "ANCHOR" },
   locked: { icon: "check", label: "LOCKED" },
   ready: { icon: "visibility", label: "READY" },
@@ -100,6 +106,8 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
   const [versionIdx, setVersionIdx] = useState<Record<string, number>>({});
   const [running, setRunning] = useState(false);
   const plans = initial?.plans ?? {};
+  const materials = initial?.materials ?? {};
+  const designNow = initial?.designNow ?? {};
 
   const roomOf = useCallback((photoId: string) => Object.entries(byRoom).find(([, vs]) => vs.some((v) => v.id === photoId))?.[0] ?? null, [byRoom]);
   const setBusyFor = (id: string, b: Busy | null) => setBusy((p) => { const n = { ...p }; if (b) n[id] = b; else delete n[id]; return n; });
@@ -128,9 +136,13 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
       followsPassed: g?.anchor && g.outcome === "passed" ? !!g.attempts.at(-1)?.style?.passed : null,
       changedSpec: g?.change ? specFieldsChanged(g.change.changed) : null,
     });
+    // C5 #1: a locked view whose render was made under another design than the room's now.
+    const drift = isLocked ? approvalDrift(latest?.gate?.design_key, designNow[photo.room_id]) : null;
     const state: PhotoRowState = busy[photo.id] === "render" || busy[photo.id] === "change"
       ? "rendering"
-      : anchor?.room_photo_id === photo.id
+      : drift
+        ? "changed"
+        : anchor?.room_photo_id === photo.id
         ? "anchor"
         : isLocked
           ? "locked"
@@ -141,8 +153,8 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
               : follows === "stale" || (follows === "unchecked" && !!anchor && !latest.anchor_render_id)
                 ? "stale"
                 : "ready";
-    return { versions: vs, idx, current, latest, anchor, isLocked, follows, state };
-  }, [versions, versionIdx, anchors, locked, busy]);
+    return { versions: vs, idx, current, latest, anchor, isLocked, follows, state, drift };
+  }, [versions, versionIdx, anchors, locked, busy, designNow]);
 
   async function render(photo: PhotoView): Promise<boolean> {
     if (busy[photo.id]) return false;
@@ -297,7 +309,7 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
     }
   }
 
-  return { byRoom, plans, versions, locked, anchors, refused, spend, refStyle, readingRefs, busy, uploading, notice, running, remaining, costPerView: initial?.costPerView ?? null, roomOf, viewInfo, setVersionIdx, render, lock, change, place, addPhotos, readRefs, renderRemaining, say };
+  return { byRoom, plans, materials, versions, locked, anchors, refused, spend, refStyle, readingRefs, busy, uploading, notice, running, remaining, costPerView: initial?.costPerView ?? null, roomOf, viewInfo, setVersionIdx, render, lock, change, place, addPhotos, readRefs, renderRemaining, say };
 }
 
 export type PhotoViewsApi = ReturnType<typeof usePhotoViews>;
@@ -468,7 +480,7 @@ export function PhotoViewCentre({ api, roomName, photo, onSelect }: { api: Photo
               <button type="button" onClick={() => onSelect(v.id)} aria-pressed={on} aria-label={`${v.label} — ${PHOTO_STATE[vi.state].label.toLowerCase()}`} className={`block w-[72px] text-left ${FOCUS}`} data-photo-view={v.id} data-placed={v.camera ? "true" : "false"}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- a view's thumbnail */}
                 <img src={img} alt="" className={`h-[96px] w-[72px] object-cover ${on ? "outline outline-2 outline-offset-0 outline-bp-ink-primary" : "border border-bp-line-hairline"}`} />
-                <span className="t-label-md mt-1 block font-bp-mono text-bp-ink-secondary">P{v.n}{vi.state === "anchor" || vi.state === "locked" ? " · locked" : ""}</span>
+                <span className="t-label-md mt-1 block font-bp-mono text-bp-ink-secondary">P{v.n}{vi.isLocked ? " · locked" : ""}</span>
               </button>
             </li>
           );
@@ -488,6 +500,13 @@ export function PhotoViewCentre({ api, roomName, photo, onSelect }: { api: Photo
         </li>
       </ul>
       <p id={`${ids}-addview`} className="t-label-md mt-1 text-bp-ink-tertiary">A view from where you have no photo needs the room in 3D — not in this pilot. Add a photo from there instead.</p>
+
+      {info.drift ? (
+        <div role="status" className="surface-inverse mt-4 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink" data-view-changed-since-approval="">
+          <p className="t-label-caps">CHANGED SINCE RENDER APPROVAL</p>
+          <p className="t-body-sm mt-1">This view was approved before {info.drift}. It no longer shows the design the BoQ prices, so the client pack leaves it out until a version showing today&rsquo;s design is locked.</p>
+        </div>
+      ) : null}
 
       {/* Design checks */}
       {g ? (
@@ -544,7 +563,7 @@ export function PhotoViewCentre({ api, roomName, photo, onSelect }: { api: Photo
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
         <Button kind="secondary" onClick={() => info.current && void api.lock(photo, info.current.render_id)} disabled={lockReason ? { reason: lockReason, reasonId: `${ids}-lock`, showReason: true } : false} testId="lock-photo-view">
-          {lockedHere ? (info.state === "anchor" ? "Locked · anchors the room" : "View locked") : busy === "lock" ? "Locking…" : "Lock this view"}
+          {lockedHere ? (info.anchor?.room_photo_id === photo.id ? "Locked · anchors the room" : "View locked") : busy === "lock" ? "Locking…" : "Lock this view"}
         </Button>
         <Button kind="quiet" onClick={() => void api.render(photo)} disabled={againReason ? { reason: againReason, reasonId: `${ids}-again`, showReason: !!info.isLocked } : false} testId="render-photo-view">
           {info.versions.length ? "Render again" : "Render this view"}
@@ -766,6 +785,27 @@ export function PhotoViewSide({ api, roomName, photo, onSelect }: { api: PhotoVi
           Layout is checked fixture by fixture against your photo; {FITTINGS_NOTE}.
         </p>
       </section>
+
+      {api.materials[photo.room_id]?.length ? (
+        <section aria-labelledby="mat-h" data-material-labels="">
+          <h2 id="mat-h" className="t-label-caps text-bp-ink-tertiary">MATERIALS IN THIS DESIGN</h2>
+          <ul className="mt-2 border-t border-bp-line-hairline">
+            {api.materials[photo.room_id]!.map((m) => (
+              <li key={m.field} className="border-b border-bp-line-hairline px-1 py-2" data-material={m.field} data-material-label={m.label} title={m.why}>
+                <span className="flex items-baseline gap-3">
+                  <span className="t-body-sm min-w-0 flex-1 text-bp-ink-primary">
+                    <span className="capitalize">{m.element}</span>
+                    <span className="text-bp-ink-secondary"> · {m.finish}</span>
+                  </span>
+                  <span className={`t-label-caps shrink-0 ${m.label === "changed" ? "text-bp-ink-primary underline decoration-bp-brass underline-offset-4" : "text-bp-ink-tertiary"}`}>{MATERIAL_LABEL_TEXT[m.label]}</span>
+                </span>
+                <span className="t-label-md block text-bp-ink-tertiary">{m.why}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="t-label-md mt-2 text-bp-ink-tertiary">Read from the locked view&rsquo;s design, the room&rsquo;s product choices and the current BoQ.</p>
+        </section>
+      ) : null}
 
       <section aria-labelledby="rs-h">
         <h2 id="rs-h" className="t-label-caps text-bp-ink-tertiary">RENDER SPEND</h2>

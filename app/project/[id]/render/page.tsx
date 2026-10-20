@@ -24,6 +24,7 @@ import { loadMiniPlans, loadPhotoViews } from "@/lib/render/photo-views-load";
 import { loadStudioState } from "@/lib/render/photo-view-anchor";
 import { photoViewCostAed, photoViewMaxAttempts } from "@/lib/render/photo-view-run";
 import { projectRenderSpend } from "@/lib/render/render-spend";
+import { loadMaterialState } from "@/lib/render/material-labels-load";
 
 export const dynamic = "force-dynamic";
 
@@ -372,7 +373,9 @@ export default async function RenderPage({
       projectRenderSpend(sbRows, projectId),
       sbRows.from("project_briefs").select("reference_style").eq("project_id", projectId).maybeSingle<{ reference_style: { text: string; at: string } | null }>(),
     ]);
-    photoViews = { byRoom, plans, ...state, spendAed: spend?.render_spend_aed ?? null, referenceStyle: brief.error ? null : brief.data?.reference_style ?? null, costPerView: photoViewCostAed(photoViewMaxAttempts()) };
+    // C5 #1: each material labelled (illustrative · specified · priced · changed since approval), and each room's design now.
+    const materialState = await loadMaterialState(sbRows as unknown as SupabaseClient, projectId, ids, { plans, anchors: state.anchors, versions: state.versions as never });
+    photoViews = { byRoom, plans, ...state, ...materialState, spendAed: spend?.render_spend_aed ?? null, referenceStyle: brief.error ? null : brief.data?.reference_style ?? null, costPerView: photoViewCostAed(photoViewMaxAttempts()) };
   }
 
   const flags = journeyFlagsFromEnv();
