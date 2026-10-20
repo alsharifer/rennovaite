@@ -1321,6 +1321,43 @@ Root cause: `docs/SPRINT_C_ROOT_CAUSE.md` §2. No migration.
 - **Unchanged**: Arabella 116,679.56 and the pilot bathroom (byte-identical
   dry-runs on master vs C2; dev demo villa too).
 
+### Sprint C3 — install classes + scope-aware product swaps (21 Oct)
+
+B7 5 assumed a product swap moves only the rate; it can move scope (concealed
+thermostatic → exposed set drops the chase and the make-good; floor-standing
+WC → wall-hung adds a frame, a concealed cistern and a duct wall). No migration
+(the review record is in `rooms.spec.wet_room`).
+
+- **Every product option has an install class** (`ProductOption.install`,
+  `lib/boq/product-swaps.ts`); two new groups, **WC mounting** (`wc_mount`:
+  floor_standing | wall_hung) and **Basin mounting** (`basin_mount`: on_vanity |
+  wall_hung), and the shower valve gains **exposed** (R-77 `san.shower_exposed`,
+  1,300 allowance). A line offers EVERY group it belongs to
+  (`productGroupsOf`, `ReviewLine.products` — the WC is a fittings grade and a
+  mount); `productGroupOf` (first) is unchanged.
+- **The rule** (`lib/boq/install-classes.ts`, pure): within a class = rate only;
+  across classes → the dependent lines (priced for the BASE class: concealed,
+  floor-standing, on a vanity) are **recomputed by rule** where one exists —
+  WC wall-hung: W-31 frame + WC (R-19), W-32 flush plate (R-43), W-33 duct wall
+  (R-63) in the BoQ, no longer an option — or **flagged** `scope_review`
+  "Scope review needed — <what changed>" (+ `scope_review_field`): exposed
+  shower → the supply point (P2 shower_mixer, priced as a concealed first fix);
+  wall-hung basin → the vanity / its top / the basin mixer / the basin point,
+  plus its own W-35 line TBC. Flags are a function of the CURRENT choice and
+  the review record (`openReviews`), never of remembering the swap.
+- **Where it shows / blocks**: the Issues navigator's first group "SCOPE REVIEW
+  NEEDED — BLOCKS EXPORT"; the inspector's inverse block with **Mark reviewed**
+  (`POST /api/projects/:id/scope-review { field }` → `wet_room.reviewed` +
+  `reviewed_log`, a design edit "Scope reviewed by <name> — …", then a
+  regenerate); the export gate (`pack-readiness` `scope_review` → checklist
+  item "Every product swap's scope is reviewed"). The product picker warns
+  before a cross-class swap (`swapEffect`); the swap route clears an earlier
+  review of the field and its cause names the install change.
+- **Tests**: `lib/boq/__tests__/wet-room.test.ts` → "C3" (the shower swap
+  flags the supply point and blocks the export — never silently kept; within a
+  class rate-only; WC recomputed; basin flagged; reviewed clears; the navigator).
+  The pilot bathroom and Arabella regenerate identically to master.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

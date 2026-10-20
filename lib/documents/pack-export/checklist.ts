@@ -58,6 +58,18 @@ export function buildChecklist(input: {
       fix: !r.has_boq || r.stale_boq_needs_selection.length ? boq : null,
     },
   ];
+  // C3: a product swapped across install classes left lines priced for the old install.
+  const review = r.scope_review ?? [];
+  if (review.length) {
+    items.push({
+      key: "scope_review",
+      ok: false,
+      title: "Every product swap's scope is reviewed",
+      detail: "A product was swapped for one installed differently. Re-price the flagged lines if they changed, then mark the change reviewed on the BoQ.",
+      items: review,
+      fix: boq,
+    });
+  }
   if (parity) {
     const unpricedEls = parity.elements.filter((e) => e.status === "fail");
     items.push({

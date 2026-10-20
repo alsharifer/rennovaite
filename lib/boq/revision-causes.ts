@@ -175,7 +175,16 @@ export async function loadRecordedCauses(db: SupabaseClient, projectId: string, 
         // B7 5: a product swapped from a BoQ line — "Product changed by <name>", on the lines it touches.
         if (layer === "product") {
           const keys = Array.isArray(d.line_keys) ? d.line_keys.map(str) : [];
-          out.push({ kind: "product_change", at, summary: productChangeSummary(d.by_name ? str(d.by_name) : null, str(d.group), str(d.from_label), str(d.to_label)), item_keys: keys, line_keys: keys });
+          // C3: a swap across install classes says what it moved beyond the rate.
+          const install = d.install && typeof d.install === "object" ? (d.install as Row) : null;
+          const beyond = install && install.kind !== "rate_only" && install.what ? ` · ${install.kind === "review" ? "scope review needed" : "install recomputed"}: ${str(install.what)}` : "";
+          out.push({ kind: "product_change", at, summary: `${productChangeSummary(d.by_name ? str(d.by_name) : null, str(d.group), str(d.from_label), str(d.to_label))}${beyond}`, item_keys: keys, line_keys: keys });
+          break;
+        }
+        // C3: a member marked a swap's scope change reviewed — the flagged lines stop blocking the export.
+        if (layer === "scope_review") {
+          const keys = Array.isArray(d.line_keys) ? d.line_keys.map(str) : [];
+          out.push({ kind: "product_change", at, summary: `Scope reviewed by ${d.by_name ? str(d.by_name) : "a member"} — ${str(d.what)}`, item_keys: keys, line_keys: keys });
           break;
         }
         // B7 4: the wet-room panel (bulkhead, heater, niche, valve, extractor) — one cause for the window.

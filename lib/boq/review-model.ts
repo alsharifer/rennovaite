@@ -11,7 +11,7 @@
 // =============================================================================
 
 import { boqDerivedInfo, derivedLineNote, isUnpricedLine } from "@/lib/documents/boq-derived";
-import { optionBasis, productGroupOf } from "./product-swaps";
+import { optionBasis, productGroupsOf, type ProductGroup, type ProductOption } from "./product-swaps";
 import { RATE_BASIS_ORDER } from "./rate-basis";
 import type { ProposalGateVerdict, ReferenceBasis, ReferenceBasisAcceptance } from "@/lib/documents/reference-basis-types";
 import { REFERENCE_BASIS_BANNER } from "@/lib/documents/reference-basis-types";
@@ -96,9 +96,12 @@ function draftNotice(statement: string): { key: string; sentence: string } {
 
 /** B7 5: the product group a stored line belongs to, as the inspector offers it. */
 function productOf(l: { item_key?: string | null; rule_id?: string | null }): ReviewLine["product"] {
-  const g = productGroupOf(l);
-  if (!g) return null;
-  return { field: g.group.field, group: g.group.label, current: g.current.value, options: g.group.options.map((o) => ({ value: o.value, label: o.label, rate: o.rate_aed, unit: o.unit, basis: optionBasis(o) })) };
+  return productsOf(l)[0] ?? null;
+}
+
+/** C3: every product group the line belongs to, each option with its install class. */
+function productsOf(l: { item_key?: string | null; rule_id?: string | null }): NonNullable<ReviewLine["products"]> {
+  return productGroupsOf(l).map(({ group, current }: { group: ProductGroup; current: ProductOption }) => ({ field: group.field, group: group.label, current: current.value, options: group.options.map((o) => ({ value: o.value, label: o.label, rate: o.rate_aed, unit: o.unit, basis: optionBasis(o), install: o.install })) }));
 }
 
 export function buildReviewModel(i: ReviewInputs): ReviewModel {
@@ -146,6 +149,9 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
         prov: i.provenance?.lines[key] ?? null,
         book,
         product: wetRoomBoq ? productOf(l) : null,
+        products: wetRoomBoq ? productsOf(l) : [],
+        scopeReview: typeof (l as unknown as { scope_review?: unknown }).scope_review === "string" ? (l as unknown as { scope_review: string }).scope_review : null,
+        scopeReviewField: typeof (l as unknown as { scope_review_field?: unknown }).scope_review_field === "string" ? (l as unknown as { scope_review_field: string }).scope_review_field : null,
       };
     });
     return {

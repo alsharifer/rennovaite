@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { memberName } from "@/lib/boq/apply-correction";
+import { CLASS_CHANGES, swapEffect } from "@/lib/boq/install-classes";
 import { groupLineKeys, isProductValue, PRODUCT_GROUPS } from "@/lib/boq/product-swaps";
 import { wetRoomChoicesOf, WET_ROOM_TYPES } from "@/lib/boq/wet-room";
 import { recordPilotEvent } from "@/lib/pilot/events";
@@ -19,6 +20,11 @@ export const dynamic = "force-dynamic";
 // design edit (layer "product") naming who changed what — the revision diff's
 // cause "Product changed by <name>". The caller then regenerates (a new
 // revision). Members only. "Add a price" stays rate-only.
+//
+// C3: a swap across INSTALL CLASSES moves scope (lib/boq/install-classes.ts):
+// the regenerate recomputes the dependent lines by rule or flags them "Scope
+// review needed"; any earlier review of this field is cleared (a new swap needs
+// a new review). The response says which: { install: { kind, what } }.
 const Body = z.object({ field: z.string().min(1).max(40), value: z.union([z.string().max(40), z.boolean()]) });
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -44,10 +50,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const to = group.options.find((o) => o.value === value)!;
   if (from.value === to.value) return NextResponse.json({ success: true, changed: false });
 
-  const wetRoom = { ...((room.spec?.wet_room as Record<string, unknown> | undefined) ?? {}), [field]: value };
+  const prior = (room.spec?.wet_room as Record<string, unknown> | undefined) ?? {};
+  const effect = swapEffect(field, from.value, to.value);
+  const reviewed = Array.isArray(prior.reviewed) ? (prior.reviewed as unknown[]).filter((k) => typeof k === "string" && !k.startsWith(`${field}:`)) : [];
+  const wetRoom = { ...prior, [field]: value, reviewed };
   const { error } = await db.from("rooms").update({ spec: { ...(room.spec ?? {}), wet_room: wetRoom } }).eq("id", room.id);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   const by_name = await memberName(db, caller);
-  await recordPilotEvent(db, projectId, "design_edit", { layer: "product", room_id: room.id, field, from: from.value, to: to.value, group: group.label, from_label: from.label, to_label: to.label, by_name, line_keys: groupLineKeys(group) }, { actor: caller.id });
-  return NextResponse.json({ success: true, changed: true, field, value });
+  await recordPilotEvent(db, projectId, "design_edit", { layer: "product", room_id: room.id, field, from: from.value, to: to.value, group: group.label, from_label: from.label, to_label: to.label, by_name, line_keys: [...groupLineKeys(group), ...(effect.kind === "rate_only" ? [] : CLASS_CHANGES.filter((c) => c.field === field).flatMap((c) => c.dependent))], install: effect }, { actor: caller.id });
+  return NextResponse.json({ success: true, changed: true, field, value, install: effect });
 }

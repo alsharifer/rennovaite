@@ -39,6 +39,7 @@ import { footprintCorners, footprintOf } from "@/lib/overlays/footprint";
 import { replacedIds } from "@/lib/overlays/replaces";
 import type { PlanGraph, Point } from "@/lib/plan/geometry";
 
+import { installLineKey, openReviews, SCOPE_REVIEW_PREFIX } from "./install-classes";
 import { lineTotal, money2, sumMoney } from "./money";
 import { rateBasisOf } from "./rate-basis";
 import type { BoqLine, PomiSection, ScopeItem } from "./schema";
@@ -85,6 +86,8 @@ export interface WetRoomContext {
   bulkhead: boolean;
   /** room spec: the value-engineered choices the room takes (rooms.spec.wet_room). */
   choices: WetRoomChoices;
+  /** C3: the scope reviews a member recorded ("shower_valve:exposed" — rooms.spec.wet_room.reviewed). */
+  reviewed?: string[];
   /** room spec: what is on site now, when it differs from the plan (the strip-out names it). */
   existing_fixtures: string | null;
 }
@@ -96,8 +99,8 @@ export interface WetRoomContext {
 export interface WetRoomChoices {
   /** "fixed_panel" = one fixed walk-in panel instead of the hinged enclosure. */
   shower_screen: "enclosure" | "fixed_panel";
-  /** "manual" = a concealed manual mixer instead of the thermostatic set. */
-  shower_valve: "thermostatic" | "manual";
+  /** "manual" = a concealed manual mixer instead of the thermostatic set; C3 "exposed" = a set on the wall face (another install class). */
+  shower_valve: "thermostatic" | "manual" | "exposed";
   /** "ready_made" = a wall-hung unit with its own ceramic basin top. */
   vanity: "floating_stone" | "ready_made";
   /** "mid" = mid-range WC, basin mixer and LED mirror. */
@@ -106,20 +109,32 @@ export interface WetRoomChoices {
   waste: "skip" | "bagged";
   /** false = the niche without its LED strip. */
   niche_led: boolean;
+  /** C3: "wall_hung" = frame + concealed cistern + duct wall (recomputed by rule, no longer an option). */
+  wc_mount: "floor_standing" | "wall_hung";
+  /** C3: "wall_hung" = a basin on the wall, no vanity (the vanity and basin first fix go to scope review). */
+  basin_mount: "on_vanity" | "wall_hung";
 }
 
-export const BASE_CHOICES: WetRoomChoices = { shower_screen: "enclosure", shower_valve: "thermostatic", vanity: "floating_stone", fittings: "premium", waste: "skip", niche_led: true };
+export const BASE_CHOICES: WetRoomChoices = { shower_screen: "enclosure", shower_valve: "thermostatic", vanity: "floating_stone", fittings: "premium", waste: "skip", niche_led: true, wc_mount: "floor_standing", basin_mount: "on_vanity" };
+
+/** C3: the scope reviews recorded on the room (rooms.spec.wet_room.reviewed). */
+export function wetRoomReviewedOf(spec: unknown): string[] {
+  const w = (spec && typeof spec === "object" ? (spec as Record<string, unknown>).wet_room : null) as Record<string, unknown> | null | undefined;
+  return Array.isArray(w?.reviewed) ? (w!.reviewed as unknown[]).filter((x): x is string => typeof x === "string") : [];
+}
 
 export function wetRoomChoicesOf(spec: unknown): WetRoomChoices {
   const w = (spec && typeof spec === "object" ? (spec as Record<string, unknown>).wet_room : null) as Record<string, unknown> | null | undefined;
   if (!w || typeof w !== "object") return { ...BASE_CHOICES };
   return {
     shower_screen: w.shower_screen === "fixed_panel" ? "fixed_panel" : "enclosure",
-    shower_valve: w.shower_valve === "manual" ? "manual" : "thermostatic",
+    shower_valve: w.shower_valve === "manual" ? "manual" : w.shower_valve === "exposed" ? "exposed" : "thermostatic",
     vanity: w.vanity === "ready_made" ? "ready_made" : "floating_stone",
     fittings: w.fittings === "mid" ? "mid" : "premium",
     waste: w.waste === "bagged" ? "bagged" : "skip",
     niche_led: w.niche_led !== false,
+    wc_mount: w.wc_mount === "wall_hung" ? "wall_hung" : "floor_standing",
+    basin_mount: w.basin_mount === "wall_hung" ? "wall_hung" : "on_vanity",
   };
 }
 
@@ -223,6 +238,7 @@ export function wetRoomContextFrom(graph: PlanGraph, roomId: string, fixtures: r
     extractor: room.spec?.extractor !== false,
     bulkhead: room.spec?.bulkhead != null && room.spec.bulkhead !== false,
     choices: wetRoomChoicesOf(room.spec),
+    reviewed: wetRoomReviewedOf(room.spec),
     existing_fixtures: existingFixturesOf(room.spec) ?? (gone.size ? onSiteList(own) : null),
   };
 }
@@ -329,7 +345,13 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
 
   // --- Sanitaryware: floor-standing WC base case; bidet; basin + mixer; shower set.
   remove("Sanitaryware", (l) => ["Q-22", "Q-24d"].includes(ruleOf(l)));
-  if (wcs.length)
+  // C3: a wall-hung WC is another install class — recomputed by rule (frame + WC
+  // R-19, flush plate R-43, duct wall R-63) in place of the floor-standing WC.
+  if (wcs.length && ch.wc_mount === "wall_hung") {
+    add("Sanitaryware", W("W-31", "Sanitaryware", "san.wc", "Wall-hung WC with concealed cistern frame — supply and install (existing soil position)", wcs.length, "no", `WC on the plan × ${wcs.length} — R-19, the market WC-suite band the reference villa's wall-hung WCs were priced at`, { element_refs: wcs.map((f) => f.id) }));
+    add("Sanitaryware", W("W-32", "Sanitaryware", "san.actuator", "WC flush plate for the concealed cistern — supply", wcs.length, "no", "R-43", { element_refs: wcs.map((f) => f.id) }));
+    add("Sanitaryware", W("W-33", "Sanitaryware", "san.wc_duct_wall", "Duct wall to the WC — MR board on the frame, waterproofed, tiled", wcs.length, "no", "R-63, ~1.2 m wide on the WC wall", { element_refs: wcs.map((f) => f.id) }));
+  } else if (wcs.length)
     add("Sanitaryware", ch.fittings === "mid"
       ? W("W-15", "Sanitaryware", "san.wc_floor_mid", "Floor-standing close-coupled WC, mid-range — supply and install (existing position)", wcs.length, "no", `WC on the plan × ${wcs.length} (R-71)`, { element_refs: wcs.map((f) => f.id) })
       : W("W-15", "Sanitaryware", "san.wc_floor", "Floor-standing close-coupled rimless WC — supply and install (existing position)", wcs.length, "no", `WC on the plan × ${wcs.length}`, { element_refs: wcs.map((f) => f.id) }));
@@ -347,6 +369,15 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
     remove("Sanitaryware", (l) => ruleOf(l) === "Q-24");
     add("Sanitaryware", W("W-27", "Sanitaryware", "san.shower_manual", "Concealed manual shower mixer with diverter, rain head + hand shower, brushed brass (existing position)", 1, "no", "one shower (R-68)", { element_refs: [shower.id] }));
   }
+  // C3: an exposed set is another install class — its own product line; the
+  // supply point (priced as a concealed first fix) goes to scope review below.
+  if (shower && ch.shower_valve === "exposed") {
+    remove("Sanitaryware", (l) => ruleOf(l) === "Q-24");
+    add("Sanitaryware", W("W-34", "Sanitaryware", "san.shower_exposed", "Exposed thermostatic shower set — bar mixer and riser rail on the wall, rain head + hand shower, brushed brass (existing position)", 1, "no", "one shower (R-77)", { element_refs: [shower.id] }));
+  }
+  // C3: a wall-hung basin has no rule yet — its own line TBC; the vanity and the
+  // basin first fix go to scope review below.
+  if (basins.length && ch.basin_mount === "wall_hung") add("Sanitaryware", tbc("W-35", "san.basin_wall_hung", "Wall-hung basin with a bottle trap — supply and install", basins.length, "no", "C3 — no rule prices a wall-hung basin yet. TBC — QS to price."));
   if (!basins.length) remove("Sanitaryware", (l) => ruleOf(l) === "Q-23");
 
   // --- Joinery: a floating vanity with a stone top and an open shelf; the door stays.
@@ -407,7 +438,7 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
   // --- Options, outside the total.
   const options: BoqOption[] = [];
   const base = (rule: string) => [...sections.values()].flat().filter((l) => ruleOf(l) === rule);
-  if (wcs.length) {
+  if (wcs.length && ch.wc_mount !== "wall_hung") {
     const adds = [
       { ...W("WO-1", "Sanitaryware", "san.wc", "Wall-hung WC with concealed cistern frame — supply and install (existing soil position)", wcs.length, "no", "R-19 — the market WC-suite band the reference villa's wall-hung WCs were priced at"), work_section: "Sanitaryware" },
       { ...W("WO-2", "Sanitaryware", "san.actuator", "WC flush plate for the concealed cistern — supply", wcs.length, "no", "R-43"), work_section: "Sanitaryware" },
@@ -422,13 +453,20 @@ export function applyWetRoomPackage<T extends DocLike>(boq: T, ctx: WetRoomConte
     options.push({ key: "bulkhead_removal", label: "Remove the bulkhead over the shower", note: "A flat ceiling over the shower. The cove light runs along the bulkhead, so it goes with it.", adds, replaces: replaces.map((l) => ({ description: l.description, rule_id: l.rule_id ?? "", total_aed: l.total_aed })), net_aed: money2(sumMoney(adds.map((a) => a.total_aed)) - sumMoney(replaces.map((l) => l.total_aed))) });
   }
 
+  // C3: lines priced for the base install class that a chosen product no longer
+  // matches — flagged until a member marks the change reviewed. Never silently kept.
+  const reviews = openReviews(ch, ctx.reviewed ?? []);
+  for (const r of reviews) {
+    for (const [name] of sections) edit(name, (l) => r.dependent.includes(installLineKey(l)), () => ({ scope_review: `${SCOPE_REVIEW_PREFIX}${r.what}`, scope_review_field: r.field }));
+  }
+
   // Every line says what its rate rests on.
   const out = [...sections.entries()]
     .filter(([, lines]) => lines.length > 0)
     .map(([work_section, lines]) => ({ work_section, lines: lines.map((l) => ({ ...l, rate_basis: rateBasisOf(l) })), section_total_aed: 0 }));
   for (const o of options) o.adds = o.adds.map((a) => ({ ...a, rate_basis: rateBasisOf(a) }));
   const chained = rechain({ ...boq, sections: out } as unknown as ChainedDoc) as unknown as T;
-  return { ...chained, options, wet_room: { package: WET_ROOM_PACKAGE, room_id: ctx.room_id } };
+  return { ...chained, options, wet_room: { package: WET_ROOM_PACKAGE, room_id: ctx.room_id, ...(reviews.length ? { scope_review: reviews.map((r) => ({ field: r.field, what: r.what, lines: r.dependent })) } : {}) } };
 }
 
 /** Each option's delta on the grand total — through the BoQ's own chain (OH&P, contingency, VAT). Call LAST. */

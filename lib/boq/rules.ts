@@ -633,6 +633,15 @@ export const RATE_RULES: Record<string, RateRule> = {
     allowance_aed: 600,
     allowance_note: "Recessed shower niche ~600 × 300, formed, waterproofed, tiled — no LED strip, AED 600 allowance (R-56 with the LED is 950). QS to confirm.",
   },
+  // C3 (21 Oct): the exposed shower set — a different INSTALL class from the
+  // concealed valves (R-21 / R-68): no valve body in the wall, a bar mixer and a
+  // riser rail on its face. Choosing it flags the shower supply point (priced
+  // as a concealed first fix) for scope review (lib/boq/install-classes.ts).
+  "san.shower_exposed": {
+    rule_id: "R-77",
+    allowance_aed: 1300,
+    allowance_note: "Exposed thermostatic shower set — bar mixer and riser rail on the wall face, rain head + hand shower, brushed brass, supply + install, AED 1,300 allowance (mid-range exposed set). QS to confirm.",
+  },
   // C1 (20 Oct): aluminium & glazing per m² of THIS plan's openings
   // (lib/boq/glazing.ts). The reference villa's aluminium order used to be
   // printed line by line — its rooms, its quantities — on every project with an
