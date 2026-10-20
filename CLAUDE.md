@@ -1223,8 +1223,22 @@ Report `docs/BATHROOM_PILOT_B10.md`. No migration.
     the three kept were each "partly" done.
   - The vanity: ×0.98 masked vs ×2.68 with its size stated in the prompt.
   - A masked RESTYLE is not viable: the shell barely restyles and invents.
-- **Not wired**: "Ask for a change" and the restyle pipeline are unchanged,
-  pending a ruling on masked edits for in-place requests.
+- **Wired as "Ask for a change" for one-item requests** (ruled 20 Oct,
+  `lib/render/masked-change.ts`, used by `photo-view-change.ts`):
+  - a request that names exactly ONE live check item (`itemsNamedBy`) that the
+    current image's reading locates → that item's box, padded `MASK_PAD`
+    (1.5 %), raised to a stated height, is the mask; flux-fill edits inside it;
+  - kept by `maskedVerdict` (not unchanged, layout check passes, request not
+    "no") → a version with `change.path = "masked"`;
+  - otherwise today's edit runs as the fallback, recording `change.masked`
+    `{ item, box, kept: false, why }`; no item / several / not in view → today's
+    edit directly. The studio says which path made the version.
+  - The restyle pipeline is unchanged (a masked restyle is not viable).
+  - **Known limit (live, 20 Oct):** the mask is the WHOLE item, so asked for a
+    white ceramic top the fill also turned the oak vanity black (twice, the
+    second time with a "keep every other part" prompt line).
+  - Live: `node --env-file=.env.local scripts/b10-masked-change-check.mjs
+    [port] [render-id] [--cap=2]` (hard cap).
 - **Hard spend cap** (`lib/render/spend-cap.ts` `SpendCap`): every paid call
   reserves its worst case (`WORST_CASE_USD`) against the session's tagged
   render_spend (`detail.session_ref`) and is refused past the cap. Every render

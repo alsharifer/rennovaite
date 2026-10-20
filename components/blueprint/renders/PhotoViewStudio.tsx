@@ -588,6 +588,15 @@ export function PhotoViewCentre({ api, roomName, photo, onSelect }: { api: Photo
               {lastChange.line}
             </p>
           ) : null}
+          {lastChange?.path === "masked" && lastChange.masked ? (
+            <p className="t-body-sm mt-1 text-bp-ink-secondary" data-change-path="masked">
+              Changed inside the {lastChange.masked.item}&apos;s outline only — nothing else in the image moved.
+            </p>
+          ) : lastChange?.path === "edit" && lastChange.masked && !lastChange.masked.kept ? (
+            <p className="t-body-sm mt-1 text-bp-ink-secondary" data-change-path="edit-fallback">
+              Tried inside the {lastChange.masked.item}&apos;s outline first ({lastChange.masked.why}); the whole image was edited instead.
+            </p>
+          ) : null}
         </>
       ) : null}
 

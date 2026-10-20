@@ -121,3 +121,39 @@ edit is tried once more.
 - **What's inside the mask is the new limit.** Worth trying: a reference crop of
   the wanted product as an image condition (flux-fill takes none, so a model
   that takes a mask and an image).
+
+## Wired (20 Oct): masked edits are "Ask for a change" for one-item requests
+
+Ruling: a request that names one item is edited inside that item's box, and
+today's edit is the fallback when the request isn't done.
+
+- **Routing** (`lib/render/masked-change.ts`, pure):
+  - `maskedChangeTarget` finds the ONE live check item the request names
+    (`itemsNamedBy`). Its box comes from the current image's reading,
+    padded 1.5 % and raised to a stated height.
+  - No item, several items, or an item not in view → today's edit, no masked
+    try.
+  - `maskedVerdict` keeps the masked version unless:
+    - the image is unchanged;
+    - the layout check refuses it;
+    - the reading says "not done" ("partly" is kept, as for today's edit).
+- **Route** (`photo-view-change.ts`):
+  - the masked try → kept as a version with `change.path = "masked"`;
+  - or today's edit runs, with `change.masked = { item, box, kept: false, why }`
+    on every row it writes.
+  - The studio says which path made the version.
+- **Live** (`scripts/b10-masked-change-check.mjs`, dev test bathroom, Photo 3's
+  B2-era version, hard cap US$2, ≈ US$0.24 spent):
+  - "Change the vanity counter to a white ceramic top with an integrated basin"
+    → version, flux-fill-pro, `path: masked`, layout held; nothing outside the
+    vanity's box moved. Run twice.
+  - **But the fill redesigned what the request did not name**: the top became
+    white, and the oak cabinet became black, both times. The second run had the
+    prompt line "every other part of the vanity keeps exactly its colour,
+    material, size and design". The describer still rated the request done, so
+    the version was kept.
+- **One trial, not wired** (US$0.04): the same request through today's edit
+  model (nano-banana), pasted back inside the vanity's box only
+  (`compositeInside`) → white top, oak cabinet kept, nothing outside the box
+  changed (`data/Bathroom Pilot/b10-eval/live-edit-inside-mask.jpg`). One
+  sample; the edit model sees the whole room, so it knows what the vanity is.

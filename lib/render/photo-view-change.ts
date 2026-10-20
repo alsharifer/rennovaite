@@ -21,6 +21,13 @@
 //   6. The version follows its parent's lock; on the ANCHOR view it moves the
 //      room's anchor (spec read again) and every other view's "follows" goes
 //      stale — shown, not re-rendered.
+//
+// The masked path (ruled 20 Oct, B10): a request that names exactly ONE item is
+// first edited INSIDE that item's outline (masked-change.ts → masked-edit.ts:
+// flux-fill-pro, the parent pasted back outside the mask, so nothing else can
+// move). It is held to the same checks — unchanged, layout, "was it done". When
+// it falls short, today's edit runs as the fallback and the version records the
+// masked try and why it was not kept (`change.path`, `change.masked`).
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -38,6 +45,8 @@ import { designKey } from "@/lib/documents/render-consistency";
 import { moveAnchor } from "./photo-view-anchor";
 import { PhotoViewError, type PhotoViewChange, type PhotoViewGate } from "./photo-view-run";
 import { IMAGE_PRICE_USD, recordSpend, type SpendRow } from "./render-spend";
+import { MASK_MODEL, maskedEdit, maskPng } from "./masked-edit";
+import { maskedChangePrompt, maskedChangeTarget, maskedVerdict } from "./masked-change";
 import { changeLine, describeChange, type RoomAnchor } from "./room-spec";
 import { compareImages, isUnchangedEdit, UNCHANGED_MESSAGE } from "./similarity";
 
@@ -104,14 +113,94 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   const items = mini ? checkItemsFor(mini) : parent.gate.items;
   const carried = mini ? carryLocated(parent.gate.items, reference.items, items) : reference.items;
   const before = { items: carried };
+  const resizable = itemsNamedBy(request, items);
+  let cost = 0;
 
+  const record = async (status: string, gate: Record<string, unknown>, image: string | null, used: { model: string; prompt: string }) => {
+    const { data: row, error } = await db.from("renders").insert({ project_id: input.projectId, room_id: null, room_photo_id: photo.id, parent_render_id: parent.id, prompt: used.prompt, image_url: image, source_image_url: parent.image_url, model: used.model, mode: "photo_view", gate, status, ...(parent.anchor_render_id ? { anchor_render_id: parent.anchor_render_id } : {}) }).select("id").single<{ id: string }>();
+    if (error || !row) throw new Error(`could not save the change: ${error?.message}`);
+    await recordSpend(db, spend.splice(0).map((s) => ({ ...s, render_id: row.id, room_photo_id: photo.id, detail: { ...(s.detail ?? {}), actor: input.actor } })));
+    return row.id;
+  };
+
+  // A kept change becomes version N (both paths end here).
+  const keep = async (k: { next: Uint8Array; read: { items: PhotoViewGate["before"] }; sim: Awaited<ReturnType<typeof compareImages>> | null; what: { changed: string[]; summary: string }; line: string; used: { model: string; prompt: string }; path: "masked" | "edit"; masked: PhotoViewChange["masked"] }): Promise<ChangeOutcome> => {
+    const { count } = await db.from("renders").select("id", { count: "exact", head: true }).eq("room_photo_id", photo.id).eq("mode", "photo_view").eq("status", "succeeded");
+    const version = (count ?? 0) + 1;
+    const change: PhotoViewChange = {
+      request,
+      changed: k.what.changed,
+      summary: k.what.summary,
+      line: changeLine(request, version, k.what.changed),
+      version,
+      parent_render_id: parent.id,
+      ssim: k.sim ? Math.round(k.sim.ssim * 1000) / 1000 : null,
+      changed_pct: k.sim ? Math.round(k.sim.changedPct * 10) / 10 : null,
+      cost_usd: Math.round(cost * 10000) / 10000,
+      path: k.path,
+      masked: k.masked,
+    };
+    const stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, k.next, mime(k.next));
+    // The version's own reading is what the next change is held to.
+    const attempts = parent.gate!.attempts.length ? [...parent.gate!.attempts.slice(0, -1), { ...parent.gate!.attempts.at(-1)!, after: k.read.items }] : parent.gate!.attempts;
+    const { data: roomRow } = await db.from("rooms").select("spec").eq("id", photo.room_id).maybeSingle<{ spec: Record<string, unknown> | null }>();
+    const design_key = mini ? designKey(mini.fixtures, roomRow?.spec?.wet_room ?? null) : parent.gate!.design_key;
+    const gate: PhotoViewGate = { ...parent.gate!, items, attempts, outcome: "passed", line: k.line, change, cost_usd: change.cost_usd, ...(design_key ? { design_key } : {}) };
+    const id = await record("succeeded", gate as unknown as Record<string, unknown>, stored, k.used);
+
+    // The lock follows the version the user changed; on the anchor view, so does the anchor.
+    let anchor: RoomAnchor | null = null;
+    if (photo.locked_render_id === parent.id) {
+      await db.from("room_photos").update({ locked_render_id: id, locked_at: new Date().toISOString() }).eq("id", photo.id);
+      const { data: a } = await db.from("room_anchors").select("render_id").eq("room_id", photo.room_id).maybeSingle<{ render_id: string }>();
+      if (a?.render_id === parent.id) anchor = await moveAnchor(db, { projectId: input.projectId, roomId: photo.room_id, render: { id, image_url: stored, room_photo_id: photo.id }, actor: input.actor, request });
+    }
+    return { kind: "version", render_id: id, image_url: stored, gate, change, anchor };
+  };
+
+  // --- 1. The masked path: a request that names one item, edited inside its outline. ---
+  let masked: PhotoViewChange["masked"] = null;
+  const target = maskedChangeTarget(request, items, carried);
+  const parentSize = imageSize(parentBytes);
+  if (target && parentSize) {
+    const maskedPrompt = maskedChangePrompt(target.item, request);
+    const tried = { item: target.item.short, box: target.box };
+    try {
+      const m = await maskedEdit(parentBytes, await maskPng(parentSize, [target.box]), maskedPrompt);
+      cost += IMAGE_PRICE_USD[MASK_MODEL] ?? 0;
+      spend.push({ project_id: input.projectId, purpose: "photo_view", model: MASK_MODEL, size: `${parentSize.width}x${parentSize.height}`, cost_usd: IMAGE_PRICE_USD[MASK_MODEL] ?? null, detail: { step: "change_masked", request, item: target.item.short } });
+      const mNext = new Uint8Array(m.bytes);
+      const mRead = await detectAgreed({ mediaType: mime(mNext), data: b64(mNext) }, items, "after", parentSize, { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: carried });
+      const mReadUsd = checkCostUsd(mRead.usage);
+      cost += mReadUsd;
+      spend.push({ project_id: input.projectId, purpose: "photo_check", model: mRead.model, cost_usd: mReadUsd, detail: { step: "change_masked_layout", usage: mRead.usage } });
+      const mSim = await compareImages(Buffer.from(parentBytes), Buffer.from(mNext)).catch(() => null);
+      const mVerdict = judgePhotoPlacement(items, before, mRead, { resizable });
+      const early = maskedVerdict({ unchanged: !!mSim && isUnchangedEdit(mSim), layout: mVerdict });
+      if (!early.keep) masked = { ...tried, kept: false, why: early.why };
+      else {
+        const mWhat = await describeChange({ mediaType: mime(parentBytes), data: b64(parentBytes) }, { mediaType: mime(mNext), data: b64(mNext) }, request);
+        const mWhatUsd = checkCostUsd(mWhat.usage);
+        cost += mWhatUsd;
+        spend.push({ project_id: input.projectId, purpose: "photo_check", model: mRead.model, cost_usd: mWhatUsd, detail: { step: "change_masked_describe", usage: mWhat.usage } });
+        const done = maskedVerdict({ unchanged: false, layout: mVerdict, requestDone: mWhat.request_done, summary: mWhat.summary });
+        if (done.keep) return keep({ next: mNext, read: mRead, sim: mSim, what: mWhat, line: mVerdict.line, used: { model: MASK_MODEL, prompt: maskedPrompt }, path: "masked", masked: { ...tried, kept: true } });
+        masked = { ...tried, kept: false, why: done.why };
+      }
+    } catch (e) {
+      masked = { ...tried, kept: false, why: `the masked edit failed — ${e instanceof Error ? e.message.slice(0, 160) : String(e)}` };
+    }
+  }
+
+  // --- 2. Today's edit: every other request, and the fallback when the masked edit fell short. ---
   const arm = photoViewArm();
   const model = ARM_MODEL[arm];
   const pinned = arm === "edit_pro" ? await padToAspect(parentBytes) : null;
   const prompt = changePrompt(request, !!pinned);
+  const used = { model, prompt };
   const url = await runRenderModel(model, pinned ? restyleInput("edit_pro", prompt, `data:image/jpeg;base64,${pinned.bytes.toString("base64")}`) : { prompt, image_input: [parent.image_url], aspect_ratio: "match_input_image", output_format: "jpg" });
   const raw = await fetchSceneBytes(url);
-  let cost = IMAGE_PRICE_USD[model] ?? 0;
+  cost += IMAGE_PRICE_USD[model] ?? 0;
   spend.push({ project_id: input.projectId, purpose: "photo_view", model, size: (() => { const s = imageSize(raw); return s ? `${s.width}x${s.height}` : null; })(), cost_usd: IMAGE_PRICE_USD[model] ?? null, detail: { step: "change", request, arm } });
   // Read where everything is in the model's own frame first: a pinned output is cut back by it.
   const readRaw = await detectAgreed({ mediaType: mime(raw), data: b64(raw) }, items, "after", imageSize(raw), { image: { mediaType: mime(reference.bytes), data: b64(reference.bytes) }, located: carried });
@@ -129,26 +218,20 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   }
 
   const sim = await compareImages(Buffer.from(parentBytes), Buffer.from(next)).catch(() => null);
-  const record = async (status: string, gate: Record<string, unknown>, image: string | null) => {
-    const { data: row, error } = await db.from("renders").insert({ project_id: input.projectId, room_id: null, room_photo_id: photo.id, parent_render_id: parent.id, prompt, image_url: image, source_image_url: parent.image_url, model, mode: "photo_view", gate, status, ...(parent.anchor_render_id ? { anchor_render_id: parent.anchor_render_id } : {}) }).select("id").single<{ id: string }>();
-    if (error || !row) throw new Error(`could not save the change: ${error?.message}`);
-    await recordSpend(db, spend.map((s) => ({ ...s, render_id: row.id, room_photo_id: photo.id, detail: { ...(s.detail ?? {}), actor: input.actor } })));
-    return row.id;
-  };
 
   // R10a: an edit that came back the same image is on record, never a version.
   if (sim && isUnchangedEdit(sim)) {
-    const id = await record("unchanged", { unchanged: true, request, similarity: sim }, null);
+    const id = await record("unchanged", { unchanged: true, request, similarity: sim, masked }, null, used);
     return { kind: "unchanged", render_id: id, message: UNCHANGED_MESSAGE };
   }
 
-  const verdict = judgePhotoPlacement(items, before, read, { resizable: itemsNamedBy(request, items) });
+  const verdict = judgePhotoPlacement(items, before, read, { resizable });
   if (!verdict.passed) {
     const first = verdict.failures[0];
     const message = `That change ${first ? first.message.replace(/^the render /, "") : "moved the layout"} — it was not kept. Try asking for it differently.`;
     // B7 6: kept for "see what differs" — the refused image (stored: the model's URL expires) and its reading.
     const refused_image_url = await uploadRenderBytes(`projects/${input.projectId}/photo-views/refused-${photo.id}-${Date.now()}.jpg`, next, mime(next)).catch(() => null);
-    const id = await record("unchanged", { unchanged: false, layout_failed: true, request, failures: verdict.failures, similarity: sim, candidate_url: url, refused_image_url, items, before: carried, after: read.items }, null);
+    const id = await record("unchanged", { unchanged: false, layout_failed: true, request, failures: verdict.failures, similarity: sim, candidate_url: url, refused_image_url, items, before: carried, after: read.items, masked }, null, used);
     return { kind: "moved", render_id: id, message, refused: { render_id: id, image_url: refused_image_url ?? url, request, message, failures: verdict.failures, after: read.items, created_at: new Date().toISOString() } };
   }
 
@@ -160,37 +243,9 @@ export async function runPhotoViewChange(db: SupabaseClient, input: { projectId:
   // happen ("No visible change; shattaf still present", live 19 Oct) — the
   // honest unchanged answer, never a version.
   if (what.request_done === "no") {
-    const id = await record("unchanged", { unchanged: true, request, similarity: sim, read_unchanged: true, summary: what.summary, candidate_url: url }, null);
+    const id = await record("unchanged", { unchanged: true, request, similarity: sim, read_unchanged: true, summary: what.summary, candidate_url: url, masked }, null, used);
     return { kind: "unchanged", render_id: id, message: UNCHANGED_MESSAGE };
   }
 
-  const { count } = await db.from("renders").select("id", { count: "exact", head: true }).eq("room_photo_id", photo.id).eq("mode", "photo_view").eq("status", "succeeded");
-  const version = (count ?? 0) + 1;
-  const change: PhotoViewChange = {
-    request,
-    changed: what.changed,
-    summary: what.summary,
-    line: changeLine(request, version, what.changed),
-    version,
-    parent_render_id: parent.id,
-    ssim: sim ? Math.round(sim.ssim * 1000) / 1000 : null,
-    changed_pct: sim ? Math.round(sim.changedPct * 10) / 10 : null,
-    cost_usd: Math.round(cost * 10000) / 10000,
-  };
-  const stored = await uploadRenderBytes(`projects/${input.projectId}/photo-views/${photo.id}-${Date.now()}.jpg`, next, mime(next));
-  // The version's own reading is what the next change is held to.
-  const attempts = parent.gate.attempts.length ? [...parent.gate.attempts.slice(0, -1), { ...parent.gate.attempts.at(-1)!, after: read.items }] : parent.gate.attempts;
-  const { data: roomRow } = await db.from("rooms").select("spec").eq("id", photo.room_id).maybeSingle<{ spec: Record<string, unknown> | null }>();
-  const design_key = mini ? designKey(mini.fixtures, roomRow?.spec?.wet_room ?? null) : parent.gate.design_key;
-  const gate: PhotoViewGate = { ...parent.gate, items, attempts, outcome: "passed", line: verdict.line, change, cost_usd: change.cost_usd, ...(design_key ? { design_key } : {}) };
-  const id = await record("succeeded", gate as unknown as Record<string, unknown>, stored);
-
-  // The lock follows the version the user changed; on the anchor view, so does the anchor.
-  let anchor: RoomAnchor | null = null;
-  if (photo.locked_render_id === parent.id) {
-    await db.from("room_photos").update({ locked_render_id: id, locked_at: new Date().toISOString() }).eq("id", photo.id);
-    const { data: a } = await db.from("room_anchors").select("render_id").eq("room_id", photo.room_id).maybeSingle<{ render_id: string }>();
-    if (a?.render_id === parent.id) anchor = await moveAnchor(db, { projectId: input.projectId, roomId: photo.room_id, render: { id, image_url: stored, room_photo_id: photo.id }, actor: input.actor, request });
-  }
-  return { kind: "version", render_id: id, image_url: stored, gate, change, anchor };
+  return keep({ next, read, sim, what, line: verdict.line, used, path: "edit", masked });
 }
