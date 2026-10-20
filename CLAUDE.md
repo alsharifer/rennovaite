@@ -622,9 +622,9 @@ Spec §7.4, Figma 81:716 / dark 82:2244; migration **058** `rooms.in_scope`
   progress) and the Overview / hub ("11 of 13 rooms in scope") follow.
 - **Whole-home (kept)**: project lumps Q-05 civil alterations, Q-32 site set-up,
   Q-33 DM/DEWA permits, Q-36 scaffold, Q-37 handover clean (garden GL-01–03);
-  demolition from the proposed plan; the aluminium & glazing allowance (ruled
-  whole-home, 14 Oct — every line notes "Covers the whole unit — adjust if only
-  some rooms are in scope"); fixtures in no room. Area-driven prelims (soft
+  demolition from the proposed plan; fixtures in no room. (The aluminium &
+  glazing allowance was ruled whole-home here — SUPERSEDED by C1: glazing comes
+  from the plan's own openings and follows the rooms in scope.) Area-driven prelims (soft
   strip, floor removal, floor protection, skips — ceil'd) follow the rooms.
 - **Q-11 staircase renovation (ruled 14 Oct)**: priced when an in-scope stairs
   room exists; none when the stairs room is out of scope; with NO stairs room
@@ -1205,6 +1205,73 @@ Report `docs/BATHROOM_PILOT_B9.md`. Migration **066**.
   - The pilot bathroom's allowances: 46.5 % → 23.8 % of the work
     (rev 15, AED 37,601.29). Room protection stays an allowance — no per-room
     figure exists.
+
+### Sprint C1 — ground truth never emits a line; glazing from the plan (20 Oct)
+
+Root cause: `docs/SPRINT_C_ROOT_CAUSE.md` (C0). Jumeirah's BoQ carried the
+Mudon aluminium order line by line — "Guest bedroom", "Office", AED 92,449 —
+because `buildAluminumSection` printed `ALUMINUM` from `lib/ground-truth/` on
+every plan with an interior room, and the inspector said "Mudon ground-truth
+quotations". No migration.
+
+- **The rule** (`lib/boq/__tests__/ground-truth-rule.test.ts`): nothing under
+  `lib/ground-truth/` emits a BoQ line. The pricing path (assemble + the route)
+  may import from it only the allowlisted rates per unit by type and their
+  vocabulary (JOINERY rates, the garden rate vocabulary and inclusion rules, the
+  programme anchors, `INTERNAL_REF`) — each with its reason; an assembled BoQ
+  carries no record of the aluminium order, tile cart or joinery order. The
+  orders stay as transcriptions.
+- **Glazing from the plan's own openings** (`lib/boq/glazing.ts`, pure):
+  windows, and doors between a roofed room and the outside (no room, a terrace /
+  balcony, an open zone), sides probed with the plan rules' `placeOpening` (a
+  derived wall's `room_ids` misreads hand-drawn neighbours); internal doors stay
+  joinery, archways and gates are never glazing; in-scope rooms only (K12).
+  Q-38 windows / Q-39 external doors, m² of opening, `element_refs` = the
+  openings, the measurement names each opening by THIS plan's room; a defaulted
+  or detected size → `qty_derived`. Priced through the resolver (a firm's own
+  rate answers first) at **R-75 `alum.window` 3,324.10 / m²** and **R-76
+  `alum.external_door` 2,623.47 / m²** — calibrated (rate basis), sourced from
+  the reference villa's order with the arithmetic in the note, `vendor_or_source`
+  "reference villa — aluminium & glazing supplier" (`sourced.role`). Its skylight
+  and balustrade are not plan openings and price nothing.
+- **No openings → no glazing lines**, no fallback allowance (ruled 20 Oct): the
+  BoQ records `glazing_not_priced` ("No windows or doors drawn — glazing not
+  priced."), the review model's `notices.glazing`, the Issues navigator's
+  PLAN CHECK row → `/plan?layer=openings`. Not for a garden-only plan or the
+  wet-room package (it prices no glazing).
+- **Provenance text names no project**: `module_reference`'s detail is "a rate
+  per unit transacted on a comparable Dubai villa … its source stays private",
+  and every tier detail passes `cur()`. The cove-LED line names only the room
+  kinds the plan has; the timeline note and the LLM prompt say "reference villa".
+- **Scan over every rendered surface** (`lib/identity/surface-scan.ts`, pure):
+  withheld identities + every other project's name + the reference-project
+  markers (Mudon, Al Naseem, Villa 94, Arabella — allowed on that project's own
+  surfaces) + the reference orders' room labels (`REFERENCE_ROOM_LABELS`,
+  derived from the transcriptions) absent from THIS plan (whole-word match —
+  "Bath" does not make "Master bathroom" a room). In the suite:
+  `lib/identity/__tests__/surface-scan.test.ts` builds the inspector / popover
+  chains, the review model, the Issues navigator, the revision diff, the
+  proposal and BoQ PDF pages from the Jumeirah and Mudon prod fixtures. On any
+  database: `scripts/read-path-leak-scan.ts` §6 (every project's latest
+  revision; a pre-C1 revision fails until regenerated).
+- **Engine 0.4.0 + the diff cause**: across 0.4.0 (stored engine versions, like
+  H7), a removed Aluminum & Glass line of the reference order (not the S6 shower
+  glass / mirror) has cause `engine_change` "Removed reference-project glazing
+  lines (defect, C1)" and reads "Reference-project glazing line (removed)" — its
+  amount and cause, never the room text (key and item_key masked too); an added
+  `alum.window` / `alum.external_door` line reads "Glazing priced from this
+  plan's windows and doors (C1)" (`lib/boq/revision-diff.ts c1GlazingCause`).
+  Stored revisions are never rewritten — a prod regenerate makes the next one
+  (owner's go-ahead; docs/SPRINT_C_ROOT_CAUSE.md §4).
+- **Measured**: Jumeirah rev 1 re-run → −92,449.00 of quotation lines, + its 8
+  windows (13.53 m² × 3,324.10 = 44,975.07, all derived sizes; no external door —
+  every door opens to a room): subtotal 444,858.36 → 397,384.43. Mudon's 5 Sep
+  revision → −92,449.00 + 1 window (1.44 m², 4,786.70 — its other 4 openings
+  "need a wall"), plus the S6-pre drift any re-run of that revision brings
+  (vanity slab, shower glass, mirrors +10,700.00 — named in the test). Dev: Arabella 116,679.56 unchanged; the demo villa
+  exactly −92,449.00 (no openings → the reason). Fixtures:
+  `lib/boq/__fixtures__/c1-jumeirah-rev1.json`, `c1-mudon-latest.json` (prod,
+  read-only, curated); test `lib/boq/__tests__/c1-scope-leak.test.ts`.
 
 ## Brand — Atelier Precise (parked marketing only since K8)
 

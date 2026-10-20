@@ -33,7 +33,8 @@ export const RATE_BASIS_LABEL: Record<RateBasis, string> = {
 };
 
 // B9: R-68 / R-70 are the reference villa's sanitary order; R-67 / R-69 / R-71 the catalogue.
-const CALIBRATED_RULES = new Set(["R-30", "R-31", "R-35", "R-36", "R-40", "R-41", "R-42", "R-43", "R-44", "R-68", "R-70"]);
+// C1: R-75 / R-76 are the reference villa's aluminium order, per m² of opening.
+const CALIBRATED_RULES = new Set(["R-30", "R-31", "R-35", "R-36", "R-40", "R-41", "R-42", "R-43", "R-44", "R-68", "R-70", "R-75", "R-76"]);
 const CATALOGUE_RULES = new Set(["R-67", "R-69", "R-71"]);
 
 interface LineLike {

@@ -13,6 +13,7 @@ import { generateDeterministicBoq } from "../engine";
 import { boqIssues } from "../issues";
 import { buildReviewModel } from "../review-model";
 import { MUDON_FIRST_FLOOR } from "../fixtures/mudon-first-floor";
+import { glazingOpeningsFrom } from "../glazing";
 import { appendJoineryAluminumSections } from "../joinery-aluminum";
 import { quantifyPlan } from "../quantify";
 import { DEFAULT_FLOORING } from "../rules";
@@ -97,7 +98,7 @@ describe("the priced BoQ — totals reconcile; re-adding restores", () => {
     expect(stable(price(MUDON_FIRST_FLOOR))).toBe(before);
   });
 
-  it("joinery follows the rooms (wardrobes, doors); the aluminium allowance is whole-home", () => {
+  it("joinery follows the rooms (wardrobes, doors); a bedroom out of scope leaves the bathrooms' glass and mirrors alone", () => {
     const all = price(MUDON_FIRST_FLOOR);
     const scoped = price(MUDON_FIRST_FLOOR.filter((r) => r.id !== "kids-bedroom-2"));
     const sec = (b: typeof all, name: string) => b.sections.find((s) => s.work_section === name);
@@ -259,10 +260,21 @@ describe("Q-11 staircase allowance", () => {
   });
 });
 
-it("the aluminium & glazing allowance stays whole-home and says so on every line", () => {
-  const { boq } = generateDeterministicBoq({ rooms: MUDON_FIRST_FLOOR, labourRates: LABOUR_RATES_FIXTURE as never, skus: PRICING_SKUS_FIXTURE, styleKey: "contemporary-arabic" });
-  const out = appendJoineryAluminumSections(boq, MUDON_FIRST_FLOOR.map((r) => ({ ...r, name_en: r.name })) as never);
-  const alu = out.sections.flatMap((s) => s.lines).filter((l) => (l.rule_id ?? "").startsWith("GT/aluminum/"));
-  expect(alu.length).toBeGreaterThan(0);
-  expect(alu.every((l) => /Covers the whole unit — adjust if only some rooms are in scope/.test(l.notes ?? ""))).toBe(true);
+it("glazing follows the rooms in scope (C1 supersedes the 14 Oct whole-home allowance)", () => {
+  // Two rooms, a window each on an outside wall; take one out of scope → its window goes with it.
+  const graph = buildPlanGraph({
+    projectId: "p", planId: "pl", scale: null, total_area_m2: 40,
+    rooms: [
+      { id: "a", name_en: "Living Room", name_ar: null, room_type: "living", area_m2: 20, polygon: [[0, 0], [5, 0], [5, 4], [0, 4]] },
+      { id: "b", name_en: "Bedroom 2", name_ar: null, room_type: "bedroom", area_m2: 20, polygon: [[5, 0], [10, 0], [10, 4], [5, 4]] },
+    ],
+    openings: [
+      { id: "w1", type: "window", width_mm: 1200, height_mm: 1500, position: [2.5, 0] },
+      { id: "w2", type: "window", width_mm: 1000, height_mm: 1200, position: [7.5, 0] },
+    ],
+  } as unknown as BuildPlanGraphInput);
+  const all = glazingOpeningsFrom(graph);
+  expect(all.map((o) => o.id).sort()).toEqual(["w1", "w2"]);
+  const scoped = glazingOpeningsFrom(graph, new Set(["a"]));
+  expect(scoped.map((o) => [o.id, o.rooms.join("/")])).toEqual([["w1", "Living Room"]]);
 });

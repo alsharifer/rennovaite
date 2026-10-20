@@ -112,6 +112,8 @@ export interface ReviewModel {
     /** K11 #3: `lineKeys` = the two lines a finding names (row keys), for the Issues navigator. */
     duplicates: { label: string; detail: string; lineKeys?: string[] }[];
     garden: { kept: number; removed: number; undecided: number } | null;
+    /** C1: the plan-check reason when the plan priced no glazing ("No windows or doors drawn — glazing not priced."). Absent / null = none. */
+    glazing?: string | null;
   };
   /** The client's own entered budget — owner projects only (H7). */
   budget: number | null;

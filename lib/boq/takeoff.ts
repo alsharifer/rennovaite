@@ -265,6 +265,9 @@ export function computeTakeoff(
     area_m2: g.room.area_m2,
   }));
   const ledStrip = ledStripAllowance(componentRooms);
+  // C1: the description names only the room kinds THIS plan has (it used to say
+  // "living/dining/master" on a plan with no master bedroom).
+  const ledKinds = (["living", "dining", "majlis", "master_bedroom"] as const).filter((t) => componentRooms.some((r) => r.type === t)).map((t) => (t === "master_bedroom" ? "master" : t));
 
   // F-08
   const wardrobeLm = round2(
@@ -531,7 +534,7 @@ export function computeTakeoff(
             rule_id: "S6-02",
             work_section: "Lighting" as const,
             item_key: "light.led_strip",
-            description: "Cove LED strip — supply (living/dining/master)",
+            description: `Cove LED strip — supply (${ledKinds.join("/")})`,
             quantity: ledStrip.quantity,
             unit: ledStrip.unit,
             measurement: ledStrip.measurement,

@@ -8,7 +8,7 @@ import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { PACK_JOB_HEADER, packJobActor } from "@/lib/documents/pack-export/guard";
 import { recordPilotEvent } from "@/lib/pilot/events";
 import { applyElementMapping } from "@/lib/boq/element-map";
-import { loadBoqInputs, priceDeterministicBoq, type LabourRateRow, type PricingSkuRow } from "@/lib/boq/assemble";
+import { loadBoqInputs, priceDeterministicBoq, pricedGlazingForLlm, type LabourRateRow, type PricingSkuRow } from "@/lib/boq/assemble";
 import { regenerateAuthority } from "@/lib/boq/regenerate";
 import { projectAccess } from "@/lib/projects/http";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
@@ -167,7 +167,7 @@ function computeQuantities(
       unit: "m2",
       suggested_rate_aed: null,
       notes:
-        "Typical Mudon bathroom wet-wall area = 28 m² per bathroom × " +
+        "Typical reference-villa bathroom wet-wall area = 28 m² per bathroom × " +
         `${bathroomCount} bathrooms.`,
     },
     {
@@ -668,7 +668,7 @@ Produce the priced BoQ as JSON per the schema in the system prompt. Reply with J
     const mappedLlm = applyElementMapping(llmBoq, takeoffItems, elementPricer(firm, "mid"));
     const overlaidLlm = await appendOverlaySections(mappedLlm, projectId, supabase);
     const gardenedLlm = await appendGardenSections(overlaidLlm, projectId, supabase, { firm });
-    const boq = applyOhp(appendJoineryAluminumSections(gardenedLlm, rooms), firm.ohpPct);
+    const boq = applyOhp(appendJoineryAluminumSections(gardenedLlm, rooms, pricedGlazingForLlm(loaded.inputs)), firm.ohpPct);
 
     // 5. Save and return.
     const { data: inserted, error: insertErr } = await supabase

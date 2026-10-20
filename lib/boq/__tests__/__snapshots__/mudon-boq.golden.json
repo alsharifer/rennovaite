@@ -448,102 +448,6 @@
         "work_section": "Aluminum & Glass",
         "lines": [
           {
-            "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
-            "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
-            "quantity": 2,
-            "unit": "no",
-            "rate_aed": 5150,
-            "total_aed": 10300,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
-            "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
-            "quantity": 2,
-            "unit": "no",
-            "rate_aed": 5150,
-            "total_aed": 10300,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
-            "description": "Master bathroom — Tilt & turn system DG, 950×950",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 3000,
-            "total_aed": 3000,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
-            "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 12040,
-            "total_aed": 12040,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
-            "description": "Office — Thermal-break sliding system DG, 1700×2300",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 10384,
-            "total_aed": 10384,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
-            "description": "Office — Thermal-break sliding system DG, 1830×3000",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 14176,
-            "total_aed": 14176,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
-            "description": "Living area — Skylight DG, 1830×3750",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 15749,
-            "total_aed": 15749,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
-            "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
-            "quantity": 10,
-            "unit": "lm",
-            "rate_aed": 1650,
-            "total_aed": 16500,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
             "rule_id": "S6-06/R-47",
             "description": "Frameless shower glass partition — supply and install",
             "quantity": 3,
@@ -568,7 +472,7 @@
             "scope": "supply_and_install"
           }
         ],
-        "section_total_aed": 100999
+        "section_total_aed": 8550
       },
       {
         "work_section": "Sanitaryware",
@@ -793,7 +697,7 @@
         "work_section": "Lighting",
         "lines": [
           {
-            "description": "Cove LED strip — supply (living/dining/master)",
+            "description": "Cove LED strip — supply (living/master)",
             "quantity": 43.29,
             "unit": "lm",
             "rate_aed": 85,
@@ -842,14 +746,14 @@
         "section_total_aed": 8215.56
       }
     ],
-    "subtotal_aed": 392667.63,
+    "subtotal_aed": 300218.63,
     "contingency_pct": 8,
-    "contingency_aed": 31413.41,
+    "contingency_aed": 24017.49,
     "vat_pct": 5,
-    "vat_aed": 21204.05,
-    "grand_total_aed": 445285.09,
+    "vat_aed": 16211.81,
+    "grand_total_aed": 340447.93,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "value",
       "flooring": "engineered_wood",
       "style_key": "scandi-arabic"
@@ -1278,102 +1182,6 @@
         "work_section": "Aluminum & Glass",
         "lines": [
           {
-            "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
-            "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
-            "quantity": 2,
-            "unit": "no",
-            "rate_aed": 5150,
-            "total_aed": 10300,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
-            "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
-            "quantity": 2,
-            "unit": "no",
-            "rate_aed": 5150,
-            "total_aed": 10300,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
-            "description": "Master bathroom — Tilt & turn system DG, 950×950",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 3000,
-            "total_aed": 3000,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
-            "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 12040,
-            "total_aed": 12040,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
-            "description": "Office — Thermal-break sliding system DG, 1700×2300",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 10384,
-            "total_aed": 10384,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
-            "description": "Office — Thermal-break sliding system DG, 1830×3000",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 14176,
-            "total_aed": 14176,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
-            "description": "Living area — Skylight DG, 1830×3750",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 15749,
-            "total_aed": 15749,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
-            "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
-            "quantity": 10,
-            "unit": "lm",
-            "rate_aed": 1650,
-            "total_aed": 16500,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
             "rule_id": "S6-06/R-47",
             "description": "Frameless shower glass partition — supply and install",
             "quantity": 3,
@@ -1398,7 +1206,7 @@
             "scope": "supply_and_install"
           }
         ],
-        "section_total_aed": 100999
+        "section_total_aed": 8550
       },
       {
         "work_section": "Sanitaryware",
@@ -1623,7 +1431,7 @@
         "work_section": "Lighting",
         "lines": [
           {
-            "description": "Cove LED strip — supply (living/dining/master)",
+            "description": "Cove LED strip — supply (living/master)",
             "quantity": 43.29,
             "unit": "lm",
             "rate_aed": 85,
@@ -1672,14 +1480,14 @@
         "section_total_aed": 13692.6
       }
     ],
-    "subtotal_aed": 476539.06,
+    "subtotal_aed": 384090.06,
     "contingency_pct": 8,
-    "contingency_aed": 38123.12,
+    "contingency_aed": 30727.2,
     "vat_pct": 5,
-    "vat_aed": 25733.11,
-    "grand_total_aed": 540395.29,
+    "vat_aed": 20740.86,
+    "grand_total_aed": 435558.12,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "mid",
       "flooring": "porcelain",
       "style_key": "contemporary-majlis"
@@ -2108,102 +1916,6 @@
         "work_section": "Aluminum & Glass",
         "lines": [
           {
-            "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
-            "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
-            "quantity": 2,
-            "unit": "no",
-            "rate_aed": 5150,
-            "total_aed": 10300,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
-            "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
-            "quantity": 2,
-            "unit": "no",
-            "rate_aed": 5150,
-            "total_aed": 10300,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
-            "description": "Master bathroom — Tilt & turn system DG, 950×950",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 3000,
-            "total_aed": 3000,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
-            "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 12040,
-            "total_aed": 12040,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
-            "description": "Office — Thermal-break sliding system DG, 1700×2300",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 10384,
-            "total_aed": 10384,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
-            "description": "Office — Thermal-break sliding system DG, 1830×3000",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 14176,
-            "total_aed": 14176,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
-            "description": "Living area — Skylight DG, 1830×3750",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 15749,
-            "total_aed": 15749,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
-            "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
-            "quantity": 10,
-            "unit": "lm",
-            "rate_aed": 1650,
-            "total_aed": 16500,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
             "rule_id": "S6-06/R-47",
             "description": "Frameless shower glass partition — supply and install",
             "quantity": 3,
@@ -2228,7 +1940,7 @@
             "scope": "supply_and_install"
           }
         ],
-        "section_total_aed": 100999
+        "section_total_aed": 8550
       },
       {
         "work_section": "Sanitaryware",
@@ -2453,7 +2165,7 @@
         "work_section": "Lighting",
         "lines": [
           {
-            "description": "Cove LED strip — supply (living/dining/master)",
+            "description": "Cove LED strip — supply (living/master)",
             "quantity": 43.29,
             "unit": "lm",
             "rate_aed": 85,
@@ -2502,14 +2214,14 @@
         "section_total_aed": 20538.9
       }
     ],
-    "subtotal_aed": 640139.17,
+    "subtotal_aed": 547690.17,
     "contingency_pct": 8,
-    "contingency_aed": 51211.13,
+    "contingency_aed": 43815.21,
     "vat_pct": 5,
-    "vat_aed": 34567.52,
-    "grand_total_aed": 725917.82,
+    "vat_aed": 29575.27,
+    "grand_total_aed": 621080.65,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "premium",
       "flooring": "porcelain",
       "style_key": "luxe-minimal"
@@ -2938,102 +2650,6 @@
         "work_section": "Aluminum & Glass",
         "lines": [
           {
-            "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
-            "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
-            "quantity": 2,
-            "unit": "no",
-            "rate_aed": 5150,
-            "total_aed": 10300,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
-            "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
-            "quantity": 2,
-            "unit": "no",
-            "rate_aed": 5150,
-            "total_aed": 10300,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
-            "description": "Master bathroom — Tilt & turn system DG, 950×950",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 3000,
-            "total_aed": 3000,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
-            "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 12040,
-            "total_aed": 12040,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
-            "description": "Office — Thermal-break sliding system DG, 1700×2300",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 10384,
-            "total_aed": 10384,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
-            "description": "Office — Thermal-break sliding system DG, 1830×3000",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 14176,
-            "total_aed": 14176,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
-            "description": "Living area — Skylight DG, 1830×3750",
-            "quantity": 1,
-            "unit": "no",
-            "rate_aed": 15749,
-            "total_aed": 15749,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
-            "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
-            "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
-            "quantity": 10,
-            "unit": "lm",
-            "rate_aed": 1650,
-            "total_aed": 16500,
-            "vendor_or_source": "aluminium & glazing reference quotation (allowance)",
-            "notes": "Requires site measurement — allowance only. Covers the whole unit — adjust if only some rooms are in scope.",
-            "rate_status": "site_assessment",
-            "scope": "supply_and_install"
-          },
-          {
             "rule_id": "S6-06/R-47",
             "description": "Frameless shower glass partition — supply and install",
             "quantity": 3,
@@ -3058,7 +2674,7 @@
             "scope": "supply_and_install"
           }
         ],
-        "section_total_aed": 100999
+        "section_total_aed": 8550
       },
       {
         "work_section": "Sanitaryware",
@@ -3283,7 +2899,7 @@
         "work_section": "Lighting",
         "lines": [
           {
-            "description": "Cove LED strip — supply (living/dining/master)",
+            "description": "Cove LED strip — supply (living/master)",
             "quantity": 43.29,
             "unit": "lm",
             "rate_aed": 85,
@@ -3332,14 +2948,14 @@
         "section_total_aed": 13692.6
       }
     ],
-    "subtotal_aed": 476539.06,
+    "subtotal_aed": 384090.06,
     "contingency_pct": 8,
-    "contingency_aed": 38123.12,
+    "contingency_aed": 30727.2,
     "vat_pct": 5,
-    "vat_aed": 25733.11,
-    "grand_total_aed": 540395.29,
+    "vat_aed": 20740.86,
+    "grand_total_aed": 435558.12,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "mid",
       "flooring": "porcelain",
       "style_key": null

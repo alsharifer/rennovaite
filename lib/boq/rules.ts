@@ -18,7 +18,12 @@ import { CANONICAL_SECTION_ORDER } from "./section-order";
 // v0.3.0 (H7) — 2-dp rates at resolution, line totals round(qty × rate, 2),
 // contingency and VAT to the fils, the canonical section order. A revision
 // diff across 0.2.0 → 0.3.0 names that as the cause of the fils it moves.
-export const ENGINE_VERSION = "0.3.0";
+//
+// v0.4.0 (C1) — the reference villa's aluminium order no longer prints as
+// lines; glazing is priced from the plan's own windows and external doors. A
+// revision diff across 0.4.0 names the removed lines "Removed reference-project
+// glazing lines (defect, C1)" and the new ones by their plan.
+export const ENGINE_VERSION = "0.4.0";
 
 // --- C: dimensional constants (rule IDs C-xx) --------------------------------
 
@@ -143,7 +148,12 @@ export type RateRule = {
    *   calibrated  transacted on the reference villa (Mudon's sanitary order)
    *   catalogue   a retail catalogue price (pricing_skus), + a labour-book band to fit it
    */
-  sourced?: { basis: "calibrated" | "catalogue"; as_of: string };
+  sourced?: {
+    basis: "calibrated" | "catalogue";
+    as_of: string;
+    /** C1: the supplier's ROLE on the reference villa (never its name). Default "sanitaryware supplier" (B9's two rules). */
+    role?: string;
+  };
 };
 
 export const RATE_RULES: Record<string, RateRule> = {
@@ -622,6 +632,25 @@ export const RATE_RULES: Record<string, RateRule> = {
     rule_id: "R-74",
     allowance_aed: 600,
     allowance_note: "Recessed shower niche ~600 × 300, formed, waterproofed, tiled — no LED strip, AED 600 allowance (R-56 with the LED is 950). QS to confirm.",
+  },
+  // C1 (20 Oct): aluminium & glazing per m² of THIS plan's openings
+  // (lib/boq/glazing.ts). The reference villa's aluminium order used to be
+  // printed line by line — its rooms, its quantities — on every project with an
+  // interior room. It now enters the engine only as these two rates, by opening
+  // type; the order itself stays a transcription in lib/ground-truth, and no
+  // line comes from it (lib/boq/__tests__/ground-truth-rule.test.ts). Its
+  // skylight and stair balustrade are not openings on a plan and price nothing.
+  "alum.window": {
+    rule_id: "R-75",
+    allowance_aed: 3324.1,
+    allowance_note: "Aluminium window, thermal-break frame, double-glazed, supply + install — 3,324.10 per m² of opening as transacted on the reference villa (aluminium & glazing supplier, Jul 2026): one tilt & turn window, 0.95 × 0.95 m = 0.9025 m², 3,000.00. One window — QS to confirm.",
+    sourced: { basis: "calibrated", as_of: "2026-07-17", role: "aluminium & glazing supplier" },
+  },
+  "alum.external_door": {
+    rule_id: "R-76",
+    allowance_aed: 2623.47,
+    allowance_note: "Aluminium external door, thermal-break sliding system, double-glazed, supply + install — 2,623.47 per m² of opening as transacted on the reference villa (aluminium & glazing supplier, Jul 2026): three sliding doors, 1.85 × 2.46 + 1.70 × 2.30 + 1.83 × 3.00 = 13.951 m², 36,600.00. Its hinged doors with fixed curved glass are left out — their glass area is not stated.",
+    sourced: { basis: "calibrated", as_of: "2026-07-17", role: "aluminium & glazing supplier" },
   },
   "san.bath": {
     rule_id: "R-65",

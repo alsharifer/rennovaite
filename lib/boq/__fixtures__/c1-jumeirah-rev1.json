@@ -1,0 +1,1767 @@
+{
+ "_note": "Production, read-only (20 Oct 2026, Sprint C1): project Jumeirah Parks Garden, its latest stored BoQ revision (aacc3876-1f02-418d-b3c6-4ffa9a8d0ef0, 2026-10-13T14:38:56.748477+00:00) curated through curateBoq, and its plan's rooms and openings as derivePlanGraph reads them. The fixture for the scope-leak tests (docs/SPRINT_C_ROOT_CAUSE.md).",
+ "project": {
+  "id": "a7fc40cb-c6f6-49e1-9a6e-71548e8620dc",
+  "name": "Jumeirah Parks Garden"
+ },
+ "boq": {
+  "id": "aacc3876-1f02-418d-b3c6-4ffa9a8d0ef0",
+  "created_at": "2026-10-13T14:38:56.748477+00:00",
+  "sections": {
+   "contingency_aed": 35588.67,
+   "contingency_pct": 8,
+   "engine": {
+    "flooring": "porcelain",
+    "generated_at": "2026-10-13T14:38:51.249Z",
+    "style_key": "luxe-minimal",
+    "tier": "premium",
+    "version": "0.3.0"
+   },
+   "garden": {
+    "derived_lines": 0,
+    "draft": {
+     "derived": [],
+     "draft": false,
+     "note": null,
+     "statement": null
+    },
+    "kept": [],
+    "needs_selection": [],
+    "removals": [],
+    "undecided": []
+   },
+   "grand_total_aed": 504469.38,
+   "programme": {
+    "basis": "Indicative only. Scaled from one comparable Dubai garden (90 days from mobilisation to handover for AED 152,059 of work) by this BoQ's value (x 1.50), rounded to 5 days. Phase lengths are derived from the value of the work in each phase; the reference project did not record its phase split. To be replaced by the contractor's programme.",
+    "indicative": true,
+    "phases": [
+     {
+      "days": 5,
+      "name": "Mobilisation & setting out",
+      "sections": [],
+      "start_day": 1
+     },
+     {
+      "days": 10,
+      "name": "Demolition & site clearance",
+      "sections": [
+       "Demolition"
+      ],
+      "start_day": 6
+     },
+     {
+      "days": 11,
+      "name": "Hardscape & structures",
+      "sections": [
+       "Hardscape & Structures"
+      ],
+      "start_day": 16
+     },
+     {
+      "days": 104,
+      "name": "Soft landscaping, irrigation & MEP",
+      "sections": [
+       "Soft Landscaping",
+       "Irrigation",
+       "Electrical & Lighting",
+       "Plumbing"
+      ],
+      "start_day": 27
+     },
+     {
+      "days": 5,
+      "name": "Snagging & handover",
+      "sections": [],
+      "start_day": 131
+     }
+    ],
+    "provenance": "derived",
+    "total_days": 135
+   },
+   "sections": [
+    {
+     "lines": [
+      {
+       "description": "Site setup, hoarding, protection, daily clean",
+       "item_key": "prelim.site_setup",
+       "kind": "lump",
+       "notes": "R-27: high band (tier premium); lump sum per project",
+       "quantity": 1,
+       "rate_aed": 25000,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-32/R-27",
+       "total_aed": 25000,
+       "unit": "project",
+       "vendor_or_source": "labour_rates: Site setup, protection, daily clean — residential first-floor refit",
+       "wastage_pct": 0
+      },
+      {
+       "description": "DM / DEWA permits and fees",
+       "item_key": "prelim.permits",
+       "kind": "lump",
+       "notes": "R-28: high band (tier premium); lump sum per project",
+       "quantity": 1,
+       "rate_aed": 15000,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-33/R-28",
+       "total_aed": 15000,
+       "unit": "project",
+       "vendor_or_source": "labour_rates: Permit and DM/DEWA fees — typical first-floor refit",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Skip hire and waste disposal",
+       "item_key": "prelim.skips",
+       "kind": "labour",
+       "notes": "R-29: high band (tier premium); F-11: ceil(144.6 × 0.2 ÷ 4.5) = 7 skips",
+       "quantity": 7,
+       "rate_aed": 3000,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-34/R-29",
+       "total_aed": 21000,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: Skip hire and waste disposal",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Protective floor covering over new tiling until handover",
+       "item_key": "prelim.floor_protection",
+       "kind": "allowance",
+       "notes": "R-37: Protective floor covering over new tiling until handover, AED 8/m². QS to confirm.; F-14: total floor area = 144.6 m²",
+       "quantity": 144.6,
+       "rate_aed": 8,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-35/R-37",
+       "total_aed": 1156.8,
+       "unit": "m2",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Rolling scaffold hire — ceiling + painting works",
+       "item_key": "prelim.scaffold",
+       "kind": "allowance",
+       "notes": "R-38: Rolling scaffold hire for ceiling + painting works, lump. QS to confirm.; lump sum per project",
+       "quantity": 1,
+       "rate_aed": 2500,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-36/R-38",
+       "total_aed": 2500,
+       "unit": "project",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Final clearance + professional handover clean",
+       "item_key": "prelim.handover_clean",
+       "kind": "allowance",
+       "notes": "R-39: Final site clearance + professional handover clean, lump. QS to confirm.; lump sum per project",
+       "quantity": 1,
+       "rate_aed": 1500,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-37/R-39",
+       "total_aed": 1500,
+       "unit": "project",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Garden preliminaries & approvals",
+       "item_key": "garden.preliminaries",
+       "kind": "supply_and_install",
+       "notes": "per project — approvals, admin, shop drawings",
+       "quantity": 1,
+       "rate_aed": 3520,
+       "rate_band": "sku",
+       "rate_status": "actual_transaction",
+       "rate_tier": "reference",
+       "rule_id": "GL-01",
+       "total_aed": 3520,
+       "unit": "lump",
+       "vendor_or_source": "market reference — Dubai garden 2026",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Garden mobilization & site management",
+       "item_key": "garden.mobilization",
+       "kind": "supply_and_install",
+       "notes": "per project — debris removal, setting out, protection, supervision",
+       "quantity": 1,
+       "rate_aed": 4400,
+       "rate_band": "sku",
+       "rate_status": "actual_transaction",
+       "rate_tier": "reference",
+       "rule_id": "GL-02",
+       "total_aed": 4400,
+       "unit": "lump",
+       "vendor_or_source": "market reference — Dubai garden 2026",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 74076.8,
+     "work_section": "Preliminaries"
+    },
+    {
+     "lines": [
+      {
+       "description": "Garden demolition & strip-out",
+       "item_key": "garden.demolition",
+       "kind": "supply_and_install",
+       "notes": "per project — strip-out of 69.2 m² existing hardscape and grass (lump for a garden this size, not scaled)",
+       "quantity": 1,
+       "rate_aed": 4400,
+       "rate_band": "sku",
+       "rate_status": "actual_transaction",
+       "rate_tier": "reference",
+       "rule_id": "GL-03",
+       "total_aed": 4400,
+       "unit": "lump",
+       "vendor_or_source": "market reference — Dubai garden 2026",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 4400,
+     "work_section": "Demolition"
+    },
+    {
+     "lines": [
+      {
+       "description": "Civil alterations — opening closures/openings, new partitions, storage room",
+       "item_key": "civil.alterations",
+       "kind": "allowance",
+       "notes": "R-35: Civil alterations allowance — door-opening closures/openings, new partition walls, storage-room blockwork (reference project §2: AED 15k). Design-dependent; QS to re-measure per project.; allowance pending design layout (R-35)",
+       "quantity": 1,
+       "rate_aed": 15000,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-05/R-35",
+       "total_aed": 15000,
+       "unit": "project",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 15000,
+     "work_section": "Blockwork"
+    },
+    {
+     "lines": [
+      {
+       "description": "Wall plaster / skim coat (net of openings)",
+       "element_refs": [
+        "wall-1",
+        "wall-2",
+        "wall-3",
+        "wall-4",
+        "wall-5",
+        "wall-6",
+        "wall-7",
+        "wall-8",
+        "wall-9",
+        "wall-10",
+        "wall-11",
+        "wall-12",
+        "wall-13",
+        "wall-14",
+        "wall-15",
+        "wall-16",
+        "wall-17",
+        "wall-18",
+        "wall-19",
+        "wall-20",
+        "wall-21",
+        "wall-22",
+        "wall-23",
+        "wall-24",
+        "wall-25",
+        "wall-26",
+        "wall-27",
+        "wall-28",
+        "wall-29",
+        "wall-30",
+        "wall-31",
+        "wall-32",
+        "wall-33",
+        "wall-34",
+        "wall-35",
+        "wall-36",
+        "wall-37",
+        "wall-38",
+        "wall-39",
+        "wall-40",
+        "wall-41",
+        "wall-42",
+        "wall-43"
+       ],
+       "kind": "supply_and_install",
+       "notes": "Aggregated from 43 element take-off items.",
+       "quantity": 330.34,
+       "rate_aed": 55,
+       "rate_band": "mid",
+       "rate_status": "priced",
+       "rule_id": "P4/quantify/wall_plaster",
+       "total_aed": 18168.7,
+       "unit": "m2",
+       "vendor_or_source": "Deterministic take-off (P4)",
+       "wastage_pct": 0,
+       "work_item_key": "wall_plaster"
+      }
+     ],
+     "section_total_aed": 18168.7,
+     "work_section": "Plaster"
+    },
+    {
+     "lines": [
+      {
+       "description": "Floor finish — supply & install",
+       "element_refs": [
+        "6b1d1850-5770-4b78-9799-8a4aa64823d9",
+        "f506e79f-2b6f-4bca-b6ec-450c73272112",
+        "822bb188-0d9a-416f-9eaf-c29a0ddddedb",
+        "9d998466-b368-42d9-af19-d52995970c31",
+        "ca338ae6-c5f9-4e3b-9e24-f97249cdc928",
+        "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+        "01dfac68-c7c2-48bb-8e99-be222fd6246f",
+        "d95938a5-ba7e-4513-a743-021d7eba8b04"
+       ],
+       "kind": "supply_and_install",
+       "notes": "Aggregated from 8 element take-off items.",
+       "quantity": 137.6,
+       "rate_aed": 190,
+       "rate_band": "mid",
+       "rate_status": "priced",
+       "rule_id": "P4/quantify/floor_finish",
+       "total_aed": 26144,
+       "unit": "m2",
+       "vendor_or_source": "Deterministic take-off (P4)",
+       "wastage_pct": 0,
+       "work_item_key": "floor_finish"
+      },
+      {
+       "description": "Staircase tile — developed tread/riser surface (144×305 slab)",
+       "item_key": "floor.stair_tile",
+       "kind": "allowance",
+       "notes": "R-44: RAK Surface XL 144×305 slab, list rate — staircase; developed area × C-08 factor; QS to confirm from stair drawing; F-16: stair footprint 7 m² × 2.6 (C-08) = 18.2 m²",
+       "quantity": 18.2,
+       "rate_aed": 446.45,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-11b/R-44",
+       "total_aed": 8125.39,
+       "unit": "m2",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 34269.39,
+     "work_section": "Floor Finishes"
+    },
+    {
+     "lines": [
+      {
+       "description": "Wet-area wall tiling — supply & install",
+       "element_refs": [
+        "6b1d1850-5770-4b78-9799-8a4aa64823d9",
+        "ca338ae6-c5f9-4e3b-9e24-f97249cdc928",
+        "d95938a5-ba7e-4513-a743-021d7eba8b04"
+       ],
+       "kind": "supply_and_install",
+       "notes": "Aggregated from 3 element take-off items.",
+       "quantity": 108.63,
+       "rate_aed": 260,
+       "rate_band": "mid",
+       "rate_status": "priced",
+       "rule_id": "P4/quantify/wet_tiling",
+       "total_aed": 28243.8,
+       "unit": "m2",
+       "vendor_or_source": "Deterministic take-off (P4)",
+       "wastage_pct": 0,
+       "work_item_key": "wet_tiling"
+      }
+     ],
+     "section_total_aed": 28243.8,
+     "work_section": "Wall Finishes"
+    },
+    {
+     "lines": [
+      {
+       "description": "Gypsum ceiling + finish",
+       "element_refs": [
+        "6b1d1850-5770-4b78-9799-8a4aa64823d9",
+        "f506e79f-2b6f-4bca-b6ec-450c73272112",
+        "822bb188-0d9a-416f-9eaf-c29a0ddddedb",
+        "9d998466-b368-42d9-af19-d52995970c31",
+        "ca338ae6-c5f9-4e3b-9e24-f97249cdc928",
+        "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+        "01dfac68-c7c2-48bb-8e99-be222fd6246f",
+        "d95938a5-ba7e-4513-a743-021d7eba8b04",
+        "37f799df-752c-4fbd-9574-05d1c2a97d74"
+       ],
+       "kind": "supply_and_install",
+       "notes": "Aggregated from 9 element take-off items.",
+       "quantity": 144.6,
+       "rate_aed": 130,
+       "rate_band": "mid",
+       "rate_status": "priced",
+       "rule_id": "P4/quantify/ceiling_finish",
+       "total_aed": 18798,
+       "unit": "m2",
+       "vendor_or_source": "Deterministic take-off (P4)",
+       "wastage_pct": 0,
+       "work_item_key": "ceiling_finish"
+      }
+     ],
+     "section_total_aed": 18798,
+     "work_section": "Ceilings"
+    },
+    {
+     "lines": [
+      {
+       "description": "Bathroom cabinet with doors, MR melamine",
+       "notes": "One per bathroom × 2",
+       "quantity": 2,
+       "rate_aed": 2400,
+       "rate_status": "actual_transaction",
+       "rule_id": "GT/joinery/bath_cabinet",
+       "scope": "supply_and_install",
+       "total_aed": 4800,
+       "unit": "item",
+       "vendor_or_source": "joinery reference quotation (transacted composite rates)"
+      },
+      {
+       "description": "Bathroom vanity box, MR melamine",
+       "notes": "One per bathroom × 2",
+       "quantity": 2,
+       "rate_aed": 1800,
+       "rate_status": "actual_transaction",
+       "rule_id": "GT/joinery/vanity",
+       "scope": "supply_and_install",
+       "total_aed": 3600,
+       "unit": "item",
+       "vendor_or_source": "joinery reference quotation (transacted composite rates)"
+      },
+      {
+       "description": "Solid door leaf, new handle + hinges",
+       "notes": "Bedrooms + bathrooms = 2 leaves (ref 5.1)",
+       "quantity": 2,
+       "rate_aed": 2700,
+       "rate_status": "actual_transaction",
+       "rule_id": "GT/joinery/door_leaf",
+       "scope": "supply_and_install",
+       "total_aed": 5400,
+       "unit": "no",
+       "vendor_or_source": "joinery reference quotation (transacted composite rates)"
+      },
+      {
+       "description": "Solid meranti door frame, painted + fixed",
+       "notes": "2 frames (ref 5.2)",
+       "quantity": 2,
+       "rate_aed": 1550,
+       "rate_status": "actual_transaction",
+       "rule_id": "GT/joinery/door_frame",
+       "scope": "supply_and_install",
+       "total_aed": 3100,
+       "unit": "no",
+       "vendor_or_source": "joinery reference quotation (transacted composite rates)"
+      },
+      {
+       "description": "Vanity counter slab — allowance, requires site measurement",
+       "notes": "S6-05: 1 slab per vanity unit in the joinery scope = 2",
+       "quantity": 2,
+       "rate_aed": 1450,
+       "rate_status": "site_assessment",
+       "rule_id": "S6-05/R-46",
+       "scope": "supply_and_install",
+       "total_aed": 2900,
+       "unit": "no",
+       "vendor_or_source": "S6-pre G19 — excluded from the client-supplied tile package; indicative allowance"
+      }
+     ],
+     "section_total_aed": 19800,
+     "work_section": "Joinery"
+    },
+    {
+     "lines": [
+      {
+       "description": "Guest bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+       "notes": "Requires site measurement — allowance only",
+       "quantity": 2,
+       "rate_aed": 5150,
+       "rate_status": "site_assessment",
+       "rule_id": "GT/aluminum/guest_bedroom_thermal_break_hinged_door_curved_fixed_d",
+       "scope": "supply_and_install",
+       "total_aed": 10300,
+       "unit": "no",
+       "vendor_or_source": "aluminium & glazing reference quotation (allowance)"
+      },
+      {
+       "description": "Master bedroom — Thermal-break hinged door + curved fixed DG glass, 700×2650",
+       "notes": "Requires site measurement — allowance only",
+       "quantity": 2,
+       "rate_aed": 5150,
+       "rate_status": "site_assessment",
+       "rule_id": "GT/aluminum/master_bedroom_thermal_break_hinged_door_curved_fixed_d",
+       "scope": "supply_and_install",
+       "total_aed": 10300,
+       "unit": "no",
+       "vendor_or_source": "aluminium & glazing reference quotation (allowance)"
+      },
+      {
+       "description": "Master bathroom — Tilt & turn system DG, 950×950",
+       "notes": "Requires site measurement — allowance only",
+       "quantity": 1,
+       "rate_aed": 3000,
+       "rate_status": "site_assessment",
+       "rule_id": "GT/aluminum/master_bathroom_tilt_turn_system_dg_950_950",
+       "scope": "supply_and_install",
+       "total_aed": 3000,
+       "unit": "no",
+       "vendor_or_source": "aluminium & glazing reference quotation (allowance)"
+      },
+      {
+       "description": "Kids bedroom — Thermal-break sliding system DG, 1850×2460",
+       "notes": "Requires site measurement — allowance only",
+       "quantity": 1,
+       "rate_aed": 12040,
+       "rate_status": "site_assessment",
+       "rule_id": "GT/aluminum/kids_bedroom_thermal_break_sliding_system_dg_1850_246",
+       "scope": "supply_and_install",
+       "total_aed": 12040,
+       "unit": "no",
+       "vendor_or_source": "aluminium & glazing reference quotation (allowance)"
+      },
+      {
+       "description": "Office — Thermal-break sliding system DG, 1700×2300",
+       "notes": "Requires site measurement — allowance only",
+       "quantity": 1,
+       "rate_aed": 10384,
+       "rate_status": "site_assessment",
+       "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1700_230",
+       "scope": "supply_and_install",
+       "total_aed": 10384,
+       "unit": "no",
+       "vendor_or_source": "aluminium & glazing reference quotation (allowance)"
+      },
+      {
+       "description": "Office — Thermal-break sliding system DG, 1830×3000",
+       "notes": "Requires site measurement — allowance only",
+       "quantity": 1,
+       "rate_aed": 14176,
+       "rate_status": "site_assessment",
+       "rule_id": "GT/aluminum/office_thermal_break_sliding_system_dg_1830_300",
+       "scope": "supply_and_install",
+       "total_aed": 14176,
+       "unit": "no",
+       "vendor_or_source": "aluminium & glazing reference quotation (allowance)"
+      },
+      {
+       "description": "Living area — Skylight DG, 1830×3750",
+       "notes": "Requires site measurement — allowance only",
+       "quantity": 1,
+       "rate_aed": 15749,
+       "rate_status": "site_assessment",
+       "rule_id": "GT/aluminum/living_area_skylight_dg_1830_3750",
+       "scope": "supply_and_install",
+       "total_aed": 15749,
+       "unit": "no",
+       "vendor_or_source": "aluminium & glazing reference quotation (allowance)"
+      },
+      {
+       "description": "G.F–F.F stair — Shaped glass balustrade 12mm tinted bronze",
+       "notes": "Requires site measurement — allowance only",
+       "quantity": 10,
+       "rate_aed": 1650,
+       "rate_status": "site_assessment",
+       "rule_id": "GT/aluminum/g_f_f_f_stair_shaped_glass_balustrade_12mm_tinted_bron",
+       "scope": "supply_and_install",
+       "total_aed": 16500,
+       "unit": "lm",
+       "vendor_or_source": "aluminium & glazing reference quotation (allowance)"
+      },
+      {
+       "description": "Frameless shower glass partition — supply and install",
+       "notes": "S6-06: 1 per wet room with a shower (bathroom/ensuite; powder excluded) = 1",
+       "quantity": 1,
+       "rate_aed": 2200,
+       "rate_status": "indicative",
+       "rule_id": "S6-06/R-47",
+       "scope": "supply_and_install",
+       "total_aed": 2200,
+       "unit": "no",
+       "vendor_or_source": "S6-pre G21 — excluded from the aluminium & glazing reference package; indicative rate"
+      },
+      {
+       "description": "Bathroom mirror — supply and install",
+       "notes": "S6-07: max(wet rooms 2, vanity units 2) = 2",
+       "quantity": 2,
+       "rate_aed": 650,
+       "rate_status": "indicative",
+       "rule_id": "S6-07/R-48",
+       "scope": "supply_and_install",
+       "total_aed": 1300,
+       "unit": "no",
+       "vendor_or_source": "S6-pre G21 — excluded from the aluminium & glazing reference package; indicative rate"
+      }
+     ],
+     "section_total_aed": 95949,
+     "work_section": "Aluminum & Glass"
+    },
+    {
+     "lines": [
+      {
+       "description": "Wall-hung WC incl. concealed cistern — install",
+       "item_key": "san.wc",
+       "kind": "supply_and_install",
+       "notes": "R-19: high band (tier premium); 1 per bathroom × 2",
+       "quantity": 2,
+       "rate_aed": 5500,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-22/R-19",
+       "total_aed": 11000,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: WC suite supply and install — mid-range",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Vanity basin with mixer — install",
+       "item_key": "san.basin",
+       "kind": "supply_and_install",
+       "notes": "R-20: high band (tier premium); 1 per bathroom × 2",
+       "quantity": 2,
+       "rate_aed": 4500,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-23/R-20",
+       "total_aed": 9000,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: Wash basin with mixer — supply and install",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Shower system with concealed thermostatic valve — install",
+       "item_key": "san.shower",
+       "kind": "labour",
+       "notes": "R-21: high band (tier premium); 1 per bathroom × 2",
+       "quantity": 2,
+       "rate_aed": 9000,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-24/R-21",
+       "total_aed": 18000,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: Shower system — mixer, handset, rain head",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Shattaf (health faucet), matt black — supply",
+       "item_key": "san.shattaf",
+       "kind": "allowance",
+       "notes": "R-40: GROHE shattaf, matt black — sanitaryware supplier (supply); 1 per wet room × 2 (sanitaryware supplier)",
+       "quantity": 2,
+       "rate_aed": 250,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-24a/R-40",
+       "total_aed": 500,
+       "unit": "no",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Paper holder, matt black — supply",
+       "item_key": "san.paper_holder",
+       "kind": "allowance",
+       "notes": "R-41: GROHE Essentials paper holder, matt black — sanitaryware supplier; 1 per wet room × 2 (sanitaryware supplier)",
+       "quantity": 2,
+       "rate_aed": 210,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-24b/R-41",
+       "total_aed": 420,
+       "unit": "no",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Towel rail, matt black — supply",
+       "item_key": "san.towel_rail",
+       "kind": "allowance",
+       "notes": "R-42: GROHE Essentials towel rail, matt black — sanitaryware supplier; 1 per wet room × 2 (sanitaryware supplier)",
+       "quantity": 2,
+       "rate_aed": 260,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-24c/R-42",
+       "total_aed": 520,
+       "unit": "no",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      },
+      {
+       "description": "WC actuator plate, vertical square — supply",
+       "item_key": "san.actuator",
+       "kind": "allowance",
+       "notes": "R-43: GROHE actuator plate, vertical square — sanitaryware supplier; 1 per wet room × 2 (sanitaryware supplier)",
+       "quantity": 2,
+       "rate_aed": 450,
+       "rate_band": "allowance",
+       "rate_tier": "allowance",
+       "rule_id": "Q-24d/R-43",
+       "total_aed": 900,
+       "unit": "no",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 40340,
+     "work_section": "Sanitaryware"
+    },
+    {
+     "lines": [
+      {
+       "description": "LED downlights — supply and install (interior)",
+       "item_key": "elec.downlight",
+       "kind": "supply_and_install",
+       "notes": "R-14: high band (tier premium); F-06: Σ interior ceil(area / 3.5) = 45",
+       "quantity": 45,
+       "rate_aed": 300,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-17/R-14",
+       "total_aed": 13500,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: LED downlight — supply and install",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Power sockets and switches — supply and install (interior)",
+       "item_key": "elec.point",
+       "kind": "supply_and_install",
+       "notes": "R-15: high band (tier premium); F-07: Σ interior ceil(area × 0.4) = 62",
+       "quantity": 62,
+       "rate_aed": 220,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-18/R-15",
+       "total_aed": 13640,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: Power socket or switch — supply and install",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 27140,
+     "work_section": "Electrical"
+    },
+    {
+     "lines": [
+      {
+       "description": "Bathroom plumbing re-pipe (full PPR) — per bathroom",
+       "item_key": "plumb.bath_rewire",
+       "kind": "labour",
+       "notes": "R-16: high band (tier premium); bathroom count = 2",
+       "quantity": 2,
+       "rate_aed": 13000,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-19/R-16",
+       "total_aed": 26000,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: Bathroom plumbing rewire — per bathroom, full",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Concealed water heater — supply and install",
+       "item_key": "plumb.water_heater",
+       "kind": "supply_and_install",
+       "notes": "R-17: high band (tier premium); 1 per bathroom × 2 (reference project retained existing heaters — QS to confirm inclusion)",
+       "quantity": 2,
+       "rate_aed": 5000,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-20/R-17",
+       "total_aed": 10000,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: Concealed water heater — supply and install",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Floor / linear shower drain — install",
+       "item_key": "plumb.floor_drain",
+       "kind": "supply_and_install",
+       "notes": "R-18: high band (tier premium); 1 per bathroom × 2",
+       "quantity": 2,
+       "rate_aed": 1200,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-21/R-18",
+       "total_aed": 2400,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: Floor drain — supply and install",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 38400,
+     "work_section": "Plumbing"
+    },
+    {
+     "lines": [
+      {
+       "description": "FCU deep service and clean — retained units",
+       "item_key": "hvac.fcu_service",
+       "kind": "labour",
+       "notes": "R-22: high band (tier premium); rooms retaining existing FCU = 4",
+       "quantity": 4,
+       "rate_aed": 600,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-27/R-22",
+       "total_aed": 2400,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: AC servicing and cleaning",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 2400,
+     "work_section": "MEP / HVAC"
+    },
+    {
+     "lines": [
+      {
+       "description": "Cove LED strip — supply (living/dining/master)",
+       "item_key": "light.led_strip",
+       "kind": "allowance",
+       "notes": "R-45: G10 — cove LED strip SUPPLY, AED 85/lm indicative (24V 14.4W/m COB strip + driver + profile, Dubai trade counter mid-2026). Complements R-31, which prices the cove LABOUR at 45/lm and explicitly assumes 'strips client-supplied' — this is the material that assumption left out. QS to confirm.; S6-02: Σ perimeter over 3 eligible room(s) (living/dining/majlis/master only), perimeter from area at aspect 1.3 = 64.25 lm",
+       "quantity": 64.25,
+       "rate_aed": 85,
+       "rate_band": "allowance",
+       "rate_status": "indicative",
+       "rate_tier": "allowance",
+       "rule_id": "S6-02/R-45",
+       "total_aed": 5461.25,
+       "unit": "lm",
+       "vendor_or_source": "allowance",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Decorative pendants — installation",
+       "item_key": "light.pendant",
+       "kind": "labour",
+       "notes": "R-26: high band (tier premium); F-09: 1 per bedroom (0) + 2 living = 2",
+       "quantity": 2,
+       "rate_aed": 500,
+       "rate_band": "high",
+       "rate_tier": "labour_book",
+       "rule_id": "Q-31/R-26",
+       "total_aed": 1000,
+       "unit": "no",
+       "vendor_or_source": "labour_rates: Decorative pendant — installation labour only",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 6461.25,
+     "work_section": "Lighting"
+    },
+    {
+     "lines": [
+      {
+       "description": "Wall painting — primer + 2 coats",
+       "element_refs": [
+        "wall-1",
+        "wall-2",
+        "wall-3",
+        "wall-4",
+        "wall-5",
+        "wall-6",
+        "wall-7",
+        "wall-8",
+        "wall-9",
+        "wall-10",
+        "wall-11",
+        "wall-12",
+        "wall-13",
+        "wall-14",
+        "wall-15",
+        "wall-16",
+        "wall-17",
+        "wall-18",
+        "wall-19",
+        "wall-20",
+        "wall-21",
+        "wall-22",
+        "wall-23",
+        "wall-24",
+        "wall-25",
+        "wall-26",
+        "wall-27",
+        "wall-28",
+        "wall-29",
+        "wall-30",
+        "wall-31",
+        "wall-32",
+        "wall-33",
+        "wall-34",
+        "wall-35",
+        "wall-36",
+        "wall-37",
+        "wall-38",
+        "wall-39",
+        "wall-40",
+        "wall-41",
+        "wall-42",
+        "wall-43"
+       ],
+       "kind": "supply_and_install",
+       "notes": "Aggregated from 43 element take-off items.",
+       "quantity": 330.34,
+       "rate_aed": 35,
+       "rate_band": "mid",
+       "rate_status": "priced",
+       "rule_id": "P4/quantify/wall_paint",
+       "total_aed": 11561.9,
+       "unit": "m2",
+       "vendor_or_source": "Deterministic take-off (P4)",
+       "wastage_pct": 0,
+       "work_item_key": "wall_paint"
+      }
+     ],
+     "section_total_aed": 11561.9,
+     "work_section": "Decoration & Painting"
+    },
+    {
+     "lines": [
+      {
+       "description": "PCC base under paving",
+       "element_refs": [
+        "58bf9fcf-81d5-4fec-983c-ad703efd1022"
+       ],
+       "item_key": "garden.pcc_base",
+       "kind": "supply_and_install",
+       "notes": "paved zone area = 15.2 m² (PCC and paving measured off the same drawn area; the reference project quoted 75 m² PCC against 87 m² paving)",
+       "quantity": 15.2,
+       "rate_aed": 105.6,
+       "rate_band": "sku",
+       "rate_status": "actual_transaction",
+       "rate_tier": "reference",
+       "rule_id": "GL-04",
+       "total_aed": 1605.12,
+       "unit": "m2",
+       "vendor_or_source": "market reference — Dubai garden 2026",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Porcelain paving installation",
+       "element_refs": [
+        "58bf9fcf-81d5-4fec-983c-ad703efd1022"
+       ],
+       "item_key": "garden.paving_install",
+       "kind": "supply_and_install",
+       "notes": "paved zone area = 15.2 m²",
+       "quantity": 15.2,
+       "rate_aed": 70.4,
+       "rate_band": "sku",
+       "rate_status": "actual_transaction",
+       "rate_tier": "reference",
+       "rule_id": "GL-05",
+       "total_aed": 1070.08,
+       "unit": "m2",
+       "vendor_or_source": "market reference — Dubai garden 2026",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Outdoor porcelain tile supply (1200x600 R11 class)",
+       "element_refs": [
+        "58bf9fcf-81d5-4fec-983c-ad703efd1022"
+       ],
+       "item_key": "garden.tile_supply",
+       "kind": "supply_and_install",
+       "notes": "paved zone area = 15.2 m²; tile is bought per m² PURCHASED, which site setting-out usually reduces",
+       "quantity": 15.2,
+       "rate_aed": 128.1,
+       "rate_band": "sku",
+       "rate_status": "site_assessment",
+       "rate_tier": "reference",
+       "rule_id": "GL-06",
+       "total_aed": 1947.12,
+       "unit": "m2",
+       "vendor_or_source": "market reference — Dubai garden 2026",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Timber / composite deck (no reference rate — QS to price)",
+       "element_refs": [
+        "8e1e0ff4-6b5a-4497-a326-3632a96b79d8"
+       ],
+       "item_key": "garden.deck",
+       "kind": "supply_and_install",
+       "notes": "deck zone area = 21.1 m²",
+       "quantity": 21.1,
+       "rate_aed": 0,
+       "rate_band": "sku",
+       "rate_status": "needs_qs",
+       "rate_tier": "unpriced",
+       "rule_id": "GL-20",
+       "total_aed": 0,
+       "unit": "m2",
+       "vendor_or_source": "rate to be confirmed — not in the landscape rate book",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 4622.32,
+     "work_section": "Hardscape & Structures"
+    },
+    {
+     "lines": [
+      {
+       "description": "Artificial grass supply",
+       "element_refs": [
+        "fa5afe0c-b6ad-4f01-8c2e-e1677446f518"
+       ],
+       "item_key": "garden.grass_supply",
+       "kind": "supply_and_install",
+       "notes": "artificial grass zone area = 54 m²",
+       "quantity": 54,
+       "rate_aed": 26.4,
+       "rate_band": "sku",
+       "rate_status": "actual_transaction",
+       "rate_tier": "reference",
+       "rule_id": "GL-07",
+       "total_aed": 1425.6,
+       "unit": "m2",
+       "vendor_or_source": "market reference — Dubai garden 2026",
+       "wastage_pct": 0
+      },
+      {
+       "description": "Artificial grass installation (base+sand+borders)",
+       "element_refs": [
+        "fa5afe0c-b6ad-4f01-8c2e-e1677446f518"
+       ],
+       "item_key": "garden.grass_install",
+       "kind": "supply_and_install",
+       "notes": "artificial grass zone area = 54 m² (incl. base prep, sand bed and borders)",
+       "quantity": 54,
+       "rate_aed": 70.4,
+       "rate_band": "sku",
+       "rate_status": "actual_transaction",
+       "rate_tier": "reference",
+       "rule_id": "GL-08",
+       "total_aed": 3801.6,
+       "unit": "m2",
+       "vendor_or_source": "market reference — Dubai garden 2026",
+       "wastage_pct": 0
+      }
+     ],
+     "section_total_aed": 5227.2,
+     "work_section": "Soft Landscaping"
+    }
+   ],
+   "subtotal_aed": 444858.36,
+   "vat_aed": 24022.35,
+   "vat_pct": 5
+  }
+ },
+ "plan": {
+  "id": "1f9ee118-8593-41e3-946f-c09bc9af1554",
+  "plot_width_m": null,
+  "source": "parsed",
+  "total_area_m2": 246.8
+ },
+ "rooms": [
+  {
+   "area_m2": 9,
+   "id": "01dfac68-c7c2-48bb-8e99-be222fd6246f",
+   "in_scope": true,
+   "name_en": "Maid Room",
+   "polygon": [
+    [
+     740.6096140669413,
+     24.00314651272932
+    ],
+    [
+     820.4149473443063,
+     24.00314651272932
+    ],
+    [
+     820.4149473443063,
+     190.83527253111805
+    ],
+    [
+     740.6096140669413,
+     190.83527253111805
+    ]
+   ],
+   "room_type": "maid",
+   "unroofed": false
+  },
+  {
+   "area_m2": 7,
+   "id": "37f799df-752c-4fbd-9574-05d1c2a97d74",
+   "in_scope": true,
+   "name_en": "Stairs",
+   "polygon": [
+    [
+     740.603259321573,
+     408.479394150529
+    ],
+    [
+     849.4384922822917,
+     408.479394150529
+    ],
+    [
+     849.4384922822917,
+     575.3267664746262
+    ],
+    [
+     740.603259321573,
+     575.3267664746262
+    ]
+   ],
+   "room_type": "stairs",
+   "unroofed": false
+  },
+  {
+   "area_m2": 15.2,
+   "id": "58bf9fcf-81d5-4fec-983c-ad703efd1022",
+   "in_scope": true,
+   "name_en": "New room",
+   "polygon": [
+    [
+     107.73587867418983,
+     357.49943365301687
+    ],
+    [
+     228.22238663693912,
+     358.84122302819657
+    ],
+    [
+     226.8806863033393,
+     569.2913602259454
+    ],
+    [
+     106.39411692148573,
+     573.3166055107471
+    ]
+   ],
+   "room_type": "paving",
+   "unroofed": true
+  },
+  {
+   "area_m2": 5.5,
+   "id": "6b1d1850-5770-4b78-9799-8a4aa64823d9",
+   "in_scope": true,
+   "name_en": "Bath",
+   "polygon": [
+    [
+     820.4132005530996,
+     24
+    ],
+    [
+     892.9572078285769,
+     24
+    ],
+    [
+     892.9572078285769,
+     154.55614663885578
+    ],
+    [
+     820.4132005530996,
+     154.55614663885578
+    ]
+   ],
+   "room_type": "bathroom",
+   "unroofed": false
+  },
+  {
+   "area_m2": 18.2,
+   "id": "822bb188-0d9a-416f-9eaf-c29a0ddddedb",
+   "in_scope": true,
+   "name_en": "Entrance Foyer",
+   "polygon": [
+    [
+     739.4150461213949,
+     189.87296962488136
+    ],
+    [
+     740.5984366477481,
+     189.87296962488136
+    ],
+    [
+     740.5984366477481,
+     190.85232730186334
+    ],
+    [
+     795.5648862683618,
+     190.85232730186334
+    ],
+    [
+     894.194365654422,
+     194.1984660315518
+    ],
+    [
+     870.4857485574832,
+     407.2087607751324
+    ],
+    [
+     743.7405425280654,
+     408.47376444123415
+    ],
+    [
+     740.5984366477481,
+     408.47376444123415
+    ],
+    [
+     740.5984366477481,
+     343.06083293281273
+    ],
+    [
+     740.5576300778739,
+     336.93984745167535
+    ],
+    [
+     742.393925722215,
+     336.5725883228071
+    ],
+    [
+     739.8639183900117,
+     249.36894850153666
+    ]
+   ],
+   "room_type": "foyer",
+   "unroofed": false
+  },
+  {
+   "area_m2": 21.1,
+   "id": "8e1e0ff4-6b5a-4497-a326-3632a96b79d8",
+   "in_scope": true,
+   "name_en": "New room",
+   "polygon": [
+    [
+     232.5159751103089,
+     354.8160391637635
+    ],
+    [
+     393.2541686911995,
+     357.49949507338556
+    ],
+    [
+     395.93763077750344,
+     571.9747547151984
+    ],
+    [
+     229.83251302400504,
+     576
+    ]
+   ],
+   "room_type": "deck",
+   "unroofed": true
+  },
+  {
+   "area_m2": 37.5,
+   "id": "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+   "in_scope": true,
+   "name_en": "Living Room",
+   "polygon": [
+    [
+     399.65954534839636,
+     241.61570022542932
+    ],
+    [
+     589.0428361347867,
+     241.61570022542932
+    ],
+    [
+     589.3692886937807,
+     338.2864642575256
+    ],
+    [
+     589.0428361347867,
+     338.2864642575256
+    ],
+    [
+     590.1854200912657,
+     567.3745475315604
+    ],
+    [
+     590.22622666114,
+     571.7816570779793
+    ],
+    [
+     399.65954534839636,
+     575.331828657039
+    ]
+   ],
+   "room_type": "living",
+   "unroofed": false
+  },
+  {
+   "area_m2": 30,
+   "id": "9d998466-b368-42d9-af19-d52995970c31",
+   "in_scope": true,
+   "name_en": "Family Room",
+   "polygon": [
+    [
+     399.64258071732934,
+     24
+    ],
+    [
+     588.2493108145691,
+     24
+    ],
+    [
+     588.2493108145691,
+     241.63202182643187
+    ],
+    [
+     399.64258071732934,
+     241.63202182643187
+    ]
+   ],
+   "room_type": "living",
+   "unroofed": false
+  },
+  {
+   "area_m2": 22.2,
+   "id": "ca338ae6-c5f9-4e3b-9e24-f97249cdc928",
+   "in_scope": true,
+   "name_en": "Kitchen",
+   "polygon": [
+    [
+     588.2675113071759,
+     23.99426308605851
+    ],
+    [
+     740.5984366477481,
+     23.99426308605851
+    ],
+    [
+     740.5984366477481,
+     189.87296962488136
+    ],
+    [
+     739.4150461213949,
+     189.87296962488136
+    ],
+    [
+     739.8231118201373,
+     241.61570022542932
+    ],
+    [
+     737.946009605922,
+     241.65650679530356
+    ],
+    [
+     637.1945885864008,
+     241.65650679530356
+    ],
+    [
+     637.1945885864008,
+     335.91968320481914
+    ],
+    [
+     637.235395156275,
+     335.91968320481914
+    ],
+    [
+     637.235395156275,
+     337.34791315041787
+    ],
+    [
+     618.3419533044977,
+     337.7151722792861
+    ],
+    [
+     591.8176828862356,
+     334.24661383997494
+    ]
+   ],
+   "room_type": "kitchen",
+   "unroofed": false
+  },
+  {
+   "area_m2": 5.9,
+   "id": "d95938a5-ba7e-4513-a743-021d7eba8b04",
+   "in_scope": true,
+   "name_en": "Powder Room / WD",
+   "polygon": [
+    [
+     637.1945885864008,
+     241.65650679530356
+    ],
+    [
+     739.6598855406404,
+     241.65650679530356
+    ],
+    [
+     742.393925722215,
+     336.5725883228071
+    ],
+    [
+     709.7486698228157,
+     343.1832526424355
+    ],
+    [
+     709.7486698228157,
+     335.91968320481914
+    ],
+    [
+     637.1945885864008,
+     335.91968320481914
+    ]
+   ],
+   "room_type": "powder",
+   "unroofed": false
+  },
+  {
+   "area_m2": 21.2,
+   "id": "f506e79f-2b6f-4bca-b6ec-450c73272112",
+   "in_scope": true,
+   "name_en": "Hall",
+   "polygon": [
+    [
+     589.0428361347867,
+     338.2864642575256
+    ],
+    [
+     709.7486698228157,
+     335.91968320481914
+    ],
+    [
+     709.7486698228157,
+     343.1832526424355
+    ],
+    [
+     731.4985715657906,
+     343.1832526424355
+    ],
+    [
+     731.4985715657906,
+     338.7761430960166
+    ],
+    [
+     740.1087578092571,
+     337.0214605914239
+    ],
+    [
+     740.5984366477481,
+     343.14244607256126
+    ],
+    [
+     740.5984366477481,
+     575.331828657039
+    ],
+    [
+     590.22622666114,
+     572.9650476043325
+    ]
+   ],
+   "room_type": "dining",
+   "unroofed": false
+  },
+  {
+   "area_m2": 54,
+   "id": "fa5afe0c-b6ad-4f01-8c2e-e1677446f518",
+   "in_scope": true,
+   "name_en": "Grass",
+   "polygon": [
+    [
+     111.07492387734986,
+     33.64232847487395
+    ],
+    [
+     397.68152623340114,
+     31.0104821107925
+    ],
+    [
+     392.3146634798977,
+     350.1709145984057
+    ],
+    [
+     105.81127927127096,
+     349.99027764521355
+    ]
+   ],
+   "room_type": "artificial_grass",
+   "unroofed": true
+  }
+ ],
+ "openings": [
+  {
+   "confirmed_at": "2026-10-14T18:39:36.153+00:00",
+   "context_id": null,
+   "derived": true,
+   "height_mm": 2100,
+   "id": "073d9fab-2935-4dba-a992-b23c29a73159",
+   "kind": "door",
+   "position": [
+    797.086,
+    190.8474
+   ],
+   "room_id": "01dfac68-c7c2-48bb-8e99-be222fd6246f",
+   "sill_mm": 0,
+   "source": "detected",
+   "wall_ref": "wall-39",
+   "width_mm": 600
+  },
+  {
+   "confirmed_at": "2026-10-14T18:39:36.153+00:00",
+   "context_id": null,
+   "derived": true,
+   "height_mm": 2100,
+   "id": "122a6ef4-5940-4eb9-a8e7-e39bf1b84c93",
+   "kind": "door",
+   "position": [
+    821.029,
+    82.7503
+   ],
+   "room_id": "6b1d1850-5770-4b78-9799-8a4aa64823d9",
+   "sill_mm": 0,
+   "source": "detected",
+   "wall_ref": "wall-7",
+   "width_mm": 950
+  },
+  {
+   "confirmed_at": null,
+   "context_id": null,
+   "derived": false,
+   "height_mm": 2400,
+   "id": "25e5365a-58b5-4733-b8b9-22893deeeba2",
+   "kind": "archway",
+   "position": [
+    494.35119074159155,
+    241.61570022542932
+   ],
+   "room_id": "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+   "sill_mm": 0,
+   "source": "user_drawn",
+   "wall_ref": "wall-48",
+   "width_mm": 2400
+  },
+  {
+   "confirmed_at": "2026-10-14T18:39:36.153+00:00",
+   "context_id": null,
+   "derived": true,
+   "height_mm": 2100,
+   "id": "2a0ec16d-749f-40d6-9930-82ae82331416",
+   "kind": "door",
+   "position": [
+    741.219,
+    134.9535
+   ],
+   "room_id": "01dfac68-c7c2-48bb-8e99-be222fd6246f",
+   "sill_mm": 0,
+   "source": "detected",
+   "wall_ref": "wall-33",
+   "width_mm": 930
+  },
+  {
+   "confirmed_at": "2026-10-14T18:39:36.153+00:00",
+   "context_id": null,
+   "derived": false,
+   "height_mm": 2400,
+   "id": "44dc45ac-7d4b-49d8-9d14-b6753a8e93c2",
+   "kind": "archway",
+   "position": [
+    588.8651,
+    132.816
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "sill_mm": 0,
+   "source": "detected",
+   "wall_ref": "wall-17",
+   "width_mm": 3000
+  },
+  {
+   "confirmed_at": null,
+   "context_id": null,
+   "derived": true,
+   "height_mm": 1200,
+   "id": "75712e25-deb1-4b29-b735-e8e7821ebe33",
+   "kind": "window",
+   "position": [
+    399.65954534839636,
+    408.47376444123415
+   ],
+   "room_id": "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+   "sill_mm": 900,
+   "source": "user_drawn",
+   "wall_ref": "wall-54",
+   "width_mm": 1200
+  },
+  {
+   "confirmed_at": "2026-10-14T18:39:36.153+00:00",
+   "context_id": null,
+   "derived": true,
+   "height_mm": 1200,
+   "id": "7bb55a40-e4d1-4003-8fb6-3f3e457aee42",
+   "kind": "window",
+   "position": [
+    400.2583,
+    198.1056
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "sill_mm": 900,
+   "source": "detected",
+   "wall_ref": "wall-21",
+   "width_mm": 850
+  },
+  {
+   "confirmed_at": "2026-10-14T18:39:36.153+00:00",
+   "context_id": null,
+   "derived": true,
+   "height_mm": 2100,
+   "id": "7df86cda-dc76-4cf8-a86f-cffcf6063e44",
+   "kind": "door",
+   "position": [
+    385.4436902797617,
+    31.12285950822174
+   ],
+   "room_id": "fa5afe0c-b6ad-4f01-8c2e-e1677446f518",
+   "sill_mm": 0,
+   "source": "detected",
+   "wall_ref": "wall-24",
+   "width_mm": 600
+  },
+  {
+   "confirmed_at": "2026-10-14T18:39:36.153+00:00",
+   "context_id": null,
+   "derived": true,
+   "height_mm": 1200,
+   "id": "7ec5e9cd-c8c1-437a-a682-f5d91d7a8d6f",
+   "kind": "window",
+   "position": [
+    400.2583,
+    56.6448
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "sill_mm": 900,
+   "source": "detected",
+   "wall_ref": "wall-21",
+   "width_mm": 740
+  },
+  {
+   "confirmed_at": null,
+   "context_id": null,
+   "derived": true,
+   "height_mm": 2100,
+   "id": "99fb3d42-5c69-4a76-a6ff-45342213ba4a",
+   "kind": "door",
+   "position": [
+    741.026905631428,
+    289.11454755905544
+   ],
+   "room_id": "d95938a5-ba7e-4513-a743-021d7eba8b04",
+   "sill_mm": 0,
+   "source": "user_drawn",
+   "wall_ref": "wall-67",
+   "width_mm": 900
+  },
+  {
+   "confirmed_at": null,
+   "context_id": null,
+   "derived": true,
+   "height_mm": 1200,
+   "id": "9e476ff6-4e80-4a32-a929-e8a85c6c8441",
+   "kind": "window",
+   "position": [
+    664.4329739774621,
+    23.99426308605851
+   ],
+   "room_id": "ca338ae6-c5f9-4e3b-9e24-f97249cdc928",
+   "sill_mm": 900,
+   "source": "user_drawn",
+   "wall_ref": "wall-36",
+   "width_mm": 1200
+  },
+  {
+   "confirmed_at": null,
+   "context_id": null,
+   "derived": false,
+   "height_mm": 2400,
+   "id": "a6c42a31-7267-4b98-b609-d6daad347f5f",
+   "kind": "archway",
+   "position": [
+    740.603259321573,
+    491.9030803125776
+   ],
+   "room_id": "37f799df-752c-4fbd-9574-05d1c2a97d74",
+   "sill_mm": 0,
+   "source": "user_drawn",
+   "wall_ref": "wall-72",
+   "width_mm": 3000
+  },
+  {
+   "confirmed_at": null,
+   "context_id": null,
+   "derived": true,
+   "height_mm": 1200,
+   "id": "bb3ce1d0-e7dd-40d7-93a7-15f5703afe7c",
+   "kind": "window",
+   "position": [
+    665.412331654444,
+    574.1484381306855
+   ],
+   "room_id": "f506e79f-2b6f-4bca-b6ec-450c73272112",
+   "sill_mm": 900,
+   "source": "user_drawn",
+   "wall_ref": "wall-34",
+   "width_mm": 1200
+  },
+  {
+   "confirmed_at": null,
+   "context_id": null,
+   "derived": true,
+   "height_mm": 1200,
+   "id": "cc03bce3-d7c0-4530-8a70-a4944df7b79b",
+   "kind": "window",
+   "position": [
+    493.9459457659492,
+    24
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "sill_mm": 900,
+   "source": "user_drawn",
+   "wall_ref": "wall-2",
+   "width_mm": 1200
+  },
+  {
+   "confirmed_at": "2026-10-14T18:39:36.153+00:00",
+   "context_id": null,
+   "derived": true,
+   "height_mm": 2600,
+   "id": "db690c34-a632-4756-a49c-7404b46ec941",
+   "kind": "window",
+   "position": [
+    400.2583,
+    124.1107
+   ],
+   "room_id": "9d998466-b368-42d9-af19-d52995970c31",
+   "sill_mm": 0,
+   "source": "detected",
+   "wall_ref": "wall-21",
+   "width_mm": 1700
+  },
+  {
+   "confirmed_at": null,
+   "context_id": null,
+   "derived": true,
+   "height_mm": 1200,
+   "id": "dedba9b8-8ef4-439f-8e8b-176604b83717",
+   "kind": "window",
+   "position": [
+    494.9428860047682,
+    573.556742867509
+   ],
+   "room_id": "8fdf1e7b-67d7-4de5-a5fd-558c64e75bfc",
+   "sill_mm": 900,
+   "source": "user_drawn",
+   "wall_ref": "wall-53",
+   "width_mm": 1200
+  }
+ ]
+}

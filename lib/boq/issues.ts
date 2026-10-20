@@ -10,6 +10,9 @@
 //   DERIVED — CONFIRM ON SITE           ONE row for every line whose quantity
 //                                       is derived (confirm on a site visit)
 //   RATE BASIS                          the reference-basis gate, while open
+//   PLAN CHECK                          C1: no windows or doors drawn, so no
+//                                       glazing is priced (the BoQ's
+//                                       glazing_not_priced) → the Openings layer
 //   <the step's own reason>             the rail's attention / blocked reason
 //                                       for this step (plan check, changed
 //                                       since rev N) — the unpriced reason is
@@ -25,7 +28,7 @@ import { STAIRS_ASSUMED_NOTE } from "@/lib/plan/scope";
 
 import type { ReviewModel } from "./review-types";
 
-export type IssueGroupKey = "unmatched" | "unpriced" | "assumed" | "confirm" | "duplicates" | "derived" | "basis" | "step" | "plan_blocks" | "plan_hard" | "plan_soft";
+export type IssueGroupKey = "unmatched" | "unpriced" | "assumed" | "confirm" | "duplicates" | "derived" | "basis" | "plan_check" | "step" | "plan_blocks" | "plan_hard" | "plan_soft";
 
 export interface IssueRow {
   id: string;
@@ -68,6 +71,7 @@ export const GROUP_TITLE: Record<IssueGroupKey, string> = {
   duplicates: "POSSIBLY COUNTED TWICE",
   derived: "DERIVED — CONFIRM ON SITE",
   basis: "RATE BASIS",
+  plan_check: "PLAN CHECK",
   step: "THIS STEP",
   plan_blocks: "BLOCKS REGENERATE",
   plan_hard: "NOT ALLOWED — FIX ON THE PLAN",
@@ -183,6 +187,17 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
       title: GROUP_TITLE.basis,
       count: 1,
       rows: [{ id: "basis", ref: null, title: `${ref.referenceLines} of ${ref.totalLines} lines priced from the market reference`, detail: "Review your rates, or accept the market basis for this revision", action: "Review rates", lineKey: null, open: null, href: `/project/${model.projectId}/rates#reference-basis` }],
+    });
+  }
+
+  // C1: the plan has no windows or doors, so no glazing is priced — said, not hidden (no fallback allowance).
+  const glazing = model.notices.glazing ?? null;
+  if (glazing) {
+    groups.push({
+      key: "plan_check",
+      title: GROUP_TITLE.plan_check,
+      count: 1,
+      rows: [{ id: "glazing", ref: null, title: glazing, detail: "Draw the windows and external doors on the plan, then regenerate", action: "Open the plan", lineKey: null, open: null, href: `/project/${model.projectId}/plan?layer=openings` }],
     });
   }
 

@@ -351,7 +351,7 @@ export class RateResolver {
     if (rule.allowance_aed != null && rule.sourced) {
       return {
         rate_aed: rule.allowance_aed,
-        vendor_or_source: rule.sourced.basis === "catalogue" ? "retail catalogue" : "reference villa — sanitaryware supplier",
+        vendor_or_source: rule.sourced.basis === "catalogue" ? "retail catalogue" : `reference villa — ${rule.sourced.role ?? "sanitaryware supplier"}`,
         kind: "supply_and_install",
         rate_band: rule.sourced.basis === "catalogue" ? "sku" : "book",
         wastage: 0,

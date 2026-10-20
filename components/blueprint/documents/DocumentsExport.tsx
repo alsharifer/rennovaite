@@ -167,7 +167,7 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, initialPro
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={running}
-              placeholder="e.g. Arabella Garden — Draft for Review"
+              placeholder="e.g. Garden — Draft for Review"
               className="t-body-sm h-9 w-full rounded-none border border-bp-line-control bg-bp-surface-base px-3 text-bp-ink-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bp-focus-ring"
             />
             {nameChanged ? <span className="t-label-md text-bp-ink-tertiary">Saved when the export starts.</span> : null}

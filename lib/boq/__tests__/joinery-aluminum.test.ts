@@ -52,20 +52,26 @@ describe("Joinery section (Step 4)", () => {
   });
 });
 
-describe("Aluminum & Glass section (Step 4)", () => {
-  const section = buildAluminumSection()!;
-
-  it("is all site_assessment allowances carrying the measurement caveat", () => {
-    expect(section.work_section).toBe("Aluminum & Glass");
-    expect(section.lines).toHaveLength(ALUMINUM.length);
+describe("Aluminum & Glass section (C1: the plan's own openings, never the reference order)", () => {
+  it("prints no line of the reference villa's aluminium order", () => {
+    const section = buildAluminumSection(MUDON_ROOMS)!;
+    const quoted = new Set(ALUMINUM.flatMap((a) => [a.item, a.location]));
     for (const l of section.lines) {
-      expect(l.rate_status).toBe("site_assessment");
-      expect(l.notes).toMatch(/allowance only/i);
+      expect(l.rule_id.startsWith("GT/aluminum/")).toBe(false);
+      for (const q of quoted) expect(l.description).not.toContain(q);
     }
   });
 
-  it("reconciles to the quoted total (92,449)", () => {
-    expect(section.section_total_aed).toBe(TRADE_TOTALS.aluminum.excl_vat);
+  it("without glazing lines it carries only the S6-pre shower glass and mirrors", () => {
+    const section = buildAluminumSection(MUDON_ROOMS)!;
+    expect(section.lines.map((l) => l.rule_id.split("/")[0]).sort()).toEqual(["S6-06", "S6-07"]);
+  });
+
+  it("the glazing lines it is given come first, supply and install, in the section total", () => {
+    const glazing = [{ rule_id: "Q-38/R-75", description: "Aluminium windows — thermal-break, double-glazed, supply and install", quantity: 2.88, unit: "m2", rate_aed: 3324.1, total_aed: lineTotal(2.88, 3324.1), vendor_or_source: "reference villa — aluminium & glazing supplier", notes: null }];
+    const section = buildAluminumSection(MUDON_ROOMS, glazing)!;
+    expect(section.lines[0]).toMatchObject({ rule_id: "Q-38/R-75", scope: "supply_and_install" });
+    expect(section.section_total_aed).toBe(sumMoney(section.lines.map((l) => l.total_aed)));
   });
 });
 

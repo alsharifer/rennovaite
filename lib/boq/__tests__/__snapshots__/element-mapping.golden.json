@@ -608,7 +608,7 @@
         "work_section": "Lighting",
         "lines": [
           {
-            "description": "Cove LED strip — supply (living/dining/master)",
+            "description": "Cove LED strip — supply (living/master)",
             "quantity": 43.29,
             "unit": "lm",
             "rate_aed": 85,
@@ -733,7 +733,7 @@
     "vat_aed": 18320.12,
     "grand_total_aed": 384722.59,
     "engine": {
-      "version": "0.3.0",
+      "version": "0.4.0",
       "tier": "mid",
       "flooring": "porcelain",
       "style_key": "contemporary-majlis"
