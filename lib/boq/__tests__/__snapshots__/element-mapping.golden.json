@@ -608,7 +608,7 @@
         "work_section": "Lighting",
         "lines": [
           {
-            "description": "Cove LED strip — supply (living/dining/master)",
+            "description": "Cove LED strip — supply (living/master)",
             "quantity": 43.29,
             "unit": "lm",
             "rate_aed": 85,

@@ -45,6 +45,8 @@ export interface ReviewBoq {
     undecided?: unknown[];
   } | null;
   programme?: ReviewModel["programme"];
+  /** C1: why the plan priced no glazing (lib/boq/glazing.ts) — absent when glazing is priced or not applicable. */
+  glazing_not_priced?: string;
   /** B5 (lib/boq/wet-room.ts). */
   options?: { key: string; label: string; note: string; net_aed: number; delta_total_aed?: number; adds: { description: string; quantity: number; unit: string; rate_aed: number; total_aed: number; rate_basis?: string }[]; replaces: { description: string; total_aed: number }[] }[];
 }
@@ -225,6 +227,7 @@ export function buildReviewModel(i: ReviewInputs): ReviewModel {
       draft: draft ? { ...draft, derivedLines: info.derivedLines, note: garden?.draft?.note ?? null } : null,
       reference,
       duplicates: i.duplicates,
+      glazing: typeof i.boq.glazing_not_priced === "string" ? i.boq.glazing_not_priced : null,
       garden: garden && ((garden.kept?.length ?? 0) > 0 || (garden.removals?.length ?? 0) > 0 || (garden.undecided?.length ?? 0) > 0)
         ? { kept: garden.kept?.length ?? 0, removed: garden.removals?.length ?? 0, undecided: garden.undecided?.length ?? 0 }
         : null,

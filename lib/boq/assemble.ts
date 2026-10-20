@@ -23,7 +23,8 @@ import { loadAccessoryOverrides } from "@/lib/accessories/load";
 import { applyElementMapping, persistTakeoffItems } from "@/lib/boq/element-map";
 import { generateDeterministicBoq, priceScopeItem } from "@/lib/boq/engine";
 import { appendGardenSections } from "@/lib/boq/garden-boq-feed";
-import { appendJoineryAluminumSections } from "@/lib/boq/joinery-aluminum";
+import { GLAZING_UNREADABLE_REASON, glazingOpeningsFrom, glazingScope, hasRoofedInterior, NO_GLAZING_REASON, type GlazingScopeItem } from "@/lib/boq/glazing";
+import { appendJoineryAluminumSections, type GlazingInput, type GlazingLine } from "@/lib/boq/joinery-aluminum";
 import { quantifyPlan, type TakeoffItem } from "@/lib/boq/quantify";
 import { elementPricer, RateResolver } from "@/lib/boq/rates";
 import { applyWetRoomPackage, priceOptions, WET_ROOM_TYPES, wetRoomContextFrom, type WetRoomContext } from "@/lib/boq/wet-room";
@@ -111,6 +112,34 @@ export interface BoqInputs {
   openingsNeedWall?: string[];
   /** B5: a project that IS one wet room (room intake) — priced with the wet-room package. */
   wetRoom?: WetRoomContext | null;
+  /**
+   * C1: this plan's windows and external doors as scope items (lib/boq/glazing.ts)
+   * — [] when the plan has none; null when its openings could not be read.
+   * Omitted (an older caller) = read as null.
+   */
+  glazing?: GlazingScopeItem[] | null;
+}
+
+/**
+ * C1: the aluminium section's input — this plan's glazing scope priced through
+ * the resolver (a firm's own window rate answers first), or the reason the BoQ
+ * records when nothing is priced. A wet-room package prices no glazing.
+ */
+export function pricedGlazing(inputs: Pick<BoqInputs, "rooms" | "glazing" | "wetRoom">, resolver: RateResolver, accessorySelections: Parameters<typeof priceScopeItem>[2] = {}): GlazingInput {
+  if (inputs.wetRoom) return { lines: [], notPriced: null };
+  const items = inputs.glazing ?? null;
+  const lines: GlazingLine[] = (items ?? []).map((item) => {
+    const { element_refs, ...scope } = item;
+    return { ...priceScopeItem(scope, resolver, accessorySelections), element_refs } as unknown as GlazingLine;
+  });
+  const interior = hasRoofedInterior(inputs.rooms);
+  const notPriced = !interior || lines.length > 0 ? null : items === null ? GLAZING_UNREADABLE_REASON : NO_GLAZING_REASON;
+  return { lines, notPriced };
+}
+
+/** C1: the legacy LLM path's glazing — R-75 / R-76 need no labour book or catalogue, only the firm and reference books. */
+export function pricedGlazingForLlm(inputs: Pick<BoqInputs, "rooms" | "glazing" | "wetRoom" | "firm" | "referenceRows">): GlazingInput {
+  return pricedGlazing(inputs, new RateResolver([], [], "mid", {}, { reference: inputs.referenceRows, firm: inputs.firm }));
 }
 
 /** Why a project cannot be priced: the HTTP status and body the route answers with. */
@@ -291,9 +320,12 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   let takeoffItems: TakeoffItem[] = [];
   let openingsNeedWall: string[] = [];
   let wetRoom: WetRoomContext | null = null;
+  let glazing: GlazingScopeItem[] | null = null;
   try {
     const graph = await derivePlanGraph(projectId);
     openingsNeedWall = graph.openings_need_wall ?? [];
+    // C1: glazing from this plan's own windows and external doors, in-scope rooms only (K12).
+    glazing = glazingScope(glazingOpeningsFrom(graph, new Set(rooms.map((r) => r.id))));
     const proposed = await getProposedGraph(projectId);
     takeoffItems = quantifyPlan(graph, { proposed });
     // B5: a project that IS one bathroom (the room intake) is priced as a
@@ -319,7 +351,7 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
   const referenceRows = await loadReferenceRows(supabase);
 
   return {
-    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs, ...(openingsNeedWall.length ? { openingsNeedWall } : {}), ...(wetRoom ? { wetRoom } : {}) },
+    inputs: { project, plan, rooms, labourRates: labourRes.data, skus: skuRes.data, chosenStyleKey, approvedCount, takeoffItems, firm, referenceRows, stairs, ...(openingsNeedWall.length ? { openingsNeedWall } : {}), ...(wetRoom ? { wetRoom } : {}), glazing },
   };
 }
 
@@ -383,16 +415,15 @@ export async function priceDeterministicBoq(supabase: SupabaseClient, projectId:
   // plan_fixtures counts (best-effort, no-op when there are none). H3: not
   // flag-gated — OVERLAYS_ENABLED shows the overlay layer, it does not price.
   const overlaid = await appendOverlaySections(mappedBoq, projectId, supabase);
-  // Ground-truth: append Joinery + Aluminum & Glass sections (Atrium/Global
-  // Creation actuals; aluminum = site_assessment allowances). Core, additive.
-  const joined = appendJoineryAluminumSections(overlaid, rooms);
-  // B5: one bathroom from its dimensions — the wet-room package over the villa
-  // lines, priced through the same resolver as the engine (same tier, books, firm).
+  // The same resolver as the engine (same tier, books, firm) prices the glazing
+  // and the wet-room package.
+  const resolver = new RateResolver(engineLabour, engineSkus, engineBoq.engine.tier, accessorySelections, { reference: referenceRows, firm });
+  // Joinery (reference rates per unit) + Aluminum & Glass (C1: this plan's
+  // windows and external doors per m² of opening). Core, additive.
+  const joined = appendJoineryAluminumSections(overlaid, rooms, pricedGlazing(inputs, resolver, accessorySelections));
+  // B5: one bathroom from its dimensions — the wet-room package over the villa lines.
   const withJoinery = inputs.wetRoom
-    ? (() => {
-        const resolver = new RateResolver(engineLabour, engineSkus, engineBoq.engine.tier, accessorySelections, { reference: referenceRows, firm });
-        return applyWetRoomPackage(joined as unknown as Parameters<typeof applyWetRoomPackage>[0], inputs.wetRoom, (item) => priceScopeItem(item, resolver, accessorySelections)) as unknown as typeof joined;
-      })()
+    ? (applyWetRoomPackage(joined as unknown as Parameters<typeof applyWetRoomPackage>[0], inputs.wetRoom, (item) => priceScopeItem(item, resolver, accessorySelections)) as unknown as typeof joined)
     : joined;
   // G3: append the landscape sections from the drawn garden (zones, runs,
   // units, points) priced at the calibrated landscape rates. No-op for a

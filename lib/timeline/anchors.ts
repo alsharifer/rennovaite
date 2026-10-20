@@ -161,7 +161,7 @@ export const PHASE_ANCHORS: PhaseAnchor[] = [
     predecessor: 3,
     driver: "painted_m2",
     driver_rationale:
-      "Painting dominates this phase and is measured by painted area; the electrical 2nd fix runs inside the same window. On Mudon it ran concurrently with screed and tiling, finishing three days earlier.",
+      "Painting dominates this phase and is measured by painted area; the electrical 2nd fix runs inside the same window. On the reference villa it ran concurrently with screed and tiling, finishing three days earlier.",
     anchor_driver_value: MUDON_DRIVERS.painted_m2,
     floor_days: 5,
     sections: ["Decoration & Painting", "Electrical", "Electrical Installations"],

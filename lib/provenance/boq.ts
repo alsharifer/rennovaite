@@ -116,7 +116,7 @@ export const TIER_DISPLAY: Record<string, TierDisplay> = {
   firm_private: { name: "Private", detail: "The contractor's own rate book — shadows the market reference for this project only.", qs: "Contractor's own rate — not QS-reviewed by the platform." },
   firm_correction: { name: "market_fair", detail: "A market_fair correction by this project's contractor, explicitly promoted into its rate book.", qs: "A reviewed correction — not a QS validation." },
   reference: { name: "actual_transaction", detail: "Calibrated market reference — a rate actually paid on a comparable Dubai project.", qs: "QS validation not recorded." },
-  module_reference: { name: "actual_transaction", detail: "Transacted reference rates from the Mudon ground-truth quotations, held in code (lib/ground-truth).", qs: "Not QS-validated (qs_validated = false on every transacted row)." },
+  module_reference: { name: "actual_transaction", detail: "A rate per unit transacted on a comparable Dubai villa — a calibrated reference; its source stays private.", qs: "Not QS-validated (qs_validated = false on every transacted row)." },
   catalog: { name: "Fallback — catalogue", detail: "No book rate: a Dubai supplier-catalogue price picked at the style's tier.", qs: "Catalogue price — no QS validation on record." },
   allowance: { name: "Fallback — rule allowance", detail: "No book or catalogue rate: the take-off rule's allowance.", qs: "Allowance — QS to confirm." },
   labour_book: { name: "Fallback — labour rate book", detail: "A market labour band for the style's tier.", qs: "Market labour band — no QS validation on record." },
@@ -224,7 +224,8 @@ function lineProvenance(line: ProvLine, workSection: string, ctx: ProvenanceCont
   const tierKey = lineTierKey(line, workSection);
   const tier = tierKey ? TIER_DISPLAY[tierKey] : undefined;
   const rSteps: ChainStep[] = [];
-  if (tier) rSteps.push({ kind: "tier", label: tier.name, detail: tier.detail });
+  // C1: the tier text is curated like every other step — no project or quotation is ever named.
+  if (tier) rSteps.push({ kind: "tier", label: tier.name, detail: cur(tier.detail) });
   else gaps.push(`${figureRef} rate: resolution tier cannot be established (rule ${line.rule_id ?? "none"}, band ${line.rate_band ?? "none"})`);
   if (line.vendor_or_source) rSteps.push({ kind: "source", label: "Source", detail: cur(line.vendor_or_source) });
   // A price added on review replaces whatever basis the engine's note gave.

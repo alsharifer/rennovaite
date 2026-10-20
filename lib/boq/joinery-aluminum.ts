@@ -2,24 +2,22 @@
 // lib/boq/joinery-aluminum.ts — the two missing BoQ sections (ground-truth Step 4).
 //
 // The real project is 39% joinery + aluminum/glass; the platform BoQ had
-// neither. Added as an ADDITIVE post-pass (like appendOverlaySections), priced
-// from the Atrium (joinery) + Global Creation (aluminum) actuals:
+// neither. Added as an ADDITIVE post-pass (like appendOverlaySections):
 //   - Joinery: quantities from room/fixture heuristics (wardrobe/dresser per
-//     bedroom, cabinet+vanity per bathroom, doors), priced from actual composite
-//     rates. All supply_and_install → NEVER get a separate install line.
-//   - Aluminum & glass: the graph has no openings, so per-opening pricing is
-//     impossible. Room-scoped ALLOWANCE lines flagged site_assessment, each
-//     carrying the "Requires site measurement — allowance only" caveat.
-//     TODO(openings): replace allowances with measured openings once captured.
+//     bedroom, cabinet+vanity per bathroom, doors), priced from the reference
+//     villa's composite rates PER UNIT (lib/ground-truth/mudon-actuals JOINERY —
+//     rates only, never its lines). All supply_and_install → NEVER get a
+//     separate install line.
+//   - Aluminum & glass (C1): the lines come from THIS plan's windows and
+//     external doors (lib/boq/glazing.ts), priced by the caller per m² of
+//     opening (R-75 / R-76). Until C1 this section printed the reference
+//     villa's aluminium order line by line on every project — its rooms, its
+//     quantities (docs/SPRINT_C_ROOT_CAUSE.md). Ground truth never emits a
+//     line (lib/boq/__tests__/ground-truth-rule.test.ts).
 // Pure + unit-tested.
 // =============================================================================
 
-import {
-  JOINERY,
-  ALUMINUM,
-  ALUMINUM_ALLOWANCE_CAVEAT,
-  ALUMINUM_SCOPE_NOTE,
-} from "@/lib/ground-truth/mudon-actuals";
+import { JOINERY } from "@/lib/ground-truth/mudon-actuals";
 import { enforceScope, type ScopedLine } from "./scope";
 import { lineTotal, money2, sumMoney } from "./money";
 import { RATE_RULES } from "./rules";
@@ -49,11 +47,36 @@ export interface GtBoqLine {
   rate_status: GtRateStatus;
   scope: "supply_and_install";
 }
+/** C1: a glazing line priced through the resolver (lib/boq/glazing.ts) — an engine line, supply and install. */
+export interface GlazingLine {
+  rule_id: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  rate_aed: number;
+  total_aed: number;
+  vendor_or_source: string;
+  notes: string | null;
+  [field: string]: unknown;
+}
+
 export interface GtSection {
   work_section: "Joinery" | "Aluminum & Glass";
-  lines: GtBoqLine[];
+  lines: (GtBoqLine | GlazingLine)[];
   section_total_aed: number;
 }
+
+/**
+ * C1: what the aluminium section is built from — this plan's priced glazing
+ * lines, and, when the plan has none, the reason the BoQ records for the
+ * Issues navigator (null when nothing needs saying).
+ */
+export interface GlazingInput {
+  lines: GlazingLine[];
+  notPriced: string | null;
+}
+
+export const NO_GLAZING: GlazingInput = { lines: [], notPriced: null };
 
 const BEDROOM = new Set(["master_bedroom", "bedroom"]);
 /** Outdoor zones — see lib/boq/rules.ts LANDSCAPE_TYPES. */
@@ -183,40 +206,21 @@ export function buildJoinerySection(rooms: RoomTypeCount[]): GtSection | null {
 }
 
 /**
- * Aluminum & glass section — room-scoped ALLOWANCES (site_assessment), from the
- * Global Creation quote's per-item lump values. Never a measured quantity.
+ * Aluminum & glass section (C1) — this plan's glazing lines (windows and
+ * external doors, priced per m² of opening by the caller), then the S6-pre
+ * shower glass and mirrors. No openings → no glazing lines; the caller records
+ * why (GlazingInput.notPriced).
  */
-export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | null {
-  if (ALUMINUM.length === 0) return null;
-  // The allowance is an INTERIOR one — windows, doors and balustrades of a
-  // villa fit-out. A plan with no interior rooms has none of them, and a garden
-  // project was picking up the whole AED 92k allowance for nothing.
+export function buildAluminumSection(rooms: RoomTypeCount[] = [], glazing: readonly GlazingLine[] = []): GtSection | null {
+  // A plan with no interior rooms has no glazing, shower or mirror of its own.
   if (rooms.length > 0 && rooms.every((r) => LANDSCAPE.has(r.room_type ?? ""))) return null;
-  // I4: a role label, never the contractor or its quotation number (lib/identity/curation.ts).
-  const src = "aluminium & glazing reference quotation (allowance)";
-  const slug = (v: string) =>
-    v.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);
-  const lines: GtBoqLine[] = ALUMINUM.map((a) =>
-    line(
-      `GT/aluminum/${slug(a.location)}_${slug(a.item)}`,
-      `${a.location} — ${a.item}`,
-      a.qty,
-      a.unit === "LM" ? "lm" : "no",
-      Math.round((a.total / a.qty) * 100) / 100,
-      src,
-      "site_assessment",
-      `${ALUMINUM_ALLOWANCE_CAVEAT}. ${ALUMINUM_SCOPE_NOTE}.`,
-    ),
-  );
-  // --- S6-pre (G21): "This excludes shower glass and mirrors" ---------------
+  const lines: (GtBoqLine | GlazingLine)[] = glazing.map((l) => ({ ...l, scope: "supply_and_install" as const }));
+  // --- S6-pre (G21): shower glass and mirrors -------------------------------
   //
-  // Appended to the ACTUALS section rather than emitted by the engine, for the
-  // same reason the stair tile is re-appended in element-map.ts: the aluminum
-  // section is rebuilt from the Global Creation quote, so anything the engine
-  // put in "Aluminum & Glass" would be discarded on the way through.
-  //
-  // These are the only lines in this section that are NOT from the quotation,
-  // and they are flagged "indicative" to say exactly that.
+  // Appended here rather than emitted by the engine, for the same reason the
+  // stair tile is re-appended in element-map.ts: this section is rebuilt on
+  // every generation, so anything the engine put in "Aluminum & Glass" would be
+  // discarded on the way through. Flagged "indicative".
   const componentRooms = rooms.map((r, i) => ({
     id: String(i),
     type: r.room_type,
@@ -260,11 +264,11 @@ export function buildAluminumSection(rooms: RoomTypeCount[] = []): GtSection | n
   return finalize("Aluminum & Glass", lines);
 }
 
-function finalize(work_section: GtSection["work_section"], lines: GtBoqLine[]): GtSection | null {
+function finalize(work_section: GtSection["work_section"], lines: (GtBoqLine | GlazingLine)[]): GtSection | null {
   if (lines.length === 0) return null;
   // Guard: these are all supply_and_install composites — enforceScope must find
   // no install line shadowing them (no double-count).
-  const scoped: ScopedLine[] = lines.map((l) => ({ description: l.description, scope: l.scope, install_group: work_section }));
+  const scoped: ScopedLine[] = lines.map((l) => ({ description: l.description, scope: "supply_and_install", install_group: work_section }));
   const { violations } = enforceScope(scoped);
   if (violations.some((v) => v.kind === "composite_with_install")) {
     throw new Error(`[joinery-aluminum] scope violation in ${work_section}: composite line paired with install`);
@@ -289,13 +293,18 @@ interface BoqLike {
 /**
  * Append the Joinery + Aluminum & Glass sections to a BoQ and recompute the
  * contingency/VAT/grand-total chain. Idempotent (drops prior copies first).
- * Ground-truth is core (not flagged) — but no-ops safely when there are no rooms.
+ * Core (not flagged) — but no-ops safely when there are no rooms.
+ *
+ * C1: `glazing` carries this plan's priced glazing lines; when it says the
+ * glazing is not priced (no windows or doors drawn), the document records the
+ * reason as `glazing_not_priced` — the Issues navigator's row.
  */
-export function appendJoineryAluminumSections<T extends BoqLike>(boq: T, rooms: RoomTypeCount[]): T {
+export function appendJoineryAluminumSections<T extends BoqLike>(boq: T, rooms: RoomTypeCount[], glazing: GlazingInput = NO_GLAZING): T {
   const joinery = buildJoinerySection(rooms);
-  const aluminum = buildAluminumSection(rooms);
+  const aluminum = buildAluminumSection(rooms, glazing.lines);
   const extra = [joinery, aluminum].filter((s): s is GtSection => s !== null);
-  if (extra.length === 0) return boq;
+  const reason = glazing.notPriced ? { glazing_not_priced: glazing.notPriced } : {};
+  if (extra.length === 0) return { ...boq, ...reason };
 
   // The actuals-based Joinery section SUPERSEDES the engine's own generic
   // "Joinery & Carpentry" estimate (same wardrobes/vanities/doors) — keeping
@@ -307,5 +316,5 @@ export function appendJoineryAluminumSections<T extends BoqLike>(boq: T, rooms: 
       !(joinery !== null && s.work_section === "Joinery & Carpentry"),
   );
   // H7: canonical order, section totals, subtotal and chain — all by rechain.
-  return rechain({ ...boq, sections: [...kept, ...(extra as unknown as BoqLike["sections"])] } as unknown as ChainedDoc) as unknown as T;
+  return rechain({ ...boq, ...reason, sections: [...kept, ...(extra as unknown as BoqLike["sections"])] } as unknown as ChainedDoc) as unknown as T;
 }
