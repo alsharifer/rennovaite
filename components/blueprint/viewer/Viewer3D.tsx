@@ -88,6 +88,23 @@ function subscribeTheme(cb: () => void) {
     mq.removeEventListener("change", cb);
   };
 }
+/** C5 #4: can this browser draw WebGL at all? Read once — a browser with it off gets a sentence, not a crash. */
+let webglCache: boolean | null = null;
+function hasWebGL(): boolean {
+  if (webglCache === null) {
+    try {
+      const c = document.createElement("canvas");
+      webglCache = !!(c.getContext("webgl2") ?? c.getContext("webgl"));
+    } catch {
+      webglCache = false;
+    }
+  }
+  return webglCache;
+}
+function useWebGL(): boolean {
+  return useSyncExternalStore(noSubscribe, hasWebGL, () => true);
+}
+
 function useTokens(): Tokens | null {
   const raw = useSyncExternalStore(subscribeTheme, readTokens, () => "");
   return useMemo(() => {
@@ -441,6 +458,7 @@ export interface BackTargets {
 
 export function Viewer3D({ scene, data, finishes, back }: { scene: SceneModel; data: ViewerData; finishes?: FinishPlan; back: BackTargets }) {
   const tokens = useTokens();
+  const webgl = useWebGL();
   const remembered = useSyncExternalStore(noSubscribe, () => readStep(data.projectId), () => null);
   const backTo = (remembered ? back.steps[remembered] : undefined) ?? back.steps[back.fallback];
   const [mode, setMode] = useState<Mode>("orbit");
@@ -519,7 +537,17 @@ export function Viewer3D({ scene, data, finishes, back }: { scene: SceneModel; d
         </div>
 
         <div className={`relative min-h-[520px] flex-1 ${hover && !measure ? "cursor-pointer" : measure ? "cursor-crosshair" : ""}`}>
-          {tokens ? (
+          {!webgl ? (
+            <div className="flex h-full items-center justify-center p-8" data-viewer-no-webgl="">
+              <StateBlock kind="error" title="This browser can’t draw the 3D view">
+                WebGL is turned off or not available here. Your plan, renders and drawings show the same rooms — open the 3D view in another browser to walk them.
+              </StateBlock>
+            </div>
+          ) : !tokens ? (
+            <div className="px-6 py-8" data-viewer-waiting="">
+              <StateBlock kind="loading" title="Building your plan in 3D" rows={4} columns={3} />
+            </div>
+          ) : (
           <SceneBoundary>
             <Canvas
               flat
@@ -541,7 +569,7 @@ export function Viewer3D({ scene, data, finishes, back }: { scene: SceneModel; d
               {mode === "orbit" ? <OrbitRig scene={scene} /> : <WalkControls scene={scene} onLeave={() => setMode("orbit")} />}
             </Canvas>
           </SceneBoundary>
-          ) : null}
+          )}
         </div>
 
         <div className="z-10 flex flex-col gap-2 px-6 pb-5">

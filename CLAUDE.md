@@ -1387,6 +1387,40 @@ BoQ has nothing to programme.
   (was 8–14 weeks on the Overview and 135 days on the BoQ). One number per
   project on every surface — tested, a stale stored programme included.
 
+### Sprint C5 — labels, itemised checks, persona, 3D entries (21 Oct)
+
+- **Material labels** (`lib/render/material-labels.ts`, pure; loader
+  `material-labels-load.ts`): every element of a room's anchor spec on the
+  renders page ("MATERIALS IN THIS DESIGN") and every Specification item carry
+  ONE of **Changed since render approval · Priced · Specified · Illustrative
+  (render only)**, read from the B7 gate's objects — the locked render's
+  `gate.design_key`, the room's `rooms.spec.wet_room` now, the current BoQ's
+  product lines (`ELEMENT_PRODUCTS`). Tiles are illustrative until chosen on
+  the Specification (the BoQ prices an allowance). A locked view whose render
+  was made under another design reads **CHANGED SINCE APPROVAL** with what
+  moved (`approvalDrift`) — the pack already leaves it out. A view rendered
+  before B7 has no fingerprint: neither says it changed. `designKey` ignores
+  C3's `reviewed` / `reviewed_log` (a recorded review is not a design change).
+- **The design check, itemised** (`lib/render/design-check-items.ts`): five
+  rows — Geometry · Openings · Fixtures · Finishes follow anchor · Products
+  match BoQ — each ✓ / ✗ with its reason; a row nothing checked reads "✗ … not
+  checked — <why>", never ✓. Head: "DESIGN CHECK · N OF 5 PASSED". Photo views
+  (`photoViewCheckRows`: failures by reason/kind onto rows), room renders
+  (`roomRenderCheckRows`: the interior QA is ONE judgement of walls + openings
+  + camera; a garden scene render reads faithfulness / placement /
+  consistency). The studio, the room-render panel and the room pack print the
+  same rows.
+- **Persona** (`journeyPersona`, `railPersonaLabels` in `lib/journey.ts`): K2's
+  rule in one place; a firm persona never reads "My home" / "Owner"
+  (`lib/__tests__/persona.test.ts`). Production, 21 Oct: no project is
+  firm-attached, so the reviewer's Jumeirah project correctly shows the owner
+  journey; Move to firm… gives the firm journey.
+- **3D view** (`lib/viewer/available.ts`): every entry (01 Plan, the Overview,
+  Renders) asks `viewerAvailable` — flag on AND the plan stands up walls; an
+  open garden or a project without a plan has no link. The page answers an
+  unreadable plan with an empty state (not the error page) and a browser
+  without WebGL with a sentence (`data-viewer-no-webgl`), never a blank canvas.
+
 ## Brand — Atelier Precise (parked marketing only since K8)
 
 The visual system is **Atelier Precise**: an editorial, paper-on-paper aesthetic

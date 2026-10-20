@@ -1,5 +1,6 @@
 import { OpeningsAutoDetect } from "@/components/blueprint/plan/OpeningsAutoDetect";
 import { renderOpeningsLabel, type OpeningsBasis } from "@/lib/plan/openings-vocab";
+import { viewerHref } from "@/lib/viewer/available";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
@@ -400,7 +401,7 @@ export default async function RenderPage({
       batchJobs={batchJobs}
       initialEvenings={initialEvenings}
       renderInfo={renderInfo}
-      viewerHref={process.env.VIEWER_3D_ENABLED === "true" ? `/project/${projectId}/viewer?from=render` : null}
+      viewerHref={await viewerHref(projectId)}
       costHref={ownerStepHref("cost", projectId, flags)}
       notInScope={notInScope}
       planHref={`/project/${projectId}/plan`}

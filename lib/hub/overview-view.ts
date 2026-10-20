@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RevisionBoq } from "@/lib/boq/revision-diff";
+import { viewerAvailable } from "@/lib/viewer/available";
 import { documentStatus } from "@/lib/documents/document-status";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { latestPackJobs } from "@/lib/documents/pack-export/job";
@@ -177,7 +178,8 @@ export async function loadOverviewView(db: SupabaseClient, projectId: string, ra
     name: (project?.display_name || project?.name || "Project").trim(),
     meta,
     costUpdated: latest ? `${dubai(latest.created_at).date} · ${dubai(latest.created_at).time}` : null,
-    viewer: process.env.VIEWER_3D_ENABLED === "true" && rooms.length > 0,
+    // C5 #4: only when the plan stands up walls — the one answer every entry gives.
+    viewer: rooms.length > 0 && (await viewerAvailable(projectId)),
     estimate: estimate && rev ? { ...estimate, rev, budget } : null,
     design: { locked: perRoom.size, direction, tiles },
     next: overviewNext(projectId, st, { direction, unpriced: (estimate?.excluded ?? []).map((x) => x.description.toLowerCase()) }),
