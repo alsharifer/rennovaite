@@ -22,6 +22,7 @@ import { usePathname } from "next/navigation";
 
 import { signOut } from "@/app/_actions/sign-out";
 import { SIGNED_IN_HOME } from "@/lib/auth/link-error";
+import { railPersonaLabels } from "@/lib/journey";
 import type { RailContext } from "@/lib/journey-state";
 
 import { Icon } from "../Icon";
@@ -67,6 +68,7 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
   const pathname = usePathname();
   const theme = useThemePref();
   const firm = ctx.persona === "firm";
+  const labels = railPersonaLabels(ctx.persona, { admin: !!ctx.firm?.admin });
   const initials = (ctx.caller.email ?? "?").split("@")[0]!.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase() || "?";
 
   return (
@@ -90,8 +92,8 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
       ) : null}
 
       {ctx.project ? (
-        <Switcher eyebrow={firm ? "Project" : "My home"} title={ctx.project?.name ?? "Choose a project"} sub={ctx.project ? revLine(ctx.project) : undefined} icon="unfold_more">
-          <p className="t-label-caps px-4 pb-1 pt-1 text-bp-ink-tertiary">{firm ? "Projects" : "Your homes"}</p>
+        <Switcher eyebrow={labels.switcher} title={ctx.project?.name ?? "Choose a project"} sub={ctx.project ? revLine(ctx.project) : undefined} icon="unfold_more">
+          <p className="t-label-caps px-4 pb-1 pt-1 text-bp-ink-tertiary">{labels.projects}</p>
           {ctx.projects.map((p) => (
             <Link key={p.id} href={onProject(pathname, ctx.project?.id ?? null, p.id)} className="block px-4 py-2 hover:bg-bp-surface-sunken" aria-current={p.id === ctx.project?.id ? "true" : undefined}>
               <span className="t-nav-item block text-bp-ink-primary">{p.name}</span>
@@ -113,8 +115,8 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
           </Link>
         </nav>
       ) : steps.length > 0 ? (
-        <nav aria-label={firm ? "Firm journey" : "Your renovation"} className="flex-1 py-2">
-          <p className="t-label-caps bp-rail-x px-6 pb-2 pt-3 text-bp-ink-tertiary">{firm ? "Firm journey" : "Your renovation"}</p>
+        <nav aria-label={labels.journey} className="flex-1 py-2">
+          <p className="t-label-caps bp-rail-x px-6 pb-2 pt-3 text-bp-ink-tertiary">{labels.journey}</p>
           <StepList steps={steps} activeKey={activeKey} />
         </nav>
       ) : (
@@ -152,7 +154,7 @@ export function JourneyRail({ ctx, steps, activeKey }: { ctx: RailContext; steps
           <span className="t-label-md flex h-8 w-8 shrink-0 items-center justify-center border border-bp-line-control text-bp-ink-primary">{initials}</span>
           <span className="bp-rail-x min-w-0">
             <span className="t-body-sm block truncate text-bp-ink-primary">{ctx.caller.email ?? "Signed in"}</span>
-            <span className="t-label-caps block text-bp-ink-tertiary">{firm ? (ctx.firm?.admin ? "Firm admin" : "Firm member") : "Owner"}</span>
+            <span className="t-label-caps block text-bp-ink-tertiary">{labels.role}</span>
           </span>
         </summary>
         <div className="bp-rail-x border-t border-bp-line-hairline bg-bp-surface-raised py-2">
