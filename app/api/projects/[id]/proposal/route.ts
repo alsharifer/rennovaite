@@ -16,7 +16,7 @@ import { StoreError } from "@/lib/firms/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // L4 — GET /api/projects/:id/proposal[?format=pdf|pages|json]
 //
