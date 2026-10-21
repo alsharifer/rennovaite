@@ -155,11 +155,14 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
     ...(options.proposal ? [{ name: `${base}-proposal.pdf`, path: `/api/projects/${P}/proposal`, type: "application/pdf" }] : []),
     ...(roomPack ? [{ name: `${base}-room-pack.pdf`, path: `/api/projects/${P}/room-pack`, type: "application/pdf" }] : []),
   ];
-  const produced: { name: string; bytes: Uint8Array; type: string; status: number }[] = [];
-  for (const d of docs) {
-    const r = await t.bytes(d.path);
-    produced.push({ name: d.name, bytes: r.bytes, type: d.type, status: r.status });
-  }
+  // In parallel: each document is its own route (its own function on Vercel), and the in-app job
+  // runs inside ONE route's 300 s budget — serially, a garden pack ran out of it (Jumeirah, 21 Oct).
+  const produced: { name: string; bytes: Uint8Array; type: string; status: number }[] = await Promise.all(
+    docs.map(async (d) => {
+      const r = await t.bytes(d.path);
+      return { name: d.name, bytes: r.bytes, type: d.type, status: r.status };
+    }),
+  );
   check(
     `${["drawing set", ...(garden ? ["render pack"] : []), ...(options.boqPdf ? ["BoQ"] : []), ...(options.proposal ? ["proposal"] : []), ...(roomPack ? ["room pack"] : [])].join(", ")} export as PDFs`,
     produced.every((p) => p.status === 200 && p.bytes.byteLength > 10_000),
@@ -168,18 +171,23 @@ export async function runPackExport(ctx: PackExportContext): Promise<PackExportR
 
   // --- 6. what the documents print ---------------------------------------------------
   await progress("checks", 85, "checking what the documents print");
-  const sheets = (await t.get<{ sheets?: { sheetNumber: string; kind: string; title: string; svg: string }[] }>(`/api/projects/${P}/drawings`)).body.sheets ?? [];
-  const packPages = garden ? (await t.get<{ pages?: string[] }>(`/api/projects/${P}/render-pack?format=pages`)).body.pages ?? [] : [];
-  const packSummary = garden
-    ? (await t.get<{ gate?: { camera: string; label: string; view: string; outcome: string; reason?: string | null; consistency?: { passed: boolean; failures: string[]; anchor: boolean } | null; attempts: { attempt: number; passed: boolean }[] }[]; pages?: { kind?: string }[]; mix?: Record<string, number>; missing_images?: string[] }>(`/api/projects/${P}/render-pack?format=json`)).body
-    : null;
-  const boqPages = options.boqPdf ? (await t.get<{ pages?: string[] }>(`/api/projects/${P}/boq-pdf?format=pages`)).body.pages ?? [] : null;
-  const proposalDoc = options.proposal ? (await t.get<{ pages?: string[]; reference?: string | null }>(`/api/projects/${P}/proposal?format=pages`)).body : null;
-  const { data: boqRow } = await db.from("boqs").select("id, sections").eq("project_id", P).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; sections: Parameters<typeof printedChecks>[0]["boq"] & { garden?: { draft?: { draft?: boolean; statement?: string | null; derived?: string[] } } } }>();
+  // The inputs below are independent reads — fetched together (the same 300 s budget).
+  const [sheets, packPages, packSummary, boqPages, proposalDoc, { data: boqRow }, boqHtml, planHtmlAny] = await Promise.all([
+    t.get<{ sheets?: { sheetNumber: string; kind: string; title: string; svg: string }[] }>(`/api/projects/${P}/drawings`).then((r) => r.body.sheets ?? []),
+    garden ? t.get<{ pages?: string[] }>(`/api/projects/${P}/render-pack?format=pages`).then((r) => r.body.pages ?? []) : Promise.resolve([] as string[]),
+    garden
+    ? t.get<{ gate?: { camera: string; label: string; view: string; outcome: string; reason?: string | null; consistency?: { passed: boolean; failures: string[]; anchor: boolean } | null; attempts: { attempt: number; passed: boolean }[] }[]; pages?: { kind?: string }[]; mix?: Record<string, number>; missing_images?: string[] }>(`/api/projects/${P}/render-pack?format=json`).then((r) => r.body)
+    : Promise.resolve(null),
+    options.boqPdf ? t.get<{ pages?: string[] }>(`/api/projects/${P}/boq-pdf?format=pages`).then((r) => r.body.pages ?? []) : Promise.resolve(null),
+    options.proposal ? t.get<{ pages?: string[]; reference?: string | null }>(`/api/projects/${P}/proposal?format=pages`).then((r) => r.body) : Promise.resolve(null),
+    db.from("boqs").select("id, sections").eq("project_id", P).order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; sections: Parameters<typeof printedChecks>[0]["boq"] & { garden?: { draft?: { draft?: boolean; statement?: string | null; derived?: string[] } } } }>(),
+    t.text(`/project/${P}/boq`).then((r) => r.text),
+    // Read whenever the project is a garden; used only when its BoQ is a draft.
+    garden ? t.text(`/project/${P}/plan`).then((r) => r.text) : Promise.resolve(null),
+  ]);
   const boq = boqRow!.sections;
   const draftStatement = boq.garden?.draft?.draft ? boq.garden.draft.statement ?? null : null;
-  const boqHtml = (await t.text(`/project/${P}/boq`)).text;
-  const planHtml = draftStatement ? (await t.text(`/project/${P}/plan`)).text : null;
+  const planHtml = draftStatement ? planHtmlAny : null;
 
   const { INTERNAL_REF, PUBLIC_SOURCE_LABEL } = await import("@/lib/ground-truth/villa94-garden");
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
