@@ -36,7 +36,21 @@ export interface ReviewLine {
   /** Firm persona only: the firm's book has no active entry for this item; `canAdd` = it is in the entry vocabulary. */
   book: { hasEntry: boolean; canAdd: boolean; unit: string | null } | null;
   /** B7 5: on a wet-room BoQ, the product group this line belongs to and what else it could be (lib/boq/product-swaps.ts). */
-  product: { field: string; group: string; current: string | boolean; options: { value: string | boolean; label: string; rate: number | null; unit: string; basis?: "catalogue" | "calibrated" | "allowance" | null }[] } | null;
+  product: ReviewProduct | null;
+  /** C3: every product group the line belongs to (the WC is a fittings grade AND a mount). */
+  products?: ReviewProduct[];
+  /** C3: "Scope review needed — <what changed>": a product swap across install classes left this line priced for the old install. */
+  scopeReview?: string | null;
+  /** C3: the field whose change it was (shower_valve | wc_mount | basin_mount) — what "Mark reviewed" posts. */
+  scopeReviewField?: string | null;
+}
+
+export interface ReviewProduct {
+  field: string;
+  group: string;
+  current: string | boolean;
+  /** C3: install = the option's install class — a swap between two classes moves scope. */
+  options: { value: string | boolean; label: string; rate: number | null; unit: string; basis?: "catalogue" | "calibrated" | "allowance" | null; install?: string }[];
 }
 
 export interface ReviewSection {

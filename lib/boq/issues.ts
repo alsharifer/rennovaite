@@ -28,7 +28,7 @@ import { STAIRS_ASSUMED_NOTE } from "@/lib/plan/scope";
 
 import type { ReviewModel } from "./review-types";
 
-export type IssueGroupKey = "unmatched" | "unpriced" | "assumed" | "confirm" | "duplicates" | "derived" | "basis" | "plan_check" | "step" | "plan_blocks" | "plan_hard" | "plan_soft";
+export type IssueGroupKey = "scope_review" | "unmatched" | "unpriced" | "assumed" | "confirm" | "duplicates" | "derived" | "basis" | "plan_check" | "step" | "plan_blocks" | "plan_hard" | "plan_soft";
 
 export interface IssueRow {
   id: string;
@@ -64,6 +64,7 @@ export interface IssueList {
 }
 
 export const GROUP_TITLE: Record<IssueGroupKey, string> = {
+  scope_review: "SCOPE REVIEW NEEDED — BLOCKS EXPORT",
   unmatched: "YOUR PRICES — NO LONGER MATCHED",
   assumed: "ASSUMED — CONFIRM",
   confirm: "ALLOWANCE — CONFIRM ON SITE",
@@ -85,6 +86,18 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
   const lines = model.sections.flatMap((s) => s.lines);
   const order = new Map(lines.map((l, i) => [l.key, i]));
   const groups: IssueGroup[] = [];
+
+  // C3: a product swap across install classes left these lines priced for the
+  // old install — they block the export until a member marks the change reviewed.
+  const review = lines.filter((l) => !!l.scopeReview);
+  if (review.length > 0) {
+    groups.push({
+      key: "scope_review",
+      title: GROUP_TITLE.scope_review,
+      count: review.length,
+      rows: review.map((l) => ({ id: `scope:${l.key}`, ref: l.ref, title: l.scopeReview!, detail: l.description, action: "Review the line", lineKey: l.key, open: "line" as const, href: null })),
+    });
+  }
 
   // K11: a price someone added whose line is gone (or no longer unique) after a regenerate —
   // it prices nothing and is never attached elsewhere; it waits here until removed or re-applied.
@@ -210,7 +223,7 @@ export function boqIssues(model: ReviewModel, step: StepStatus | null = null): I
     });
   }
 
-  const keys = new Set<string>([...unpriced.map((l) => l.key), ...assumed.map((l) => l.key), ...confirm.map((l) => l.key), ...dups.flatMap((d) => (d.lineKeys ?? []).filter((k) => order.has(k))), ...derived.map((l) => l.key)]);
+  const keys = new Set<string>([...review.map((l) => l.key), ...unpriced.map((l) => l.key), ...assumed.map((l) => l.key), ...confirm.map((l) => l.key), ...dups.flatMap((d) => (d.lineKeys ?? []).filter((k) => order.has(k))), ...derived.map((l) => l.key)]);
   return {
     groups,
     count: groups.reduce((n, g) => n + g.rows.length, 0),

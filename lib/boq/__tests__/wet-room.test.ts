@@ -15,6 +15,12 @@ import { applyWetRoomPackage, footprintSides, priceOptions, wetRoomContextFrom }
 import { isUnpricedLine } from "@/lib/documents/boq-derived";
 import { buildPlanGraph, type RawOpening } from "@/lib/plan/geometry";
 import { roomFromDimensions } from "@/lib/plan/room-intake";
+import { swapEffect } from "@/lib/boq/install-classes";
+import { boqIssues } from "@/lib/boq/issues";
+import { buildReviewModel } from "@/lib/boq/review-model";
+import { PRODUCT_GROUPS } from "@/lib/boq/product-swaps";
+import { readinessFrom } from "@/lib/documents/pack-readiness";
+import { buildChecklist } from "@/lib/documents/pack-export/checklist";
 
 const L = 2.66;
 const n = (xCm: number, yCm: number): [number, number] => [xCm / 100 / L, yCm / 100 / L];
@@ -63,7 +69,7 @@ const LABOUR: LabourRate[] = [
 ];
 const SKUS: PricingSku[] = [{ sku: "T1", brand: "X", category: "Tiles", subcategory: "Marble Effect Porcelain", description_en: "porcelain", unit: "m2", price_aed: 90, vendor: "v" }];
 
-function pilotBoq(room: Record<string, unknown> = RAW, fixtures: typeof FIXTURES = FIXTURES) {
+function pilotBoq(room: Record<string, unknown> = RAW, fixtures: typeof FIXTURES = FIXTURES, opts: { points?: boolean } = {}) {
   const graph = graphOf(room);
   const items = quantifyPlan(graph).filter((i) => i.work_item_key !== "ceiling_finish");
   const { boq } = generateDeterministicBoq({ rooms: [{ id: "bath", name: "Bathroom", room_type: "bathroom", area_m2: 7, polygon: ROOM.polygon, ceiling_h_m: 2.8 }], labourRates: LABOUR, skus: SKUS, styleKey: null });
@@ -71,6 +77,15 @@ function pilotBoq(room: Record<string, unknown> = RAW, fixtures: typeof FIXTURES
   const joined = appendJoineryAluminumSections(mapped, [{ room_type: "bathroom", area_m2: 7 }]);
   // The P2 overlay as assemble appends it (the heater's TBC line included).
   joined.sections.push({ work_section: "Plumbing & Sanitary", lines: [{ description: "Electric water heater — supply & install", quantity: 1, unit: "no", rate_aed: 0, total_aed: 0, vendor_or_source: "TBC", notes: null, rule_id: "P2/overlay/water_heater", kind: "supply_and_install", rate_band: "allowance", wastage_pct: 0, rate_status: "needs_qs" } as never], section_total_aed: 0 } as never);
+  // C3: the P2 points as the pilot's BoQ carries them (the lines a swap across install classes can leave behind).
+  if (opts.points) {
+    const point = (rule: string, description: string, rate: number) => ({ description, quantity: 1, unit: "no", rate_aed: rate, total_aed: rate, vendor_or_source: "overlay point rate", notes: null, rule_id: rule, kind: "supply_and_install", rate_band: "allowance", wastage_pct: 0 });
+    joined.sections.find((s) => s.work_section === "Plumbing & Sanitary")!.lines.push(
+      point("P2/overlay/wc_point", "WC supply + soil connection — first & second fix", 850) as never,
+      point("P2/overlay/basin_point", "Wash-basin supply + waste — first & second fix", 650) as never,
+      point("P2/overlay/shower_mixer", "Shower mixer supply point — first & second fix", 750) as never,
+    );
+  }
   const wallTile = items.filter((i) => i.work_item_key === "wet_tiling").reduce((s, i) => s + i.qty, 0);
   const ctx = wetRoomContextFrom(graph, "bath", fixtures, wallTile)!;
   const resolver = new RateResolver(LABOUR, SKUS, boq.engine.tier, {});
@@ -292,5 +307,88 @@ describe("B7 4 — the wet-room panel's choices reach the BoQ", () => {
   });
   it("the heater is relocated, at the height the panel gave", () => {
     expect(lines(out).find((l) => (l.rule_id ?? "").startsWith("W-23"))!.description).toMatch(/^Water heater — relocate locally \(existing heater kept; N wall at ~2\.10 m/);
+  });
+});
+
+// C3 — install classes: a product swap across classes moves SCOPE, never only the rate.
+describe("C3 — scope-aware product swaps on the pilot bathroom", () => {
+  const withChoice = (wet_room: Record<string, unknown>) => pilotBoq({ ...RAW, spec: { bulkhead: { over: "shower" }, wet_room } }, FIXTURES, { points: true }).out;
+  const flagged = (doc: ReturnType<typeof withChoice>) => lines(doc as never).filter((l) => typeof (l as unknown as { scope_review?: string }).scope_review === "string");
+  const base = withChoice({});
+
+  it("the base case flags nothing", () => {
+    expect(flagged(base)).toEqual([]);
+    expect((base as unknown as { wet_room: { scope_review?: unknown } }).wet_room.scope_review).toBeUndefined();
+  });
+
+  it("within a class (thermostatic → manual, both concealed) the swap is rate-only: the product line changes, nothing is flagged", () => {
+    const manual = withChoice({ shower_valve: "manual" });
+    expect(flagged(manual)).toEqual([]);
+    const point = (d: typeof base) => lines(d as never).find((l) => l.rule_id === "P2/overlay/shower_mixer")!;
+    expect(point(manual).total_aed).toBe(point(base).total_aed);
+    expect(lines(manual as never).some((l) => l.item_key === "san.shower_manual")).toBe(true);
+  });
+
+  it("the shower swap concealed → exposed never silently keeps the install lines: the supply point is flagged, the export is blocked", () => {
+    const exposed = withChoice({ shower_valve: "exposed" });
+    const all = lines(exposed as never);
+    expect(all.some((l) => l.item_key === "san.shower_exposed")).toBe(true);
+    expect(all.some((l) => (l.rule_id ?? "").startsWith("Q-24/"))).toBe(false);
+    const f = flagged(exposed);
+    expect(f.map((l) => l.rule_id)).toEqual(["P2/overlay/shower_mixer"]);
+    expect((f[0] as unknown as { scope_review: string }).scope_review).toMatch(/^Scope review needed — shower valve concealed → exposed: the supply point was priced as a concealed first fix/);
+    expect((exposed as unknown as { wet_room: { scope_review: { field: string }[] } }).wet_room.scope_review.map((r) => r.field)).toEqual(["shower_valve"]);
+    // …and the export gate refuses it, naming the line.
+    const blocked = readinessFrom({ untypedCounters: [], undecided: [], boqNeedsSelection: [], scopeReview: f.map((l) => `${l.description} — ${(l as unknown as { scope_review: string }).scope_review}`) });
+    expect(blocked.ready).toBe(false);
+    expect(buildChecklist({ projectId: "p", readiness: blocked, parity: null, documentName: "Bathroom refit" }).find((c) => c.key === "scope_review")).toMatchObject({ ok: false });
+  });
+
+  it("once a member marks it reviewed, the line is no longer flagged — its figure is the one they left", () => {
+    const reviewed = withChoice({ shower_valve: "exposed", reviewed: ["shower_valve:exposed"] });
+    expect(flagged(reviewed)).toEqual([]);
+  });
+
+  it("WC floor-standing → wall-hung is recomputed by rule: frame + WC, flush plate, duct wall in the BoQ; the option goes", () => {
+    const hung = withChoice({ wc_mount: "wall_hung" });
+    const all = lines(hung as never);
+    expect(all.some((l) => l.item_key === "san.wc_floor" || l.item_key === "san.wc_floor_mid")).toBe(false);
+    expect(["san.wc", "san.actuator", "san.wc_duct_wall"].every((k) => all.some((l) => l.item_key === k))).toBe(true);
+    expect(flagged(hung)).toEqual([]);
+    expect((hung as unknown as { options: { key: string }[] }).options.map((o) => o.key)).not.toContain("wall_hung_wc");
+    expect((base as unknown as { options: { key: string }[] }).options.map((o) => o.key)).toContain("wall_hung_wc");
+  });
+
+  it("basin on a vanity → wall-hung: its own line TBC, and the vanity and the basin first fix are flagged", () => {
+    const hung = withChoice({ basin_mount: "wall_hung" });
+    const all = lines(hung as never);
+    expect(all.find((l) => l.item_key === "san.basin_wall_hung")).toMatchObject({ rate_status: "needs_qs", total_aed: 0 });
+    const keys = flagged(hung).map((l) => l.item_key ?? l.rule_id);
+    expect(keys).toEqual(expect.arrayContaining(["P2/overlay/basin_point"]));
+    expect(keys.some((k) => k === "GT/joinery/vanity" || k === "joinery.vanity_ready" || k === "san.basin" || k === "san.basin_mixer_mid")).toBe(true);
+  });
+
+  it("every product option carries an install class; swapEffect reads them", () => {
+    for (const g of PRODUCT_GROUPS) for (const o of g.options) expect(typeof o.install, `${g.field}:${String(o.value)}`).toBe("string");
+    expect(swapEffect("shower_valve", "thermostatic", "manual")).toEqual({ kind: "rate_only" });
+    expect(swapEffect("shower_valve", "manual", "exposed").kind).toBe("review");
+    expect(swapEffect("wc_mount", "floor_standing", "wall_hung").kind).toBe("recompute");
+    expect(swapEffect("shower_screen", "enclosure", "fixed_panel")).toEqual({ kind: "rate_only" });
+  });
+});
+
+describe("C3 — the flag reaches the Issues navigator and the inspector", () => {
+  it("SCOPE REVIEW NEEDED leads the navigator; the line carries the flag and the field to review", () => {
+    const exposed = pilotBoq({ ...RAW, spec: { bulkhead: { over: "shower" }, wet_room: { shower_valve: "exposed" } } }, FIXTURES, { points: true }).out;
+    const model = buildReviewModel({ projectId: "p", boqId: "b", rev: 2, revDate: "2026-10-21", persona: "owner", boq: exposed as never, provenance: null, tierCtx: { qsValidated: {} }, firm: null, basis: null, duplicates: [], budget: null });
+    const g = boqIssues(model, null).groups[0]!;
+    expect(g.key).toBe("scope_review");
+    expect(g.title).toBe("SCOPE REVIEW NEEDED — BLOCKS EXPORT");
+    const line = model.sections.flatMap((s) => s.lines).find((l) => l.scopeReview)!;
+    expect(line.scopeReviewField).toBe("shower_valve");
+    expect(g.rows[0]).toMatchObject({ lineKey: line.key, open: "line" });
+    // The WC line offers both its groups: the fittings grade and the mounting.
+    const wc = model.sections.flatMap((s) => s.lines).find((l) => l.itemKey === "san.wc_floor")!;
+    expect(wc.products?.map((p) => p.field).sort()).toEqual(["fittings", "wc_mount"]);
   });
 });

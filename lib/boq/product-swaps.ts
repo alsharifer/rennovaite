@@ -13,6 +13,12 @@
 // what else it could be. Choosing one writes the room's choice and regenerates
 // — a new revision whose cause reads "Product changed by <name>". "Add a price"
 // stays rate-only (K11).
+//
+// C3: every option has an INSTALL CLASS. Within a class a swap moves the
+// product's rate only; across classes it moves scope — the dependent lines are
+// recomputed by rule or flagged "Scope review needed" (lib/boq/install-classes.ts).
+// A line can belong to more than one group (the WC is a fittings grade AND a
+// mount): productGroupsOf lists them all.
 // =============================================================================
 
 import { RATE_RULES } from "./rules";
@@ -28,6 +34,8 @@ export interface ProductOption {
   /** Its rule's allowance where it has one (AED, per the line's unit); null = a market rate. */
   rate_aed: number | null;
   unit: string;
+  /** C3: how it is installed. A swap between two classes moves scope, not only a rate. */
+  install: string;
 }
 
 export interface ProductGroup {
@@ -53,48 +61,66 @@ export const PRODUCT_GROUPS: readonly ProductGroup[] = [
     field: "shower_screen",
     label: "Shower glass",
     options: [
-      { value: "enclosure", label: "Frameless enclosure — panels with a hinged door", lines: ["S6-06"], rate_aed: 2200, unit: "per panel" },
-      { value: "fixed_panel", label: "One fixed walk-in panel", lines: ["alum.shower_panel_fixed"], rate_aed: allowance("alum.shower_panel_fixed"), unit: "no" },
+      { value: "enclosure", label: "Frameless enclosure — panels with a hinged door", lines: ["S6-06"], rate_aed: 2200, unit: "per panel", install: "glass screen" },
+      { value: "fixed_panel", label: "One fixed walk-in panel", lines: ["alum.shower_panel_fixed"], rate_aed: allowance("alum.shower_panel_fixed"), unit: "no", install: "glass screen" },
     ],
   },
   {
     field: "shower_valve",
     label: "Shower valve",
     options: [
-      { value: "thermostatic", label: "Thermostatic concealed valve, rain head + hand shower", lines: ["san.shower"], rate_aed: null, unit: "no" },
-      { value: "manual", label: "Manual concealed mixer, rain head + hand shower", lines: ["san.shower_manual"], rate_aed: allowance("san.shower_manual"), unit: "no" },
+      { value: "thermostatic", label: "Thermostatic concealed valve, rain head + hand shower", lines: ["san.shower"], rate_aed: null, unit: "no", install: "concealed" },
+      { value: "manual", label: "Manual concealed mixer, rain head + hand shower", lines: ["san.shower_manual"], rate_aed: allowance("san.shower_manual"), unit: "no", install: "concealed" },
+      { value: "exposed", label: "Exposed thermostatic set — bar mixer and riser rail on the wall, rain head + hand shower", lines: ["san.shower_exposed"], rate_aed: allowance("san.shower_exposed"), unit: "no", install: "exposed" },
     ],
   },
   {
     field: "vanity",
     label: "Vanity",
     options: [
-      { value: "floating_stone", label: "Made-to-measure floating vanity with a stone top", lines: ["GT/joinery/vanity", "S6-05"], rate_aed: null, unit: "item" },
-      { value: "ready_made", label: "Ready-made wall-hung vanity with its own ceramic basin", lines: ["joinery.vanity_ready"], rate_aed: allowance("joinery.vanity_ready"), unit: "no" },
+      { value: "floating_stone", label: "Made-to-measure floating vanity with a stone top", lines: ["GT/joinery/vanity", "S6-05"], rate_aed: null, unit: "item", install: "vanity unit" },
+      { value: "ready_made", label: "Ready-made wall-hung vanity with its own ceramic basin", lines: ["joinery.vanity_ready"], rate_aed: allowance("joinery.vanity_ready"), unit: "no", install: "vanity unit" },
     ],
   },
   {
     field: "fittings",
     label: "Fittings grade — WC, basin mixer, mirror",
     options: [
-      { value: "premium", label: "Rimless WC, basin with mixer, backlit demister mirror", lines: ["san.wc_floor", "san.basin", "alum.mirror_backlit"], rate_aed: null, unit: "set" },
-      { value: "mid", label: "Mid-range WC, basin mixer and LED mirror", lines: ["san.wc_floor_mid", "san.basin_mixer_mid", "alum.mirror_led_mid"], rate_aed: null, unit: "set" },
+      { value: "premium", label: "Rimless WC, basin with mixer, backlit demister mirror", lines: ["san.wc_floor", "san.basin", "alum.mirror_backlit"], rate_aed: null, unit: "set", install: "standard" },
+      { value: "mid", label: "Mid-range WC, basin mixer and LED mirror", lines: ["san.wc_floor_mid", "san.basin_mixer_mid", "alum.mirror_led_mid"], rate_aed: null, unit: "set", install: "standard" },
     ],
   },
   {
     field: "waste",
     label: "Waste removal",
     options: [
-      { value: "skip", label: "A skip", lines: ["prelim.skips"], rate_aed: null, unit: "no" },
-      { value: "bagged", label: "Bagged and carried out by hand", lines: ["prelim.waste_bagged"], rate_aed: allowance("prelim.waste_bagged"), unit: "project" },
+      { value: "skip", label: "A skip", lines: ["prelim.skips"], rate_aed: null, unit: "no", install: "waste removal" },
+      { value: "bagged", label: "Bagged and carried out by hand", lines: ["prelim.waste_bagged"], rate_aed: allowance("prelim.waste_bagged"), unit: "project", install: "waste removal" },
     ],
   },
   {
     field: "niche_led",
     label: "Shower niche",
     options: [
-      { value: true, label: "Niche with an LED strip", lines: ["wall.shower_niche"], rate_aed: allowance("wall.shower_niche"), unit: "no" },
-      { value: false, label: "Plain niche", lines: ["wall.shower_niche_plain"], rate_aed: allowance("wall.shower_niche_plain"), unit: "no" },
+      { value: true, label: "Niche with an LED strip", lines: ["wall.shower_niche"], rate_aed: allowance("wall.shower_niche"), unit: "no", install: "niche" },
+      { value: false, label: "Plain niche", lines: ["wall.shower_niche_plain"], rate_aed: allowance("wall.shower_niche_plain"), unit: "no", install: "niche" },
+    ],
+  },
+  // C3: how the WC and the basin are MOUNTED — each a different install class.
+  {
+    field: "wc_mount",
+    label: "WC mounting",
+    options: [
+      { value: "floor_standing", label: "Floor-standing close-coupled WC", lines: ["san.wc_floor", "san.wc_floor_mid"], rate_aed: null, unit: "no", install: "floor_standing" },
+      { value: "wall_hung", label: "Wall-hung WC on a concealed-cistern frame, flush plate, tiled duct wall", lines: ["san.wc", "san.actuator", "san.wc_duct_wall"], rate_aed: null, unit: "no", install: "wall_hung" },
+    ],
+  },
+  {
+    field: "basin_mount",
+    label: "Basin mounting",
+    options: [
+      { value: "on_vanity", label: "Basin on a vanity", lines: ["joinery.vanity_ready", "GT/joinery/vanity", "san.basin", "san.basin_mixer_mid"], rate_aed: null, unit: "no", install: "on_vanity" },
+      { value: "wall_hung", label: "Wall-hung basin with a bottle trap — no vanity", lines: ["san.basin_wall_hung"], rate_aed: null, unit: "no", install: "wall_hung" },
     ],
   },
 ];
@@ -106,14 +132,20 @@ export function lineProductKey(line: { item_key?: string | null; rule_id?: strin
   return r.startsWith("GT/") ? r : r.split("/")[0]!;
 }
 
-/** The product group a BoQ line belongs to and the option it is, or null. */
-export function productGroupOf(line: { item_key?: string | null; rule_id?: string | null }): { group: ProductGroup; current: ProductOption } | null {
+/** Every product group a BoQ line belongs to, with the option it is (C3: the WC is a grade AND a mount). */
+export function productGroupsOf(line: { item_key?: string | null; rule_id?: string | null }): { group: ProductGroup; current: ProductOption }[] {
   const key = lineProductKey(line);
+  const out: { group: ProductGroup; current: ProductOption }[] = [];
   for (const group of PRODUCT_GROUPS) {
     const current = group.options.find((o) => o.lines.includes(key));
-    if (current) return { group, current };
+    if (current) out.push({ group, current });
   }
-  return null;
+  return out;
+}
+
+/** The first product group a BoQ line belongs to and the option it is, or null. */
+export function productGroupOf(line: { item_key?: string | null; rule_id?: string | null }): { group: ProductGroup; current: ProductOption } | null {
+  return productGroupsOf(line)[0] ?? null;
 }
 
 /** Every line key a group touches — what its revision cause names. */

@@ -21,6 +21,7 @@
 
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { ProductPicker } from "./ProductPicker";
+import { ScopeReview } from "./ScopeReview";
 
 import { formatAED, formatQty } from "@/lib/format/aed";
 import type { ReviewLine, ReviewModel } from "@/lib/boq/review-types";
@@ -250,11 +251,17 @@ export function Inspector({ headingRef, ...p }: InspectorProps) {
               ) : null}
             </Block>
 
-            {line.product ? (
+            {line.scopeReview && line.scopeReviewField ? (
               <Block>
-                <ProductPicker projectId={model.projectId} product={line.product} />
+                <ScopeReview projectId={model.projectId} field={line.scopeReviewField} text={line.scopeReview} />
               </Block>
             ) : null}
+
+            {(line.products?.length ? line.products : line.product ? [line.product] : []).map((product) => (
+              <Block key={product.field}>
+                <ProductPicker projectId={model.projectId} product={product} />
+              </Block>
+            ))}
 
             <Block>
               <div className="flex flex-wrap items-center gap-6">

@@ -17,6 +17,7 @@ import { useId, useState } from "react";
 
 import { Button } from "@/components/blueprint/Button";
 import { formatAED } from "@/lib/format/aed";
+import { swapEffect } from "@/lib/boq/install-classes";
 import type { ReviewLine } from "@/lib/boq/review-types";
 
 export function ProductPicker({ projectId, product }: { projectId: string; product: NonNullable<ReviewLine["product"]> }) {
@@ -25,6 +26,8 @@ export function ProductPicker({ projectId, product }: { projectId: string; produ
   const [pick, setPick] = useState<string | boolean>(product.current);
   const [state, setState] = useState<{ kind: "idle" } | { kind: "running" } | { kind: "done"; text: string } | { kind: "error"; text: string }>({ kind: "idle" });
   const chosen = product.options.find((o) => o.value === pick)!;
+  // C3: a product installed differently moves scope, not only the rate — say so before it is chosen.
+  const effect = pick === product.current ? { kind: "rate_only" as const } : swapEffect(product.field, product.current, pick);
 
   async function use() {
     setState({ kind: "running" });
@@ -67,6 +70,13 @@ export function ProductPicker({ projectId, product }: { projectId: string; produ
       <p id={`${ids}-note`} className="t-body-sm mt-2 text-bp-ink-secondary">
         Changing the product makes a new revision; the drawings and renders follow the new design.
       </p>
+      {effect.kind !== "rate_only" ? (
+        <p className="t-body-sm mt-2 border-l-2 border-bp-line-strong pl-3 text-bp-ink-primary" data-install-change={effect.kind}>
+          {effect.kind === "recompute"
+            ? `This changes how it is installed — ${effect.what}. The lines around it are recomputed.`
+            : `This changes how it is installed — ${effect.what}. Those lines will be marked "Scope review needed" and the export is blocked until you review them.`}
+        </p>
+      ) : null}
       <div className="mt-3">
         <Button kind="secondary" onClick={() => void use()} disabled={pick === product.current || state.kind === "running" ? { reason: pick === product.current ? "This is the product in the BoQ — choose another to change it." : "Changing the product…", reasonId: `${ids}-why`, showReason: true } : false} testId="product-use">
           {state.kind === "running" ? "Changing and regenerating…" : `Use ${chosen.label.charAt(0).toLowerCase()}${chosen.label.slice(1)}`}
