@@ -71,10 +71,11 @@ export interface PhotoViewsInitial {
 }
 
 type Busy = "render" | "lock" | "change" | "place";
-export type PhotoRowState = "changed" | "locked" | "anchor" | "ready" | "rendering" | "not_yet" | "not_placed" | "failed" | "stale";
+export type PhotoRowState = "changed" | "untracked" | "locked" | "anchor" | "ready" | "rendering" | "not_yet" | "not_placed" | "failed" | "stale";
 
 export const PHOTO_STATE: Record<PhotoRowState, { icon: string; label: string }> = {
   changed: { icon: "update", label: "CHANGED SINCE APPROVAL" },
+  untracked: { icon: "help", label: "LOCKED · PRODUCTS NOT CHECKED" },
   anchor: { icon: "anchor", label: "ANCHOR" },
   locked: { icon: "check", label: "LOCKED" },
   ready: { icon: "visibility", label: "READY" },
@@ -139,11 +140,15 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
     });
     // C5 #1: a locked view whose render was made under another design than the room's now.
     const drift = isLocked ? approvalDrift(latest?.gate?.design_key, designNow[photo.room_id]) : null;
+    // C5 gap: a locked view with no product record cannot be vouched for — it never reads as current.
+    const untracked = isLocked && !!latest && !latest.gate?.design_key;
     const state: PhotoRowState = busy[photo.id] === "render" || busy[photo.id] === "change"
       ? "rendering"
       : drift
         ? "changed"
-        : anchor?.room_photo_id === photo.id
+        : untracked
+          ? "untracked"
+          : anchor?.room_photo_id === photo.id
         ? "anchor"
         : isLocked
           ? "locked"
@@ -154,7 +159,7 @@ export function usePhotoViews(projectId: string, initial: PhotoViewsInitial | nu
               : follows === "stale" || (follows === "unchecked" && !!anchor && !latest.anchor_render_id)
                 ? "stale"
                 : "ready";
-    return { versions: vs, idx, current, latest, anchor, isLocked, follows, state, drift };
+    return { versions: vs, idx, current, latest, anchor, isLocked, follows, state, drift, untracked };
   }, [versions, versionIdx, anchors, locked, busy, designNow]);
 
   async function render(photo: PhotoView): Promise<boolean> {
@@ -489,6 +494,13 @@ export function PhotoViewCentre({ api, roomName, photo, onSelect }: { api: Photo
         </li>
       </ul>
       <p id={`${ids}-addview`} className="t-label-md mt-1 text-bp-ink-tertiary">A view from where you have no photo needs the room in 3D — not in this pilot. Add a photo from there instead.</p>
+
+      {info.untracked && !info.drift ? (
+        <div className="mt-4 border-l-2 border-bp-line-strong bg-bp-surface-sunken px-4 py-3" data-view-untracked="">
+          <p className="t-label-caps text-bp-ink-primary">PRODUCTS NOT CHECKED</p>
+          <p className="t-body-sm mt-1 text-bp-ink-secondary">This view was locked before renders recorded their products, so nothing can confirm it shows the products the BoQ prices. Ask for a change and lock the new version to check it.</p>
+        </div>
+      ) : null}
 
       {info.drift ? (
         <div role="status" className="surface-inverse mt-4 bg-bp-alert-surface px-4 py-3 text-bp-alert-ink" data-view-changed-since-approval="">

@@ -41,6 +41,9 @@ export interface DesignCheckRow {
   reason: string;
 }
 
+/** A render made before B7 recorded its products (gate.design_key). */
+export const PRODUCTS_UNTRACKED = "rendered before product tracking";
+
 const row = (key: DesignCheckKey, state: DesignCheckState, reason: string): DesignCheckRow => ({ key, label: DESIGN_CHECK_LABEL[key], state, reason: state === "unchecked" ? `not checked — ${reason}` : reason });
 
 /** "DESIGN CHECK · 3 OF 5 PASSED" / "… · 1 FAILED". */
@@ -118,9 +121,12 @@ export function photoViewCheckRows(input: { gate: PhotoGateLike; follows: Follow
           : row("finishes", "fail", followsLine(f, input.anchorLabel, input.followsOff ?? []));
 
   const drift = approvalDrift(g.design_key, input.designNow);
-  const products = !g.design_key || !input.designNow
-    ? row("products", "unchecked", "rendered before product choices were recorded on renders")
-    : drift
+  // No product record = nothing can vouch for it: never a ✓, never silence (the stored-"Ready" failure).
+  const products = !g.design_key
+    ? row("products", "unchecked", PRODUCTS_UNTRACKED)
+    : !input.designNow
+      ? row("products", "unchecked", "the room's product choices could not be read")
+      : drift
       ? row("products", "fail", `rendered before ${drift}`)
       : row("products", "pass", "rendered with the products the BoQ prices");
 
