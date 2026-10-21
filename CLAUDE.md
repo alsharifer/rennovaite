@@ -1207,6 +1207,59 @@ Report `docs/BATHROOM_PILOT_B9.md`. Migration **066**.
     (rev 15, AED 37,601.29). Room protection stays an allowance — no per-room
     figure exists.
 
+### Bathroom pilot B10 — masked per-fixture edits (20 Oct)
+
+Report `docs/BATHROOM_PILOT_B10.md`. No migration.
+
+- **Masked edit** (`lib/render/masked-edit.ts`):
+  - `black-forest-labs/flux-fill-pro` inpaints inside a mask built from the
+    check's boxes;
+  - `compositeInside` pastes the original back outside it — nothing outside the
+    mask can change, by construction;
+  - `raiseToTop` raises a replacement's mask to its STATED height from the
+    reading's top share.
+- **Measured on the pilot:**
+  - Photo 2's four client comments: 5 masked edits, 3 kept, every layout held
+    (B6: 16 edits, 10 kept). The fixed glass panel was not done in two tries;
+    the three kept were each "partly" done.
+  - The vanity: ×0.98 masked vs ×2.68 with its size stated in the prompt.
+  - A masked RESTYLE is not viable: the shell barely restyles and invents.
+- **Wired as "Ask for a change" for one-item requests** (ruled 20 Oct,
+  `lib/render/masked-change.ts`, used by `photo-view-change.ts`):
+  - a request that names exactly ONE live check item (`itemsNamedBy`) that the
+    current image's reading locates → that item's box, padded `MASK_PAD`
+    (1.5 %), raised to a stated height, is the mask; the masked arm edits
+    inside it (below);
+  - kept by `maskedVerdict` (not unchanged, layout check passes, request not
+    "no") → a version with `change.path = "masked"`;
+  - otherwise today's edit runs as the fallback, recording `change.masked`
+    `{ item, box, kept: false, why }`; no item / several / not in view → today's
+    edit directly. The studio says which path made the version.
+  - The restyle pipeline is unchanged (a masked restyle is not viable).
+  - **The masked arm is "edit, then paste back"** (`maskedArm`,
+    `MASKED_CHANGE_MODEL` = `paste` default | `fill`; `masked-edit.ts`
+    `editThenPaste`): `google/nano-banana` edits the WHOLE image
+    (`pasteChangePrompt`), so it sees the room and knows what the item is, and
+    `compositeInside` keeps only its pixels inside the box. Measured 20 Oct
+    (`scripts/b10-paste-eval.ts`, cap US$5, US$3.20): 5 one-item requests ×
+    2 samples, Photo 3's B2-era version + Photo 2's v4 — the unnamed parts of
+    the item kept in **5 / 10 (paste) vs 0 / 10 (fill)**, done 6 vs 7 (fill's
+    "done" redesigned the item every time: the oak vanity black, the top
+    swapped for "matte white drawers", a framed enclosure for "one fixed
+    panel"), layout 10 / 10 both. Paste fails honestly (no visible change →
+    the fallback); fill fails by redesigning, and 6 of its 10 would have been
+    kept. `flux-fill-pro` stays as `fill`.
+  - **Known limits:** a 1.2 m cabinet where the bidet stood fails on both arms
+    when the parent's reading carries no `top` share (a B2-era reading: the
+    box stays the bidet's); a real change small against the whole frame can
+    read as "unchanged" (similarity is whole-frame) and fall back.
+  - Live: `node --env-file=.env.local scripts/b10-masked-change-check.mjs
+    [port] [render-id] [--cap=2]` (hard cap).
+- **Hard spend cap** (`lib/render/spend-cap.ts` `SpendCap`): every paid call
+  reserves its worst case (`WORST_CASE_USD`) against the session's tagged
+  render_spend (`detail.session_ref`) and is refused past the cap. Every render
+  session uses one; the cap is never raised mid-session.
+
 ### Sprint C1 — ground truth never emits a line; glazing from the plan (20 Oct)
 
 Root cause: `docs/SPRINT_C_ROOT_CAUSE.md` (C0). Jumeirah's BoQ carried the
@@ -3391,6 +3444,7 @@ surface: the rail keeps the step you came from, `shell/step-memory.ts`).
 | `MULTIVIEW_RENDERS_ENABLED`       | server — the bathroom pilot's one flag (B1–B6). B1: `"true"` adds "One room from its dimensions" to the intake; B2: the studio's photo views. Off = intake and studio exactly as before |
 | `PHOTO_VIEW_MAX_ATTEMPTS`         | server — B2: `1` = one paid render per photo view (no re-render after a failed check). Unset = the first render and one re-render |
 | `PHOTO_VIEW_MODEL`                | server — B2b: the photo-view restyle model. Unset / `"pro"` = frame-pinned `google/nano-banana-pro`; `"edit"` = `google/nano-banana` (the fallback) |
+| `MASKED_CHANGE_MODEL`             | server — B10: "Ask for a change" on one item. Unset / `"paste"` = `google/nano-banana` edits the whole image, kept only inside the item's box; `"fill"` = `black-forest-labs/flux-fill-pro` inpaints the box |
 
 ### Feature flags — read at server start (flip → restart)
 

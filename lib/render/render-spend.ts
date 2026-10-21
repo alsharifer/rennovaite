@@ -16,6 +16,8 @@ export const IMAGE_PRICE_USD: Record<string, number> = {
   "black-forest-labs/flux-depth-pro": 0.05,
   "black-forest-labs/flux-canny-pro": 0.05,
   "black-forest-labs/flux-kontext-pro": 0.04,
+  // B10: masked inpainting (per image).
+  "black-forest-labs/flux-fill-pro": 0.05,
 };
 
 export interface SpendRow {

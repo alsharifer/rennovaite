@@ -99,6 +99,10 @@ export interface PhotoViewChange {
   ssim: number | null;
   changed_pct: number | null;
   cost_usd: number;
+  /** Ruled 20 Oct (B10): "masked" = edited inside one item's outline only; "edit" = today's whole-image edit. Absent on older versions. */
+  path?: "masked" | "edit";
+  /** The masked try for this request, when there was one: the item and region, whether it was kept, and why not. */
+  masked?: { item: string; box: [number, number, number, number]; kept: boolean; why?: string } | null;
 }
 
 export class PhotoViewError extends Error {
