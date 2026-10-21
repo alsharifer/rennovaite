@@ -40,7 +40,7 @@ import { loadProjectFirmOverlay, type FirmOverlay } from "@/lib/rates/firm";
 import { applyOhp } from "@/lib/rates/ohp";
 import { loadReferenceRows, type ReferenceRateRow } from "@/lib/rates/reference";
 import type { StairsContext } from "@/lib/boq/schema";
-import { isMultiLevelProject } from "@/lib/plan/scope";
+import { stairsContextFor } from "@/lib/plan/scope";
 
 // Categories from pricing_skus relevant to a residential first-floor
 // refit. The brief named lowercase tokens ('tile', 'sanitary', etc.) but the
@@ -257,9 +257,6 @@ export async function loadPriceablePlan(
   if (unnamed.length > 0) {
     return no(409, { error: `${unnamed.length} room${unnamed.length === 1 ? " has" : "s have"} no name — name ${unnamed.length === 1 ? "it" : "them"} or mark ${unnamed.length === 1 ? "it" : "them"} out of scope on the plan.`, code: "rooms_unnamed", room_ids: unnamed.map((r) => r.id) });
   }
-  // K12 ruling (Q-11): a stairs room ANYWHERE on the plan (even left out) means the stairs are known;
-  // with none, a villa / multi-level project keeps the allowance as an assumption.
-  const stairs: StairsContext = { onPlan: rooms.some((r) => r.room_type === "stairs"), multiLevel: isMultiLevelProject(project) };
   // B5: how the plan was made (061 plans.intake) — "room_dimensions" = one room typed in. Best-effort.
   let intake: string | null = null;
   try {
@@ -268,6 +265,10 @@ export async function loadPriceablePlan(
   } catch {
     /* pre-061 */
   }
+  // K12 ruling (Q-11): a stairs room ANYWHERE on the plan (even left out) means the stairs are known;
+  // with none, a villa / multi-level project keeps the allowance as an assumption — never a plan
+  // typed in as one room (stairsContextFor).
+  const stairs: StairsContext = stairsContextFor(rooms, project, intake);
   return { project, plan, rooms: scoped, stairs, intake };
 }
 

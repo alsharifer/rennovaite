@@ -42,6 +42,16 @@ export function isMultiLevelProject(p: { name?: string | null; display_name?: st
   return /\b(villa|townhouse|town house|duplex)\b/i.test(`${p.name ?? ""} ${p.display_name ?? ""}`);
 }
 
+/**
+ * The Q-11 staircase context of a plan. A plan typed in as ONE room (61 plans.intake
+ * "room_dimensions") is never a multi-level home, whatever the project is called — a
+ * "Villa 12 — guest bathroom" priced a AED 6,000 staircase on its bathroom (demo
+ * rehearsal, 21 Oct).
+ */
+export function stairsContextFor(rooms: readonly { room_type?: string | null }[], project: { name?: string | null; display_name?: string | null }, intake: string | null): { onPlan: boolean; multiLevel: boolean } {
+  return { onPlan: rooms.some((r) => r.room_type === "stairs"), multiLevel: intake !== "room_dimensions" && isMultiLevelProject(project) };
+}
+
 /** K12: Q-11 kept on a villa whose plan shows no stairs room — the Issues navigator asks to confirm. */
 export const STAIRS_ASSUMED_NOTE = "Staircase assumed — confirm the villa has stairs";
 
