@@ -86,3 +86,13 @@ describe("one check, every surface", () => {
     for (const src of [studio, rooms]) expect(src).not.toMatch(/DESIGN CHECK · PASSED|MATCHES YOUR PHOTO/);
   });
 });
+
+describe("C5 gap: a view with no product record is never vouched for", () => {
+  it("✗ Products match BoQ — not checked — rendered before product tracking; the studio flags the locked view", () => {
+    const rows = photoViewCheckRows({ gate: gate([], { design_key: undefined }), follows: "anchor", anchorLabel: "Photo 2", designNow: KEY });
+    expect(designCheckLine(rows.find((r) => r.key === "products")!)).toBe("✗ Products match BoQ — not checked — rendered before product tracking");
+    const studio = readFileSync(path.join(ROOT, "components/blueprint/renders/PhotoViewStudio.tsx"), "utf8");
+    expect(studio).toMatch(/LOCKED · PRODUCTS NOT CHECKED/);
+    expect(studio).toMatch(/data-view-untracked/);
+  });
+});
