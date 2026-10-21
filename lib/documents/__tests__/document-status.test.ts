@@ -108,3 +108,24 @@ describe("no badge says Ready from a flag or a timestamp", () => {
     expect(page).toMatch(/const stale = .*boq_id/);
   });
 });
+
+describe("a job that outlived what runs it is not 'running' (Jumeirah, 21 Oct: 11 h 'Export running')", () => {
+  it("an app job past its route's budget reads as failed — the export stopped; a CLI job keeps the TTL", async () => {
+    const { settleStalled, APP_JOB_BUDGET_MS, JOB_TTL_MS, STALLED_ERROR } = await import("../pack-export/job");
+    const t0 = Date.parse("2026-10-21T03:34:08Z");
+    const job = { status: "running" as const, source: "app" as const, created_at: "2026-10-21T03:34:08Z", started_at: "2026-10-21T03:34:08Z", error: null, finished_at: null };
+    expect(settleStalled(job, t0 + 200_000).status).toBe("running");
+    const dead = settleStalled(job, t0 + APP_JOB_BUDGET_MS + 1);
+    expect(dead).toMatchObject({ status: "failed", error: STALLED_ERROR });
+    expect(settleStalled({ ...job, source: "cli" as const }, t0 + APP_JOB_BUDGET_MS + 1).status).toBe("running");
+    expect(settleStalled({ ...job, source: "cli" as const }, t0 + JOB_TTL_MS + 1).status).toBe("failed");
+    const s = documentStatus({ available: true, current: { boqId: "b3", rev: 3 }, jobs: [{ id: "j", manifest: null, checklist: null, options: null, ...dead }] });
+    expect(s).toMatchObject({ state: "needs_check" });
+    expect(s.label).toBe(`Needs check: the last export failed — ${STALLED_ERROR}`);
+  });
+  it("the budget is the export route's maxDuration (+ 60 s)", async () => {
+    const { APP_JOB_BUDGET_MS } = await import("../pack-export/job");
+    const src = readFileSync(path.join(ROOT, "app/api/projects/[id]/pack-export/route.ts"), "utf8");
+    expect(APP_JOB_BUDGET_MS).toBe((Number(src.match(/export const maxDuration = (\d+)/)![1]) + 60) * 1000);
+  });
+});
