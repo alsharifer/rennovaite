@@ -1,0 +1,1570 @@
+{
+ "_note": "Production, read-only (21 Oct 2026, Sprint C2): Mudon pilot villa's latest \"proposed\" plan_snapshot (89f75f37, written 29 Jul at design lock). It predates PR #57 (no `elements`, no `context`); building A-102 from it threw \"Cannot read properties of undefined (reading 'map')\" for a month (docs/SPRINT_C_ROOT_CAUSE.md §2).",
+ "graph": {
+  "derived": {
+   "ceiling_h": true,
+   "is_structural": true,
+   "level": true,
+   "metric_scale": true,
+   "north": true,
+   "openings_empty": true,
+   "wall_thickness": true,
+   "walls": true
+  },
+  "meta": {
+   "envelope_m": {
+    "depth": 14.366874386797488,
+    "width": 12.827566416783473
+   },
+   "level": "first_floor",
+   "north_deg": 0,
+   "scale": "1:100",
+   "total_area_m2": 178.5,
+   "unit_to_m": 25.655132833566945,
+   "units": "metric"
+  },
+  "notes": [
+   "Metric geometry derived from total_area_m2 (178.5 m²) via a single isotropic unit→metre factor (25.6551 m/unit); the parse carries no real x/y scale.",
+   "59 walls derived from shared/boundary polygon edges (17 party, 42 boundary); thickness 200 mm and structural status are placeholders.",
+   "openings: none persisted in the parse — returned empty (no doors/windows invented)."
+  ],
+  "openings": [],
+  "planId": "d09e105d-17e9-4737-9f7d-3bd51acda43f",
+  "projectId": "6b5fda9d-e40f-4e16-940c-7a17d27ec5dc",
+  "rooms": [
+   {
+    "area_m2": 4.7,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "fd8bcc23-70fd-4737-87ca-d1a95166938b",
+    "name_ar": "حمام",
+    "name_en": "Bath",
+    "polygon": [
+     [
+      6.157231880056067,
+      3.5917185966993714
+     ],
+     [
+      8.72274516341276,
+      3.5917185966993714
+     ],
+     [
+      8.72274516341276,
+      6.157231880056067
+     ],
+     [
+      6.157231880056067,
+      6.157231880056067
+     ]
+    ],
+    "type": "bathroom"
+   },
+   {
+    "area_m2": 16.8,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c",
+    "name_ar": "غرفة نوم 3",
+    "name_en": "Bedroom 3",
+    "polygon": [
+     [
+      4.61792391004205,
+      0
+     ],
+     [
+      8.72274516341276,
+      0
+     ],
+     [
+      8.72274516341276,
+      4.61792391004205
+     ],
+     [
+      4.61792391004205,
+      4.61792391004205
+     ]
+    ],
+    "type": "bedroom"
+   },
+   {
+    "area_m2": 19.9,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "365eadc3-7c3d-4400-9f15-1d79dbd481bb",
+    "name_ar": "غرفة نوم 4",
+    "name_en": "Bedroom 4",
+    "polygon": [
+     [
+      4.61792391004205,
+      8.72274516341276
+     ],
+     [
+      9.2358478200841,
+      8.72274516341276
+     ],
+     [
+      9.2358478200841,
+      12.827566416783473
+     ],
+     [
+      4.61792391004205,
+      12.827566416783473
+     ]
+    ],
+    "type": "bedroom"
+   },
+   {
+    "area_m2": 4.7,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "13943a21-0d88-46cd-9678-b5b529b6612d",
+    "name_ar": "غرفة الملابس",
+    "name_en": "Dressing Room",
+    "polygon": [
+     [
+      0,
+      7.6965398500700815
+     ],
+     [
+      3.0786159400280333,
+      7.6965398500700815
+     ],
+     [
+      3.0786159400280333,
+      9.74895047675544
+     ],
+     [
+      0,
+      9.74895047675544
+     ]
+    ],
+    "type": "closet"
+   },
+   {
+    "area_m2": 24,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "65e8f9eb-ca61-4de6-971f-4171a94c8758",
+    "name_ar": "غرفة المعيشة",
+    "name_en": "Family Area",
+    "polygon": [
+     [
+      2.052410626685355,
+      4.61792391004205
+     ],
+     [
+      6.157231880056067,
+      4.61792391004205
+     ],
+     [
+      6.157231880056067,
+      8.72274516341276
+     ],
+     [
+      2.052410626685355,
+      8.72274516341276
+     ]
+    ],
+    "type": "living"
+   },
+   {
+    "area_m2": 6.5,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "ef29d1ac-4b55-4496-9db1-c19cc9492201",
+    "name_ar": "شرفة أمامية",
+    "name_en": "Front Balcony",
+    "polygon": [
+     [
+      0.5131026566713379,
+      0
+     ],
+     [
+      4.61792391004205,
+      0
+     ],
+     [
+      4.61792391004205,
+      2.565513283356694
+     ],
+     [
+      0.5131026566713379,
+      2.565513283356694
+     ]
+    ],
+    "type": "balcony"
+   },
+   {
+    "area_m2": 4.7,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "a55d84d5-e740-4dce-8135-35e0fc5d5f14",
+    "name_ar": "حمام رئيسي",
+    "name_en": "Master Bath",
+    "polygon": [
+     [
+      0,
+      9.74895047675544
+     ],
+     [
+      3.0786159400280333,
+      9.74895047675544
+     ],
+     [
+      3.0786159400280333,
+      11.801361103440794
+     ],
+     [
+      0,
+      11.801361103440794
+     ]
+    ],
+    "type": "ensuite"
+   },
+   {
+    "area_m2": 19.9,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "1fa86ad1-b905-4d7a-a6e8-ff8dfb355e5d",
+    "name_ar": "غرفة النوم الرئيسية",
+    "name_en": "Master Bedroom",
+    "polygon": [
+     [
+      0,
+      2.565513283356694
+     ],
+     [
+      4.36137258170638,
+      2.565513283356694
+     ],
+     [
+      4.36137258170638,
+      7.6965398500700815
+     ],
+     [
+      0,
+      7.6965398500700815
+     ]
+    ],
+    "type": "master_bedroom"
+   },
+   {
+    "area_m2": 5.2,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "3c7ec701-dc37-4c82-9f2f-77a0c65257ff",
+    "name_ar": "ممر",
+    "name_en": "Passage",
+    "polygon": [
+     [
+      4.36137258170638,
+      4.61792391004205
+     ],
+     [
+      6.926885865063076,
+      4.61792391004205
+     ],
+     [
+      6.926885865063076,
+      8.72274516341276
+     ],
+     [
+      4.36137258170638,
+      8.72274516341276
+     ]
+    ],
+    "type": "foyer"
+   },
+   {
+    "area_m2": 7.2,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "f66a9003-89a5-4ffc-8240-aae216932736",
+    "name_ar": "درج",
+    "name_en": "Stairs",
+    "polygon": [
+     [
+      6.926885865063076,
+      0.5131026566713379
+     ],
+     [
+      9.74895047675544,
+      0.5131026566713379
+     ],
+     [
+      9.74895047675544,
+      4.61792391004205
+     ],
+     [
+      6.926885865063076,
+      4.61792391004205
+     ]
+    ],
+    "type": "stairs"
+   },
+   {
+    "area_m2": 13,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "be5b5105-2333-4fe1-9086-7d30981409a1",
+    "name_ar": "تراس",
+    "name_en": "Terrace",
+    "polygon": [
+     [
+      8.72274516341276,
+      0
+     ],
+     [
+      12.827566416783473,
+      0
+     ],
+     [
+      12.827566416783473,
+      4.61792391004205
+     ],
+     [
+      8.72274516341276,
+      4.61792391004205
+     ]
+    ],
+    "type": "terrace"
+   },
+   {
+    "area_m2": 16.4,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "d53efe93-c59d-405b-bcc2-786597d7179b",
+    "name_ar": "تراس",
+    "name_en": "Terrace 2",
+    "polygon": [
+     [
+      0.5131026566713379,
+      11.288258446769454
+     ],
+     [
+      9.2358478200841,
+      11.288258446769454
+     ],
+     [
+      9.2358478200841,
+      14.366874386797488
+     ],
+     [
+      0.5131026566713379,
+      14.366874386797488
+     ]
+    ],
+    "type": "terrace"
+   },
+   {
+    "area_m2": 2.7,
+    "ceiling_h_m": 2.9,
+    "derived_fields": [
+     "polygon",
+     "ceiling_h_m"
+    ],
+    "id": "df5244c6-cb72-400a-bcde-813a4fcdf456",
+    "name_ar": "دورة مياه",
+    "name_en": "Toilet",
+    "polygon": [
+     [
+      6.670334536727406,
+      7.1834371933987455
+     ],
+     [
+      8.72274516341276,
+      7.1834371933987455
+     ],
+     [
+      8.72274516341276,
+      8.97929649174843
+     ],
+     [
+      6.670334536727406,
+      8.97929649174843
+     ]
+    ],
+    "type": "powder"
+   }
+  ],
+  "walls": [
+   {
+    "derived": true,
+    "id": "wall-1",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.157231880056067,
+      3.5917185966993714
+     ],
+     [
+      8.72274516341276,
+      3.5917185966993714
+     ]
+    ],
+    "room_ids": [
+     "fd8bcc23-70fd-4737-87ca-d1a95166938b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-2",
+    "is_structural": null,
+    "polyline": [
+     [
+      8.72274516341276,
+      0
+     ],
+     [
+      8.72274516341276,
+      3.5917185966993714
+     ]
+    ],
+    "room_ids": [
+     "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c",
+     "be5b5105-2333-4fe1-9086-7d30981409a1"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-3",
+    "is_structural": null,
+    "polyline": [
+     [
+      8.72274516341276,
+      3.5917185966993714
+     ],
+     [
+      8.72274516341276,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c",
+     "be5b5105-2333-4fe1-9086-7d30981409a1",
+     "fd8bcc23-70fd-4737-87ca-d1a95166938b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-4",
+    "is_structural": null,
+    "polyline": [
+     [
+      8.72274516341276,
+      4.61792391004205
+     ],
+     [
+      8.72274516341276,
+      6.157231880056067
+     ]
+    ],
+    "room_ids": [
+     "fd8bcc23-70fd-4737-87ca-d1a95166938b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-5",
+    "is_structural": null,
+    "polyline": [
+     [
+      8.72274516341276,
+      7.1834371933987455
+     ],
+     [
+      8.72274516341276,
+      8.97929649174843
+     ]
+    ],
+    "room_ids": [
+     "df5244c6-cb72-400a-bcde-813a4fcdf456"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-6",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.157231880056067,
+      6.157231880056067
+     ],
+     [
+      8.72274516341276,
+      6.157231880056067
+     ]
+    ],
+    "room_ids": [
+     "fd8bcc23-70fd-4737-87ca-d1a95166938b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-7",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.157231880056067,
+      3.5917185966993714
+     ],
+     [
+      6.157231880056067,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "fd8bcc23-70fd-4737-87ca-d1a95166938b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-8",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.157231880056067,
+      4.61792391004205
+     ],
+     [
+      6.157231880056067,
+      6.157231880056067
+     ]
+    ],
+    "room_ids": [
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758",
+     "fd8bcc23-70fd-4737-87ca-d1a95166938b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-9",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.157231880056067,
+      6.157231880056067
+     ],
+     [
+      6.157231880056067,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-10",
+    "is_structural": null,
+    "polyline": [
+     [
+      0.5131026566713379,
+      0
+     ],
+     [
+      4.61792391004205,
+      0
+     ]
+    ],
+    "room_ids": [
+     "ef29d1ac-4b55-4496-9db1-c19cc9492201"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-11",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.61792391004205,
+      0
+     ],
+     [
+      8.72274516341276,
+      0
+     ]
+    ],
+    "room_ids": [
+     "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-12",
+    "is_structural": null,
+    "polyline": [
+     [
+      8.72274516341276,
+      0
+     ],
+     [
+      12.827566416783473,
+      0
+     ]
+    ],
+    "room_ids": [
+     "be5b5105-2333-4fe1-9086-7d30981409a1"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-13",
+    "is_structural": null,
+    "polyline": [
+     [
+      2.052410626685355,
+      4.61792391004205
+     ],
+     [
+      4.36137258170638,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-14",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.36137258170638,
+      4.61792391004205
+     ],
+     [
+      4.61792391004205,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff",
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-15",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.61792391004205,
+      4.61792391004205
+     ],
+     [
+      6.157231880056067,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff",
+     "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c",
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-16",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.157231880056067,
+      4.61792391004205
+     ],
+     [
+      6.926885865063076,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff",
+     "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-17",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.926885865063076,
+      4.61792391004205
+     ],
+     [
+      8.72274516341276,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c",
+     "f66a9003-89a5-4ffc-8240-aae216932736"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-18",
+    "is_structural": null,
+    "polyline": [
+     [
+      8.72274516341276,
+      4.61792391004205
+     ],
+     [
+      9.74895047675544,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "be5b5105-2333-4fe1-9086-7d30981409a1",
+     "f66a9003-89a5-4ffc-8240-aae216932736"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-19",
+    "is_structural": null,
+    "polyline": [
+     [
+      9.74895047675544,
+      4.61792391004205
+     ],
+     [
+      12.827566416783473,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "be5b5105-2333-4fe1-9086-7d30981409a1"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-20",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.61792391004205,
+      0
+     ],
+     [
+      4.61792391004205,
+      2.565513283356694
+     ]
+    ],
+    "room_ids": [
+     "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c",
+     "ef29d1ac-4b55-4496-9db1-c19cc9492201"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-21",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.61792391004205,
+      2.565513283356694
+     ],
+     [
+      4.61792391004205,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "60e0cda1-1f0f-4f9a-9a0b-dd25fffa710c"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-22",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.61792391004205,
+      8.72274516341276
+     ],
+     [
+      4.61792391004205,
+      12.827566416783473
+     ]
+    ],
+    "room_ids": [
+     "365eadc3-7c3d-4400-9f15-1d79dbd481bb"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-23",
+    "is_structural": null,
+    "polyline": [
+     [
+      2.052410626685355,
+      8.72274516341276
+     ],
+     [
+      4.36137258170638,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-24",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.36137258170638,
+      8.72274516341276
+     ],
+     [
+      4.61792391004205,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff",
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-25",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.61792391004205,
+      8.72274516341276
+     ],
+     [
+      6.157231880056067,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "365eadc3-7c3d-4400-9f15-1d79dbd481bb",
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff",
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-26",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.157231880056067,
+      8.72274516341276
+     ],
+     [
+      6.926885865063076,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "365eadc3-7c3d-4400-9f15-1d79dbd481bb",
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-27",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.926885865063076,
+      8.72274516341276
+     ],
+     [
+      9.2358478200841,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "365eadc3-7c3d-4400-9f15-1d79dbd481bb"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-28",
+    "is_structural": null,
+    "polyline": [
+     [
+      9.2358478200841,
+      8.72274516341276
+     ],
+     [
+      9.2358478200841,
+      11.288258446769454
+     ]
+    ],
+    "room_ids": [
+     "365eadc3-7c3d-4400-9f15-1d79dbd481bb"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-29",
+    "is_structural": null,
+    "polyline": [
+     [
+      9.2358478200841,
+      11.288258446769454
+     ],
+     [
+      9.2358478200841,
+      12.827566416783473
+     ]
+    ],
+    "room_ids": [
+     "365eadc3-7c3d-4400-9f15-1d79dbd481bb",
+     "d53efe93-c59d-405b-bcc2-786597d7179b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-30",
+    "is_structural": null,
+    "polyline": [
+     [
+      9.2358478200841,
+      12.827566416783473
+     ],
+     [
+      9.2358478200841,
+      14.366874386797488
+     ]
+    ],
+    "room_ids": [
+     "d53efe93-c59d-405b-bcc2-786597d7179b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-31",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.61792391004205,
+      12.827566416783473
+     ],
+     [
+      9.2358478200841,
+      12.827566416783473
+     ]
+    ],
+    "room_ids": [
+     "365eadc3-7c3d-4400-9f15-1d79dbd481bb"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-32",
+    "is_structural": null,
+    "polyline": [
+     [
+      0,
+      7.6965398500700815
+     ],
+     [
+      3.0786159400280333,
+      7.6965398500700815
+     ]
+    ],
+    "room_ids": [
+     "13943a21-0d88-46cd-9678-b5b529b6612d",
+     "1fa86ad1-b905-4d7a-a6e8-ff8dfb355e5d"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-33",
+    "is_structural": null,
+    "polyline": [
+     [
+      3.0786159400280333,
+      7.6965398500700815
+     ],
+     [
+      4.36137258170638,
+      7.6965398500700815
+     ]
+    ],
+    "room_ids": [
+     "1fa86ad1-b905-4d7a-a6e8-ff8dfb355e5d"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-34",
+    "is_structural": null,
+    "polyline": [
+     [
+      3.0786159400280333,
+      7.6965398500700815
+     ],
+     [
+      3.0786159400280333,
+      9.74895047675544
+     ]
+    ],
+    "room_ids": [
+     "13943a21-0d88-46cd-9678-b5b529b6612d"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-35",
+    "is_structural": null,
+    "polyline": [
+     [
+      3.0786159400280333,
+      9.74895047675544
+     ],
+     [
+      3.0786159400280333,
+      11.801361103440794
+     ]
+    ],
+    "room_ids": [
+     "a55d84d5-e740-4dce-8135-35e0fc5d5f14"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-36",
+    "is_structural": null,
+    "polyline": [
+     [
+      0,
+      9.74895047675544
+     ],
+     [
+      3.0786159400280333,
+      9.74895047675544
+     ]
+    ],
+    "room_ids": [
+     "13943a21-0d88-46cd-9678-b5b529b6612d",
+     "a55d84d5-e740-4dce-8135-35e0fc5d5f14"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-37",
+    "is_structural": null,
+    "polyline": [
+     [
+      0,
+      2.565513283356694
+     ],
+     [
+      0,
+      7.6965398500700815
+     ]
+    ],
+    "room_ids": [
+     "1fa86ad1-b905-4d7a-a6e8-ff8dfb355e5d"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-38",
+    "is_structural": null,
+    "polyline": [
+     [
+      0,
+      7.6965398500700815
+     ],
+     [
+      0,
+      9.74895047675544
+     ]
+    ],
+    "room_ids": [
+     "13943a21-0d88-46cd-9678-b5b529b6612d"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-39",
+    "is_structural": null,
+    "polyline": [
+     [
+      0,
+      9.74895047675544
+     ],
+     [
+      0,
+      11.801361103440794
+     ]
+    ],
+    "room_ids": [
+     "a55d84d5-e740-4dce-8135-35e0fc5d5f14"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-40",
+    "is_structural": null,
+    "polyline": [
+     [
+      2.052410626685355,
+      4.61792391004205
+     ],
+     [
+      2.052410626685355,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "65e8f9eb-ca61-4de6-971f-4171a94c8758"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-41",
+    "is_structural": null,
+    "polyline": [
+     [
+      0,
+      2.565513283356694
+     ],
+     [
+      0.5131026566713379,
+      2.565513283356694
+     ]
+    ],
+    "room_ids": [
+     "1fa86ad1-b905-4d7a-a6e8-ff8dfb355e5d"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-42",
+    "is_structural": null,
+    "polyline": [
+     [
+      0.5131026566713379,
+      2.565513283356694
+     ],
+     [
+      4.36137258170638,
+      2.565513283356694
+     ]
+    ],
+    "room_ids": [
+     "1fa86ad1-b905-4d7a-a6e8-ff8dfb355e5d",
+     "ef29d1ac-4b55-4496-9db1-c19cc9492201"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-43",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.36137258170638,
+      2.565513283356694
+     ],
+     [
+      4.61792391004205,
+      2.565513283356694
+     ]
+    ],
+    "room_ids": [
+     "ef29d1ac-4b55-4496-9db1-c19cc9492201"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-44",
+    "is_structural": null,
+    "polyline": [
+     [
+      0.5131026566713379,
+      0
+     ],
+     [
+      0.5131026566713379,
+      2.565513283356694
+     ]
+    ],
+    "room_ids": [
+     "ef29d1ac-4b55-4496-9db1-c19cc9492201"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-45",
+    "is_structural": null,
+    "polyline": [
+     [
+      0.5131026566713379,
+      11.288258446769454
+     ],
+     [
+      0.5131026566713379,
+      14.366874386797488
+     ]
+    ],
+    "room_ids": [
+     "d53efe93-c59d-405b-bcc2-786597d7179b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-46",
+    "is_structural": null,
+    "polyline": [
+     [
+      0,
+      11.801361103440794
+     ],
+     [
+      3.0786159400280333,
+      11.801361103440794
+     ]
+    ],
+    "room_ids": [
+     "a55d84d5-e740-4dce-8135-35e0fc5d5f14"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-47",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.36137258170638,
+      2.565513283356694
+     ],
+     [
+      4.36137258170638,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "1fa86ad1-b905-4d7a-a6e8-ff8dfb355e5d"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-48",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.36137258170638,
+      4.61792391004205
+     ],
+     [
+      4.36137258170638,
+      7.6965398500700815
+     ]
+    ],
+    "room_ids": [
+     "1fa86ad1-b905-4d7a-a6e8-ff8dfb355e5d",
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-49",
+    "is_structural": null,
+    "polyline": [
+     [
+      4.36137258170638,
+      7.6965398500700815
+     ],
+     [
+      4.36137258170638,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-50",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.926885865063076,
+      0.5131026566713379
+     ],
+     [
+      6.926885865063076,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "f66a9003-89a5-4ffc-8240-aae216932736"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-51",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.926885865063076,
+      4.61792391004205
+     ],
+     [
+      6.926885865063076,
+      8.72274516341276
+     ]
+    ],
+    "room_ids": [
+     "3c7ec701-dc37-4c82-9f2f-77a0c65257ff"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-52",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.926885865063076,
+      0.5131026566713379
+     ],
+     [
+      9.74895047675544,
+      0.5131026566713379
+     ]
+    ],
+    "room_ids": [
+     "f66a9003-89a5-4ffc-8240-aae216932736"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-53",
+    "is_structural": null,
+    "polyline": [
+     [
+      9.74895047675544,
+      0.5131026566713379
+     ],
+     [
+      9.74895047675544,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "f66a9003-89a5-4ffc-8240-aae216932736"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-54",
+    "is_structural": null,
+    "polyline": [
+     [
+      12.827566416783473,
+      0
+     ],
+     [
+      12.827566416783473,
+      4.61792391004205
+     ]
+    ],
+    "room_ids": [
+     "be5b5105-2333-4fe1-9086-7d30981409a1"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-55",
+    "is_structural": null,
+    "polyline": [
+     [
+      0.5131026566713379,
+      11.288258446769454
+     ],
+     [
+      9.2358478200841,
+      11.288258446769454
+     ]
+    ],
+    "room_ids": [
+     "d53efe93-c59d-405b-bcc2-786597d7179b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-56",
+    "is_structural": null,
+    "polyline": [
+     [
+      0.5131026566713379,
+      14.366874386797488
+     ],
+     [
+      9.2358478200841,
+      14.366874386797488
+     ]
+    ],
+    "room_ids": [
+     "d53efe93-c59d-405b-bcc2-786597d7179b"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-57",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.670334536727406,
+      7.1834371933987455
+     ],
+     [
+      8.72274516341276,
+      7.1834371933987455
+     ]
+    ],
+    "room_ids": [
+     "df5244c6-cb72-400a-bcde-813a4fcdf456"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-58",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.670334536727406,
+      8.97929649174843
+     ],
+     [
+      8.72274516341276,
+      8.97929649174843
+     ]
+    ],
+    "room_ids": [
+     "df5244c6-cb72-400a-bcde-813a4fcdf456"
+    ],
+    "thickness_mm": 200
+   },
+   {
+    "derived": true,
+    "id": "wall-59",
+    "is_structural": null,
+    "polyline": [
+     [
+      6.670334536727406,
+      7.1834371933987455
+     ],
+     [
+      6.670334536727406,
+      8.97929649174843
+     ]
+    ],
+    "room_ids": [
+     "df5244c6-cb72-400a-bcde-813a4fcdf456"
+    ],
+    "thickness_mm": 200
+   }
+  ]
+ }
+}

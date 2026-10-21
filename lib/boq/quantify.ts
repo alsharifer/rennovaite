@@ -107,7 +107,11 @@ export function wallKey(polyline: Point[]): string {
 }
 
 export interface QuantifyOptions {
-  /** As-built graph is the default basis; a proposed graph enables demolition. */
+  /**
+   * A proposed graph enables demolition (walls of `graph` absent from it).
+   * C2: the pricing path passes none — a design-lock snapshot is never a
+   * demolition basis (lib/boq/assemble.ts); kept for an explicit marking.
+   */
   proposed?: PlanGraph | null;
 }
 

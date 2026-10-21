@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
+import { jobBoqId } from "@/lib/documents/document-status";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { loadPackJob, signedOutputs } from "@/lib/documents/pack-export/job";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -42,5 +43,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
     downloads: await signedOutputs(db, job),
     created_at: job.created_at,
     finished_at: job.finished_at,
+    // C2: the revision the run checked — the page shows PASS only on that revision.
+    boq_id: jobBoqId(job),
   });
 }

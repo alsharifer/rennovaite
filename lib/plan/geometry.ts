@@ -305,6 +305,22 @@ export interface PlanGraph {
   openings_need_wall?: string[];
 }
 
+/** The array fields every reader of a PlanGraph maps over. */
+export const PLAN_GRAPH_ARRAYS = ["rooms", "walls", "openings", "elements", "context", "notes"] as const;
+
+/**
+ * C2: a graph STORED before a field existed (plan_snapshots — Mudon's 29 Jul
+ * "proposed" graph has no `elements` or `context`, PR #57 added them) is read
+ * with every array field filled, so no reader meets `undefined.map`. Returns
+ * the graph and the fields it had to fill (for a reader that wants to say so).
+ */
+export function normaliseGraph(g: PlanGraph): { graph: PlanGraph; filled: string[] } {
+  const filled = PLAN_GRAPH_ARRAYS.filter((f) => !Array.isArray((g as unknown as Record<string, unknown>)[f]));
+  if (filled.length === 0) return { graph: g, filled };
+  const patch = Object.fromEntries(filled.map((f) => [f, []]));
+  return { graph: { ...g, ...patch } as PlanGraph, filled };
+}
+
 // --- raw input (shape of a persisted room, DB or parsed_json) -----------------
 
 export interface RawRoom {

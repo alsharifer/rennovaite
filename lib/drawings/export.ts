@@ -38,7 +38,8 @@ import { graphDraftStatus } from "@/lib/plan/geometry";
 import type { OverlayFixtureForSheet } from "./overlay-sheet";
 import { renderPlanSheet } from "./plan-sheet";
 import { renderPlumbingSheet } from "./plumbing-sheet";
-import { sheetRev, type SheetMeta } from "./sheet";
+import { proposedBasis, sheetRev, type SheetMeta } from "./sheet";
+import { drawSheet } from "./sheet-errors";
 import { layerOf, type FixtureType } from "@/lib/overlays/types";
 
 export type SheetKind =
@@ -193,33 +194,6 @@ function sheetMeta(
   };
 }
 
-/**
- * Try to load a stored proposed snapshot graph. Best-effort: if the
- * plan_snapshots table doesn't exist yet (migration 013 not applied), silently
- * fall back to the as-built graph so generation still works.
- */
-async function loadProposedGraph(
-  projectId: string,
-  asBuilt: PlanGraph,
-): Promise<PlanGraph> {
-  try {
-    // plan_snapshots isn't in database.types.ts yet — query via an untyped client.
-    const supabase = getSupabaseAdmin() as unknown as SupabaseClient;
-    const { data, error } = await supabase
-      .from("plan_snapshots")
-      .select("graph")
-      .eq("project_id", projectId)
-      .eq("kind", "proposed")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<{ graph: PlanGraph }>();
-    if (error || !data?.graph) return asBuilt;
-    return data.graph;
-  } catch {
-    return asBuilt;
-  }
-}
-
 /** Load overlay fixtures for the services sheets (best-effort, flagged). */
 async function loadOverlayFixtures(projectId: string): Promise<OverlayFixtureForSheet[]> {
   if (process.env.OVERLAYS_ENABLED !== "true") return [];
@@ -271,16 +245,47 @@ async function loadGardenFixtures(projectId: string): Promise<GardenFixture[]> {
   }
 }
 
+/**
+ * The interior sheets, PURE (C2): A-101 the plan, A-102 proposed / demolition,
+ * A-201 finishes, A-202 doors & windows, A-401 / A-402 services. Every sheet is
+ * drawn from ONE graph — the current plan at export — so A-102 can never ship
+ * from a snapshot older than the BoQ it accompanies; its title block says
+ * "Proposed as of rev N · date". A sheet that cannot be drawn names itself and
+ * the field (lib/drawings/sheet-errors.ts).
+ */
+export function buildInteriorSheets(plan: PlanGraph, meta: SheetMeta, styleKey: string | null, fixtures: readonly OverlayFixtureForSheet[] = []): DrawingSheet[] {
+  const sheet = (kind: SheetKind, sheetNumber: string, title: string, render: () => string): DrawingSheet => ({ kind, title, sheetNumber, svg: drawSheet(sheetNumber, title, [plan], render) });
+  const sheets: DrawingSheet[] = [
+    sheet("as_built", "A-101", "As-Built Plan", () => renderPlanSheet(plan, meta, { sheetNumber: "A-101", title: "As-Built Plan" })),
+    sheet("proposed", "A-102", "Proposed / Demolition Plan", () =>
+      renderDemoSheet(plan, plan, { ...meta, basis: proposedBasis(meta.rev, meta.dateISO) }, { sheetNumber: "A-102", title: "Proposed / Demolition Plan" }),
+    ),
+    sheet("finish_schedule", "A-201", "Finish Schedule", () => renderFinishSchedule(buildFinishRows(plan, styleKey), meta, { sheetNumber: "A-201", title: "Finish Schedule" })),
+  ];
+  // A5: door/window schedule — omitted entirely when the plan has no openings
+  // rather than printing an empty table (the parse never invents doors). From
+  // the live plan_openings the take-off deducts, so schedule and net wall
+  // quantities reconcile.
+  const scheduleOpenings = plan.openings as ScheduleSourceOpening[];
+  if (scheduleOpenings.length > 0) {
+    const roomNames = new Map(plan.rooms.map((r) => [r.id, r.name_en]));
+    sheets.push(sheet("opening_schedule", "A-202", "Door & Window Schedule", () => renderOpeningSchedule(buildOpeningRows(scheduleOpenings, roomNames), meta, { sheetNumber: "A-202", title: "Door & Window Schedule" })));
+  }
+  const electrical = fixtures.filter((f) => layerOf(f.type) === "electrical");
+  const plumbing = fixtures.filter((f) => layerOf(f.type) === "plumbing");
+  if (electrical.length > 0) sheets.push(sheet("electrical", "A-401", "Electrical Plan", () => renderElectricalSheet(plan, electrical, meta, { sheetNumber: "A-401", title: "Electrical Plan" })));
+  if (plumbing.length > 0) sheets.push(sheet("plumbing", "A-402", "Plumbing Plan", () => renderPlumbingSheet(plan, plumbing, meta, { sheetNumber: "A-402", title: "Plumbing Plan" })));
+  return sheets;
+}
+
 export async function generateDrawingSet(projectId: string): Promise<DrawingSet> {
   // Read-only: derive the as-built graph live. The as-built plan_snapshot is
   // written at parse-confirm (update-plan), not here, so viewing drawings never
   // mutates state.
   const asBuilt = await derivePlanGraph(projectId);
-  const [proposed, styleKey, project] = await Promise.all([
-    loadProposedGraph(projectId, asBuilt),
-    loadLockedStyleKey(projectId),
-    loadProjectMeta(projectId),
-  ]);
+  // C2 (ruled 21 Oct): no frozen snapshot is read — the proposed layout is the
+  // CURRENT plan at export, and demolition is never inferred from a snapshot diff.
+  const [styleKey, project] = await Promise.all([loadLockedStyleKey(projectId), loadProjectMeta(projectId)]);
 
   const meta = sheetMeta(project, asBuilt, styleKey);
 
@@ -295,23 +300,26 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
     // G5: a plan on derived dimensions stamps EVERY sheet as a draft.
     const draft = graphDraftStatus(asBuilt);
     const gardenMeta = { ...meta, projectId, ...(draft.statement ? { draft: draft.statement } : {}) };
-    const garden = buildGardenSheets(asBuilt, fixturesAll, gardenMeta);
+    const garden = drawSheet("L-100…", "Garden sheets", [asBuilt], () => buildGardenSheets(asBuilt, fixturesAll, gardenMeta));
     const finish: DrawingSheet = {
       kind: "finish_schedule",
       title: "Finish Schedule",
       sheetNumber: "L-201",
       // G5d: a garden schedule is external works at ground level, never the
       // interior level the plan meta defaults to ("first floor").
-      svg: renderFinishSchedule(buildFinishRows(asBuilt, styleKey), { ...gardenMeta, level: "Ground (external works)" }, {
-        sheetNumber: "L-201",
-        title: "Finish Schedule",
-      }),
+      svg: drawSheet("L-201", "Finish Schedule", [asBuilt], () =>
+        renderFinishSchedule(buildFinishRows(asBuilt, styleKey), { ...gardenMeta, level: "Ground (external works)" }, {
+          sheetNumber: "L-201",
+          title: "Finish Schedule",
+        }),
+      ),
     };
     const zoneSheets = garden.filter((s) => s.kind === "site_plan" || s.kind === "zone_plan");
     const overlays = garden.filter((s) => s.kind === "lighting_overlay" || s.kind === "irrigation_overlay");
     // G4b: sectional elevations (L-3nn) after the finish schedule, the garden
     // elevation strips (L-501) last — sheet-number order.
-    const elevations = buildElevationSheets(designGraph(asBuilt), designFixtures(fixturesAll), gardenMeta, await loadElementVariants(asBuilt.planId));
+    const variants = await loadElementVariants(asBuilt.planId);
+    const elevations = drawSheet("L-3nn / L-501", "Garden elevations", [asBuilt], () => buildElevationSheets(designGraph(asBuilt), designFixtures(fixturesAll), gardenMeta, variants));
     const structures = elevations.filter((s) => s.kind === "structure_elevation");
     const strips = elevations.filter((s) => s.kind === "garden_elevation");
     const ordered: DrawingSheet[] = [...zoneSheets, finish, ...structures, ...overlays, ...strips];
@@ -319,7 +327,7 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
       kind: "cover",
       title: "Cover & Sheet Index",
       sheetNumber: "L-000",
-      svg: renderCoverSheet(asBuilt, fixturesAll, gardenMeta, [{ sheetNumber: "L-000", title: "Cover & Sheet Index" }, ...ordered], draft.draft ? draft : null),
+      svg: drawSheet("L-000", "Cover & Sheet Index", [asBuilt], () => renderCoverSheet(asBuilt, fixturesAll, gardenMeta, [{ sheetNumber: "L-000", title: "Cover & Sheet Index" }, ...ordered], draft.draft ? draft : null)),
     };
     return {
       projectId,
@@ -329,94 +337,18 @@ export async function generateDrawingSet(projectId: string): Promise<DrawingSet>
     };
   }
 
-  const sheets: DrawingSheet[] = [
-    {
-      kind: "as_built",
-      title: "As-Built Plan",
-      sheetNumber: "A-101",
-      svg: renderPlanSheet(asBuilt, meta, { sheetNumber: "A-101", title: "As-Built Plan" }),
-    },
-    {
-      kind: "proposed",
-      title: "Proposed / Demolition Plan",
-      sheetNumber: "A-102",
-      svg: renderDemoSheet(asBuilt, proposed, meta, {
-        sheetNumber: "A-102",
-        title: "Proposed / Demolition Plan",
-      }),
-    },
-    {
-      kind: "finish_schedule",
-      title: "Finish Schedule",
-      sheetNumber: "A-201",
-      svg: renderFinishSchedule(buildFinishRows(proposed, styleKey), meta, {
-        sheetNumber: "A-201",
-        title: "Finish Schedule",
-      }),
-    },
-  ];
-
-  // A5: door/window schedule — assembled from the graph like every other
-  // artifact. Omitted entirely when the plan has no openings rather than
-  // printing an empty table (the parse never invents doors, so an empty
-  // schedule would be a statement we can't support).
-  //
-  // Sourced from AS-BUILT, not proposed: `proposed` is a frozen plan_snapshots
-  // graph captured at design lock, so it predates any opening drawn afterwards
-  // (and snapshots written before A5 have no `openings` key at all). Openings
-  // have one live source of truth — the plan_openings table that derivePlanGraph
-  // reads — and that is also what the take-off deducts, so the schedule and the
-  // net wall quantities are guaranteed to reconcile.
-  const scheduleOpenings = (asBuilt.openings ?? []) as ScheduleSourceOpening[];
-  if (scheduleOpenings.length > 0) {
-    const roomNames = new Map(asBuilt.rooms.map((r) => [r.id, r.name_en]));
-    const openingRows = buildOpeningRows(scheduleOpenings, roomNames);
-    sheets.push({
-      kind: "opening_schedule",
-      title: "Door & Window Schedule",
-      sheetNumber: "A-202",
-      svg: renderOpeningSchedule(openingRows, meta, {
-        sheetNumber: "A-202",
-        title: "Door & Window Schedule",
-      }),
-    });
-  }
-
-  // P2: append electrical + plumbing services sheets when fixtures exist.
-  const fixtures = await loadOverlayFixtures(projectId);
-  const electrical = fixtures.filter((f) => layerOf(f.type) === "electrical");
-  const plumbing = fixtures.filter((f) => layerOf(f.type) === "plumbing");
-  if (electrical.length > 0) {
-    sheets.push({
-      kind: "electrical",
-      title: "Electrical Plan",
-      sheetNumber: "A-401",
-      svg: renderElectricalSheet(asBuilt, electrical, meta, {
-        sheetNumber: "A-401",
-        title: "Electrical Plan",
-      }),
-    });
-  }
-  if (plumbing.length > 0) {
-    sheets.push({
-      kind: "plumbing",
-      title: "Plumbing Plan",
-      sheetNumber: "A-402",
-      svg: renderPlumbingSheet(asBuilt, plumbing, meta, {
-        sheetNumber: "A-402",
-        title: "Plumbing Plan",
-      }),
-    });
-  }
+  // P2: the services sheets draw the overlay fixtures when there are any.
+  const sheets = buildInteriorSheets(asBuilt, meta, styleKey, await loadOverlayFixtures(projectId));
 
   // G4: a mixed plan (villa rooms AND garden zones) keeps its interior sheets
   // and gains the garden set after them.
   if (outdoor.length > 0) {
     const gardenFixtures = await loadGardenFixtures(projectId);
     const gardenMeta = { ...meta, projectId };
-    const garden = buildGardenSheets(asBuilt, gardenFixtures, gardenMeta);
+    const garden = drawSheet("L-100…", "Garden sheets", [asBuilt], () => buildGardenSheets(asBuilt, gardenFixtures, gardenMeta));
     sheets.push(...garden);
-    sheets.push(...buildElevationSheets(asBuilt, gardenFixtures, gardenMeta, await loadElementVariants(asBuilt.planId)));
+    const variants = await loadElementVariants(asBuilt.planId);
+    sheets.push(...drawSheet("L-3nn / L-501", "Garden elevations", [asBuilt], () => buildElevationSheets(asBuilt, gardenFixtures, gardenMeta, variants)));
   }
 
   // T3b: every printed string passes identity curation, with THIS project's

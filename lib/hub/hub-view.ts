@@ -18,7 +18,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadRecordedCauses } from "@/lib/boq/revision-causes";
 import { CAUSE_KIND_LABEL, diffRevisions, snapshotRevision, type RevisionBoq } from "@/lib/boq/revision-diff";
 import { listRevisions } from "@/lib/boq/revisions";
+import { documentStatus } from "@/lib/documents/document-status";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
+import { latestPackJobs } from "@/lib/documents/pack-export/job";
 import { loadProposalSetup } from "@/lib/documents/proposal-setup";
 import { FIRM_STEPS, OWNER_STEPS, journeyFlagsFromEnv, ownerStepHref, type JourneyFlags } from "@/lib/journey";
 import type { RailContext } from "@/lib/journey-state";
@@ -212,10 +214,15 @@ export async function loadHubView(db: SupabaseClient, projectId: string, rail: R
   const pack = packExportEnabled();
   const documents: HubView["documents"] = [];
   if (estimate) {
+    // C2: one status for what leaves through the pack — Ready only when the last
+    // export passed on THIS revision (by BoQ id); a flag decides availability only.
+    const jobs = await latestPackJobs(db, projectId, 10).catch(() => []);
+    const current = top[0] ? { boqId: top[0].boq_id, rev: n } : null;
+    const status = documentStatus({ available: pack, current, jobs });
     documents.push(
-      { key: "drawings", label: "Drawing set", icon: "draft", state: drawings ? `Generated from the plan · rev ${n}` : "Not enabled on this deployment", locked: !drawings, action: drawings ? { label: "Open", href: `/project/${projectId}/drawings` } : null },
+      { key: "drawings", label: "Drawing set", icon: "draft", state: drawings ? status.label : "Not enabled on this deployment", locked: !drawings, action: drawings ? { label: "Open", href: `/project/${projectId}/drawings` } : null },
       pack
-        ? { key: "boq_pdf", label: "BoQ PDF", icon: "table", state: `Through the export pack · rev ${n}`, locked: false, action: { label: "Export", href: `/project/${projectId}/drawings?export=1` } }
+        ? { key: "boq_pdf", label: "BoQ PDF", icon: "table", state: status.label, locked: false, action: { label: "Export", href: `/project/${projectId}/drawings?export=1` } }
         : { key: "boq_pdf", label: "BoQ PDF", icon: "table", state: "The export pack is not enabled on this deployment", locked: true, action: null },
     );
     if (rail.persona === "firm") {
@@ -223,7 +230,8 @@ export async function loadHubView(db: SupabaseClient, projectId: string, rail: R
         key: "proposal",
         label: "Client proposal",
         icon: "description",
-        state: proposal?.state === "blocked" ? `Locked · ${proposal.reason ?? "the proposal gate refuses"}` : proposal?.state === "done" ? "Exported" : "Unlocked",
+        // C2: "Exported" only when the last export WITH the proposal passed on this revision.
+        state: proposal?.state === "blocked" ? `Locked · ${proposal.reason ?? "the proposal gate refuses"}` : proposal?.state === "done" ? `Exported · rev ${n}` : "Unlocked",
         locked: proposal?.state === "blocked",
         action: { label: proposal?.state === "blocked" ? "Why locked?" : "Set up", href: `/project/${projectId}/proposal` },
       });

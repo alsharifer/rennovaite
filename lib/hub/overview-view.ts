@@ -15,7 +15,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RevisionBoq } from "@/lib/boq/revision-diff";
+import { documentStatus } from "@/lib/documents/document-status";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
+import { latestPackJobs } from "@/lib/documents/pack-export/job";
 import { resolveAnyStyle } from "@/lib/garden-styles";
 import { OWNER_STEPS, journeyFlagsFromEnv, ownerStepHref, type OwnerStepKey } from "@/lib/journey";
 import type { RailContext, StepStatus } from "@/lib/journey-state";
@@ -125,11 +127,12 @@ export async function loadOverviewView(db: SupabaseClient, projectId: string, ra
   for (const a of approved) if (a.room_id && a.render_id && !perRoom.has(a.room_id)) perRoom.set(a.room_id, { render_id: a.render_id, created_at: a.created_at });
   const top = [...perRoom.entries()].slice(0, 3);
 
-  const [rooms, renders, revCount, estimate] = await Promise.all([
+  const [rooms, renders, revCount, estimate, jobs] = await Promise.all([
     plan ? safe([] as { id: string; name_en: string | null; unroofed: boolean | null }[], async () => ((await db.from("rooms").select("id, name_en, unroofed").eq("plan_id", plan.id)).data ?? []) as { id: string; name_en: string | null; unroofed: boolean | null }[]) : Promise.resolve([]),
     top.length ? safe([] as { id: string; image_url: string | null; view: string | null }[], async () => ((await db.from("renders").select("id, image_url, view").in("id", top.map(([, v]) => v.render_id))).data ?? []) as { id: string; image_url: string | null; view: string | null }[]) : Promise.resolve([]),
     safe(0, async () => (await db.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", projectId)).count ?? 0),
     latest ? safe(null as StoredEstimate | null, async () => estimateOf(latest.sections, await loadProvenanceContext(db, projectId))) : Promise.resolve(null),
+    safe([] as Awaited<ReturnType<typeof latestPackJobs>>, () => latestPackJobs(db, projectId, 10)),
   ]);
 
   const roomName = new Map(rooms.map((r) => [r.id, r.name_en ?? "Room"]));
@@ -156,11 +159,15 @@ export async function loadOverviewView(db: SupabaseClient, projectId: string, ra
   const drawings = process.env.DRAWINGS_ENABLED === "true";
   const pack = packExportEnabled();
   const rev = revCount || null;
+  // C2: every document leaves through the export pack, so all three read ONE
+  // status — Ready only when the last export passed on THIS revision (by BoQ
+  // id). A flag decides availability, never readiness.
+  const status = documentStatus({ available: pack, current: latest && rev ? { boqId: latest.id, rev } : null, jobs });
   const documents: OverviewView["documents"] = estimate
     ? [
-        { key: "drawings", label: "Drawing set", icon: "description", state: drawings ? `Ready · rev ${rev}` : "Not available yet", locked: !drawings, href: drawings ? `/project/${projectId}/drawings` : null },
-        { key: "boq_pdf", label: "Cost breakdown (PDF)", icon: "request_quote", state: pack ? `Ready · rev ${rev}` : "Not available yet", locked: !pack, href: pack ? `/project/${projectId}/drawings?export=1` : null },
-        { key: "tender", label: "Tender pack", icon: "folder_zip", state: tenderLocked ? "Locked" : pack ? "Ready" : "Not available yet", locked: tenderLocked || !pack, href: tenderLocked ? ownerStepHref("tender", projectId, journeyFlagsFromEnv()) : pack ? `/project/${projectId}/drawings?export=1` : null },
+        { key: "drawings", label: "Drawing set", icon: "description", state: drawings ? status.label : "Not available yet", locked: !drawings, href: drawings ? `/project/${projectId}/drawings` : null },
+        { key: "boq_pdf", label: "Cost breakdown (PDF)", icon: "request_quote", state: status.label, locked: !pack, href: pack ? `/project/${projectId}/drawings?export=1` : null },
+        { key: "tender", label: "Tender pack", icon: "folder_zip", state: tenderLocked ? "Locked" : status.label, locked: tenderLocked || !pack, href: tenderLocked ? ownerStepHref("tender", projectId, journeyFlagsFromEnv()) : pack ? `/project/${projectId}/drawings?export=1` : null },
       ]
     : [];
 

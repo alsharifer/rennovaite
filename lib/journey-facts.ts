@@ -23,6 +23,7 @@ import { approvalStatus, listApprovals } from "@/lib/boq/approvals";
 import { regenerateReadiness } from "@/lib/boq/regenerate";
 import { changesSinceRevision, summarizeChanges } from "@/lib/boq/changes-since";
 import { isUnpricedLine } from "@/lib/documents/boq-derived";
+import { exportedOn } from "@/lib/documents/document-status";
 import { latestPackJobs } from "@/lib/documents/pack-export/job";
 import { loadProposalGate } from "@/lib/documents/proposal-gate";
 import { listFirms } from "@/lib/firms/store";
@@ -155,20 +156,21 @@ export async function loadProjectJourney(db: SupabaseClient, projectId: string, 
       safe([], () => latestPackJobs(db, projectId, 10)),
     ]);
     const status = latest ? approvalStatus(approvals, latest.id) : null;
-    const passedSince = jobs.filter((j) => j.status === "passed" && latest && j.created_at > latest.created_at);
     facts.firm = {
       bookStatus: gate?.firm?.book_status ?? null,
       basis: gate?.boq ? { referenceLines: gate.boq.basis.reference_lines, totalLines: gate.boq.basis.total_lines } : null,
       gate: gate?.verdict ?? { ok: false, reason: null, refusal: null },
       upstream,
       approval: status ? { firm: !!status.firm, client: !!status.client } : null,
+      // C2: the last export PASSED on THIS revision — matched by BoQ id, never by
+      // timestamp (an in-app export regenerates the BoQ inside its own job).
       exported: {
-        pack: passedSince.length > 0,
-        proposal: passedSince.some((j) => (j.options as { proposal?: boolean } | null)?.proposal === true),
+        pack: exportedOn(jobs, latest?.id ?? null),
+        proposal: exportedOn(jobs, latest?.id ?? null, { proposal: true }),
       },
     };
   } else {
-    const [brief, moodboardItems, renders, unpricedLines, renderViews] = await Promise.all([
+    const [brief, moodboardItems, renders, unpricedLines, renderViews, jobs] = await Promise.all([
       count(db, "project_briefs", projectId),
       count(db, "moodboard_items", projectId),
       count(db, "renders", projectId),
@@ -189,8 +191,10 @@ export async function loadProjectJourney(db: SupabaseClient, projectId: string, 
         const out = await outOfScopeRoomIds(db, projectId);
         return renderLockProgress(((rooms ?? []) as { id: string; room_type: string | null }[]).filter((r) => !out.has(r.id)), lockedIds.filter((x): x is string => !!x));
       }),
+      safe([], () => latestPackJobs(db, projectId, 10)),
     ]);
-    facts.owner = { brief: brief > 0, moodboardItems, renders, renderViews, unpricedLines };
+    // C2: 06 Tender is done when the last export passed on THIS revision (by BoQ id).
+    facts.owner = { brief: brief > 0, moodboardItems, renders, renderViews, unpricedLines, exported: exportedOn(jobs, latest?.id ?? null) };
   }
 
   const statuses = (persona === "firm" ? firmStepStatuses(facts) : ownerStepStatuses(facts)) as Record<string, StepStatus>;

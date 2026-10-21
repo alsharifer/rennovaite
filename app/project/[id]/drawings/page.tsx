@@ -72,7 +72,8 @@ export default async function DrawingsPage({
       (err: unknown) => ({ set: null, error: err instanceof Error ? err.message : "Failed to generate drawings." }),
     ),
     db.from("projects").select("firm_id").eq("id", projectId).maybeSingle<{ firm_id: string | null }>(),
-    db.from("boqs").select("id", { count: "exact", head: true }).eq("project_id", projectId),
+    // C2: the count is the rev; the newest row's id is what an export must have run on to pass here.
+    db.from("boqs").select("id", { count: "exact" }).eq("project_id", projectId).order("created_at", { ascending: false }).limit(1),
     // Only in-app runs: a CLI run releases into a local folder, and a verification read releases nothing.
     canExport ? latestPackJobs(db, projectId, 5).then((js) => js.filter((j) => j.source === "app")).catch(() => []) : Promise.resolve([]),
   ]);
@@ -202,7 +203,7 @@ export default async function DrawingsPage({
         <>
           {canExport && preflight ? (
             <div className="mt-8">
-              <DocumentsExport projectId={projectId} rev={rev} checkedAt={checkedAt} initial={preflight} initialProposal={wantsProposal} latestJobId={jobs[0]?.id ?? null} sheetCount={set.sheets.length} bookOpen={bookOpen} />
+              <DocumentsExport projectId={projectId} rev={rev} checkedAt={checkedAt} initial={preflight} initialProposal={wantsProposal} latestJobId={jobs[0]?.id ?? null} currentBoqId={(revCount.data?.[0] as { id: string } | undefined)?.id ?? null} sheetCount={set.sheets.length} bookOpen={bookOpen} />
             </div>
           ) : null}
 

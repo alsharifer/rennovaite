@@ -97,6 +97,16 @@ export interface SheetMeta {
    * rev N = the N-th BoQ, so a sheet and the bill beside it carry the same REV.
    */
   rev: string;
+  /**
+   * C2: what the sheet was drawn from, printed after the level in the title
+   * block ("Proposed as of rev 3 · 21 Oct 2026"). Absent on every other sheet.
+   */
+  basis?: string | null;
+}
+
+/** "Proposed as of rev N · 21 Oct 2026" — the A-102 basis (C2): the current plan at export. */
+export function proposedBasis(rev: string, dateISO: string): string {
+  return `Proposed as of rev ${rev} · ${fmtDate(dateISO)}`;
 }
 
 /**
@@ -172,7 +182,7 @@ function titleBlock(meta: SheetMeta, sheetNumber: string, sheetTitle: string): s
     ${tv(x + 2.5, r[0]! + 12.2, meta.community, 2.8)}
     ${tl(x + 2.5, r[1]! + 3.6, "Sheet title")}
     ${tv(x + 2.5, r[1]! + 8.4, sheetTitle, 3.8)}
-    ${tv(x + 2.5, r[1]! + 12.2, `Level: ${meta.level}`, 2.8)}
+    ${meta.basis ? `<g data-basis="${esc(meta.basis)}">${tv(x + 2.5, r[1]! + 12.2, `Level: ${meta.level} · ${meta.basis}`, 2.8)}</g>` : tv(x + 2.5, r[1]! + 12.2, `Level: ${meta.level}`, 2.8)}
     ${tl(cols[0]! + 2.5, r[2]! + 3.6, "Sheet")}
     <text x="${cols[0]! + 2.5}" y="${r[2]! + 9}" font-size="4.6" fill="${INK_900}" style="font-family:${FONT_MONO};font-weight:600">${esc(sheetNumber)}</text>
     ${tl(cols[1]! + 2.5, r[2]! + 3.6, "Scale")}

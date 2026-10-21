@@ -39,6 +39,8 @@ type JobView = {
   error: string | null;
   downloads: { name: string; bytes: number; url: string }[];
   finished_at?: string | null;
+  /** C2: the BoQ revision the export ran on (its manifest) — PASS only when it is the current one. */
+  boq_id?: string | null;
 };
 
 /** The proposal's own items: they block the proposal, never the rest of the pack. */
@@ -65,18 +67,22 @@ export interface DocumentsExportProps {
   /** 08 Proposal → Generate: start with the client proposal included. */
   initialProposal?: boolean;
   latestJobId: string | null;
+  /** C2: the current BoQ revision's id — a previous export's checks count only on that revision. */
+  currentBoqId: string | null;
   sheetCount: number;
   /** On a firm project: what keeps the client proposal locked, in the book's words. */
   bookOpen: { conflicts: number; outliers: number } | null;
 }
 
-export function DocumentsExport({ projectId, rev, checkedAt, initial, initialProposal = false, latestJobId, sheetCount, bookOpen }: DocumentsExportProps) {
+export function DocumentsExport({ projectId, rev, checkedAt, initial, initialProposal = false, latestJobId, currentBoqId, sheetCount, bookOpen }: DocumentsExportProps) {
   const [preflight, setPreflight] = useState<Preflight>(initial);
   const [name, setName] = useState(initial.documentName ?? "");
   const [renders, setRenders] = useState<"full" | "cached">("full");
   const [proposal, setProposal] = useState(initialProposal && !!initial.firm);
   const [job, setJob] = useState<JobView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // C2: a stored job's checklist replaces the live gate only for a run started on this page.
+  const [startedHere, setStartedHere] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const base = `/api/projects/${projectId}/pack-export`;
   const runReasonId = useId();
@@ -111,6 +117,7 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, initialPro
   async function start() {
     setError(null);
     setJob(null);
+    setStartedHere(true);
     const res = await fetch(base, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -122,7 +129,9 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, initialPro
     void poll(job_id);
   }
 
-  const gate = job?.status === "blocked" && job.checklist ? job.checklist : preflight.checklist;
+  const gate = startedHere && job?.status === "blocked" && job.checklist ? job.checklist : preflight.checklist;
+  // C2: an export run on an earlier revision passes nothing on this one.
+  const stale = !!job && (job.status === "passed" || job.status === "failed") && (job.boq_id ?? null) !== currentBoqId;
   // The run saves an edited name BEFORE it applies the gate, so a client-facing
   // name typed here already answers the name check (the same rule, isWorkingName).
   const core = gate
@@ -146,7 +155,7 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, initialPro
             <CheckRow key={c.key} c={c} status={c.ok ? "PASS" : "BLOCKS EXPORT"} />
           ))}
           {basis ? <CheckRow c={basis} status={basis.ok ? "PASS" : "BLOCKS CLIENT PROPOSAL"} /> : null}
-          <PrintedRow job={job} />
+          <PrintedRow job={job} stale={stale} rev={rev} />
         </ul>
       </section>
 
@@ -200,9 +209,15 @@ export function DocumentsExport({ projectId, rev, checkedAt, initial, initialPro
               </div>
             ) : null}
             {job?.status === "passed" ? (
-              <div className="mt-4" data-pack-downloads>
+              <div className="mt-4" data-pack-downloads data-stale={stale ? "true" : undefined}>
                 <p className="t-body-sm text-bp-ink-secondary">
-                  All <span className="t-num-sm">{job.checks_total}</span> checks on the printed pages passed.
+                  {stale ? (
+                    <>These documents are from an export of an earlier revision — run the export again for rev {rev ?? "—"}.</>
+                  ) : (
+                    <>
+                      All <span className="t-num-sm">{job.checks_total}</span> checks on the printed pages passed.
+                    </>
+                  )}
                 </p>
                 <ul className="mt-2 space-y-1.5">
                   {job.downloads.map((d) => (
@@ -336,17 +351,20 @@ function CheckRow({ c, status }: { c: ChecklistItem; status: string }) {
   );
 }
 
-function PrintedRow({ job }: { job: JobView | null }) {
-  const finished = job && (job.status === "passed" || job.status === "failed") && job.checks_total > 0;
+function PrintedRow({ job, stale, rev }: { job: JobView | null; stale: boolean; rev: number | null }) {
+  // C2: the last export's checks speak for the revision it ran on only.
+  const finished = !stale && job && (job.status === "passed" || job.status === "failed") && job.checks_total > 0;
   const ok = !!finished && job!.failed_checks.length === 0;
-  const status = !finished ? "AT EXPORT" : ok ? "PASS" : "FAILED";
+  const status = stale ? "NEEDS CHECK" : !finished ? "AT EXPORT" : ok ? "PASS" : "FAILED";
   return (
-    <li className="grid grid-cols-[24px_minmax(0,1fr)_auto] gap-3 border-b border-bp-line-hairline px-3 py-3" data-check="printed" data-ok={finished ? ok : undefined}>
-      <Icon name={!finished ? "schedule" : ok ? "check_circle" : "error"} size={20} className="mt-0.5 text-bp-ink-secondary" />
+    <li className="grid grid-cols-[24px_minmax(0,1fr)_auto] gap-3 border-b border-bp-line-hairline px-3 py-3" data-check="printed" data-ok={stale ? false : finished ? ok : undefined}>
+      <Icon name={stale ? "schedule" : !finished ? "schedule" : ok ? "check_circle" : "error"} size={20} className="mt-0.5 text-bp-ink-secondary" />
       <div className="min-w-0">
         <p className="t-heading-sm text-bp-ink-primary">No contractor or supplier names · draft statement · contents</p>
         <p className="t-body-sm mt-0.5 text-bp-ink-secondary">
-          {!finished
+          {stale
+            ? `The last export ran on an earlier revision — its checks do not cover rev ${rev ?? "—"}. Run the export again.`
+            : !finished
             ? "Checked on the printed pages when the export runs: the identity scan, the draft statement on every page, the totals and the sheets each document must carry."
             : ok
               ? `Last export: all ${job!.checks_total} checks on the printed pages passed.`

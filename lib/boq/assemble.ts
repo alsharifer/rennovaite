@@ -36,7 +36,6 @@ import { derivePlanGraph } from "@/lib/plan/derive";
 import { storedCeiling } from "@/lib/plan/geometry";
 import { isUnnamed } from "@/lib/plan/plan-rules";
 import { findOverlaps } from "@/lib/plan/overlaps";
-import { getProposedGraph } from "@/lib/plan/snapshots";
 import { loadProjectFirmOverlay, type FirmOverlay } from "@/lib/rates/firm";
 import { applyOhp } from "@/lib/rates/ohp";
 import { loadReferenceRows, type ReferenceRateRow } from "@/lib/rates/reference";
@@ -326,8 +325,12 @@ export async function loadBoqInputs(supabase: SupabaseClient, projectId: string,
     openingsNeedWall = graph.openings_need_wall ?? [];
     // C1: glazing from this plan's own windows and external doors, in-scope rooms only (K12).
     glazing = glazingScope(glazingOpeningsFrom(graph, new Set(rooms.map((r) => r.id))));
-    const proposed = await getProposedGraph(projectId);
-    takeoffItems = quantifyPlan(graph, { proposed });
+    // C2 (ruled 21 Oct): no demolition is inferred from a design-lock snapshot.
+    // Those snapshots predate the parse corrections, so diffing the live plan
+    // against one priced walls nobody is removing (Jumeirah rev 2: 342.75 m²,
+    // Mudon 5 Sep: 555.9 m²). Wall demolition returns when walls can be marked
+    // for removal on the plan.
+    takeoffItems = quantifyPlan(graph);
     // B5: a project that IS one bathroom (the room intake) is priced as a
     // bathroom refit — the wet-room package (lib/boq/wet-room.ts). Its existing
     // ceiling is repaired, not replaced with a new gypsum one.
