@@ -13,6 +13,24 @@ import type { ChecklistItem, PackExportOptions, PackExportResult, PackOutput, Pa
 export const PACK_BUCKET = "packs";
 /** A job may authorise document requests for at most this long. */
 export const JOB_TTL_MS = 3 * 60 * 60 * 1000;
+/**
+ * An in-app job runs inside ONE route's budget (pack-export route maxDuration 300 s, after()); when
+ * the function is stopped the row is never finished. Past this it is dead, not running.
+ */
+export const APP_JOB_BUDGET_MS = (300 + 60) * 1000;
+export const STALLED_ERROR = "the export stopped before it finished — it ran out of time; nothing was released";
+
+/**
+ * A queued / running job that outlived what can run it (an app job its route's budget, a CLI job the
+ * TTL) is reported as FAILED — never "Export running" forever (Jumeirah, 21 Oct: 11 h "running").
+ * Read-side only: the row is untouched, so jobAuthorises still sees the raw status.
+ */
+export function settleStalled<J extends Pick<PackJob, "status" | "source" | "created_at" | "started_at" | "error" | "finished_at">>(job: J, now = Date.now()): J {
+  if (job.status !== "running" && job.status !== "queued") return job;
+  const since = new Date(job.started_at ?? job.created_at).getTime();
+  const budget = job.source === "app" ? APP_JOB_BUDGET_MS : JOB_TTL_MS;
+  return now - since > budget ? { ...job, status: "failed", error: job.error ?? STALLED_ERROR } : job;
+}
 
 export interface PackJob {
   id: string;
@@ -49,7 +67,7 @@ export async function loadPackJob(db: SupabaseClient, jobId: string): Promise<Pa
 
 export async function latestPackJobs(db: SupabaseClient, projectId: string, limit = 5): Promise<PackJob[]> {
   const { data } = await db.from("pack_exports").select(COLS).eq("project_id", projectId).order("created_at", { ascending: false }).limit(limit);
-  return (data ?? []) as PackJob[];
+  return ((data ?? []) as PackJob[]).map((j) => settleStalled(j));
 }
 
 /** Record progress; keeps the last 40 log lines for the UI. */

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getCaller, unauthenticated } from "@/lib/auth/caller";
 import { jobBoqId } from "@/lib/documents/document-status";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
-import { loadPackJob, signedOutputs } from "@/lib/documents/pack-export/job";
+import { loadPackJob, settleStalled, signedOutputs } from "@/lib/documents/pack-export/job";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { projectAccess } from "@/lib/projects/http";
 
@@ -27,7 +27,9 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   const access = await projectAccess(getSupabaseAdmin() as unknown as SupabaseClient, caller, { project_id: id });
   if (access.denied) return access.denied;
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
-  const job = await loadPackJob(db, jobId);
+  const raw = await loadPackJob(db, jobId);
+  // A job that outlived its route's budget reads as failed, not running (settleStalled).
+  const job = raw ? settleStalled(raw) : null;
   if (!job || job.project_id !== id) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const checks = (job.manifest?.checks as { label: string; ok: boolean; detail: string }[] | undefined) ?? [];
   return NextResponse.json({
