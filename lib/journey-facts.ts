@@ -100,10 +100,13 @@ async function railFirmsOf(db: SupabaseClient, caller: Caller, firms: { id: stri
 }
 
 /** The rail for a page with no project (settings, the firm book, quote review). */
-export async function loadRailContextWithoutProject(db: SupabaseClient, caller: Caller, opts: { firmId?: string } = {}): Promise<RailContext> {
+export async function loadRailContextWithoutProject(db: SupabaseClient, caller: Caller, opts: { firmId?: string; withoutFirmNames?: boolean } = {}): Promise<RailContext> {
   const [firms, projects] = await Promise.all([safe([], () => listFirms(db, caller)), loadRailProjects(db, caller)]);
   const railFirms = await railFirmsOf(db, caller, firms);
   const firm = railFirms.find((f) => f.id === opts.firmId) ?? railFirms[0] ?? null;
+  // withoutFirmNames: a not-found page, whose tree Next embeds in EVERY page of its segment — a
+  // project page must not carry the caller's firm names through it (the pack identity scan).
+  if (opts.withoutFirmNames) return { persona: railFirms.length > 0 ? "firm" : "owner", caller: { email: caller.email }, firms: [], firm: null, projects, project: null, statuses: {} };
   return { persona: railFirms.length > 0 ? "firm" : "owner", caller: { email: caller.email }, firms: railFirms, firm, projects, project: null, statuses: {} };
 }
 
@@ -206,5 +209,9 @@ export async function loadRailContext(db: SupabaseClient, projectId: string, cal
   const railFirms = await railFirmsOf(db, caller, firms);
   const journey = await loadProjectJourney(db, projectId, caller, railFirms);
   const project = projects.find((p) => p.id === projectId) ?? { id: projectId, name: "Project", rev: null, revAt: null };
-  return { persona: journey.persona, caller: { email: caller.email }, firms: railFirms, firm: journey.firm, projects, project, statuses: journey.statuses };
+  // A project page carries only a firm name it may show (the identity rule): its own firm on a firm
+  // project, none on an owner project. The pack's identity scan reads the BoQ page whole, and the
+  // caller's firms in the rail payload are firm names on a project that is not theirs.
+  const shownFirms = journey.persona === "firm" && journey.firm ? railFirms.filter((f) => f.id === journey.firm!.id) : [];
+  return { persona: journey.persona, caller: { email: caller.email }, firms: shownFirms, firm: journey.firm, projects, project, statuses: journey.statuses };
 }
