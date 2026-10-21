@@ -5,7 +5,7 @@ import { AccountShell } from "@/components/blueprint/shell/ProjectShell";
 // access" — it never confirms that a project exists.
 export default function NotFound() {
   return (
-    <AccountShell title="Not found">
+    <AccountShell title="Not found" withoutFirmNames>
       <SegmentNotFound />
     </AccountShell>
   );
