@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { fakeDb } from "@/lib/firms/__tests__/fake-db";
 import { appendOverlaySections } from "@/lib/overlays/boq-feed";
 import { buildPlanGraph, type BuildPlanGraphInput } from "@/lib/plan/geometry";
-import { isInScope, isMultiLevelProject, netScopeChange, scopeChangeSummary, scopeSummary } from "@/lib/plan/scope";
+import { isInScope, isMultiLevelProject, netScopeChange, scopeChangeSummary, scopeSummary, stairsContextFor } from "@/lib/plan/scope";
 import { renderLockProgress } from "@/lib/render-lock-progress";
 
 import { generateDeterministicBoq } from "../engine";
@@ -239,6 +239,14 @@ describe("Q-11 staircase allowance", () => {
     expect(v).toMatchObject({ quantity: 1, qty_derived: true });
     expect(v?.measurement).toMatch(/Staircase assumed — confirm the villa has stairs/);
     expect(q11(MUDON_FIRST_FLOOR, { onPlan: false, multiLevel: false })).toBeUndefined();
+  });
+  it("a plan typed in as ONE room is never multi-level — no staircase on a bathroom called \"Villa 12 — …\" (demo, 21 Oct)", () => {
+    const bath = [{ room_type: "bathroom" }];
+    const villaName = { name: "Villa 12 — guest bathroom" };
+    expect(isMultiLevelProject(villaName)).toBe(true);
+    expect(stairsContextFor(bath, villaName, "room_dimensions")).toEqual({ onPlan: false, multiLevel: false });
+    expect(stairsContextFor(bath, villaName, null)).toEqual({ onPlan: false, multiLevel: true });
+    expect(q11(MUDON_FIRST_FLOOR, stairsContextFor(bath, villaName, "room_dimensions"))).toBeUndefined();
   });
   it("no context (the timeline, pre-K12 callers) → the pre-K12 rule, unchanged", () => {
     expect(q11(MUDON_FIRST_FLOOR)).toMatchObject({ quantity: 1 });
