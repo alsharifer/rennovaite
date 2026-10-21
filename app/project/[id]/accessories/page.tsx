@@ -8,6 +8,8 @@ import { TopBarActions } from "@/components/blueprint/shell/TopBar";
 import { revLine } from "@/components/blueprint/shell/rev-line";
 import { Specification } from "@/components/blueprint/spec/Specification";
 import { NO_CATALOGUE_REASON } from "@/lib/accessories/seed-data";
+import { specItemLabels } from "@/lib/render/material-labels";
+import { loadApprovalChanges } from "@/lib/render/material-labels-load";
 import { ALL_ACCESSORY_ITEM_KEYS, EMPTY_PICKER_DATA, loadPickerData } from "@/lib/accessories/picker-data";
 import type { RevisionBoq } from "@/lib/boq/revision-diff";
 import { formatAED } from "@/lib/format/aed";
@@ -27,7 +29,7 @@ export const dynamic = "force-dynamic";
 export default async function AccessoriesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = getSupabaseAdmin() as unknown as SupabaseClient;
-  const [data, rail, latest] = await Promise.all([
+  const [data, rail, latest, approvalChanges] = await Promise.all([
     loadPickerData(id).catch(() => EMPTY_PICKER_DATA),
     loadProjectRail(id),
     db
@@ -38,6 +40,7 @@ export default async function AccessoriesPage({ params }: { params: Promise<{ id
       .limit(1)
       .maybeSingle<{ sections: RevisionBoq }>()
       .then((r) => r.data, () => null),
+    loadApprovalChanges(db, id),
   ]);
   const persona = rail?.persona ?? "owner";
   const flags = journeyFlagsFromEnv();
@@ -53,6 +56,10 @@ export default async function AccessoriesPage({ params }: { params: Promise<{ id
     }
   }
   const chosen = Object.keys(data.selections ?? {}).length;
+  // C5 #1: the same four labels as the renders page, from the same objects.
+  const latestDoc = latest?.sections as unknown as { sections?: { lines?: unknown[] }[] } | { lines?: unknown[] }[] | null | undefined;
+  const latestLines = (Array.isArray(latestDoc) ? latestDoc : (latestDoc?.sections ?? [])).flatMap((sec) => (sec.lines ?? []) as Parameters<typeof specItemLabels>[0]["lines"][number][]);
+  const labels = specItemLabels({ itemKeys: ALL_ACCESSORY_ITEM_KEYS, lines: latestLines, selected: Object.keys(data.selections ?? {}), changed: approvalChanges });
 
   const next =
     persona === "firm"
@@ -93,6 +100,7 @@ export default async function AccessoriesPage({ params }: { params: Promise<{ id
           degraded={data.degraded ?? true}
           rev={rail?.project?.rev ?? null}
           boqHref={`/project/${id}/boq`}
+          labels={labels}
         />
       </div>
     </div>

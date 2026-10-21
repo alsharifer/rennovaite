@@ -28,7 +28,7 @@ import { latestPackJobs } from "@/lib/documents/pack-export/job";
 import { loadProposalGate } from "@/lib/documents/proposal-gate";
 import { listFirms } from "@/lib/firms/store";
 import { firmStepStatuses, ownerStepStatuses, type JourneyFacts, type PlanBlock, type RailContext, type RailFirm, type RailProject, type StepStatus } from "@/lib/journey-state";
-import type { JourneyPersona } from "@/lib/journey";
+import { journeyPersona, type JourneyPersona } from "@/lib/journey";
 import { memberProjectIds } from "@/lib/projects/access";
 import { withoutDrafts } from "@/lib/projects/intake";
 import { renderLockProgress } from "@/lib/render-lock-progress";
@@ -132,7 +132,7 @@ export async function loadProjectJourney(db: SupabaseClient, projectId: string, 
 
   const projectFirm = projectRow?.firm_id ? (firms.find((f) => f.id === projectRow.firm_id) ?? null) : null;
   // Persona: a member of the firm this project is attached to works the firm journey.
-  const persona: JourneyPersona = projectFirm ? "firm" : "owner";
+  const persona: JourneyPersona = journeyPersona(projectRow?.firm_id, firms.map((f) => f.id));
 
   const block = readiness?.block && PLAN_CODES.has(readiness.block.code) ? (readiness.block as PlanBlock) : null;
   const latest = readiness?.previous ?? null;

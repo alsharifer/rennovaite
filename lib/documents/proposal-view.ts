@@ -9,6 +9,7 @@
 // =============================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { docProgramme, programmeLabel } from "@/lib/timeline/programme";
 
 import { clientSections } from "@/lib/documents/proposal";
 import type { BoqPdfInput } from "@/lib/documents/boq-pdf";
@@ -87,7 +88,7 @@ export async function loadProposalView(db: SupabaseClient, projectId: string): P
           ? `Prices are rev ${rev ?? "—"}. ${reference > 0 ? `${reference} line${reference === 1 ? "" : "s"} price from the market reference — add ${reference === 1 ? "it" : "them"} to your book and regenerate to apply your rates` : "Regenerate to apply"}${ohpMissing ? `${reference > 0 ? " and" : ""} your OH&P ${ohpPct}%` : ""}.`
           : null,
     };
-    const prog = boq.programme;
+    const prog = docProgramme(boq as never);
     const assumptions = [info.draft ? "draft quantities" : null, info.derivedLines > 0 ? `${info.derivedLines} derived quantit${info.derivedLines === 1 ? "y" : "ies"}, firm after site verification` : null].filter(Boolean) as string[];
     const showRates = setup?.showLineRates ?? false;
     receives.push(
@@ -95,7 +96,7 @@ export async function loadProposalView(db: SupabaseClient, projectId: string): P
       { n: "02", title: "Scope summary", detail: `${sections.length} work sections, drawn ${day(boqRow.data.created_at)}` },
       { n: "03", title: "Price summary", detail: showRates ? "every line with its rate · section totals · contingency · VAT" : "section totals · contingency · VAT — no line rates" },
       { n: "04", title: "Exclusions & to be priced", detail: info.unpriced.length ? `${info.unpriced.length} line${info.unpriced.length === 1 ? "" : "s"} named` : "none — every line is priced" },
-      { n: "05", title: "Indicative programme", detail: prog ? `${prog.total_days} days · derived, not a commitment` : "not on this BoQ" },
+      { n: "05", title: "Indicative programme", detail: prog ? `${programmeLabel(prog)} · derived, not a commitment` : "not on this BoQ" },
       { n: "06", title: "Assumptions", detail: assumptions.length ? assumptions.join(", ") : "none stated" },
       { n: "07", title: "Terms", detail: [setup?.validityDays ? "validity" : null, setup?.paymentTerms ? "payment terms" : null, gate.firm?.terms_text ? "your terms" : null].filter(Boolean).join(" · ") || "none set yet" },
     );

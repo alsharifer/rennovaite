@@ -211,7 +211,8 @@ describe("the wiring (static)", () => {
     expect(read("lib/boq/assemble.ts")).toMatch(/const scoped = rooms\.filter\(\(r\) => !outOfScope\.has\(r\.id\)\);/);
     expect(read("lib/boq/quantify.ts")).toMatch(/if \(room\.in_scope === false\) continue;/);
     expect(read("lib/boq/garden-boq-feed.ts")).toMatch(/isOutdoorType\(r\.room_type\) && r\.in_scope !== false/);
-    expect(read("lib/timeline/load.ts")).toMatch(/\.filter\(\(r\) => !outOfScope\.has\(r\.id\)\)/);
+    // C4: the timeline is THE programme of the latest BoQ — scoped when the BoQ is regenerated.
+    expect(read("lib/timeline/load.ts")).toMatch(/programmeOf\(boqRow\.sections/);
     expect(read("app/project/[id]/render/page.tsx")).toMatch(/const roomList = \(rooms \?\? \[\]\)\.filter\(\(r\) => !outOfScope\.has\(r\.id\)\);/);
     expect(read("app/api/render/batch/route.ts")).toMatch(/filter\(\(r\) => !outOfScope\.has\(r\.id\)\)/);
     expect(read("app/api/render/route.ts")).toMatch(/room_not_in_scope/);

@@ -34,15 +34,23 @@ export default async function ViewerPage({
   const { id: projectId } = await params;
   const supabase = getSupabaseAdmin();
 
-  const graph = await derivePlanGraph(projectId);
+  // C5 #4: a plan that cannot be read is "nothing to show", never the error page.
+  const graph = await derivePlanGraph(projectId).catch((err) => {
+    console.error("[viewer] plan graph failed:", err);
+    return null;
+  });
 
   // Empty state — never a blank canvas or a crash.
-  if (graph.walls.length === 0) {
+  if (!graph || graph.walls.length === 0) {
     return (
       <div className="mx-auto max-w-[1344px] px-6 pb-16 pt-8 lg:px-12" data-viewer-empty>
         <PageHeader eyebrow="3D VIEW" title="Your plan in 3D" />
         <div className="mt-8 max-w-[720px]">
-          {graph.rooms.length > 0 ? (
+          {!graph ? (
+            <StateBlock kind="empty" icon="view_in_ar" title="We couldn’t read your plan for 3D" actions={<Button kind="primary" href={`/project/${projectId}/plan`}>Open plan</Button>}>
+              Your plan, cost and drawings are unaffected. Open the plan to check it; the 3D view is built from its rooms and walls.
+            </StateBlock>
+          ) : graph.rooms.length > 0 ? (
             // An open garden: zones, no walls — its 3D design views are on Renders.
             <StateBlock kind="empty" icon="view_in_ar" title="Nothing to stand up in 3D yet" actions={<Button kind="primary" href={`/project/${projectId}/render`}>Open renders</Button>}>
               The 3D view builds the walls of your rooms. Your plan has open zones and no walls, so its 3D design views are on Renders.

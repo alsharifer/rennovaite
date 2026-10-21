@@ -7,7 +7,7 @@
 // own budget when they entered one, "What this number is based on" in the
 // owner's words, and "Your design" (the latest locked views). Right: NEXT (≤ 3
 // actions, from the rail's own Attention / Blocked reasons), the 05 Timeline
-// summary (lib/timeline — the same estimate the Timeline page shows) and the
+// summary (lib/timeline/programme — the one programme every surface reads) and the
 // documents with what each gate answers. Never a firm-only item (rate book,
 // proposal, OH&P).
 // =============================================================================
@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RevisionBoq } from "@/lib/boq/revision-diff";
+import { viewerAvailable } from "@/lib/viewer/available";
 import { documentStatus } from "@/lib/documents/document-status";
 import { packExportEnabled } from "@/lib/documents/pack-export/guard";
 import { latestPackJobs } from "@/lib/documents/pack-export/job";
@@ -23,7 +24,7 @@ import { OWNER_STEPS, journeyFlagsFromEnv, ownerStepHref, type OwnerStepKey } fr
 import type { RailContext, StepStatus } from "@/lib/journey-state";
 import { loadProvenanceContext } from "@/lib/provenance/load";
 import { getStyleByKey } from "@/lib/styles";
-import { loadTimeline } from "@/lib/timeline/load";
+import { programmeLabel, programmeOf } from "@/lib/timeline/programme";
 
 import { estimateOf, type StoredEstimate } from "./estimate";
 import { outOfScopeRoomIds } from "@/lib/plan/scope-load";
@@ -113,13 +114,12 @@ export function overviewNext(projectId: string, statuses: Record<string, StepSta
 }
 
 export async function loadOverviewView(db: SupabaseClient, projectId: string, rail: RailContext): Promise<OverviewView> {
-  const [{ data: project }, latest, plan, style, approved, timeline] = await Promise.all([
+  const [{ data: project }, latest, plan, style, approved] = await Promise.all([
     db.from("projects").select("name, display_name, city, budget_aed, firm_id, created_at").eq("id", projectId).maybeSingle<{ name: string | null; display_name: string | null; city: string | null; budget_aed: number | null; firm_id: string | null; created_at: string }>(),
     safe(null as { id: string; created_at: string; sections: RevisionBoq } | null, async () => (await db.from("boqs").select("id, created_at, sections").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as { id: string; created_at: string; sections: RevisionBoq } | null),
     safe(null as { id: string } | null, async () => (await db.from("plans").select("id").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as { id: string } | null),
     safe(null as string | null, async () => ((await db.from("style_choices").select("style_key").eq("project_id", projectId).order("created_at", { ascending: false }).limit(1).maybeSingle()).data as { style_key: string | null } | null)?.style_key ?? null),
     safe([] as { room_id: string | null; render_id: string | null; created_at: string }[], async () => ((await db.from("approved_designs").select("room_id, render_id, created_at").eq("project_id", projectId).order("created_at", { ascending: false })).data ?? []) as { room_id: string | null; render_id: string | null; created_at: string }[]),
-    safe(null as Awaited<ReturnType<typeof loadTimeline>> | null, () => loadTimeline(projectId)),
   ]);
 
   // The latest lock per room — one view per room.
@@ -171,22 +171,21 @@ export async function loadOverviewView(db: SupabaseClient, projectId: string, ra
       ]
     : [];
 
-  const t = timeline?.estimate;
+  // C4: THE programme — programmeOf over the latest revision, the function every surface reads.
+  const programme = latest ? programmeOf(latest.sections as never) : null;
   return {
     projectId,
     name: (project?.display_name || project?.name || "Project").trim(),
     meta,
     costUpdated: latest ? `${dubai(latest.created_at).date} · ${dubai(latest.created_at).time}` : null,
-    viewer: process.env.VIEWER_3D_ENABLED === "true" && rooms.length > 0,
+    // C5 #4: only when the plan stands up walls — the one answer every entry gives.
+    viewer: rooms.length > 0 && (await viewerAvailable(projectId)),
     estimate: estimate && rev ? { ...estimate, rev, budget } : null,
     design: { locked: perRoom.size, direction, tiles },
     next: overviewNext(projectId, st, { direction, unpriced: (estimate?.excluded ?? []).map((x) => x.description.toLowerCase()) }),
-    // K9: a garden project's duration is its BoQ programme (never the interior model).
-    timeline: timeline?.garden
-      ? { range: `≈ ${timeline.garden.totalDays} days`, note: timeline.garden.basis }
-      : t
-        ? { range: `${t.total_weeks_low}–${t.total_weeks_high} weeks`, note: "Estimated from one calibrated Dubai project — a range, not a promise." }
-        : { range: null, note: timeline?.blocked ?? "Generate your cost first — the phases scale off its quantities." },
+    timeline: programme
+      ? { range: programmeLabel(programme), note: programme.basis }
+      : { range: null, note: latest ? "This bill of quantities has no work to programme yet." : "Generate your cost first — the programme is derived from its quantities." },
     documents,
   };
 }

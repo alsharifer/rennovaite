@@ -135,6 +135,23 @@ export function nextOwnerStep(key: OwnerStepKey): OwnerStepDef | null {
 
 export type JourneyPersona = "firm" | "owner";
 
+/**
+ * K2's persona rule, the one place it is decided (C5 #3): a member of the firm
+ * the project is attached to works the FIRM journey; everyone else — every
+ * project with no firm, and (impossible under the persona invariant) a
+ * non-member on a firm project — the owner's.
+ */
+export function journeyPersona(projectFirmId: string | null | undefined, callerFirmIds: readonly string[]): JourneyPersona {
+  return projectFirmId && callerFirmIds.includes(projectFirmId) ? "firm" : "owner";
+}
+
+/** What the rail calls things for a persona — a firm project never reads "My home" or "Owner". */
+export function railPersonaLabels(persona: JourneyPersona, opts: { admin?: boolean } = {}): { switcher: string; projects: string; journey: string; role: string } {
+  return persona === "firm"
+    ? { switcher: "Project", projects: "Projects", journey: "Firm journey", role: opts.admin ? "Firm admin" : "Firm member" }
+    : { switcher: "My home", projects: "Your homes", journey: "Your renovation", role: "Owner" };
+}
+
 export type FirmStepKey =
   | "hub"
   | "project_plan"

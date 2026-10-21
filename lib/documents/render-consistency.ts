@@ -121,6 +121,8 @@ const RENDER_TYPES = new Set(["wc_point", "bidet_point", "basin_point", "shower_
  * replaces, a stated height) and its product choices (rooms.spec.wet_room).
  * Stable across key and row order. Fixtures another one replaces are left out.
  */
+const NOT_DESIGN = new Set(["existing_fixtures", "reviewed", "reviewed_log"]);
+
 export function designKey(fixtures: readonly { id?: string; type: string; spec: Record<string, unknown> | null }[], choices: unknown): string {
   const replaced = new Set(fixtures.map((f) => f.spec?.replaces_fixture_id).filter((v): v is string => typeof v === "string"));
   const fx = fixtures
@@ -128,6 +130,7 @@ export function designKey(fixtures: readonly { id?: string; type: string; spec: 
     .map((f) => `${f.type}${typeof f.spec?.replaces === "string" ? `>${f.spec.replaces}` : ""}${typeof f.spec?.height_mm === "number" ? `@${f.spec.height_mm}` : ""}`)
     .sort();
   const c = choices && typeof choices === "object" ? (choices as Record<string, unknown>) : {};
-  const ch = Object.keys(c).filter((k) => k !== "existing_fixtures").sort().map((k) => `${k}=${String(c[k])}`);
+  // C3 scope reviews (reviewed / reviewed_log) are records about the BoQ, not the design a render shows.
+  const ch = Object.keys(c).filter((k) => !NOT_DESIGN.has(k)).sort().map((k) => `${k}=${String(c[k])}`);
   return `${fx.join(",")}|${ch.join(",")}`;
 }

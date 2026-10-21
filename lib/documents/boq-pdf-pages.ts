@@ -18,6 +18,7 @@
 // =============================================================================
 
 import { assignRefs, refMigration } from "@/lib/boq/refs";
+import { docProgramme, programmeLabel } from "@/lib/timeline/programme";
 import { sortSections } from "@/lib/boq/section-order";
 import { RATE_BASIS_ORDER } from "@/lib/boq/rate-basis";
 import { esc } from "@/lib/drawings/sheet";
@@ -193,14 +194,14 @@ export function buildBoqPdfPages(input: BoqPdfInput & { revision?: number | null
   }
 
 
-  // G5d: an INDICATIVE delivery programme, never a line. Ink bars — brass draws lines only.
-  const prog = boq.programme;
+  // An INDICATIVE delivery programme, never a line — C4: THE programme (docProgramme). Ink bars.
+  const prog = docProgramme(boq as never);
   if (prog && prog.phases.length) {
     const basis = wrapWords(prog.basis, 150);
     if (y + 16 + prog.phases.length * 6.5 + basis.length * 4.4 > BOTTOM) flush();
     y += 4;
     svg += label(M, y, "Indicative delivery programme", { fill: DOC.INK });
-    svg += text(R, y, `≈ ${prog.total_days} days · indicative · derived`, { size: 2.8, fill: DOC.INK_2, font: DOC.MONO, anchor: "end" });
+    svg += text(R, y, `${programmeLabel(prog)} · indicative · derived`, { size: 2.8, fill: DOC.INK_2, font: DOC.MONO, anchor: "end", attrs: `data-programme-days="${prog.total_days}"` });
     y += 5;
     const barX = 110;
     const barW = R - barX;

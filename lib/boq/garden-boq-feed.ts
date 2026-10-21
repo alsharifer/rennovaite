@@ -33,7 +33,6 @@ import { FirmIsolationError, FirmOverlay, FirmRateUnitError } from "@/lib/rates/
 import { isFirmTier } from "@/lib/rates/tiers";
 
 import { GardenRateBookMissingError, loadGardenRateBook, withFirmOverlay, type GardenRateBook } from "./garden-rates";
-import { indicativeProgramme } from "./programme";
 import { sumMoney } from "./money";
 import { SECTION_ORDER } from "./rules";
 import type { PomiSection, ScopeItem } from "./schema";
@@ -426,8 +425,8 @@ export async function appendGardenSections<T extends BoqLike>(
     Object.assign(boq, rechain(boq as unknown as ChainedDoc));
     // G5d: an indicative delivery programme, scaled from the reference project's
     // 90-day anchor. Stored on the BoQ document, never a line: it prices nothing.
-    const programme = indicativeProgramme(boq.sections, boq.subtotal_aed);
-    if (programme) (boq as T & { programme?: typeof programme }).programme = programme;
+    // C4: no programme is stored on the BoQ — every surface derives it from the
+    // lines (lib/timeline/programme.ts), so a stored figure can never disagree.
     return boq;
   } catch (e) {
     // Pricing-integrity failures are never a best-effort skip: a missing book,

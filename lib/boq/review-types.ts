@@ -133,7 +133,8 @@ export interface ReviewModel {
   budget: number | null;
   /** K11: applied prices whose line is not in this revision — never dropped silently (Issues navigator). */
   unmatchedPrices: { correctionId: string; item: string; type: "rate" | "quantity"; value: number; basis: string | null; by: string | null }[];
-  programme: { total_days: number; phases: { name: string; start_day: number; days: number }[]; basis: string } | null;
+  /** C4: docProgramme (lib/timeline/programme.ts) — the one programme every surface prints. */
+  programme: { total_days: number; low_days: number; high_days: number; phases: { name: string; start_day: number; days: number; basis?: string; parallel?: boolean }[]; basis: string } | null;
   /** B5: priced OUTSIDE the total — what each adds, what it replaces, and what it moves the total by. */
   options: ReviewOption[];
   /** B5: what the rates rest on, by line count and amount (absent on a BoQ that does not record it). */

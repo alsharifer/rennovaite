@@ -10,6 +10,7 @@
 // =============================================================================
 
 import { assignRefs } from "@/lib/boq/refs";
+import { docProgramme } from "@/lib/timeline/programme";
 import { boqDerivedInfo, derivedTotal, isUnpricedLine } from "@/lib/documents/boq-derived";
 import type { ParityResult } from "@/lib/documents/parity";
 import { findWithheldIdentities } from "@/lib/identity/curation";
@@ -111,7 +112,7 @@ export function printedChecks(i: PrintedInput): PackCheck[] {
     if (total.derived) check("the BoQ total renders with the derived convention, never a bare number", total.text.startsWith("≈ AED") && total.text.endsWith("*") && !!boqPages[0]?.includes(total.text), total.text);
     const boqFonts = boqPages.flatMap((s) => [...s.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1])));
     if (boqFonts.length) check("legibility: no text in the BoQ PDF under 2.6 mm (A4)", boqFonts.every((f) => f >= 2.6), `min ${Math.min(...boqFonts)} mm`);
-    if (i.boq.programme) check("the BoQ PDF carries the indicative delivery programme", boqPages.some((p) => p.includes("INDICATIVE DELIVERY PROGRAMME") && p.includes("data-programme-phase")));
+    if (docProgramme(i.boq as never)) check("the BoQ PDF carries the indicative delivery programme", boqPages.some((p) => p.includes("INDICATIVE DELIVERY PROGRAMME") && p.includes("data-programme-phase")));
     const unpriced = lines.filter(isUnpricedLine).length;
     if (unpriced) check("D4: the BoQ PDF headline says it excludes the lines still to be priced", boqPages.some((p) => p.includes('data-headline-excludes="true"')), `${unpriced} unpriced line(s)`);
     const refs = Object.values(assignRefs(i.boq.sections));
@@ -157,7 +158,7 @@ export function printedChecks(i: PrintedInput): PackCheck[] {
     if (ohp > 0) check("the proposal shows the firm's overheads & profit as its own row", pp.some((p) => p.includes(`data-ohp="${ohp}"`)), String(ohp));
     if (draft) check("watermark: every proposal page carries the draft statement", pp.every((p) => p.includes('data-boq-draft="true"') && p.includes(draft)), `${pp.length} pages`);
     if (i.proposal.terms) check("the proposal carries the firm's terms block", pp.some((p) => p.includes('data-terms="true"')));
-    if (i.boq.programme) check("the proposal carries the indicative programme", pp.some((p) => p.includes("data-programme-phase")));
+    if (docProgramme(i.boq as never)) check("the proposal carries the indicative programme", pp.some((p) => p.includes("data-programme-phase")));
     const propFonts = pp.flatMap((s) => [...s.matchAll(/font-size="([\d.]+)"/g)].map((m) => Number(m[1])));
     if (propFonts.length) check("legibility: no text in the proposal under 2.2 mm (the prepared-with mark) and body ≥ 2.6 mm", propFonts.every((f) => f >= 2.2), `min ${Math.min(...propFonts)} mm`);
     // K9: the firm's reference — on the cover and on every numbered page.

@@ -26,6 +26,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { AnalyticsEvent, track } from "@/lib/analytics";
+import { designCheckHead, roomRenderCheckRows, type DesignCheckRow } from "@/lib/render/design-check-items";
 import type { AssetLite } from "@/lib/assets/types";
 import { formatAED } from "@/lib/format/aed";
 import { resolveRender, runBatch, type GenerateResponse, RenderNotice } from "@/lib/render-batch/client";
@@ -45,7 +46,7 @@ import { PHOTO_STATE, PhotoViewCentre, PhotoViewSide, usePhotoViews, type PhotoV
 import type { PhotoView } from "@/lib/render/photo-views";
 
 export type StudioRoom = { id: string; name_en: string | null; room_type: string | null };
-export type StudioRender = { id: string; imageUrl: string; prompt: string; qa?: "passed" | "failed" | null; qaReason?: string | null; outcome?: SceneOutcome | null; /** R10b: which openings shaped it. */ openings?: string | null };
+export type StudioRender = { id: string; imageUrl: string; prompt: string; qa?: "passed" | "failed" | null; qaReason?: string | null; outcome?: SceneOutcome | null; /** R10b: which openings shaped it. */ openings?: string | null; /** C5 #2: the design check, itemised (server-built from the QA / scene gate). */ checks?: DesignCheckRow[] | null };
 
 type RowState = "locked" | "ready" | "rendering" | "queued" | "waiting" | "not_yet" | "failed" | "na";
 /** One view in the list. A garden zone can have several cameras, so a scene row is keyed by its camera. */
@@ -327,15 +328,15 @@ export function RendersStudio(props: {
 
   const downloadUrl = (room && isLocked && !isEvening && upscaled[room.id]) || current?.imageUrl || null;
   const cost = room ? props.roomCost[room.id] : undefined;
+  // C5 #2: never a bare "PASSED" — the five rows, each ✓ / ✗ with its reason.
+  const checkRows = current ? (info[current.id]?.checks ?? current.checks ?? (current.qa ? roomRenderCheckRows({ qa: { passed: current.qa === "passed", reason: current.qaReason ?? undefined }, scene: null }) : null)) : null;
   const qa = current?.outcome === "substituted"
-    ? { head: "DESIGN CHECK · 3D DESIGN VIEW", text: "The styled render did not match the plan closely enough, so the 3D design view is shown in its place." }
-    : current?.qa === "passed" || current?.outcome === "passed"
-      ? { head: "DESIGN CHECK · PASSED", text: "Checked against this room's plan before it was kept." }
-      : current?.qa === "failed"
-        ? { head: "DESIGN CHECK · FLAGGED", text: `${current.qaReason ?? "It may not match the room's real geometry."} Render again or ask for a change.` }
-        : current
-          ? { head: "DESIGN CHECK · NOT RUN", text: "This render was made before the design check existed." }
-          : null;
+    ? { head: "DESIGN CHECK · 3D DESIGN VIEW", text: "The styled render did not match the plan closely enough, so the 3D design view is shown in its place.", rows: null }
+    : checkRows
+      ? { head: designCheckHead(checkRows), text: checkRows.some((r) => r.state === "fail") ? "Render again or ask for a change." : null, rows: checkRows }
+      : current
+        ? { head: "DESIGN CHECK · NOT RUN", text: "This render was made before the design check existed.", rows: null }
+        : null;
 
   const viewSelect = (
     <label className="block">
@@ -622,11 +623,22 @@ export function RendersStudio(props: {
 
             {qa ? (
               <div className="mt-4 flex items-start gap-3 bg-bp-surface-sunken px-4 py-3" data-design-check>
-                <Icon name={current?.qa === "failed" ? "report" : "task_alt"} className="text-[20px] text-bp-ink-primary" />
-                <p>
-                  <span className="t-label-caps block text-bp-ink-primary">{qa.head}</span>
-                  <span className="t-body-sm block text-bp-ink-secondary">{qa.text}</span>
-                </p>
+                <Icon name={qa.rows?.some((r) => r.state === "fail") ? "report" : "task_alt"} className="text-[20px] text-bp-ink-primary" />
+                <div>
+                  <p className="t-label-caps text-bp-ink-primary">{qa.head}</p>
+                  {qa.rows ? (
+                    <ul className="mt-1 space-y-0.5" data-design-check-rows="">
+                      {qa.rows.map((r) => (
+                        <li key={r.key} className={`t-body-sm ${r.state === "pass" ? "text-bp-ink-primary" : "text-bp-ink-secondary"}`} data-check-row={r.key} data-check-state={r.state}>
+                          <span aria-hidden="true">{r.state === "pass" ? "✓ " : "✗ "}</span>
+                          <span className="sr-only">{r.state === "pass" ? "Passed: " : r.state === "fail" ? "Failed: " : "Not checked: "}</span>
+                          <span className="font-semibold">{r.label}</span> — {r.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {qa.text ? <p className="t-body-sm text-bp-ink-secondary">{qa.text}</p> : null}
+                </div>
               </div>
             ) : null}
 

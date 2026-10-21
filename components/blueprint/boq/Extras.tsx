@@ -33,11 +33,11 @@ export function Programme({ programme }: { programme: NonNullable<ReviewModel["p
         <h2 id="boq-programme" className="t-label-caps text-bp-ink-tertiary">
           INDICATIVE DELIVERY PROGRAMME
         </h2>
-        <span className="t-label-md text-bp-ink-secondary">≈ {programme.total_days} days · indicative · derived — never a line</span>
+        <span className="t-label-md text-bp-ink-secondary" data-programme-days={programme.total_days}>≈ {programme.total_days} working days ({programme.low_days}–{programme.high_days}) · indicative · derived — never a line</span>
       </div>
       <ul className="mt-4 space-y-2">
         {programme.phases.map((p) => (
-          <li key={p.name} className="grid grid-cols-[minmax(0,200px)_56px_minmax(0,1fr)] items-center gap-4">
+          <li key={`${p.name}-${p.start_day}`} className="grid grid-cols-[minmax(0,200px)_56px_minmax(0,1fr)] items-center gap-4">
             <span className="t-body-sm text-bp-ink-primary">{p.name}</span>
             <span className="t-num-sm text-right text-bp-ink-secondary">{p.days} d</span>
             <span className="relative h-2 bg-bp-surface-sunken" aria-hidden="true">

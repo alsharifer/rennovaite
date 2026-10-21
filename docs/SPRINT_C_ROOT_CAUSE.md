@@ -462,3 +462,32 @@ Arabella is unchanged to the fil (116,679.56).
    revisions (never overwriting). The diff names the cause by itself.
 3. Re-export Jumeirah's pack. **Mudon's export still fails** on sheet A-102
    (the C0 snapshot defect, §2) until C2 lands.
+
+## 5. C5 findings (21 Oct)
+
+**Persona (item 3).** K2's rule holds and is now one function
+(`journeyPersona`, pinned by `lib/__tests__/persona.test.ts`). The reviewer
+saw "My home · Owner" on Jumeirah Parks Garden because the project is **not
+firm-attached**: production has no firm-attached project at all (read-only,
+21 Oct — `projects.firm_id` is null everywhere; one firm, "Abdallah
+Renovation", one member). The owner journey is correct for that data. To work
+it as a firm, attach it with Move to firm… (the creator, a member of the firm);
+the test shows that flips the rail to the firm journey.
+
+**3D view (item 4).** Production's viewer page answers the reviewer's project
+with a full payload (scene, 13+ rooms). In the built-in pane the page never
+revealed, but that pane was hidden and every page on prod behaved the same
+there — not a viewer fault. With WebGL (headless Chrome, SwiftShader) on a dev
+server running this branch, the demo villa draws in full: canvas, 13 room
+labels, no error. What was wrong and is fixed:
+- entries showed with nothing to show — 01 Plan and Renders linked whenever
+  the flag was on, the Overview whenever the plan had rooms. Every entry now
+  asks `viewerAvailable` (flag AND walls); an open garden has no link
+  (verified: Arabella's Overview and Plan, none; the demo villa's, both);
+- an unreadable plan sent the viewer to the segment error page — now an empty
+  state;
+- a browser without WebGL got a crash boundary at best, a blank canvas at
+  worst — now a sentence (`data-viewer-no-webgl`), and a "building" state
+  while the page's colours load instead of nothing.
+The reviewer's original error was not reproduced (no session on their device);
+if it was a WebGL failure, they will now read the sentence instead.

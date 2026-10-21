@@ -20,8 +20,9 @@ import { withoutReplaced } from "@/lib/overlays/replaces";
 import { derivePlanGraph } from "@/lib/plan/derive";
 import { loadStudioState, type PhotoViewVersion } from "@/lib/render/photo-view-anchor";
 import { loadMiniPlans, loadPhotoViews } from "@/lib/render/photo-views-load";
-import { followsLine, followsStateOf, specElements, specFieldsChanged } from "@/lib/render/room-spec-vocab";
-import { roomProgramme } from "@/lib/timeline/room-programme";
+import { photoViewCheckRows } from "@/lib/render/design-check-items";
+import { followsStateOf, specElements, specFieldsChanged } from "@/lib/render/room-spec-vocab";
+import { programmeOf } from "@/lib/timeline/programme";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import { documentFontOptions } from "./doc-fonts";
@@ -54,16 +55,12 @@ async function fetchBytes(url: string): Promise<Uint8Array | null> {
 const isPng = (b: Uint8Array) => b[0] === 0x89 && b[1] === 0x50;
 const isJpeg = (b: Uint8Array) => b[0] === 0xff && b[1] === 0xd8;
 
-/** A version's check lines as the studio prints them (PhotoViewStudio checkLines). */
-function checksOf(v: PhotoViewVersion, photoId: string, anchor: { room_photo_id: string | null; render_id: string; label: string } | null, latestAnchorId: string | null): { text: string; ok: boolean }[] {
+/** C5 #2: a version's design check, itemised — the five rows the studio prints (PhotoViewStudio checkRows). */
+function checksOf(v: PhotoViewVersion, photoId: string, anchor: { room_photo_id: string | null; render_id: string; label: string } | null, latestAnchorId: string | null, designNow: string | null): { text: string; ok: boolean }[] {
   const g = v.gate;
-  const lines = [{ text: g.line, ok: g.outcome === "passed" }];
   const state = followsStateOf({ viewPhotoId: photoId, anchor, renderAnchorId: latestAnchorId, followsPassed: g.anchor && g.outcome === "passed" ? !!g.attempts.at(-1)?.style?.passed : null, changedSpec: g.change ? specFieldsChanged(g.change.changed) : null });
-  if (anchor && state) {
-    const off = state === "differs" ? (g.attempts.at(-1)?.style?.elements ?? []).filter((e) => e.verdict !== "yes").map((e) => e.element) : state === "changed" ? (g.change?.changed ?? []) : [];
-    lines.push({ text: followsLine(state, anchor.label, off), ok: state === "follows" || state === "anchor" });
-  } else if (g.outcome === "passed") lines.push({ text: g.style_line, ok: g.style_line.endsWith("✓") });
-  return lines;
+  const off = state === "differs" ? (g.attempts.at(-1)?.style?.elements ?? []).filter((e) => e.verdict !== "yes").map((e) => e.element) : state === "changed" ? (g.change?.changed ?? []) : [];
+  return photoViewCheckRows({ gate: g, follows: anchor ? state : null, anchorLabel: anchor?.label ?? null, followsOff: off, designNow, styleLine: g.outcome === "passed" ? g.style_line : null }).map((r) => ({ text: `${r.label} — ${r.reason}`, ok: r.state === "pass" }));
 }
 
 export interface RoomPackSummary {
@@ -143,7 +140,7 @@ export async function generateRoomPack(projectId: string, opts: { brand?: string
       render: shown?.image_url ? { src: shown.image_url, version: vs.indexOf(shown) + 1 } : null,
       pending: shown ? null : refused && !refused.ok ? refused.placeholder : null,
       photo: { src: v.url },
-      checks: shown ? checksOf(shown, v.id, anchor, latest?.anchor_render_id ?? null) : [],
+      checks: shown ? checksOf(shown, v.id, anchor, latest?.anchor_render_id ?? null, current.design_key) : [],
       locked: !!lockedId,
       anchor: anchor?.room_photo_id === v.id,
       camera: v.camera ? { position: toM(v.camera.position), heading_deg: v.camera.heading_deg } : null,
@@ -156,8 +153,8 @@ export async function generateRoomPack(projectId: string, opts: { brand?: string
   const dateISO = new Date().toISOString().slice(0, 10);
   const sheets = roomSheets({ graph, roomId: room.id, fixtures, tile: wallTileFrom(anchor?.spec.wall_tile ?? null), mirror: anchor?.spec.mirror ?? null, meta: { projectNameEn: project.name, community: project.city ?? "", level: graph.meta.level, scale: "1:20", dateISO, rev, projectId } });
 
-  // B7 1c: the room's own programme from its quantities — never the villa model's floor; none = no page.
-  const programme = roomProgramme(boq.sections);
+  // B7 1c / C4: THE programme (programmeOf) — the room's own quantities; none = no page.
+  const programme = programmeOf(boq as never);
   const tiled = typeof room.tiled_height_m === "number" && room.tiled_height_m < room.ceiling_h_m ? `to ${Math.round(room.tiled_height_m * 1000)} mm` : "to full height";
 
   const input: RoomPackInput = {

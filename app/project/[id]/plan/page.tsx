@@ -7,6 +7,7 @@ import { Icon } from "@/components/blueprint/Icon";
 import { OpeningsCheckPanel } from "@/components/blueprint/plan/OpeningsCheckPanel";
 import { PlanCheckPanel } from "@/components/blueprint/plan/PlanCheckPanel";
 import type { DetectionRun } from "@/lib/plan/openings-vocab";
+import { viewerHref } from "@/lib/viewer/available";
 import { floorCoverage, readingFloorEstimate } from "@/lib/plan/coverage";
 import { stepIssues } from "@/lib/boq/issues";
 import { PlanRulesNavigator, PlanRulesPanel } from "@/components/blueprint/plan/PlanRules";
@@ -89,6 +90,8 @@ export default async function PlanPage({
   searchParams: Promise<{ room?: string; layer?: string }>;
 }) {
   const { id: projectId } = await params;
+  // C5 #4: the 3D view link only when the plan stands up walls (the shared rule).
+  const viewer3dPromise = viewerHref(projectId);
   const { room: focusRoomId, layer: initialLayer } = await searchParams;
   const supabase = getSupabaseAdmin();
 
@@ -354,6 +357,7 @@ export default async function PlanPage({
     persona === "firm"
       ? { label: "Continue to 03 Specification", href: `/project/${projectId}/accessories` }
       : { label: "Continue to design", href: `/project/${projectId}/design` };
+  const viewer3d = await viewer3dPromise;
 
   return (
     <div className="mx-auto max-w-[1600px] px-6 py-8 pb-16 lg:px-10" data-plan-page>
@@ -440,15 +444,15 @@ export default async function PlanPage({
             {tiledRooms.length > 0 ? <TiledHeights planId={plan.id} rooms={tiledRooms} /> : null}
             {wetRoom ? <WetRoomPanel roomId={wetRoom.id} roomName={wetRoom.name} initial={wetRoom.setup} hasShower={wetRoom.hasShower} /> : null}
 
-            {process.env.DRAWINGS_ENABLED === "true" || process.env.VIEWER_3D_ENABLED === "true" ? (
+            {process.env.DRAWINGS_ENABLED === "true" || viewer3d ? (
               <section aria-label="From this plan" className="flex flex-col items-start gap-3 border-t border-bp-line-hairline pt-4">
                 {process.env.DRAWINGS_ENABLED === "true" ? (
                   <Button kind="quiet" href={`/project/${projectId}/drawings`}>
                     <Icon name="draft" size={18} /> Open the drawings
                   </Button>
                 ) : null}
-                {process.env.VIEWER_3D_ENABLED === "true" ? (
-                  <Button kind="quiet" href={`/project/${projectId}/viewer`}>
+                {viewer3d ? (
+                  <Button kind="quiet" href={viewer3d}>
                     <Icon name="view_in_ar" size={18} /> Walk your villa in 3D
                   </Button>
                 ) : null}
